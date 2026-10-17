@@ -343,7 +343,7 @@
     }
 
     function refreshOverview() {
-        overviewImg.src = `/api/focus/overview.jpg?width=800&t=${Date.now()}`;
+        overviewImg.src = `/api/focus/overview.jpg?width=800&stretch=${stretchChk.checked ? 1 : 0}&t=${Date.now()}`;
     }
 
     function startOverviewTimer() {
@@ -391,6 +391,7 @@
     $("focus-reset").addEventListener("click", () => configure({ reset: true }));
     $("focus-center").addEventListener("click", () => configure({ cx: 0.5, cy: 0.5 }));
     [markersChk, crossChk].forEach((c) => c.addEventListener("change", drawZoom));
+    stretchChk.addEventListener("change", refreshOverview);
 
     async function pickSource(lights) {
         try {
@@ -438,6 +439,26 @@
             configure({ reset: true });
         } catch (e) { alert(`Exposure: ${e.message}`); }
     }
+    const autoExpBtn = $("focus-auto-exp");
+    autoExpBtn.addEventListener("click", async () => {
+        if (!st.active) { alert("Start focus mode first."); return; }
+        autoExpBtn.disabled = true;
+        autoExpBtn.textContent = "Metering…";
+        try {
+            applyState(await api("/api/focus/auto-exposure", { method: "POST" }));
+            // Fresh curve at the new exposure
+            st.history = [];
+            st.lastResult = null;
+            updateStats(null);
+            drawChart();
+            refreshOverview();
+        } catch (e) {
+            alert(`Auto exposure: ${e.message}`);
+        } finally {
+            autoExpBtn.disabled = false;
+            autoExpBtn.textContent = "Auto expose";
+        }
+    });
     document.querySelectorAll(".focus-exp-preset").forEach((b) =>
         b.addEventListener("click", () => setExposure(parseFloat(b.dataset.exp), parseFloat(b.dataset.gain))));
     $("focus-exp-apply").addEventListener("click", () => {

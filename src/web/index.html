@@ -786,8 +786,9 @@
                         <div class="card-header">
                             <h2>Exposure While Focusing</h2>
                         </div>
-                        <p class="text-muted focus-hint">Auto-exposure pauses in focus mode. Short exposures refresh faster and blur less.</p>
+                        <p class="text-muted focus-hint">Auto-exposure pauses in focus mode so the score stays comparable. If the light changed, meter once. Short exposures refresh faster and blur less.</p>
                         <div class="btn-group focus-btns">
+                            <button class="btn btn-sm btn-primary" id="focus-auto-exp" title="Meter the zoom region (brightest parts to ~80 %), then hold that exposure">Auto expose</button>
                             <button class="btn btn-sm btn-outline focus-exp-preset" data-exp="1.0" data-gain="36">Stars 1 s · 36 dB</button>
                             <button class="btn btn-sm btn-outline focus-exp-preset" data-exp="0.1" data-gain="24">Lights 0.1 s · 24 dB</button>
                             <button class="btn btn-sm btn-outline focus-exp-preset" data-exp="0.005" data-gain="0">Day 5 ms</button>
@@ -848,6 +849,6 @@
     <script src="/static/sky_catalog.js"></script>
     <script src="/app.js?v=20261017c2"></script>
     <script src="/static/activity.js?v=20261016h"></script>
-    <script src="/static/focus.js?v=20261017f8"></script>
+    <script src="/static/focus.js?v=20261017fa"></script>
 </body>
 </html>

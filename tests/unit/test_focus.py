@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from src.analytics.focus import FocusSession, find_best_star, measure_focus, score_noise_pct, smooth_scores
+from src.analytics.focus import FocusSession, display_stretch, find_best_star, measure_focus, score_noise_pct, smooth_scores
 from src.api.main import create_app
 from src.api.service import AllSkyService
 from src.hardware.simulator import SimulatedIMX335Controller
@@ -89,6 +89,9 @@ def test_focus_api_roundtrip(client):
     assert client.post("/api/focus/config", json={"cx": 0.25, "cy": 0.75, "method": "contrast"}).json()["cx"] == 0.25
     assert client.get("/api/focus/overview.jpg").content[:2] == b"\xff\xd8"
     assert "found" in client.post("/api/focus/auto-roi").json()
+    assert client.get("/api/focus/overview.jpg", params={"stretch": 1}).content[:2] == b"\xff\xd8"
+    metered = client.post("/api/focus/auto-exposure").json()
+    assert metered["metering"] and metered["exposure_s"] > 0
     assert client.get("/api/status").json()["focus"]["active"]
     assert not client.post("/api/focus/stop").json()["active"]
     assert client.get("/focus").status_code == 200
@@ -101,3 +104,11 @@ def test_smoothing_rejects_outliers_and_noise_ignores_slow_trend():
     ramp = [v + 3 * i for i, v in enumerate(steady)]  # lens being turned: big slow change, same noise
     assert 1.0 < score_noise_pct(steady) < 3.5
     assert score_noise_pct(ramp) < 2.5
+
+
+def test_display_stretch_brightens_dark_frames():
+    rng = np.random.default_rng(0)
+    dark = np.clip(rng.normal(12, 3, (120, 160, 3)), 0, 255).astype(np.uint8)
+    dark[50:55, 60:65] = 90
+    out = display_stretch(dark)
+    assert np.median(out) > 3 * np.median(dark) and out.max() >= 250

@@ -47,6 +47,19 @@ def score_noise_pct(scores: List[float]) -> Optional[float]:
     return round(100.0 * sigma / ref, 2) if ref > 0 else None
 
 
+def display_stretch(img: np.ndarray) -> np.ndarray:
+    """Brighten a frame for viewing only (measurements always use the original): stretch the 0.5-99.7 %
+    levels to full range and, for dark scenes, lift the shadows with a gamma so dim sky detail shows."""
+    sample = img[::4, ::4]
+    lo, hi = np.percentile(sample, (0.5, 99.7))
+    if hi - lo < 2:
+        return img
+    med = (float(np.median(sample)) - lo) / (hi - lo)
+    gamma = 1.0 if med >= 0.25 else max(0.35, np.log(0.25) / np.log(max(med, 1e-3)))
+    ramp = np.clip((np.arange(256, dtype=np.float32) - lo) / (hi - lo), 0, 1) ** gamma
+    return cv2.LUT(img, (ramp * 255.0 + 0.5).astype(np.uint8))
+
+
 def _to_gray(img: np.ndarray) -> np.ndarray:
     if img.ndim == 3:
         return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)

@@ -31,7 +31,7 @@ from src.calibration.dark import DarkCalibrationEngine
 from src.analytics.cloud_cover import CloudReference, analyze_cloud_cover
 from src.analytics.cloud_history import CloudHistory
 from src.analytics.meteor import MeteorDetector
-from src.analytics.focus import FocusSession, find_best_star
+from src.analytics.focus import FocusSession, display_stretch, find_best_star
 from src.api.histogram import compute_fast_histogram
 from src.pipeline.keogram import KeogramGenerator
 from src.pipeline.startrails import StartrailsAccumulator
@@ -2178,11 +2178,7 @@ class AllSkyService:
                 return self.focus.crop_jpeg, self.focus.last_result
             crop = frame[y0:y0 + rh, x0:x0 + rw]
             result = self.focus.record(self.focus.measure(crop), ts)
-            view = crop
-            if stretch:
-                lo, hi = np.percentile(crop[::2, ::2], (1.0, 99.7))
-                if hi - lo >= 2:
-                    view = cv2.convertScaleAbs(crop, alpha=255.0 / (hi - lo), beta=-lo * 255.0 / (hi - lo))
+            view = display_stretch(crop) if stretch else crop
             ok, jpeg = cv2.imencode(".jpg", view, [cv2.IMWRITE_JPEG_QUALITY, 93])
             prev_ts = (self.focus.last_result or {}).get("frame_ts", 0.0)
             result.update({
@@ -2200,20 +2196,68 @@ class AllSkyService:
             self.focus.result_key = key
             return self.focus.crop_jpeg, result
 
-    def get_focus_overview(self, width: int = 800) -> bytes:
+    def get_focus_overview(self, width: int = 800, stretch: bool = False) -> bytes:
         """Small whole-frame JPEG for choosing the focus region (encoded once per frame)."""
         # Only frame polls keep focus mode alive: an idle /focus tab refreshing this must not
         frame = self.last_frame
         if frame is None:
             frame, _ = self.capture_frame()
         ts = self.last_capture_time
-        if self.focus.overview_key == (ts, width) and self.focus.overview_jpeg:
+        key = (ts, width, bool(stretch))
+        if self.focus.overview_key == key and self.focus.overview_jpeg:
             return self.focus.overview_jpeg
         h, w = frame.shape[:2]
         small = cv2.resize(frame, (width, int(h * width / w)), interpolation=cv2.INTER_AREA) if w > width else frame
+        if stretch:
+            small = display_stretch(small)
         ok, jpeg = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 80])
-        self.focus.overview_key, self.focus.overview_jpeg = (ts, width), jpeg.tobytes() if ok else b""
+        self.focus.overview_key, self.focus.overview_jpeg = key, jpeg.tobytes() if ok else b""
         return self.focus.overview_jpeg
+
+    def focus_auto_expose(self, target: float = 200.0, max_iter: int = 4) -> Dict[str, Any]:
+        """Meter the focus ROI once and hold the result: put its highlights (99.5th percentile) at ~200/255,
+        bright but unsaturated, which suits day scenes, stars and lights alike. The live auto-exposure is
+        tuned for a 2 s cadence and hunts at focus frame rates, so this is a direct few-frame loop instead.
+        Exposure is preferred up to 1 s, then gain (up to 48 dB)."""
+        if not self.focus.active:
+            raise RuntimeError("Focus mode is not active")
+        limits = camera_limits(self.camera)
+        min_exp = float(limits.get("min_exposure_s", 1e-4))
+        max_exp = min(1.0, float(limits.get("max_exposure_s", 1.0)))
+        max_gain = min(48.0, float(limits.get("max_gain_db", 48.0)))
+        since = self.last_capture_time
+        steps = []
+        for _ in range(max_iter):
+            frame, _, since = self._focus_new_frame(since, timeout_s=10.0 + 2 * float(getattr(self.camera, "current_exposure_s", 0)))
+            self.focus.last_poll = time.time()
+            fh, fw = frame.shape[:2]
+            x0, y0, rw, rh = self.focus.roi_rect(fw, fh)
+            roi = cv2.cvtColor(frame[y0:y0 + rh, x0:x0 + rw], cv2.COLOR_BGR2GRAY)
+            p = float(np.percentile(roi, 99.5))
+            exp = float(getattr(self.camera, "current_exposure_s", 0.01))
+            gain = float(getattr(self.camera, "current_gain_db", 0.0))
+            steps.append({"exposure_s": exp, "gain_db": gain, "p99_5": round(p, 1)})
+            if abs(p - target) <= 0.12 * target and p < 250:
+                break
+            # Output is roughly gamma 2.2 encoded: convert the brightness error to a linear factor
+            factor = 0.25 if p >= 250 else (target / max(p, 2.0)) ** 2.2
+            factor = min(16.0, max(1 / 16.0, factor))
+            total = exp * 10 ** (gain / 20.0) * factor
+            new_exp = min(max_exp, max(min_exp, total))
+            new_gain = min(max_gain, max(0.0, 20.0 * np.log10(total / new_exp))) if total > new_exp else 0.0
+            if abs(new_exp - exp) / exp < 0.03 and abs(new_gain - gain) < 0.3:
+                break  # at a limit
+            with self.lock:
+                self.camera.set_hardware_exposure(new_exp, new_gain)
+                self.last_capture_time = 0.0
+        self._persist_camera_settings()
+        with self._focus_lock:
+            # Scores from before the change are not comparable
+            self.focus.reset_stats()
+        state = self.get_focus_state()
+        state["metering"] = steps
+        self.activity.info("camera", f"Focus metering: exposure {state['exposure_s']:.4g} s, gain {state['gain_db']:.1f} dB")
+        return state
 
     def focus_auto_roi(self, lights: bool = False) -> Dict[str, Any]:
         """Centre the focus ROI on the best point source in the whole frame (stars, else bright lights)."""

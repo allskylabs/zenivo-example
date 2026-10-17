@@ -416,8 +416,21 @@ def get_focus_frame(
 
 
 @router.get("/api/focus/overview.jpg")
-def get_focus_overview(width: int = Query(800, ge=320, le=1600), service: AllSkyService = Depends(get_service)):
-    return Response(content=service.get_focus_overview(width), media_type="image/jpeg", headers=_NO_STORE)
+def get_focus_overview(
+    width: int = Query(800, ge=320, le=1600),
+    stretch: bool = Query(False, description="Brighten for display"),
+    service: AllSkyService = Depends(get_service),
+):
+    return Response(content=service.get_focus_overview(width, stretch), media_type="image/jpeg", headers=_NO_STORE)
+
+
+@router.post("/api/focus/auto-exposure")
+def focus_auto_exposure(service: AllSkyService = Depends(get_service)):
+    """Meter the focus region once (highlights to ~200/255) and hold that exposure."""
+    try:
+        return service.focus_auto_expose()
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.get("/api/stream/histogram")
