@@ -184,3 +184,34 @@ def test_factory_can_refuse_simulator_fallback(monkeypatch):
     monkeypatch.setattr("src.hardware.uvc_generic.find_uvc_device_nodes", lambda exclude_ids=(): [])
     with pytest.raises(RuntimeError):
         drv.get_camera_driver(camera_type="auto", fallback_to_simulator=False)
+
+
+def test_picamera_copies_only_the_kept_frame_read_only(fake_picamera2):
+    """Stale-exposure frames are released uncopied; the kept one is mapped read-only (no cache write-back)."""
+    maps = []
+
+    class _MappedArray:
+        def __init__(self, req, stream, reshape=True, write=True):
+            maps.append(write)
+            w, h = req.cam.config["main"]["size"]
+            self.array = np.full((h, w, 3), 7, dtype=np.uint8)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    fake_picamera2.MappedArray = _MappedArray
+    cam = PiCameraController()
+    cam.open()
+    stale = iter([500, 600])  # two frames still carrying an old exposure, then the requested one
+    real_md = _FakeRequest.get_metadata
+    _FakeRequest.get_metadata = lambda self: {**real_md(self), "ExposureTime": next(stale, real_md(self)["ExposureTime"])}
+    try:
+        frame, meta = cam.capture_frame()
+    finally:
+        _FakeRequest.get_metadata = real_md
+    assert maps == [False]
+    assert frame.shape == (cam.height, cam.width, 3) and int(frame[0, 0, 0]) == 7
+    cam.close()

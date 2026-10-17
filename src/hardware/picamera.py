@@ -195,6 +195,16 @@ class PiCameraController(CameraDriverInterface):
             "PGC": 0,
         }
 
+    @staticmethod
+    def _copy_main(req) -> np.ndarray:
+        try:
+            from picamera2 import MappedArray  # type: ignore
+
+            with MappedArray(req, "main", write=False) as m:
+                return np.array(m.array, order="C")
+        except (ImportError, TypeError):
+            return req.make_array("main")
+
     def capture_frame(self) -> Tuple[np.ndarray, Dict[str, Any]]:
         if not self.is_open:
             self.open()
@@ -203,18 +213,22 @@ class PiCameraController(CameraDriverInterface):
         # Frames queued before the last control change still carry the old exposure: skip them
         deadline = time.time() + max(10.0, self.current_exposure_s * 4 + 8.0)
         frame = md = None
-        for _ in range(6):
+        for attempt in range(6):
             req = self.picam.capture_request()
             try:
                 md = req.get_metadata()
-                frame = req.make_array("main").copy()
+                got_us = float(md.get("ExposureTime", want_us))
+                got_gain = float(md.get("AnalogueGain", want_gain))
+                exp_ok = abs(got_us - want_us) <= max(0.05 * want_us, 150.0)
+                gain_ok = abs(got_gain - want_gain) <= max(0.08 * want_gain, 0.1)
+                done = (exp_ok and gain_ok) or time.time() > deadline or attempt == 5
+                if done:
+                    # Copy only the frame that is kept, once, under a read-only DMA sync
+                    # (make_array() maps it read-write, so every release also wrote the cache back)
+                    frame = self._copy_main(req)
             finally:
                 req.release()
-            got_us = float(md.get("ExposureTime", want_us))
-            got_gain = float(md.get("AnalogueGain", want_gain))
-            exp_ok = abs(got_us - want_us) <= max(0.05 * want_us, 150.0)
-            gain_ok = abs(got_gain - want_gain) <= max(0.08 * want_gain, 0.1)
-            if (exp_ok and gain_ok) or time.time() > deadline:
+            if done:
                 break
 
         if frame.ndim == 3 and frame.shape[2] == 4:
