@@ -2522,10 +2522,12 @@ class AllSkyService:
             positions = list(np.arange(lo, coarse_hi + 1e-9, step))
             best_q, best_pos, worse_run = float("-inf"), None, 0
             sw["phase"] = "coarse"
+            coarse_pts = []
             for i, pos in enumerate(positions):
                 if self.focus.sweep_cancel:
                     raise InterruptedError
                 q = quality(measure(float(pos), "coarse"))
+                coarse_pts.append((float(pos), q))
                 sw["progress"] = 0.7 * (i + 1) / len(positions)
                 if q > best_q:
                     best_q, best_pos, worse_run = q, float(pos), 0
@@ -2542,6 +2544,22 @@ class AllSkyService:
                 pos_back = start_pos if start_pos is not None else lo
                 self._lens_finish(pos_back, "failed", f"nothing measurable in the zoom region ({method}); lens put back", "sweep")
                 return
+            # One spoiled frame must not pick the peak: 3-point median of the coarse curve, then the centre
+            # of the plateau within 3 % of its best (a short lens has a deep depth of field near infinity,
+            # and the middle of that flat top is the safest position)
+            cq = [q for _, q in coarse_pts]
+            med = [float(np.median([v for v in cq[max(0, i - 1):i + 2] if np.isfinite(v)] or [float("-inf")]))
+                   for i in range(len(cq))]
+            ib = int(np.argmax(med))
+            tol = abs(med[ib]) * 0.03
+            j0 = j1 = ib
+            while j0 > 0 and np.isfinite(med[j0 - 1]) and med[j0 - 1] >= med[ib] - tol:
+                j0 -= 1
+            while j1 < len(med) - 1 and np.isfinite(med[j1 + 1]) and med[j1 + 1] >= med[ib] - tol:
+                j1 += 1
+            best_pos = round((coarse_pts[j0][0] + coarse_pts[j1][0]) / 2.0, 4)
+            plateau = (coarse_pts[j0][0], coarse_pts[j1][0])
+            sw["coarse_plateau"] = [round(plateau[0], 3), round(plateau[1], 3)]
 
             # Fine: +-1 coarse step around the peak in 0.02 D steps, walked up and then back down. The scene
             # drifts while sweeping (dusk, AE-free exposure, lights), and averaging the two directions cancels
@@ -2557,21 +2575,25 @@ class AllSkyService:
                 sw["progress"] = 0.7 + 0.28 * (i + 1) / len(order)
             fine_pts = [(p, float(np.mean(v)) if all(np.isfinite(v)) else float("-inf")) for p, v in samples.items()]
             k = int(np.argmax([q for _, q in fine_pts]))
-            final = fine_pts[k][0]
-            # Least-squares parabola through all finite fine points: steadier than the best three alone
+            final = best_pos  # plateau centre unless the fine pass shows a clear peak
+            # Least-squares parabola through all finite fine points; trusted only when its peak stands
+            # clearly (3 %) above the ends of the fine range, otherwise the fine pass is just noise
             fx = np.array([p for p, q in fine_pts if np.isfinite(q)])
             fy = np.array([q for p, q in fine_pts if np.isfinite(q)])
             if len(fx) >= 5:
-                a2, a1, _ = np.polyfit(fx - final, fy, 2)
+                a2, a1, a0 = np.polyfit(fx - best_pos, fy, 2)
                 if a2 < 0:
-                    vertex = final - a1 / (2 * a2)
-                    if fx.min() <= vertex <= fx.max():
-                        final = float(vertex)
+                    vertex = -a1 / (2 * a2)
+                    peak = a0 - a1 * a1 / (4 * a2)
+                    edge = max(np.polyval([a2, a1, a0], fx.min() - best_pos), np.polyval([a2, a1, a0], fx.max() - best_pos))
+                    if fx.min() <= vertex + best_pos <= fx.max() and peak - edge > abs(peak) * 0.03:
+                        final = float(vertex + best_pos)
             sw["fine_mean"] = [{"pos": round(p, 4), "q": (round(q, 4) if np.isfinite(q) else None)} for p, q in fine_pts]
             best_score = -fine_pts[k][1] if lower else fine_pts[k][1]
             unit = "px HFR" if lower else "contrast"
             dist = f"{1 / final:.1f} m" if final > 0.05 else "infinity"
-            self._lens_finish(final, "done", f"best at {final:.3f} D ({dist}), {best_score:.3g} {unit}", "sweep")
+            flat = f", flat {plateau[0]:.2f}-{plateau[1]:.2f} D" if plateau[1] - plateau[0] > 0.05 else ""
+            self._lens_finish(final, "done", f"best at {final:.3f} D ({dist}), {best_score:.3g} {unit}{flat}", "sweep")
         except InterruptedError:
             pos_back = getattr(self.camera, "lens_position_target", None)
             self._lens_finish(None, "cancelled", f"cancelled, lens left at {pos_back}", "sweep")
