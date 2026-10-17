@@ -1,0 +1,22 @@
+[Unit]
+Description=AllSky Observatory (allsky-ng, multi-camera)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+Group=video
+WorkingDirectory=/home/pi/allsky-ng
+ExecStart=/home/pi/allsky-ng/.venv/bin/python run_allsky.py --host 127.0.0.1 --port 8095 --camera auto --sync-target http://127.0.0.1:3000 --sync-interval 60 --log-level warning --no-access-log \
+    --prune-dir /home/pi/hoan.uk/uploads/allsky/archive:3 \
+    --prune-dir /home/pi/hoan.uk/uploads/allsky/events:90
+Restart=always
+RestartSec=10
+Nice=5
+MemoryMax=700M
+Environment=PYTHONUNBUFFERED=1
+Environment=OMP_NUM_THREADS=2
+Environment=LIBCAMERA_LOG_LEVELS=*:WARN
+
+[Install]
+WantedBy=multi-user.target

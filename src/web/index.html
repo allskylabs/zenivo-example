@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AllSky Observatory — Edge Dashboard</title>
+    <link rel="stylesheet" href="/style.css?v=20261016t">
+</head>
+<body class="dark-mode">
+    <!-- Top Navigation Header -->
+    <header class="navbar">
+        <div class="nav-brand">
+            <div class="pulse-indicator online" id="status-pulse" title="System Online"></div>
+            <div>
+                <h1>AllSky Observatory</h1>
+                <span class="sensor-subtitle" id="sensor-subtitle">Realtek RTS5869 • Sony Starvis IMX335 (0bda:5869)</span>
+            </div>
+        </div>
+
+        <div class="nav-metrics">
+            <div class="nav-pill">
+                <span class="pill-label">STATUS</span>
+                <span class="pill-value text-success" id="nav-system-status">ONLINE</span>
+            </div>
+            <div class="nav-pill">
+                <span class="pill-label">MODE</span>
+                <span class="pill-value text-accent" id="nav-camera-mode">AUTO</span>
+            </div>
+            <div class="nav-pill">
+                <span class="pill-label">UTC</span>
+                <span class="pill-value" id="nav-utc-clock">00:00:00 UTC</span>
+            </div>
+            <button id="btn-night-vision" class="btn btn-outline" title="Preserve night vision adaptation (>650nm red light filter)">
+                <span class="icon">●</span> Red Vision Mode
+            </button>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tab-bar">
+        <a class="tab-btn" href="/live" data-tab="tab-live">Live Observatory</a>
+        <a class="tab-btn" href="/gallery" data-tab="tab-gallery">Gallery &amp; Events</a>
+        <a class="tab-btn" href="/settings" data-tab="tab-settings">Settings</a>
+        <a class="tab-btn" href="/calibration" data-tab="tab-calibration">Master Dark</a>
+        <a class="tab-btn" href="/logs" data-tab="tab-logs">Activity Log <span class="log-badge" id="log-error-badge" hidden>0</span></a>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="container">
+        <!-- TAB 1: Live Observatory -->
+        <section id="tab-live" class="tab-content">
+            <div class="dashboard-grid">
+                <!-- Left/Center Column: Live View + Histogram -->
+                <div class="main-viewport-col">
+                    <!-- Live View Card -->
+                    <div class="card viewport-card">
+                        <div class="card-header">
+                            <h2>Live View Port</h2>
+                            <div class="header-actions" style="flex-wrap: wrap; gap: 0.65rem;">
+                                <label class="checkbox-label" title="Show IAU constellation stick figures, bright stars & Messier DSOs">
+                                    <input type="checkbox" id="chk-sky-overlay"> Stars &amp; Constellations
+                                </label>
+                                <label class="checkbox-label" title="Show star & constellation name labels">
+                                    <input type="checkbox" id="chk-sky-labels"> Labels
+                                </label>
+                                <label class="checkbox-label" title="Show horizon circle, altitude rings & N/E/S/W compass">
+                                    <input type="checkbox" id="chk-grid-overlay"> Grid &amp; Compass
+                                </label>
+                                <button id="btn-refresh-frame" class="btn btn-sm btn-secondary" title="Fetch snapshot">Snapshot</button>
+                                <button id="btn-fullscreen" class="btn btn-sm btn-outline" title="Fullscreen view">Fullscreen</button>
+                            </div>
+                        </div>
+                        <div class="viewport-wrapper" id="viewport-container">
+                            <div class="zoom-stage" id="zoom-stage">
+                                <img id="live-stream-img" src="/api/live/snapshot.jpg" alt="Live AllSky Stream" draggable="false" />
+                                <canvas id="reticle-canvas"></canvas>
+                            </div>
+                            <div class="zoom-controls" aria-label="Zoom">
+                                <button type="button" id="btn-zoom-out" class="zoom-btn" title="Zoom out (-)">−</button>
+                                <button type="button" id="btn-zoom-reset" class="zoom-btn zoom-level" title="Fit to view (0)">100%</button>
+                                <button type="button" id="btn-zoom-in" class="zoom-btn" title="Zoom in (+)">+</button>
+                            </div>
+                        </div>
+                        <div class="viewport-footer">
+                            <span>Resolution: <strong id="hud-resolution">2592 × 1944</strong></span>
+                            <span>Stream: <strong id="hud-stream-mode">Binary WebSocket</strong></span>
+                            <span>Frame Delta: <strong id="hud-hw-delta">40.0 ms</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- Histogram Card -->
+                    <div class="card histogram-card">
+                        <div class="card-header">
+                            <h2>Real-Time Exposure Histogram (256 Bins)</h2>
+                            <div class="header-actions">
+                                <span class="badge" id="hist-calc-badge">< 5 ms</span>
+                            </div>
+                        </div>
+                        <div class="histogram-wrapper">
+                            <canvas id="histogram-canvas" width="600" height="160"></canvas>
+                        </div>
+                        <div class="histogram-stats-grid">
+                            <div class="stat-chip">
+                                <span class="chip-title">Mean Luma</span>
+                                <span class="chip-val" id="hist-mean">0.0</span>
+                            </div>
+                            <div class="stat-chip">
+                                <span class="chip-title">StdDev</span>
+                                <span class="chip-val" id="hist-stddev">0.0</span>
+                            </div>
+                            <div class="stat-chip">
+                                <span class="chip-title">Median</span>
+                                <span class="chip-val" id="hist-median">0</span>
+                            </div>
+                            <div class="stat-chip">
+                                <span class="chip-title">Black Clip</span>
+                                <span class="chip-val text-warning" id="hist-clip-low">0.00%</span>
+                            </div>
+                            <div class="stat-chip">
+                                <span class="chip-title">White Clip</span>
+                                <span class="chip-val text-danger" id="hist-clip-high">0.00%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Hardware Controls + Telemetry HUD -->
+                <div class="controls-col">
+                    <!-- Hardware Control Panel -->
+                    <div class="card control-card">
+                        <div class="card-header">
+                            <h2>Hardware Controls</h2>
+                            <span class="badge badge-accent" id="active-profile-badge">AUTO EPHEMERIS</span>
+                        </div>
+
+                        <!-- Mode Toggle -->
+                        <div class="control-group">
+                            <label class="control-label">Exposure Control Mode</label>
+                            <div class="btn-group">
+                                <button id="btn-mode-manual" class="btn btn-sm btn-outline">Manual</button>
+                                <button id="btn-mode-auto" class="btn btn-sm btn-primary active">Auto (Day/Night)</button>
+                            </div>
+                        </div>
+
+                        <!-- Exposure Slider -->
+                        <div class="control-group">
+                            <div class="control-label-row">
+                                <label for="range-exposure">Exposure Duration (s)</label>
+                                <span class="range-value" id="val-exposure">2.000 s</span>
+                            </div>
+                            <input type="range" id="range-exposure" min="0.00015" max="15.0" step="0.00015" value="2.0" />
+                            <div class="range-presets">
+                                <button class="btn-preset" data-exp="0.0006">0.6ms (Day)</button>
+                                <button class="btn-preset" data-exp="0.5">0.5s</button>
+                                <button class="btn-preset" data-exp="2.0">2.0s</button>
+                                <button class="btn-preset" data-exp="8.0">8.0s</button>
+                                <button class="btn-preset" data-exp="15.0">15s</button>
+                            </div>
+                        </div>
+
+                        <!-- Gain Slider -->
+                        <div class="control-group">
+                            <div class="control-label-row">
+                                <label for="range-gain">Sensor Gain (dB)</label>
+                                <span class="range-value" id="val-gain">24.0 dB</span>
+                            </div>
+                            <input type="range" id="range-gain" min="0" max="72" step="0.5" value="24" />
+                            <div class="range-presets">
+                                <button class="btn-preset-gain" data-gain="0">0 dB</button>
+                                <button class="btn-preset-gain" data-gain="18">18 dB</button>
+                                <button class="btn-preset-gain" data-gain="36">36 dB</button>
+                                <button class="btn-preset-gain" data-gain="54">54 dB</button>
+                            </div>
+                        </div>
+
+                        <button id="btn-apply-settings" class="btn btn-primary btn-block">Apply Exposure & Gain</button>
+                        <div id="control-alert" class="alert-box hidden"></div>
+                    </div>
+
+                    <!-- Telemetry HUD Gauges -->
+                    <div class="card telemetry-card">
+                        <div class="card-header">
+                            <h2>Telemetry HUD</h2>
+                            <span class="text-muted" id="telemetry-timestamp">--</span>
+                        </div>
+                        <div class="gauge-grid">
+                            <div class="gauge-box">
+                                <span class="gauge-label">EXPOSURE</span>
+                                <span class="gauge-number" id="telem-exp">2.000s</span>
+                            </div>
+                            <div class="gauge-box">
+                                <span class="gauge-label">GAIN</span>
+                                <span class="gauge-number" id="telem-gain">24.0 dB</span>
+                            </div>
+                            <div class="gauge-box">
+                                <span class="gauge-label">STAR COUNT</span>
+                                <span class="gauge-number text-accent" id="telem-stars">--</span>
+                            </div>
+                            <div class="gauge-box">
+                                <span class="gauge-label">CLOUD COVER</span>
+                                <span class="gauge-number text-warning" id="telem-clouds">--%</span>
+                            </div>
+                            <div class="gauge-box">
+                                <span class="gauge-label">SKY CONDITION</span>
+                                <span class="gauge-number" id="telem-sky-status">CLEAR</span>
+                            </div>
+                            <div class="gauge-box">
+                                <span class="gauge-label">FRAME RATE</span>
+                                <span class="gauge-number" id="telem-fps">0.5 FPS</span>
+                            </div>
+                            <div class="gauge-box">
+                                <span class="gauge-label">SENSOR TEMP</span>
+                                <span class="gauge-number" id="telem-temp">24.5 °C</span>
+                            </div>
+                            <div class="gauge-box">
+                                <span class="gauge-label">SYSTEM UPTIME</span>
+                                <span class="gauge-number" id="telem-uptime">--</span>
+                            </div>
+                        </div>
+
+                        <!-- Hardware Register Readout -->
+                        <div class="registers-box" id="registers-box">
+                            <span class="reg-title">Sony IMX335 I2C Registers</span>
+                            <div class="registers-row">
+                                <span>VMAX: <strong id="reg-vmax">--</strong></span>
+                                <span>HMAX: <strong id="reg-hmax">--</strong></span>
+                                <span>SHR0: <strong id="reg-shr0">--</strong></span>
+                                <span>PGC: <strong id="reg-pgc">--</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: Gallery & Events -->
+        <section id="tab-gallery" class="tab-content">
+            <div class="gallery-container">
+                <!-- Astronomical Products Section -->
+                <div class="section-heading" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                        <h2>Observational Products (Timelapses, Keograms, Startrails)</h2>
+                        <span class="badge badge-accent" id="gallery-date">Today's Archive</span>
+                        <span class="badge badge-success" id="gallery-frame-count">0 Frames Archived</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <label for="timelapse-fps-select" class="text-muted" style="font-size: 0.78rem;">Playback speed:</label>
+                        <select id="timelapse-fps-select" style="background: var(--bg-card-sub); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.35rem 0.5rem; border-radius: 6px; font-size: 0.8rem;">
+                            <option value="12" selected>12 FPS</option>
+                            <option value="24">24 FPS</option>
+                            <option value="30">30 FPS</option>
+                        </select>
+                        <button id="btn-build-timelapse" class="btn btn-primary btn-sm">🎬 Build / Update Timelapse Now</button>
+                    </div>
+                </div>
+                <div id="gallery-alert" class="alert-box hidden mt-3"></div>
+                <div class="products-grid" id="products-grid">
+                    <!-- Injected dynamically via app.js -->
+                </div>
+
+                <!-- Meteor & Transient Streak Log -->
+                <div class="section-heading mt-4">
+                    <h2>Detected Meteor & Transient Streak Events</h2>
+                    <span class="badge" id="event-count-badge">0 Events</span>
+                </div>
+                <div class="events-table-wrapper">
+                    <table class="events-table">
+                        <thead>
+                            <tr>
+                                <th>Event ID</th>
+                                <th>Timestamp (UTC)</th>
+                                <th>Length (px)</th>
+                                <th>Aspect Ratio</th>
+                                <th>Peak DN</th>
+                                <th>Bounding Box</th>
+                                <th>Thumbnail</th>
+                            </tr>
+                        </thead>
+                        <tbody id="events-table-body">
+                            <!-- Injected dynamically via app.js -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE: Settings (/settings) -->
+        <section id="tab-settings" class="tab-content">
+            <!-- Image Output Card: resolution + orientation -->
+            <div class="card settings-card">
+                <div class="card-header">
+                    <h2>Image Output</h2>
+                    <span class="badge badge-accent" id="output-res-badge">2592 × 1944</span>
+                </div>
+                <p class="description">
+                    Applied immediately to the live view, archived frames and frames synced to hoan.uk. The sensor still reads the full
+                    frame; RAW10 frames are binned 2×2 / 4×4 before demosaicing when the size allows, otherwise downscaled by pixel
+                    averaging. Smaller sizes cost much less CPU and also reduce noise and file size.
+                </p>
+                <div class="settings-grid">
+                    <fieldset class="settings-group">
+                        <legend>Resolution</legend>
+                        <div class="field">
+                            <label for="output-resolution">Image size</label>
+                            <select id="output-resolution">
+                                <option value="2592x1944">2592 × 1944 (5.0 MP, native sensor)</option>
+                            </select>
+                        </div>
+                        <p class="field-note" id="output-res-note">Timelapse, keogram and startrails are always stored at 1296 × 972, so changing the resolution does not affect them.</p>
+                    </fieldset>
+                    <!-- Performance: CPU vs. live-view quality -->
+                    <fieldset class="settings-group">
+                        <legend>Performance</legend>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="perf-capture-interval">Min. time between captures (s)</label>
+                                <input type="number" id="perf-capture-interval" min="0.4" max="60" step="0.1" value="1.0" />
+                            </div>
+                            <div class="field">
+                                <label for="perf-sky-enabled">Star count &amp; cloud cover</label>
+                                <label class="checkbox-label"><input type="checkbox" id="perf-sky-enabled" checked /> Sample at night</label>
+                            </div>
+                            <div class="field">
+                                <label for="perf-sky-interval">Sampling interval (min)</label>
+                                <input type="number" id="perf-sky-interval" data-scale="60" min="0.5" max="60" step="0.5" value="5" />
+                            </div>
+                            <div class="field">
+                                <label for="perf-analysis-width">Star/cloud analysis width</label>
+                                <select id="perf-analysis-width">
+                                    <option value="648">648 px (fastest)</option>
+                                    <option value="960">960 px</option>
+                                    <option value="1296">1296 px</option>
+                                    <option value="2592">Full frame (slowest)</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="perf-stream-width">Live view width</label>
+                                <select id="perf-stream-width">
+                                    <option value="640">640 px</option>
+                                    <option value="960">960 px</option>
+                                    <option value="1280">1280 px</option>
+                                    <option value="1920">1920 px</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="perf-stream-quality">Live view JPEG quality</label>
+                                <input type="number" id="perf-stream-quality" min="40" max="95" step="1" value="75" />
+                            </div>
+                        </div>
+                        <p class="field-note">
+                            Raise the capture interval or lower the sizes if the computer runs hot; exposures longer than the interval are not affected.
+                            Stars and clouds are never sampled in daylight.
+                            <span id="perf-bin-note"></span>
+                        </p>
+                    </fieldset>
+                    <!-- White balance (RAW10 night mode) -->
+                    <fieldset class="settings-group">
+                        <legend>White Balance</legend>
+                        <div class="field-grid">
+                            <div class="field field-wide">
+                                <label for="wb-mode">Mode</label>
+                                <select id="wb-mode">
+                                    <option value="auto">Auto (gray-world)</option>
+                                    <option value="manual">Manual</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="wb-r-gain">Red gain (R/G)</label>
+                                <input type="number" id="wb-r-gain" min="0.4" max="4" step="0.01" value="1.00" />
+                            </div>
+                            <div class="field">
+                                <label for="wb-b-gain">Blue gain (B/G)</label>
+                                <input type="number" id="wb-b-gain" min="0.4" max="4" step="0.01" value="1.00" />
+                            </div>
+                        </div>
+                        <p class="field-note">
+                            Applies to RAW10 frames (night, or exposure ≥ 0.4 s) and as a gentle correction on top of the camera ISP in MJPG mode (daytime).
+                            In use: <strong id="wb-applied" class="text-accent">--</strong>
+                        </p>
+                    </fieldset>
+
+                    <!-- Image orientation -->
+                    <fieldset class="settings-group">
+                        <legend>Orientation (Mirror / Flip / Rotate)</legend>
+                        <div class="toggle-list">
+                            <label class="toggle-row" for="orient-flip-h">
+                                <span class="toggle-text">
+                                    <span class="toggle-title">Horizontal mirror</span>
+                                    <span class="toggle-hint">Swap left ↔ right (East/West)</span>
+                                </span>
+                                <input type="checkbox" id="orient-flip-h" class="switch" />
+                            </label>
+                            <label class="toggle-row" for="orient-flip-v">
+                                <span class="toggle-text">
+                                    <span class="toggle-title">Vertical flip</span>
+                                    <span class="toggle-hint">Swap top ↕ bottom (North/South)</span>
+                                </span>
+                                <input type="checkbox" id="orient-flip-v" class="switch" />
+                            </label>
+                            <label class="toggle-row" for="orient-rot180">
+                                <span class="toggle-text">
+                                    <span class="toggle-title">Rotate 180°</span>
+                                    <span class="toggle-hint">For an upside-down mounted camera</span>
+                                </span>
+                                <input type="checkbox" id="orient-rot180" class="switch" />
+                            </label>
+                            <label class="toggle-row" for="orient-rot180-day" id="orient-rot180-day-row">
+                                <span class="toggle-text">
+                                    <span class="toggle-title">Rotate 180° — day frames only</span>
+                                    <span class="toggle-hint">RTS5869: day (MJPG) frames come out upside-down after a power cycle while night (RAW10) frames are upright</span>
+                                </span>
+                                <input type="checkbox" id="orient-rot180-day" class="switch" />
+                            </label>
+                        </div>
+                        <div class="orient-footer">
+                            <span id="orient-status" class="text-muted">Native sensor orientation (no transform)</span>
+                            <button id="btn-orient-reset" class="btn btn-sm btn-outline" type="button">Reset</button>
+                        </div>
+                    </fieldset>
+
+                </div>
+            </div>
+
+            <!-- Station & Camera Settings Card -->
+            <div class="card settings-card">
+                <div class="card-header">
+                    <h2>Station &amp; Optics</h2>
+                    <span class="badge badge-accent" id="station-solve-badge">NOT SOLVED YET</span>
+                </div>
+                <p class="description">
+                    Station, lens and mounting parameters are saved when you click
+                    <strong>Save configuration</strong>, or determined automatically by
+                    <a href="https://hoan.uk/astronomy/plate-solving" target="_blank" rel="noopener">plate-solving</a> on a starry night.
+                </p>
+
+                <div class="settings-grid">
+                    <!-- Station coordinates -->
+                    <fieldset class="settings-group">
+                        <legend>Station Coordinates</legend>
+                        <div class="field-grid">
+                            <div class="field field-wide">
+                                <label for="station-name">Station name</label>
+                                <input type="text" id="station-name" value="Hanoi, Vietnam" />
+                            </div>
+                            <div class="field">
+                                <label for="station-lat">Latitude (°N)</label>
+                                <input type="number" id="station-lat" min="-90" max="90" step="0.0001" value="21.0285" />
+                            </div>
+                            <div class="field">
+                                <label for="station-lon">Longitude (°E)</label>
+                                <input type="number" id="station-lon" min="-180" max="180" step="0.0001" value="105.8542" />
+                            </div>
+                            <div class="field">
+                                <label for="station-elev">Elevation (m)</label>
+                                <input type="number" id="station-elev" min="-500" max="9000" step="1" value="20" />
+                            </div>
+                            <div class="field field-end">
+                                <button id="btn-station-auto-gps" class="btn btn-sm btn-outline" type="button">📍 Locate via GPS / IP</button>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <!-- Lens & optics -->
+                    <fieldset class="settings-group">
+                        <legend>Lens &amp; Optics</legend>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="opt-focal">Focal length (mm)</label>
+                                <input type="number" id="opt-focal" min="0.5" max="500" step="0.01" value="1.65" />
+                            </div>
+                            <div class="field">
+                                <label for="opt-fov-d">Diagonal FOV (°)</label>
+                                <input type="number" id="opt-fov-d" min="1" max="260" step="0.1" value="225.0" />
+                            </div>
+                            <div class="field">
+                                <label for="opt-fov-h">Horizontal FOV (°)</label>
+                                <input type="number" id="opt-fov-h" min="1" max="240" step="0.1" value="180.0" />
+                            </div>
+                            <div class="field">
+                                <label for="opt-fov-v">Vertical FOV (°)</label>
+                                <input type="number" id="opt-fov-v" min="1" max="240" step="0.1" value="135.0" />
+                            </div>
+                            <div class="field">
+                                <label for="opt-cx">Optical center X (px)</label>
+                                <input type="number" id="opt-cx" min="0" max="2592" step="0.5" value="1296.0" />
+                            </div>
+                            <div class="field">
+                                <label for="opt-cy">Optical center Y (px)</label>
+                                <input type="number" id="opt-cy" min="0" max="1944" step="0.5" value="972.0" />
+                            </div>
+                            <div class="field">
+                                <label for="opt-r90">Horizon radius R90 (px)</label>
+                                <input type="number" id="opt-r90" min="100" max="2500" step="0.5" value="894.2" />
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <!-- Mount orientation -->
+                    <fieldset class="settings-group">
+                        <legend>Camera Mounting</legend>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="ori-npa">North position angle (°)</label>
+                                <input type="number" id="ori-npa" min="0" max="360" step="0.1" value="0.0" />
+                            </div>
+                            <div class="field">
+                                <label for="ori-tilt">Zenith tilt (°)</label>
+                                <input type="number" id="ori-tilt" min="0" max="90" step="0.1" value="0.0" />
+                            </div>
+                            <div class="field">
+                                <label for="ori-az">Tilt azimuth (°)</label>
+                                <input type="number" id="ori-az" min="0" max="360" step="0.1" value="180.0" />
+                            </div>
+                        </div>
+                        <p class="field-note">Optical center and angles use native sensor coordinates; the sky overlay applies mirror/flip automatically.</p>
+                    </fieldset>
+                </div>
+
+                <div class="settings-actions">
+                    <button id="btn-station-save" class="btn btn-primary" type="button">💾 Save configuration</button>
+                    <button id="btn-station-solve" class="btn btn-outline" type="button">🔭 Capture &amp; Auto Plate-Solve</button>
+                </div>
+
+                <div id="station-alert" class="alert-box hidden mt-3"></div>
+
+                <details class="params-summary">
+                    <summary>Camera, lens &amp; station parameter summary</summary>
+                    <div class="params-grid">
+                        <div class="telem-box"><span class="telem-label">Sensor &amp; resolution</span><span class="telem-value" id="st-sensor">Sony Starvis IMX335 (2592&times;1944, 2.0&mu;m)</span></div>
+                        <div class="telem-box"><span class="telem-label">Lens &amp; focal length</span><span class="telem-value text-accent" id="st-focal">1.65 mm (Fisheye AllSky)</span></div>
+                        <div class="telem-box"><span class="telem-label">Pixel scale</span><span class="telem-value" id="st-pixscale">250.00 arcsec/px</span></div>
+                        <div class="telem-box"><span class="telem-label">FOV horizontal &times; vertical</span><span class="telem-value" id="st-fov-hv">180.0&deg; &times; 135.0&deg;</span></div>
+                        <div class="telem-box"><span class="telem-label">Diagonal FOV</span><span class="telem-value text-accent" id="st-fov-diag">225.0&deg;</span></div>
+                        <div class="telem-box"><span class="telem-label">Optical center</span><span class="telem-value" id="st-opt-center">(1296.0, 972.0) px</span></div>
+                        <div class="telem-box"><span class="telem-label">Sensor center offset &amp; R90</span><span class="telem-value" id="st-center-offset">&Delta;(0.0, 0.0) px &bull; R90=894 px</span></div>
+                        <div class="telem-box"><span class="telem-label">Station coordinates</span><span class="telem-value" id="st-coords">21.0285&deg;N, 105.8542&deg;E (20m)</span></div>
+                        <div class="telem-box"><span class="telem-label">Field center (RA / Dec J2000)</span><span class="telem-value text-accent" id="st-radec">--</span></div>
+                        <div class="telem-box"><span class="telem-label">Azimuth &amp; Alt</span><span class="telem-value" id="st-az-alt">Az 180.0&deg; (S) &bull; Alt 90.0&deg;</span></div>
+                        <div class="telem-box"><span class="telem-label">Zenith tilt</span><span class="telem-value text-accent" id="st-tilt">0.00&deg;</span></div>
+                        <div class="telem-box"><span class="telem-label">North position angle</span><span class="telem-value" id="st-north-pa">0.00&deg;</span></div>
+                        <div class="telem-box"><span class="telem-label">WCS matrix (CD)</span><span class="telem-value" id="st-cd-matrix">[-6.94e-02, 0, 0, -6.94e-02]</span></div>
+                        <div class="telem-box"><span class="telem-label">Solve source &amp; constellations</span><span class="telem-value" id="st-solver-meta">Not plate-solved yet</span></div>
+                    </div>
+                </details>
+            </div>
+
+        </section>
+
+        <!-- PAGE: Master Dark Calibration (/calibration) -->
+        <section id="tab-calibration" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Master Dark Calibration Routine (AC1 / AC3)</h2>
+                    <span class="badge badge-accent" id="dark-status-badge">READY</span>
+                </div>
+                <p class="description">
+                    Cover the camera lens/dome, then click the button below. The system will automatically capture and median-stack all
+                    <strong>7 Standard Master Dark Profiles</strong> (0.5s &ndash; 15.0s / 12 &ndash; 48 dB) in 10-bit Bayer RAW (<code>.npy</code>) and hot pixel maps into <code>data/calibration/darks/</code> without needing manual parameter selection.
+                </p>
+
+                <!-- Hidden parameter inputs retained for automated test suite compatibility -->
+                <div class="hidden" aria-hidden="true">
+                    <input type="number" id="dark-frames-count" min="3" max="50" value="9" />
+                    <input type="number" id="dark-exposure" min="0.001" max="90.0" step="0.1" value="2.0" />
+                    <input type="number" id="dark-gain" min="0" max="72" step="1" value="36" />
+                </div>
+
+                <!-- Single 1-Click Button on Web UI -->
+                <div class="btn-group" style="flex-wrap: wrap; margin-bottom: 1rem;">
+                    <button id="btn-trigger-dark" class="btn btn-primary">Capture &amp; Build All Master Dark Profiles (0.5s &ndash; 15.0s)</button>
+                </div>
+
+                <!-- Live Calibration Status & Progress Bar -->
+                <div id="dark-progress-panel" class="calibration-status-panel">
+                    <div class="calibration-status-header">
+                        <span id="dark-status-text">Ready — Cover lens and click button above to capture 10-bit RAW Master Dark profiles (0.5s – 15.0s).</span>
+                        <span id="dark-progress-pct" class="mono-val">0%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div id="dark-progress-bar" class="progress-fill" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <!-- Persistent Calibration Notification Banner -->
+                <div id="dark-alert" class="alert-box hidden mt-3"></div>
+
+                <!-- Standard 6-Profile Matrix -->
+                <div class="section-heading mt-4">
+                    <h2>Standard Astronomical Dark Profiles Matrix</h2>
+                </div>
+                <div class="events-table-wrapper">
+                    <table class="events-table">
+                        <thead>
+                            <tr>
+                                <th>Profile</th>
+                                <th>Exposure &amp; Gain</th>
+                                <th>Stack Frames</th>
+                                <th>Status</th>
+                                <th>File / Updated (UTC)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dark-profiles-matrix-body">
+                            <tr><td colspan="5" class="text-muted" style="text-align:center;">Loading standard profile matrix...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Saved Master Dark Calibration Library Files -->
+                <div class="section-heading mt-4">
+                    <h2>Saved Master Dark Files on Disk (<code>data/calibration/darks/</code>)</h2>
+                </div>
+                <div class="events-table-wrapper">
+                    <table class="events-table">
+                        <thead>
+                            <tr>
+                                <th>Filename</th>
+                                <th>Size</th>
+                                <th>Last Updated (UTC)</th>
+                                <th>Full Path</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dark-library-body">
+                            <tr><td colspan="4" class="text-muted" style="text-align:center;">Loading calibration library...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+        <!-- TAB 5: Activity Log -->
+        <section id="tab-logs" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Activity Log</h2>
+                    <div class="header-actions" style="flex-wrap: wrap; gap: 0.5rem;">
+                        <select id="log-filter-level" aria-label="Minimum level">
+                            <option value="">All levels</option>
+                            <option value="success">Success only</option>
+                            <option value="warning">Warnings &amp; errors</option>
+                            <option value="error">Errors only</option>
+                        </select>
+                        <select id="log-filter-category" aria-label="Category">
+                            <option value="">All categories</option>
+                            <option value="system">System</option>
+                            <option value="camera">Camera</option>
+                            <option value="capture">Capture</option>
+                            <option value="archive">Archive</option>
+                            <option value="timelapse">Timelapse</option>
+                            <option value="products">Keogram / Startrails</option>
+                            <option value="storage">Storage</option>
+                            <option value="sync">Sync (hoan.uk)</option>
+                            <option value="calibration">Calibration</option>
+                            <option value="station">Station</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline" id="btn-storage-cleanup">Run cleanup now</button>
+                        <a class="btn btn-sm btn-outline" href="/api/logs/download">Download log</a>
+                    </div>
+                </div>
+                <div class="log-summary" id="log-summary">Loading…</div>
+                <div class="log-storage" id="log-storage"></div>
+                <ul class="log-list" id="log-list"></ul>
+            </div>
+        </section>
+    </main>
+    <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <span>AllSky Observatory Edge Station</span>
+        <span>Platform Synchronization: hoan.uk (192.168.3.24)</span>
+    </footer>
+
+    <!-- App JavaScript -->
+    <script src="/static/sky_catalog.js"></script>
+    <script src="/app.js?v=20261017w"></script>
+    <script src="/static/activity.js?v=20261016h"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Runtime data (frames, darks, products, station config)
+data/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.agents/
+pip.log

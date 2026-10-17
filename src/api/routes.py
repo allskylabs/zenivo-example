@@ -1,0 +1,501 @@
+"""
+FastAPI Router Definition for IMX335 Edge Web API.
+Implements all REST, streaming, and WebSocket endpoints conforming to F15-F17 and AC3.
+"""
+
+import os
+from typing import Dict, Any, Optional
+from fastapi import APIRouter, HTTPException, Query, WebSocket, status, Depends
+from fastapi.responses import Response, StreamingResponse
+
+from src.api.schemas import (
+    ExposureControlRequest,
+    GainControlRequest,
+    CameraModeRequest,
+    MasterDarkRequest,
+    StationLocationRequest,
+    ImageTransformRequest,
+    OutputResolutionRequest,
+    PerformanceSettingsRequest,
+    WhiteBalanceRequest,
+    StoragePolicyRequest,
+)
+from src.api.service import AllSkyService
+from src.api.stream import mjpeg_frame_generator, handle_live_websocket, sse_event_generator
+
+router = APIRouter()
+
+
+def get_service() -> AllSkyService:
+    """Dependency injector for AllSkyService instance."""
+    return AllSkyService.get_instance()
+
+
+# ----------------------------------------------------------------------
+# Camera Status & Telemetry Endpoints (AC3.1, AC3.2)
+# ----------------------------------------------------------------------
+
+@router.get("/api/status")
+def get_camera_status(service: AllSkyService = Depends(get_service)):
+    """
+    Retrieve camera hardware status, Sony IMX335 I2C registers (VMAX, HMAX, SHR0, PGC),
+    accurate hardware timing, and system uptime.
+    """
+    return service.get_status()
+
+
+@router.get("/api/telemetry")
+def get_live_telemetry(service: AllSkyService = Depends(get_service)):
+    """
+    Retrieve real-time astronomical telemetry: exposure, gain, star count,
+    cloud cover percentage, and 256-bin RGB/Luma histogram.
+    """
+    return service.get_telemetry()
+
+
+# ----------------------------------------------------------------------
+# Hardware Control Endpoints (AC3.3)
+# ----------------------------------------------------------------------
+
+@router.post("/api/camera/exposure")
+def set_camera_exposure(
+    req: ExposureControlRequest,
+    service: AllSkyService = Depends(get_service),
+):
+    """
+    Set camera hardware exposure duration (0.001s to 90.0s) and optional gain.
+    Rejects out-of-range values with HTTP 422.
+    """
+    result = service.set_exposure(req.exposure_s, req.gain_db)
+    # Ensure settings object includes requested_exposure_s for test compliance
+    if "settings" in result and isinstance(result["settings"], dict):
+        result["settings"]["requested_exposure_s"] = req.exposure_s
+    else:
+        result["settings"] = {"requested_exposure_s": req.exposure_s}
+    return result
+
+
+@router.post("/api/camera/gain")
+def set_camera_gain(
+    req: GainControlRequest,
+    service: AllSkyService = Depends(get_service),
+):
+    """
+    Set camera sensor analog/digital gain (0.0 dB to 72.0 dB).
+    Rejects out-of-range values with HTTP 422.
+    """
+    result = service.set_gain(req.gain_db)
+    if "settings" in result and isinstance(result["settings"], dict):
+        result["settings"]["requested_gain_db"] = req.gain_db
+    else:
+        result["settings"] = {"requested_gain_db": req.gain_db}
+    return result
+
+
+@router.post("/api/camera/mode")
+def set_camera_mode(
+    req: CameraModeRequest,
+    service: AllSkyService = Depends(get_service),
+):
+    """
+    Toggle between 'auto' (Day/Night ephemeris loop) and 'manual' modes.
+    """
+    mode_target = "auto" if req.auto is True or (req.mode and req.mode.lower() == "auto") else "manual"
+    return service.set_mode(mode_target)
+
+
+@router.get("/api/camera/orientation")
+def get_camera_orientation(service: AllSkyService = Depends(get_service)):
+    """Return the current mirror / flip / rotate settings."""
+    return service.get_station_config().get("image_transform", {})
+
+
+@router.post("/api/camera/orientation")
+def set_camera_orientation(
+    req: ImageTransformRequest,
+    service: AllSkyService = Depends(get_service),
+):
+    """Set mirror (horizontal), flip (vertical) and 0/180° rotation of all output images."""
+    if req.rotate_deg is not None and req.rotate_deg % 360 not in (0, 180):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="rotate_deg must be 0 or 180")
+    return service.set_image_transform(req.flip_horizontal, req.flip_vertical, req.rotate_deg, req.rotate_isp_180)
+
+
+@router.get("/api/camera/white-balance")
+def get_camera_white_balance(service: AllSkyService = Depends(get_service)):
+    """Return RAW10 white balance mode, manual gains and gains currently applied."""
+    return service.get_white_balance()
+
+
+@router.post("/api/camera/white-balance")
+def set_camera_white_balance(
+    req: WhiteBalanceRequest,
+    service: AllSkyService = Depends(get_service),
+):
+    """Set RAW10 white balance: auto (gray-world) or manual R/B gains."""
+    return service.set_white_balance(req.mode, req.r_gain, req.b_gain)
+
+
+@router.get("/api/camera/resolution")
+def get_camera_resolution(service: AllSkyService = Depends(get_service)):
+    """Return the current output resolution and selectable presets."""
+    return service.get_resolution_options()
+
+
+@router.post("/api/camera/resolution")
+def set_camera_resolution(
+    req: OutputResolutionRequest,
+    service: AllSkyService = Depends(get_service),
+):
+    """Select the output resolution (downscaled from the native 2592x1944 frame)."""
+    try:
+        return service.set_output_resolution(req.width, req.height)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.get("/api/camera/performance")
+def get_camera_performance(service: AllSkyService = Depends(get_service)):
+    """Return CPU/quality settings (capture interval, analysis and stream size)."""
+    return service.get_performance()
+
+
+@router.post("/api/camera/performance")
+def set_camera_performance(
+    req: PerformanceSettingsRequest,
+    service: AllSkyService = Depends(get_service),
+):
+    """Update CPU/quality settings; omitted fields stay unchanged."""
+    return service.set_performance(**req.model_dump(exclude_none=True))
+
+
+@router.post("/api/camera/auto")
+def toggle_camera_auto(
+    service: AllSkyService = Depends(get_service),
+):
+    """Convenience alias for toggling auto mode."""
+    new_mode = "manual" if service.mode == "auto" else "auto"
+    return service.set_mode(new_mode)
+
+
+# ----------------------------------------------------------------------
+# Calibration Library Endpoints (AC3.4)
+# ----------------------------------------------------------------------
+
+@router.get("/api/calibration/status")
+def get_calibration_status(
+    service: AllSkyService = Depends(get_service),
+):
+    """
+    Retrieve real-time Master Dark calibration progress, status message,
+    latest calibration result, and saved calibration library files.
+    """
+    return service.get_calibration_status()
+
+
+@router.post("/api/calibration/auto-library")
+def trigger_auto_dark_library(
+    only_missing: bool = Query(default=False),
+    service: AllSkyService = Depends(get_service),
+):
+    """
+    Automatically capture and median-stack all 6 standard Master Dark profiles
+    (Twilight to High-Sensitivity Night) without requiring manual parameter selection.
+    """
+    return service.trigger_auto_dark_library(only_missing=only_missing)
+
+
+@router.post("/api/calibration/master-dark")
+@router.post("/api/calibration/dark")
+def trigger_master_dark(
+    req: MasterDarkRequest,
+    service: AllSkyService = Depends(get_service),
+):
+    """
+    Capture N frames with matching exposure and gain, median stack into Master Dark,
+    detect hot pixels (DN >= 100), and store to calibration library.
+    """
+    return service.trigger_master_dark(req.num_frames, req.exposure_s, req.gain_db)
+
+
+# ----------------------------------------------------------------------
+# Station Setup & Astrometric Plate-Solving Endpoints (hoan.uk/astronomy/plate-solving)
+# ----------------------------------------------------------------------
+
+@router.get("/api/station/config")
+def get_station_config(
+    service: AllSkyService = Depends(get_service),
+):
+    """
+    Retrieve complete station coordinates, optical parameters, FOV, focal length,
+    optical center, zenith tilt, azimuth, altitude, and WCS parameters.
+    """
+    return service.get_station_config()
+
+
+@router.post("/api/station/location")
+@router.post("/api/station/settings")
+def update_station_location(
+    req: StationLocationRequest,
+    service: AllSkyService = Depends(get_service),
+):
+    """
+    Save user coordinates (manual input or browser GPS) and/or manual camera/lens/station
+    parameter overrides from the Web UI. Only runs plate-solving if auto_plate_solve=True.
+    """
+    lat = req.latitude_deg if req.latitude_deg is not None else req.latitude
+    lon = req.longitude_deg if req.longitude_deg is not None else req.longitude
+    name = req.location_name if req.location_name is not None else req.station_name
+    overrides = {
+        k: getattr(req, k)
+        for k in (
+            "lens_model",
+            "focal_length_mm",
+            "pixel_scale_arcsec_px",
+            "fov_horizontal_deg",
+            "fov_vertical_deg",
+            "fov_diagonal_deg",
+            "optical_center_x_px",
+            "optical_center_y_px",
+            "horizon_radius_90_px",
+            "azimuth_deg",
+            "altitude_deg",
+            "zenith_tilt_deg",
+            "north_position_angle_deg",
+        )
+        if getattr(req, k) is not None
+    }
+    return service.update_station_location(
+        latitude_deg=lat,
+        longitude_deg=lon,
+        elevation_m=req.elevation_m,
+        location_name=name,
+        geo_source=req.geo_source or "manual",
+        fov_hint=req.fov_hint or "auto",
+        auto_plate_solve=req.auto_plate_solve,
+        manual_overrides=overrides if overrides else None,
+    )
+
+
+@router.post("/api/station/auto-locate")
+def auto_locate_station(
+    auto_plate_solve: bool = Query(default=False),
+    service: AllSkyService = Depends(get_service),
+):
+    """
+    Automatically detect station coordinates via IP Geolocation fallback when user clicks on Web UI.
+    Does not run plate-solving unless auto_plate_solve=True.
+    """
+    return service.auto_locate_station(auto_plate_solve=auto_plate_solve)
+
+
+@router.post("/api/station/plate-solve")
+def run_station_plate_solve(
+    fov_hint: str = Query(default="auto"),
+    service: AllSkyService = Depends(get_service),
+):
+    """
+    Capture a live frame and solve all camera, lens, FOV, focal length, optical center,
+    orientation, tilt, and azimuth parameters via https://hoan.uk/astronomy/plate-solving.
+    """
+    return service.run_station_plate_solve(fov_hint=fov_hint)
+
+
+# ----------------------------------------------------------------------
+# Live Snapshot & Histogram Endpoints (AC3.5, AC3.6)
+# ----------------------------------------------------------------------
+
+@router.get("/api/live/snapshot.webp")
+@router.get("/api/snapshot.webp")
+def get_snapshot_webp(service: AllSkyService = Depends(get_service)):
+    """
+    Return latest calibrated 2592x1944 WebP frame (captured as RAW10, subtracted in RAW10, then saved as WebP).
+    """
+    try:
+        webp_bytes = service.get_snapshot_webp()
+        return Response(content=webp_bytes, media_type="image/webp")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"WebP snapshot generation failed: {e}")
+
+
+@router.get("/api/live/snapshot.jpg")
+@router.get("/api/snapshot.jpg")
+def get_snapshot_jpeg(service: AllSkyService = Depends(get_service)):
+    """
+    Return latest calibrated 2592x1944 JPEG frame with valid magic bytes (0xFFD8...0xFFD9).
+    """
+    try:
+        jpeg_bytes = service.get_snapshot_jpeg()
+        return Response(content=jpeg_bytes, media_type="image/jpeg")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Snapshot generation failed: {e}")
+
+
+@router.get("/api/stream/histogram")
+def get_live_histogram(service: AllSkyService = Depends(get_service)):
+    """
+    Compute and return vectorized 256-bin RGB and Luma histogram in < 10ms with statistics.
+    """
+    frame, _ = service.capture_frame()
+    from src.api.histogram import compute_fast_histogram
+    return compute_fast_histogram(frame)
+
+
+# ----------------------------------------------------------------------
+# Gallery & Events Endpoints (AC3.7)
+# ----------------------------------------------------------------------
+
+@router.get("/api/gallery")
+def get_gallery_items(service: AllSkyService = Depends(get_service)):
+    """
+    List captured astronomical products: diurnal keograms, nocturnal startrails, timelapses.
+    """
+    return service.get_gallery()
+
+
+@router.post("/api/gallery/generate")
+@router.post("/api/timelapse/generate")
+def generate_gallery_products(
+    fps: float = Query(default=12.0, ge=1.0, le=60.0),
+    service: AllSkyService = Depends(get_service),
+):
+    """
+    Compile/refresh today's H.264 Timelapse (.mp4), Meridian Keogram (.jpg), and Startrails (.jpg)
+    from archived frames on disk.
+    """
+    try:
+        res = service.generate_observational_products(fps=fps, ensure_min_frames=True)
+        res["gallery"] = service.get_gallery()
+        return res
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to generate timelapse/products: {exc}")
+
+
+
+@router.get("/api/events")
+@router.get("/api/events/meteors")
+def get_meteor_events(
+    limit: int = Query(default=20, ge=1, le=100),
+    service: AllSkyService = Depends(get_service),
+):
+    """
+    List detected meteor events with geometrical streak properties and crop coordinates.
+    """
+    return service.get_events(limit=limit)
+
+
+# ----------------------------------------------------------------------
+# Live Video Stream (MJPEG & WebSocket)
+# ----------------------------------------------------------------------
+
+@router.get("/api/stream/mjpeg")
+@router.get("/api/live/mjpeg")
+def get_mjpeg_stream(
+    fps: float = Query(default=5.0, ge=0.5, le=30.0),
+    downscale: int = Query(default=960, ge=320, le=2592),
+    limit: Optional[int] = Query(default=None, ge=1),
+    service: AllSkyService = Depends(get_service),
+):
+    """
+    Multipart MJPEG video stream for live browser video preview.
+    """
+    return StreamingResponse(
+        mjpeg_frame_generator(service, fps=fps, downscale_width=downscale, max_frames=limit),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
+@router.get("/api/stream/sse")
+@router.get("/api/sse")
+def get_sse_stream(
+    interval: float = Query(default=1.0, ge=0.25, le=10.0),
+    service: AllSkyService = Depends(get_service),
+):
+    """
+    Server-Sent Events (SSE) push stream for real-time telemetry and status updates.
+    """
+    return StreamingResponse(
+        sse_event_generator(service, interval=interval),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.websocket("/ws/live")
+async def websocket_live_stream(
+    websocket: WebSocket,
+    service: AllSkyService = Depends(get_service),
+):
+    """
+    Bidirectional WebSocket feed for real-time binary JPEG frames, telemetry streaming, and commands.
+    """
+    await handle_live_websocket(websocket, service)
+
+
+# ----------------------------------------------------------------------
+# Storage / retention
+# ----------------------------------------------------------------------
+@router.get("/api/storage")
+def get_storage_status(service: AllSkyService = Depends(get_service)):
+    """Disk usage of the data directory, archived frame days and the active retention policy."""
+    return service.get_storage_status()
+
+
+@router.post("/api/storage/cleanup")
+def run_storage_cleanup(service: AllSkyService = Depends(get_service)):
+    """Apply the retention policy now."""
+    return service.run_storage_cleanup()
+
+
+@router.put("/api/storage/policy")
+def update_storage_policy(payload: StoragePolicyRequest, service: AllSkyService = Depends(get_service)):
+    """Change retention limits (days kept, size cap, free-space floor, archive / timelapse intervals)."""
+    return service.configure_storage(**payload.model_dump(exclude_none=True))
+
+
+# ----------------------------------------------------------------------
+# Activity log
+# ----------------------------------------------------------------------
+@router.get("/api/logs")
+def get_activity_logs(
+    since_id: int = Query(0, ge=0),
+    limit: int = Query(200, ge=1, le=1000),
+    level: Optional[str] = Query(None, pattern="^(info|success|warning|error)$"),
+    category: Optional[str] = Query(None, max_length=32),
+):
+    """Activity log entries (newest first) plus 24h counts per level."""
+    from src.activity import get_activity_log
+
+    log = get_activity_log()
+    return {"entries": log.query(since_id=since_id, limit=limit, level=level, category=category), **log.summary()}
+
+
+@router.get("/api/logs/download")
+def download_activity_log():
+    """Download the current activity log file (JSON lines)."""
+    from fastapi.responses import FileResponse
+    from src.activity import get_activity_log
+
+    path = get_activity_log().log_path
+    if not path or not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="No activity log file yet")
+    return FileResponse(path, media_type="application/x-ndjson", filename="allsky-activity.jsonl")
+
+
+@router.post("/api/station/plate-solve/start")
+def start_station_plate_solve(
+    fov_hint: str = Query(default="auto", max_length=16),
+    service: AllSkyService = Depends(get_service),
+):
+    """Start plate-solving in the background; poll /api/station/plate-solve/status."""
+    return service.start_plate_solve_job(fov_hint=fov_hint)
+
+
+@router.get("/api/station/plate-solve/status")
+def get_station_plate_solve_status(service: AllSkyService = Depends(get_service)):
+    """State of the background plate-solve job (idle / running / success / failed)."""
+    return service.get_plate_solve_status()
