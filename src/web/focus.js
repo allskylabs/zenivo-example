@@ -8,7 +8,28 @@
     "use strict";
 
     const onFocusPage = (window.location.pathname.replace(/\/+$/, "") || "/") === "/focus";
-    if (!onFocusPage) return;
+    if (!onFocusPage) {
+        // Other pages: warn while focus mode holds the exposure (auto-exposure and archiving are paused)
+        const bar = document.createElement("div");
+        bar.className = "focus-banner";
+        bar.hidden = true;
+        bar.innerHTML = 'Focus mode is on: auto-exposure and archiving are paused. <a href="/focus">Open focus</a> <button class="btn btn-sm btn-outline">Stop focus mode</button>';
+        const nav = document.querySelector(".tab-bar");
+        if (nav) nav.after(bar);
+        bar.querySelector("button").addEventListener("click", async () => {
+            await fetch("/api/focus/stop", { method: "POST" });
+            bar.hidden = true;
+        });
+        const check = async () => {
+            try {
+                const s = await (await fetch("/api/focus", { cache: "no-store" })).json();
+                bar.hidden = !s.active;
+            } catch (e) { /* offline: keep the last state */ }
+        };
+        check();
+        setInterval(check, 20000);
+        return;
+    }
 
     const $ = (id) => document.getElementById(id);
     const canvas = $("focus-zoom-canvas");
@@ -23,6 +44,7 @@
     const overviewWrap = $("focus-overview-wrap");
     const roiBox = $("focus-roi-box");
     const roiSizeSel = $("focus-roi-size");
+    const keepBtn = $("focus-keep");
     const stretchChk = $("focus-stretch");
     const markersChk = $("focus-markers");
     const crossChk = $("focus-crosshair");
@@ -79,6 +101,7 @@
         toggleBtn.classList.toggle("btn-danger", st.active);
         badge.textContent = st.active ? "LIVE" : "OFF";
         badge.classList.toggle("on", st.active);
+        showExpiry(s.expires_in_s);
         emptyMsg.hidden = st.active && !!st.bitmap;
         placeRoiBox();
     }
@@ -90,6 +113,11 @@
         if (st.running) return;
         st.running = true;
         while (st.active) {
+            if (document.hidden) {
+                // A background tab must not keep focus mode alive: the server ends it after 60 s without polls
+                await new Promise((ok) => document.addEventListener("visibilitychange", ok, { once: true }));
+                continue;
+            }
             try {
                 const url = `/api/focus/frame?since=${st.lastTs}&stretch=${stretchChk.checked ? 1 : 0}`;
                 const r = await fetch(url, { cache: "no-store" });
@@ -111,8 +139,17 @@
         st.running = false;
     }
 
+    function showExpiry(sec) {
+        if (sec === undefined || sec === null || !st.active) { badge.textContent = st.active ? "LIVE" : "OFF"; keepBtn.hidden = true; return; }
+        const m = Math.floor(sec / 60), ss = String(Math.floor(sec % 60)).padStart(2, "0");
+        badge.textContent = `LIVE · ${m}:${ss}`;
+        badge.title = "Focus mode ends by itself after 15 min without a click or key press here";
+        keepBtn.hidden = sec > 120;
+    }
+
     function onResult(res) {
         st.lastResult = res;
+        showExpiry(res.expires_in_s);
         st.frameW = res.frame_width;
         st.frameH = res.frame_height;
         const fam = familyOf(res.method);
@@ -474,6 +511,17 @@
     }
     document.addEventListener("DOMContentLoaded", fitLayout);
     window.addEventListener("load", fitLayout);
+
+    // Any click or key press on this page counts as someone focusing (keeps focus mode from timing out)
+    let lastTouch = 0;
+    const touch = () => {
+        if (!st.active || Date.now() - lastTouch < 30000) return;
+        lastTouch = Date.now();
+        fetch("/api/focus/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {});
+    };
+    document.addEventListener("pointerdown", touch);
+    document.addEventListener("keydown", touch);
+    keepBtn.addEventListener("click", () => { lastTouch = 0; touch(); keepBtn.hidden = true; });
 
     (async function init() {
         try {

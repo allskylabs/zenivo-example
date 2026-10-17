@@ -846,6 +846,8 @@ class AllSkyService:
             target_gain = gain_db if gain_db is not None else self.camera.current_gain_db
             reg_info = self.camera.set_hardware_exposure(exposure_s, target_gain)
             self.last_capture_time = 0.0
+            if self.focus.active:
+                self.focus.last_action = time.time()
             self._persist_camera_settings()
             self.activity.info(
                 "camera",
@@ -2098,6 +2100,9 @@ class AllSkyService:
     # Focus assistant
     # ------------------------------------------------------------------
     FOCUS_IDLE_S = 60.0
+    # A forgotten /focus tab keeps polling, so also end focus mode this long after the last user action:
+    # auto-exposure is paused meanwhile and the sky would go dark (or white) as the light changes
+    FOCUS_MAX_UNATTENDED_S = 900.0
 
     def get_focus_state(self) -> Dict[str, Any]:
         state = self.focus.state()
@@ -2105,6 +2110,8 @@ class AllSkyService:
         state["gain_db"] = float(getattr(self.camera, "current_gain_db", 0.0))
         state["mode"] = self.mode
         state["limits"] = camera_limits(self.camera)
+        if self.focus.active:
+            state["expires_in_s"] = round(max(0.0, self.focus.last_action + self.FOCUS_MAX_UNATTENDED_S - time.time()), 1)
         frame = self.last_frame
         if frame is not None:
             state["frame_width"], state["frame_height"] = int(frame.shape[1]), int(frame.shape[0])
@@ -2114,7 +2121,7 @@ class AllSkyService:
         """Enter focus mode: native resolution, fastest capture rate, auto-exposure and archiving paused."""
         with self._focus_lock:
             self.focus.configure(**config)
-            self.focus.last_poll = time.time()
+            self.focus.last_poll = self.focus.last_action = time.time()
             if not self.focus.active:
                 self.focus.active = True
                 self.focus.started_at = time.time()
@@ -2144,9 +2151,14 @@ class AllSkyService:
             if self.focus.active and time.time() - self.focus.last_poll > self.FOCUS_IDLE_S:
                 self.stop_focus("no focus viewer for 60 s")
                 return
+            if self.focus.active and time.time() - self.focus.last_action > self.FOCUS_MAX_UNATTENDED_S:
+                self.stop_focus(f"no user action for {self.FOCUS_MAX_UNATTENDED_S / 60:.0f} min")
+                return
 
     def configure_focus(self, reset: bool = False, **config: Any) -> Dict[str, Any]:
+        """Change ROI/method/smoothing; with nothing to change it only counts as a user action (keep-alive)."""
         with self._focus_lock:
+            self.focus.last_action = time.time()
             self.focus.configure(**config)
             if reset:
                 self.focus.reset_stats()
@@ -2190,6 +2202,7 @@ class AllSkyService:
                 "exposure_s": float(meta.get("actual_exposure_s", getattr(self.camera, "current_exposure_s", 0.0))),
                 "gain_db": float(meta.get("gain_db", getattr(self.camera, "current_gain_db", 0.0))),
                 "capture_path": meta.get("capture_path"),
+                "expires_in_s": round(max(0.0, self.focus.last_action + self.FOCUS_MAX_UNATTENDED_S - time.time()), 1),
             })
             self.focus.last_result = result
             self.focus.crop_jpeg = jpeg.tobytes() if ok else b""
@@ -2221,6 +2234,7 @@ class AllSkyService:
         Exposure is preferred up to 1 s, then gain (up to 48 dB)."""
         if not self.focus.active:
             raise RuntimeError("Focus mode is not active")
+        self.focus.last_action = time.time()
         limits = camera_limits(self.camera)
         min_exp = float(limits.get("min_exposure_s", 1e-4))
         max_exp = min(1.0, float(limits.get("max_exposure_s", 1.0)))

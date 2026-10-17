@@ -93,6 +93,7 @@ def test_focus_api_roundtrip(client):
     metered = client.post("/api/focus/auto-exposure").json()
     assert metered["metering"] and metered["exposure_s"] > 0
     assert client.get("/api/status").json()["focus"]["active"]
+    assert 0 < client.get("/api/focus").json()["expires_in_s"] <= AllSkyService.FOCUS_MAX_UNATTENDED_S
     assert not client.post("/api/focus/stop").json()["active"]
     assert client.get("/focus").status_code == 200
 
@@ -112,3 +113,15 @@ def test_display_stretch_brightens_dark_frames():
     dark[50:55, 60:65] = 90
     out = display_stretch(dark)
     assert np.median(out) > 3 * np.median(dark) and out.max() >= 250
+
+
+def test_focus_ends_without_user_action(client, monkeypatch):
+    svc = AllSkyService.get_instance()
+    monkeypatch.setattr(AllSkyService, "FOCUS_MAX_UNATTENDED_S", 0.5)
+    client.post("/api/focus/start", json={})
+    import time
+    deadline = time.time() + 8
+    while svc.focus.active and time.time() < deadline:
+        client.get("/api/focus/frame")  # a forgotten tab keeps polling
+        time.sleep(0.3)
+    assert not svc.focus.active

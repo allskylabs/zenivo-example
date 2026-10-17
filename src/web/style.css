@@ -1315,3 +1315,20 @@ a.tab-btn {
     padding: 0.3rem 0.45rem;
     font-family: var(--font-mono);
 }
+.focus-keep { margin-top: 0.5rem; border-color: var(--warning); color: var(--warning); }
+.focus-keep[hidden] { display: none; }
+.focus-banner {
+    margin: 0.75rem 1.5rem 0;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid var(--warning);
+    border-radius: 8px;
+    background: rgba(245, 158, 11, 0.12);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+}
+.focus-banner[hidden] { display: none; }
+.focus-banner a { color: var(--accent); }
