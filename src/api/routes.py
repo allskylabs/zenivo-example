@@ -19,6 +19,7 @@ from src.api.schemas import (
     PerformanceSettingsRequest,
     WhiteBalanceRequest,
     StoragePolicyRequest,
+    CloudConfigRequest,
 )
 from src.api.service import AllSkyService
 from src.api.stream import mjpeg_frame_generator, handle_live_websocket, sse_event_generator
@@ -169,6 +170,32 @@ def set_camera_performance(
     return service.set_performance(**req.model_dump(exclude_none=True))
 
 
+@router.get("/api/sky/clouds/history")
+def get_cloud_history(
+    hours: float = Query(24.0, gt=0, le=9600, description="Window length in hours, ending at `end`"),
+    end: Optional[float] = Query(None, description="Window end as Unix seconds (default: now)"),
+    max_points: int = Query(600, ge=10, le=5000, description="Average into this many buckets at most"),
+    service: AllSkyService = Depends(get_service),
+):
+    """Cloud cover time series (one sample per analysis interval) with a small summary."""
+    return service.get_cloud_history(hours=hours, end_ts=end, max_points=max_points)
+
+
+@router.get("/api/sky/clouds/config")
+def get_cloud_config(service: AllSkyService = Depends(get_service)):
+    """Sky region used for cloud analysis and the learned clear-sky reference."""
+    return service.get_cloud_config()
+
+
+@router.post("/api/sky/clouds/config")
+def set_cloud_config(req: CloudConfigRequest, service: AllSkyService = Depends(get_service)):
+    """Set the sky region and/or reset the learned clear-sky reference."""
+    try:
+        return service.set_cloud_config(sky_roi=req.sky_roi, reset_reference=req.reset_reference)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
 @router.post("/api/camera/auto")
 def toggle_camera_auto(
     service: AllSkyService = Depends(get_service),
@@ -305,6 +332,10 @@ def run_station_plate_solve(
 # Live Snapshot & Histogram Endpoints (AC3.5, AC3.6)
 # ----------------------------------------------------------------------
 
+# Live frames change every capture; without this Cloudflare adds a 4 h browser TTL and /live shows a stale frame
+_NO_STORE = {"Cache-Control": "no-store, max-age=0"}
+
+
 @router.get("/api/live/snapshot.webp")
 @router.get("/api/snapshot.webp")
 def get_snapshot_webp(service: AllSkyService = Depends(get_service)):
@@ -313,7 +344,7 @@ def get_snapshot_webp(service: AllSkyService = Depends(get_service)):
     """
     try:
         webp_bytes = service.get_snapshot_webp()
-        return Response(content=webp_bytes, media_type="image/webp")
+        return Response(content=webp_bytes, media_type="image/webp", headers=_NO_STORE)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"WebP snapshot generation failed: {e}")
 
@@ -326,7 +357,7 @@ def get_snapshot_jpeg(service: AllSkyService = Depends(get_service)):
     """
     try:
         jpeg_bytes = service.get_snapshot_jpeg()
-        return Response(content=jpeg_bytes, media_type="image/jpeg")
+        return Response(content=jpeg_bytes, media_type="image/jpeg", headers=_NO_STORE)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Snapshot generation failed: {e}")
 

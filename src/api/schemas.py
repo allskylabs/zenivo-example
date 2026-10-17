@@ -60,10 +60,18 @@ class PerformanceSettingsRequest(BaseModel):
     analysis_max_width: Optional[int] = Field(None, ge=320, le=2592, description="Star/cloud analysis width")
     sky_analysis_enabled: Optional[bool] = Field(None, description="Turn star count / cloud cover sampling on or off")
     analysis_interval_s: Optional[float] = Field(
-        None, ge=10, le=3600, description="Seconds between star/cloud samples (night only)"
+        None, ge=10, le=3600, description="Seconds between star/cloud samples"
     )
     stream_max_width: Optional[int] = Field(None, ge=320, le=2592, description="Live stream JPEG width")
     stream_jpeg_quality: Optional[int] = Field(None, ge=40, le=95, description="Live stream JPEG quality")
+
+
+class CloudConfigRequest(BaseModel):
+    """Request payload for cloud cover analysis: sky region and/or forgetting the learned clear-sky reference."""
+    sky_roi: Optional[List[float]] = Field(
+        None, min_length=4, max_length=4, description="Sky region as fractions [left, top, right, bottom]"
+    )
+    reset_reference: bool = Field(False, description="Forget the learned clear-sky reference (after re-aiming the camera)")
 
 
 class StationLocationRequest(BaseModel):

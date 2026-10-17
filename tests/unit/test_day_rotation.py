@@ -70,25 +70,31 @@ def test_auto_exposure_goes_below_1ms_on_downscaled_live_frames():
     assert exp < 0.0005 and gain == 0.0
 
 
-def test_sky_analysis_skipped_in_daylight_and_throttled_at_night(monkeypatch):
+def test_sky_analysis_throttled_and_recorded_day_and_night(monkeypatch):
     import src.api.service as svc_mod
     import src.calibration.auto_exposure as ae_mod
 
     AllSkyService.reset_instance()
     svc = AllSkyService.get_instance()
     calls = []
-    monkeypatch.setattr(svc_mod, "estimate_stars_and_clouds", lambda f: calls.append(1) or {"star_count": 7, "cloud_cover_pct": 12.0, "status": "clear"})
+
+    def fake(frame, exp, gain, sun, roi, reference):
+        calls.append(sun)
+        return {"star_count": 7 if sun < 0 else 0, "cloud_cover_pct": 12.0, "status": "clear", "method": "night" if sun < 0 else "day", "confidence": 0.8}
+
+    monkeypatch.setattr(svc_mod, "analyze_cloud_cover", fake)
     frame = np.zeros((100, 100, 3), np.uint8)
 
     monkeypatch.setattr(ae_mod, "calculate_solar_elevation", lambda lat, lon: 20.0)
-    svc._sun_check_ts = 0.0
-    assert svc._sky_stats(frame, is_pytest=False)["status"] == "daylight" and not calls
-
-    monkeypatch.setattr(ae_mod, "calculate_solar_elevation", lambda lat, lon: -30.0)
-    svc._sun_check_ts = 0.0
-    assert svc._sky_stats(frame, is_pytest=False)["star_count"] == 7
+    assert svc._sky_stats(frame, is_pytest=False)["status"] == "clear" and calls == [20.0]
     svc._sky_stats(frame, is_pytest=False)  # within analysis_interval_s: cached
     assert len(calls) == 1
+
+    monkeypatch.setattr(ae_mod, "calculate_solar_elevation", lambda lat, lon: -30.0)
+    svc._sky_stats_cache["_ts"] = 0.0
+    assert svc._sky_stats(frame, is_pytest=False)["star_count"] == 7
+    hist = svc.get_cloud_history(hours=1)
+    assert [p["m"] for p in hist["points"]] == ["day", "night"] and hist["summary"]["mean"] == 12.0
     AllSkyService.reset_instance()
 
 
@@ -107,6 +113,6 @@ def test_sky_analysis_can_be_disabled_and_interval_set(monkeypatch):
     body = client.post("/api/camera/performance", json={"sky_analysis_enabled": False, "analysis_interval_s": 600}).json()
     assert body["current"]["sky_analysis_enabled"] == 0 and body["current"]["analysis_interval_s"] == 600.0
     calls = []
-    monkeypatch.setattr(svc_mod, "estimate_stars_and_clouds", lambda f: calls.append(1) or {})
+    monkeypatch.setattr(svc_mod, "analyze_cloud_cover", lambda *a, **k: calls.append(1) or {})
     assert svc._sky_stats(np.zeros((10, 10, 3), np.uint8), is_pytest=True)["status"] == "disabled" and not calls
     AllSkyService.reset_instance()

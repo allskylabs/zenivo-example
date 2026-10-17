@@ -237,6 +237,11 @@ class PiCameraController(CameraDriverInterface):
         frame_dur_us = float(md.get("FrameDuration", md.get("ExposureTime", want_us)))
         self._last_ts = now
         exp_s = float(md.get("ExposureTime", want_us)) / 1e6
+        if exp_s < 0.001 and exp_s > self.current_exposure_s * 1.1:
+            # libcamera's ExposureTime minimum is below what the sensor mode can do (IMX708 2304x1296: 26 vs 53 us);
+            # asking for less makes the ISP add digital gain, so the floor actually reached becomes the limit
+            self.min_exposure_s = exp_s
+            self.current_exposure_s = exp_s
         gain_db = 20.0 * math.log10(max(1.0, float(md.get("AnalogueGain", want_gain))))
         meta: Dict[str, Any] = {
             "hw_frame_delta": round(frame_dur_us / 1000.0, 2),

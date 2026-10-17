@@ -27,6 +27,9 @@ SKY_STATUS_TO_CODE = {
     "scattered": 2,
     "broken": 3,
     "overcast": 4,
+    "unknown": 5,
+    "overexposed": 6,
+    "disabled": 7,
 }
 CAL_STATE_TO_CODE = {
     "idle": 0,

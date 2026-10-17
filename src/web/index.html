@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllSky Observatory — Edge Dashboard</title>
-    <link rel="stylesheet" href="/style.css?v=20261016t">
+    <link rel="stylesheet" href="/style.css?v=20261017c1">
 </head>
 <body class="dark-mode">
     <!-- Top Navigation Header -->
@@ -72,7 +72,8 @@
                         </div>
                         <div class="viewport-wrapper" id="viewport-container">
                             <div class="zoom-stage" id="zoom-stage">
-                                <img id="live-stream-img" src="/api/live/snapshot.jpg" alt="Live AllSky Stream" draggable="false" />
+                                <img id="live-stream-img" alt="Live AllSky Stream" draggable="false" />
+                                <script>document.getElementById("live-stream-img").src = "/api/live/snapshot.jpg?t=" + Date.now();</script>
                                 <canvas id="reticle-canvas"></canvas>
                             </div>
                             <div class="zoom-controls" aria-label="Zoom">
@@ -231,6 +232,32 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Cloud cover over time -->
+            <div class="card cloud-card">
+                <div class="card-header">
+                    <h2>Cloud Cover History</h2>
+                    <div class="cloud-ranges" role="group" aria-label="Time range">
+                        <button class="btn-range" data-hours="6">6 h</button>
+                        <button class="btn-range active" data-hours="24">24 h</button>
+                        <button class="btn-range" data-hours="72">3 d</button>
+                        <button class="btn-range" data-hours="168">7 d</button>
+                        <button class="btn-range" data-hours="720">30 d</button>
+                    </div>
+                </div>
+                <div class="cloud-summary" id="cloud-summary">
+                    <span>Mean <strong id="cloud-mean">--</strong></span>
+                    <span>Clear time <strong id="cloud-clear">--</strong></span>
+                    <span>Range <strong id="cloud-range">--</strong></span>
+                    <span>Samples <strong id="cloud-samples">--</strong></span>
+                    <span class="cloud-legend"><i class="lg-night"></i>Night <i class="lg-low"></i>Low confidence</span>
+                </div>
+                <div class="cloud-chart-wrap" id="cloud-chart-wrap">
+                    <svg id="cloud-chart" role="img" aria-label="Cloud cover percentage over time"></svg>
+                    <div class="cloud-tooltip hidden" id="cloud-tooltip"></div>
+                    <div class="cloud-empty hidden" id="cloud-empty">No cloud samples in this range yet. One is taken every analysis interval (Settings → Performance).</div>
+                </div>
+            </div>
         </section>
 
         <!-- TAB 2: Gallery & Events -->
@@ -255,6 +282,15 @@
                 </div>
                 <div id="gallery-alert" class="alert-box hidden mt-3"></div>
                 <div class="products-grid" id="products-grid">
+                    <!-- Injected dynamically via app.js -->
+                </div>
+
+                <!-- Products archived on previous days -->
+                <div class="section-heading mt-4">
+                    <h2>Previous Days</h2>
+                    <span class="badge" id="history-count-badge">0 Days</span>
+                </div>
+                <div class="products-grid history-grid" id="history-grid">
                     <!-- Injected dynamically via app.js -->
                 </div>
 
@@ -318,7 +354,7 @@
                             </div>
                             <div class="field">
                                 <label for="perf-sky-enabled">Star count &amp; cloud cover</label>
-                                <label class="checkbox-label"><input type="checkbox" id="perf-sky-enabled" checked /> Sample at night</label>
+                                <label class="checkbox-label"><input type="checkbox" id="perf-sky-enabled" checked /> Sample day and night</label>
                             </div>
                             <div class="field">
                                 <label for="perf-sky-interval">Sampling interval (min)</label>
@@ -349,9 +385,37 @@
                         </div>
                         <p class="field-note">
                             Raise the capture interval or lower the sizes if the computer runs hot; exposures longer than the interval are not affected.
-                            Stars and clouds are never sampled in daylight.
+                            Cloud cover is sampled day and night (stars only at night); each sample is plotted under Live → Cloud Cover History.
                             <span id="perf-bin-note"></span>
                         </p>
+                    </fieldset>
+                    <!-- Cloud cover analysis -->
+                    <fieldset class="settings-group">
+                        <legend>Cloud Cover</legend>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="roi-left">Sky region left (%)</label>
+                                <input type="number" id="roi-left" data-roi="0" min="0" max="95" step="1" value="0" />
+                            </div>
+                            <div class="field">
+                                <label for="roi-top">Sky region top (%)</label>
+                                <input type="number" id="roi-top" data-roi="1" min="0" max="95" step="1" value="0" />
+                            </div>
+                            <div class="field">
+                                <label for="roi-right">Sky region right (%)</label>
+                                <input type="number" id="roi-right" data-roi="2" min="5" max="100" step="1" value="100" />
+                            </div>
+                            <div class="field">
+                                <label for="roi-bottom">Sky region bottom (%)</label>
+                                <input type="number" id="roi-bottom" data-roi="3" min="5" max="100" step="1" value="100" />
+                            </div>
+                        </div>
+                        <p class="field-note">
+                            Only this part of the frame is analysed: exclude buildings, trees and the horizon (e.g. bottom 40% if the lower part shows rooftops).
+                            The clear-sky reference is learned automatically; reset it after moving or re-aiming the camera.
+                            <span id="cloud-ref-note" class="text-muted"></span>
+                        </p>
+                        <button type="button" class="btn btn-sm btn-outline" id="btn-cloud-ref-reset">Reset learned clear-sky reference</button>
                     </fieldset>
                     <!-- White balance (RAW10 night mode) -->
                     <fieldset class="settings-group">
@@ -671,7 +735,7 @@
 
     <!-- App JavaScript -->
     <script src="/static/sky_catalog.js"></script>
-    <script src="/app.js?v=20261017w"></script>
+    <script src="/app.js?v=20261017c2"></script>
     <script src="/static/activity.js?v=20261016h"></script>
 </body>
 </html>

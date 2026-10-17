@@ -48,6 +48,9 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
     # Edge Web UI static files
     web_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))
     if os.path.isdir(web_dir):
+        # The page shell must revalidate so a new ?v= on app.js/style.css reaches browsers
+        no_cache = {"Cache-Control": "no-cache"}
+
         # Mount static directory
         app.mount("/static", StaticFiles(directory=web_dir), name="static")
 
@@ -55,7 +58,7 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         def serve_root():
             index_path = os.path.join(web_dir, "index.html")
             if os.path.exists(index_path):
-                return FileResponse(index_path, media_type="text/html")
+                return FileResponse(index_path, media_type="text/html", headers=no_cache)
             return {"status": "online", "message": "IMX335 AllSky Edge API"}
 
         # Each UI section has its own URL; all share the same page shell
@@ -65,11 +68,11 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         @app.get("/calibration")
         @app.get("/logs")
         def serve_section_page():
-            return FileResponse(os.path.join(web_dir, "index.html"), media_type="text/html")
+            return FileResponse(os.path.join(web_dir, "index.html"), media_type="text/html", headers=no_cache)
 
         @app.get("/index.html")
         def serve_index_html():
-            return FileResponse(os.path.join(web_dir, "index.html"), media_type="text/html")
+            return FileResponse(os.path.join(web_dir, "index.html"), media_type="text/html", headers=no_cache)
 
         @app.get("/app.js")
         def serve_app_js():

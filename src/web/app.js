@@ -131,6 +131,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Gallery Elements
     const productsGrid = document.getElementById("products-grid");
+    const historyGrid = document.getElementById("history-grid");
+    const historyCountBadge = document.getElementById("history-count-badge");
     const eventsTableBody = document.getElementById("events-table-body");
     const eventCountBadge = document.getElementById("event-count-badge");
 
@@ -2234,7 +2236,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (e) {}
     }
 
-    const SKY_CODE_NAMES = ["clear", "mostly_clear", "scattered", "broken", "overcast"];
+    const SKY_CODE_NAMES = ["clear", "mostly_clear", "scattered", "broken", "overcast", "unknown", "overexposed", "disabled"];
     const CAL_CODE_NAMES = ["idle", "running", "completed", "error"];
 
     function unpackAndRenderAsb1Packet(buf) {
@@ -2411,6 +2413,235 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ------------------------------------------------------------------
+    // Cloud Cover History chart (inline SVG, refreshed every 5 min)
+    // ------------------------------------------------------------------
+    const cloudChart = document.getElementById("cloud-chart");
+    if (cloudChart && currentPage === "tab-live") {
+        const SVG_NS = "http://www.w3.org/2000/svg";
+        const cloudTip = document.getElementById("cloud-tooltip");
+        const cloudEmpty = document.getElementById("cloud-empty");
+        const cloudWrap = document.getElementById("cloud-chart-wrap");
+        const rangeBtns = document.querySelectorAll(".cloud-ranges .btn-range");
+        let cloudHours = 24;
+        try {
+            cloudHours = Number(localStorage.getItem("cloudHours")) || 24;
+        } catch (e) {
+            /* storage unavailable */
+        }
+        let cloudData = null;
+        let cloudGeom = null;
+
+        const svgEl = (tag, attrs, parent) => {
+            const el = document.createElementNS(SVG_NS, tag);
+            Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+            if (parent) parent.appendChild(el);
+            return el;
+        };
+        const fmtTime = (t, withDate) => {
+            const d = new Date(t * 1000);
+            const hm = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+            return withDate ? `${d.toLocaleDateString([], { day: "2-digit", month: "short" })} ${hm}` : hm;
+        };
+
+        function renderCloudChart() {
+            if (!cloudData) return;
+            const box = cloudChart.getBoundingClientRect();
+            const W = Math.max(280, Math.round(box.width));
+            const H = Math.round(box.height) || 260;
+            const m = { l: 40, r: 12, t: 10, b: 24 };
+            const pw = W - m.l - m.r;
+            const ph = H - m.t - m.b;
+            const { start, end } = cloudData;
+            const pts = cloudData.points.filter((p) => p.cc !== null && p.cc !== undefined);
+            const x = (t) => m.l + ((t - start) / (end - start)) * pw;
+            const y = (v) => m.t + (1 - v / 100) * ph;
+            cloudChart.setAttribute("viewBox", `0 0 ${W} ${H}`);
+            cloudChart.replaceChildren();
+            cloudEmpty.classList.toggle("hidden", pts.length > 0);
+
+            // Night bands from consecutive night samples
+            const all = cloudData.points;
+            const step = Math.max(cloudData.interval_s, (end - start) / 600);
+            let runStart = null;
+            all.forEach((p, i) => {
+                const night = p.m === "night";
+                if (night && runStart === null) runStart = p.t - step / 2;
+                const next = all[i + 1];
+                const endsHere = night && (!next || next.m !== "night" || next.t - p.t > step * 4);
+                if (endsHere) {
+                    const x0 = Math.max(m.l, x(runStart));
+                    const x1 = Math.min(m.l + pw, x(p.t + step / 2));
+                    if (x1 > x0) svgEl("rect", { class: "night-band", x: x0, y: m.t, width: x1 - x0, height: ph }, cloudChart);
+                    runStart = null;
+                }
+            });
+
+            // Grid + y labels
+            [0, 25, 50, 75, 100].forEach((v) => {
+                svgEl("line", { class: "grid", x1: m.l, x2: m.l + pw, y1: y(v), y2: y(v) }, cloudChart);
+                const tx = svgEl("text", { class: "axis-label", x: m.l - 6, y: y(v) + 4, "text-anchor": "end" }, cloudChart);
+                tx.textContent = `${v}%`;
+            });
+            // X ticks at round local hours / days
+            const span = end - start;
+            const tickH = span <= 6 * 3600 ? 1 : span <= 26 * 3600 ? 3 : span <= 80 * 3600 ? 12 : span <= 170 * 3600 ? 24 : 120;
+            const tickS = tickH * 3600;
+            const tzOff = new Date().getTimezoneOffset() * 60;
+            let t0 = Math.ceil((start - tzOff) / tickS) * tickS + tzOff;
+            const maxTicks = Math.max(2, Math.floor(pw / 70));
+            const stride = Math.max(1, Math.ceil(span / tickS / maxTicks));
+            for (let t = t0, k = 0; t <= end; t += tickS, k++) {
+                if (k % stride) continue;
+                const tx = svgEl("text", { class: "axis-label", x: x(t), y: H - 6, "text-anchor": "middle" }, cloudChart);
+                tx.textContent = tickH >= 24 ? fmtTime(t, true).split(" ").slice(0, 2).join(" ") : fmtTime(t, false);
+            }
+
+            // Line segments, broken over gaps (camera off, overexposed frames)
+            const gap = step * 3.5;
+            const segs = [];
+            pts.forEach((p, i) => {
+                if (i === 0 || p.t - pts[i - 1].t > gap) segs.push([]);
+                segs[segs.length - 1].push(p);
+            });
+            segs.forEach((seg) => {
+                const line = seg.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.cc).toFixed(1)}`).join("");
+                if (seg.length > 1) {
+                    svgEl("path", { class: "cc-area", d: `${line}L${x(seg[seg.length - 1].t).toFixed(1)},${y(0)}L${x(seg[0].t).toFixed(1)},${y(0)}Z` }, cloudChart);
+                    svgEl("path", { class: "cc-line", d: line }, cloudChart);
+                } else {
+                    svgEl("circle", { class: "hover-dot", cx: x(seg[0].t), cy: y(seg[0].cc), r: 3 }, cloudChart);
+                }
+            });
+            // Low-confidence samples as hollow markers (only when sparse enough to read)
+            if (pts.length <= 300) {
+                pts.filter((p) => (p.conf ?? 1) < 0.5).forEach((p) => svgEl("circle", { class: "cc-low", cx: x(p.t), cy: y(p.cc), r: 3.5 }, cloudChart));
+            }
+            cloudGeom = { pts, x, y, m, pw, ph, W, H };
+        }
+
+        function showCloudTip(clientX) {
+            if (!cloudGeom || !cloudGeom.pts.length) return;
+            const rect = cloudChart.getBoundingClientRect();
+            const px = ((clientX - rect.left) / rect.width) * cloudGeom.W;
+            let best = cloudGeom.pts[0];
+            cloudGeom.pts.forEach((p) => {
+                if (Math.abs(cloudGeom.x(p.t) - px) < Math.abs(cloudGeom.x(best.t) - px)) best = p;
+            });
+            cloudChart.querySelectorAll(".crosshair, .hover-sel").forEach((el) => el.remove());
+            const cx = cloudGeom.x(best.t);
+            svgEl("line", { class: "crosshair", x1: cx, x2: cx, y1: cloudGeom.m.t, y2: cloudGeom.m.t + cloudGeom.ph }, cloudChart);
+            svgEl("circle", { class: "hover-dot hover-sel", cx, cy: cloudGeom.y(best.cc), r: 5 }, cloudChart);
+            const mode = best.m === "night" ? "Night" : best.m === "day" ? "Day" : "";
+            const extra = best.m === "night" ? ` · ${best.stars} stars` : "";
+            const conf = (best.conf ?? 1) < 0.5 ? " · low confidence" : "";
+            const avg = best.n > 1 ? ` · avg of ${best.n}` : "";
+            cloudTip.innerHTML = `<strong>${best.cc.toFixed(0)}%</strong> cloud<br>${fmtTime(best.t, true)}<br>${mode}${extra}${conf}${avg}`;
+            cloudTip.classList.remove("hidden");
+            const left = (cx / cloudGeom.W) * rect.width;
+            const tipW = cloudTip.offsetWidth;
+            cloudTip.style.left = `${Math.min(rect.width - tipW - 4, Math.max(4, left + (left > rect.width / 2 ? -tipW - 12 : 12)))}px`;
+        }
+        cloudChart.addEventListener("pointermove", (e) => showCloudTip(e.clientX));
+        cloudChart.addEventListener("pointerleave", () => {
+            cloudTip.classList.add("hidden");
+            cloudChart.querySelectorAll(".crosshair, .hover-sel").forEach((el) => el.remove());
+        });
+
+        async function loadCloudHistory() {
+            try {
+                const maxPoints = Math.min(1200, Math.max(100, Math.round(cloudWrap.clientWidth / 2)));
+                const res = await fetch(`/api/sky/clouds/history?hours=${cloudHours}&max_points=${maxPoints}`);
+                if (!res.ok) return;
+                cloudData = await res.json();
+                const sm = cloudData.summary || {};
+                const pct = (v) => (v === null || v === undefined ? "--" : `${Number(v).toFixed(0)}%`);
+                document.getElementById("cloud-mean").textContent = pct(sm.mean);
+                document.getElementById("cloud-clear").textContent = pct(sm.clear_pct);
+                document.getElementById("cloud-range").textContent = sm.min === null || sm.min === undefined ? "--" : `${pct(sm.min)} – ${pct(sm.max)}`;
+                document.getElementById("cloud-samples").textContent = sm.samples ?? "--";
+                renderCloudChart();
+            } catch (e) {
+                /* keep the previous chart */
+            }
+        }
+        rangeBtns.forEach((btn) => {
+            btn.classList.toggle("active", Number(btn.dataset.hours) === cloudHours);
+            btn.addEventListener("click", () => {
+                cloudHours = Number(btn.dataset.hours);
+                rangeBtns.forEach((b) => b.classList.toggle("active", b === btn));
+                try {
+                    localStorage.setItem("cloudHours", String(cloudHours));
+                } catch (e) {
+                    /* storage unavailable */
+                }
+                loadCloudHistory();
+            });
+        });
+        let resizeTimer = null;
+        window.addEventListener("resize", () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(renderCloudChart, 150);
+        });
+        loadCloudHistory();
+        setInterval(loadCloudHistory, 300000);
+    }
+
+    // ------------------------------------------------------------------
+    // Cloud cover settings (sky region + learned reference)
+    // ------------------------------------------------------------------
+    const roiInputs = document.querySelectorAll("input[data-roi]");
+    const cloudRefNote = document.getElementById("cloud-ref-note");
+    const btnCloudRefReset = document.getElementById("btn-cloud-ref-reset");
+
+    function syncCloudConfigUI(cfg) {
+        if (!cfg || !cfg.sky_roi) return;
+        roiInputs.forEach((inp) => {
+            if (document.activeElement !== inp) inp.value = Math.round(cfg.sky_roi[Number(inp.dataset.roi)] * 100);
+        });
+        if (cloudRefNote && cfg.reference) {
+            const r = cfg.reference;
+            cloudRefNote.textContent = `Learned so far: ${r.night_samples} night samples, ${r.day_samples} mixed-sky day samples.`;
+        }
+    }
+
+    async function postCloudConfig(body) {
+        try {
+            const res = await fetch("/api/sky/clouds/config", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(JSON.stringify(data.detail || "Unknown error"));
+            syncCloudConfigUI(data);
+            return true;
+        } catch (err) {
+            showAlert(stationAlert, `❌ Failed to save cloud settings: ${err.message}`, "error", true);
+            return false;
+        }
+    }
+
+    if (roiInputs.length && currentPage === "tab-settings") {
+        fetch("/api/sky/clouds/config")
+            .then((res) => (res.ok ? res.json() : null))
+            .then(syncCloudConfigUI)
+            .catch(() => {});
+        roiInputs.forEach((inp) =>
+            inp.addEventListener("change", () => {
+                const roi = [0, 0, 1, 1];
+                roiInputs.forEach((el) => (roi[Number(el.dataset.roi)] = Number(el.value) / 100));
+                if (roi.every(Number.isFinite)) postCloudConfig({ sky_roi: roi });
+            })
+        );
+        if (btnCloudRefReset) {
+            btnCloudRefReset.addEventListener("click", async () => {
+                if (!confirm("Forget the learned clear-sky reference? Cloud cover is less accurate until it relearns (a few nights).")) return;
+                if (await postCloudConfig({ reset_reference: true })) showAlert(stationAlert, "✅ Clear-sky reference reset.", "success", true);
+            });
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Gallery & Events Fetcher + On-Demand Timelapse Builder
     // ------------------------------------------------------------------
     const galleryDateEl = document.getElementById("gallery-date");
@@ -2506,7 +2737,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 `;
             } else {
                 mediaHtml = `
-                    <a href="${mediaUrl}" target="_blank" title="Click to view full size" style="width:100%;height:100%;display:block;">
+                    <a href="${mediaUrl}" data-viewer="${item.title || item.type}" title="Click to view full size" style="width:100%;height:100%;display:block;">
                         <img src="${mediaUrl}" alt="${item.title || item.type}" loading="lazy" />
                     </a>
                 `;
@@ -2529,7 +2760,87 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
             productsGrid.appendChild(card);
         });
+        renderHistory(data.history || []);
     }
+
+    function formatSize(kb) {
+        return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb.toFixed(0)} KB`;
+    }
+
+    function renderHistory(days) {
+        if (!historyGrid) return;
+        historyGrid.innerHTML = "";
+        if (historyCountBadge) historyCountBadge.textContent = `${days.length} ${days.length === 1 ? "Day" : "Days"}`;
+        if (days.length === 0) {
+            historyGrid.innerHTML = "<p class='text-muted'>No products from previous days.</p>";
+            return;
+        }
+
+        days.forEach((day) => {
+            const card = document.createElement("div");
+            card.className = "product-card";
+            const tl = day.timelapse;
+            // Past videos fetch only their header and first frame (#t=0.5) until played
+            const mediaHtml = tl
+                ? `<video controls loop muted playsinline preload="metadata" src="${tl.url}#t=0.5"></video>`
+                : "<span>No timelapse</span>";
+            const thumbs = [["keogram", "Keogram"], ["startrails", "Startrails"]]
+                .filter(([k]) => day[k])
+                .map(([k, label]) => `
+                    <a class="history-thumb" href="${day[k].url}" data-viewer="${label} — ${day.date}" title="View ${label}">
+                        <img src="${day[k].url}" alt="${label} ${day.date}" loading="lazy" />
+                        <span>${label}</span>
+                    </a>`)
+                .join("");
+
+            card.innerHTML = `
+                <div class="product-media">
+                    ${mediaHtml}
+                </div>
+                ${thumbs ? `<div class="history-thumbs">${thumbs}</div>` : ""}
+                <div class="product-info">
+                    <div class="product-title">
+                        <span>${day.date}</span>
+                        ${tl ? `<a href="${tl.url}" download class="btn btn-sm btn-outline" style="padding: 0.15rem 0.5rem; font-size: 0.72rem; text-decoration: none;">⬇️ Video · ${formatSize(tl.size_kb)}</a>` : ""}
+                    </div>
+                </div>
+            `;
+            historyGrid.appendChild(card);
+        });
+    }
+
+    // In-page image viewer for keograms / startrails (Esc, click or ✕ to close)
+    const viewer = document.createElement("div");
+    viewer.className = "image-viewer hidden";
+    viewer.innerHTML = `
+        <button class="image-viewer-close" title="Close (Esc)">✕</button>
+        <img alt="" />
+        <div class="image-viewer-caption"></div>
+    `;
+    document.body.appendChild(viewer);
+    const viewerImg = viewer.querySelector("img");
+    const viewerCaption = viewer.querySelector(".image-viewer-caption");
+
+    function closeViewer() {
+        viewer.classList.add("hidden");
+        viewerImg.removeAttribute("src");
+    }
+
+    document.addEventListener("click", (e) => {
+        const link = e.target.closest("a[data-viewer]");
+        if (link) {
+            if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return; // keep open-in-new-tab
+            e.preventDefault();
+            viewerImg.src = link.getAttribute("href");
+            viewerCaption.textContent = link.dataset.viewer;
+            viewer.classList.remove("hidden");
+        } else if (!viewer.classList.contains("hidden") && viewer.contains(e.target)) {
+            closeViewer();
+        }
+    });
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !viewer.classList.contains("hidden")) closeViewer();
+    });
 
     function renderEvents(evData) {
         eventsTableBody.innerHTML = "";

@@ -27,7 +27,8 @@ from src.hardware.v4l2_mmap import (
 )
 from src.calibration.auto_exposure import DayNightAutoExposure
 from src.calibration.dark import DarkCalibrationEngine
-from src.analytics.stars_clouds import estimate_stars_and_clouds
+from src.analytics.cloud_cover import CloudReference, analyze_cloud_cover
+from src.analytics.cloud_history import CloudHistory
 from src.analytics.meteor import MeteorDetector
 from src.api.histogram import compute_fast_histogram
 from src.pipeline.keogram import KeogramGenerator
@@ -94,7 +95,7 @@ class AllSkyService:
         "min_capture_interval_s": 2.0,  # floor between real captures while viewers poll
         "analysis_max_width": 960,      # star/cloud analysis runs on a frame downscaled to this width
         "sky_analysis_enabled": 1,      # star count / cloud cover sampling on (1) or off (0)
-        "analysis_interval_s": 300.0,   # star/cloud sampling every 5 min (night only); frames in between reuse it
+        "analysis_interval_s": 300.0,   # star/cloud sampling every 5 min (day and night); frames in between reuse it
         "stream_max_width": 960,        # live WebSocket JPEG width
         "stream_jpeg_quality": 75,      # live WebSocket JPEG quality
     }
@@ -180,6 +181,16 @@ class AllSkyService:
         self.auto_exposure.elevation = float(self.station_config.get("elevation_m", 20.0))
         self._sync_camera_identity()
         self._update_raw10_bin()
+
+        # Cloud cover: learned clear-sky reference + time series (tests keep theirs out of data/)
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            import tempfile
+
+            self.cloud_reference = CloudReference(None)
+            self.cloud_history = CloudHistory(os.path.join(tempfile.mkdtemp(prefix="allsky-test-"), "cloud_history.jsonl"))
+        else:
+            self.cloud_reference = CloudReference(os.path.join(self.output_dir, "calibration", "cloud_reference.json"))
+            self.cloud_history = CloudHistory(os.path.join(self.output_dir, "logs", "cloud_history.jsonl"))
 
         # Observational products pipeline accumulators (Keogram, Startrails, Timelapse)
         self.keogram_gen = KeogramGenerator(slice_width=3, max_slices=2880)
@@ -516,6 +527,7 @@ class AllSkyService:
                 try:
                     self.auto_exposure.exposure_s = float(getattr(self.camera, "current_exposure_s", self.auto_exposure.exposure_s))
                     self.auto_exposure.gain_db = float(getattr(self.camera, "current_gain_db", self.auto_exposure.gain_db))
+                    self.auto_exposure.hw_min_exposure_s = getattr(self.camera, "min_exposure_s", None)
                     new_exp, new_gain, ae_telem = self.auto_exposure.process_frame_feedback(
                         frame, live_camera=not is_pytest
                     )
@@ -674,38 +686,92 @@ class AllSkyService:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
-    def _sky_stats(self, frame: np.ndarray, is_pytest: bool) -> Dict[str, Any]:
-        """Star count / cloud cover: skipped in daylight, otherwise at most once per analysis_interval_s."""
+    def _sky_stats(self, frame: np.ndarray, is_pytest: bool, meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Star count / cloud cover, at most once per analysis_interval_s; each sample goes to the cloud history."""
         now = time.time()
         cached = getattr(self, "_sky_stats_cache", None)
+        last_cc = float((cached or {}).get("cloud_cover_pct", 0.0))
         if not int(self.performance.get("sky_analysis_enabled", 1)):
-            return {"star_count": 0, "cloud_cover_pct": float((cached or {}).get("cloud_cover_pct", 0.0)), "status": "disabled"}
+            return {"star_count": 0, "cloud_cover_pct": last_cc, "status": "disabled"}
+        if not is_pytest and cached is not None and now - cached["_ts"] < float(self.performance.get("analysis_interval_s", 300.0)):
+            return cached
+        sun_elev = -30.0
         if not is_pytest:
             from src.calibration.auto_exposure import calculate_solar_elevation
 
-            if now - getattr(self, "_sun_check_ts", 0.0) >= 60.0:
-                self._sun_check_ts = now
-                self._sun_elev = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon)
-            if getattr(self, "_sun_elev", -90.0) > -6.0:
-                # Daylight/civil twilight: star counts are just noise, so do not spend CPU on them
-                return {
-                    "star_count": 0,
-                    "cloud_cover_pct": float((cached or {}).get("cloud_cover_pct", 0.0)),
-                    "status": "daylight",
-                }
-            if cached is not None and now - cached["_ts"] < float(self.performance.get("analysis_interval_s", 300.0)):
-                return cached
+            sun_elev = float(calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon))
+        meta = meta or {}
+        exposure_s = float(meta.get("actual_exposure_s", getattr(self.camera, "current_exposure_s", 1.0)))
+        gain_db = float(meta.get("gain_db", getattr(self.camera, "current_gain_db", 0.0)))
         try:
             # Analyse a downscaled copy: 2x2 binning is ~4x cheaper (415 -> 110 ms on a Pi 4) with nearly the same star count
             h, w = frame.shape[:2]
             aw = int(self.performance["analysis_max_width"])
             analysis_frame = cv2.resize(frame, (aw, max(1, round(h * aw / w))), interpolation=cv2.INTER_AREA) if w > aw else frame
-            stats = estimate_stars_and_clouds(analysis_frame)
+            stats = analyze_cloud_cover(
+                analysis_frame, exposure_s, gain_db, sun_elev, roi=self.sky_roi, reference=self.cloud_reference
+            )
         except Exception:
-            stats = {"star_count": 0, "cloud_cover_pct": 0.0, "status": "unknown"}
+            stats = {"star_count": 0, "cloud_cover_pct": None, "status": "unknown", "method": "", "confidence": 0.0}
+        self.cloud_history.append({
+            "t": int(now),
+            "cc": stats.get("cloud_cover_pct"),
+            "m": stats.get("method", ""),
+            "conf": stats.get("confidence", 0.0),
+            "stars": int(stats.get("star_count", 0)),
+            "sun": round(sun_elev, 1),
+        })
+        # Live telemetry keeps showing the last measured value when this frame could not be judged
+        if stats.get("cloud_cover_pct") is None:
+            stats["cloud_cover_pct"] = last_cc
         stats["_ts"] = now
         self._sky_stats_cache = stats
         return stats
+
+    @property
+    def sky_roi(self) -> List[float]:
+        """Sky region (left, top, right, bottom fractions) that cloud analysis looks at."""
+        roi = self.station_config.get("sky_roi") or [0.0, 0.0, 1.0, 1.0]
+        return [float(v) for v in roi][:4] if len(roi) >= 4 else [0.0, 0.0, 1.0, 1.0]
+
+    def get_cloud_config(self) -> Dict[str, Any]:
+        return {"sky_roi": self.sky_roi, "reference": self.cloud_reference.to_dict()}
+
+    def set_cloud_config(self, sky_roi: Optional[List[float]] = None, reset_reference: bool = False) -> Dict[str, Any]:
+        if sky_roi is not None:
+            if len(sky_roi) != 4:
+                raise ValueError("sky_roi needs 4 values: left, top, right, bottom")
+            l, t, r, b = (min(1.0, max(0.0, float(v))) for v in sky_roi)
+            if r - l < 0.05 or b - t < 0.05:
+                raise ValueError("sky_roi must cover at least 5% of the frame in each direction")
+            self.station_config["sky_roi"] = [round(l, 3), round(t, 3), round(r, 3), round(b, 3)]
+            self._save_station_config()
+            self._sky_stats_cache = None
+        if reset_reference:
+            with self.cloud_reference.lock:
+                self.cloud_reference.reset()
+            self.activity.info("clouds", "Cloud cover clear-sky reference reset; it relearns over the next nights")
+        return {"success": True, **self.get_cloud_config()}
+
+    def get_cloud_history(self, hours: float = 24.0, end_ts: Optional[float] = None, max_points: int = 600) -> Dict[str, Any]:
+        end_t = float(end_ts) if end_ts else time.time()
+        start_t = end_t - max(0.5, min(24.0 * 400, float(hours))) * 3600.0
+        raw = self.cloud_history.query(start_t, end_t, max_points=10**9)
+        points = self.cloud_history.query(start_t, end_t, max_points=max(10, min(5000, int(max_points))))
+        vals = [p["cc"] for p in raw if p.get("cc") is not None]
+        return {
+            "start": int(start_t),
+            "end": int(end_t),
+            "interval_s": float(self.performance.get("analysis_interval_s", 300.0)),
+            "points": points,
+            "summary": {
+                "samples": len(vals),
+                "mean": round(sum(vals) / len(vals), 1) if vals else None,
+                "min": min(vals) if vals else None,
+                "max": max(vals) if vals else None,
+                "clear_pct": round(100.0 * sum(1 for v in vals if v < 25.0) / len(vals), 1) if vals else None,
+            },
+        }
 
     def get_telemetry(self) -> Dict[str, Any]:
         """
@@ -728,7 +794,7 @@ class AllSkyService:
             cached["calibration"] = self.get_calibration_status()
             return cached
 
-        sky_stats = self._sky_stats(frame, is_pytest)
+        sky_stats = self._sky_stats(frame, is_pytest, meta)
 
         # Real-time histogram
         hist = compute_fast_histogram(frame)
@@ -788,6 +854,7 @@ class AllSkyService:
                 try:
                     self.auto_exposure.exposure_s = float(getattr(self.camera, "current_exposure_s", self.auto_exposure.exposure_s))
                     self.auto_exposure.gain_db = float(getattr(self.camera, "current_gain_db", self.auto_exposure.gain_db))
+                    self.auto_exposure.hw_min_exposure_s = getattr(self.camera, "min_exposure_s", None)
                     new_exp, new_gain, _ = self.auto_exposure.process_frame_feedback(self.last_frame, live_camera=True)
                     self.camera.set_hardware_exposure(new_exp, new_gain)
                     self.last_capture_time = 0.0
@@ -1701,7 +1768,39 @@ class AllSkyService:
             "archived_frames_count": frame_count,
             "timelapse_compiling": self._timelapse_compiling,
             "items": items,
+            "history": self._list_past_products(today_str),
         }
+
+    def _list_past_products(self, today_str: str) -> List[Dict[str, Any]]:
+        """Dated products (YYYY-MM-DD.mp4/.jpg) from previous days, newest first."""
+        date_re = re.compile(r"^(\d{4}-\d{2}-\d{2})\.(mp4|jpg)$")
+        sources = (
+            ("timelapse", self.timelapses_dir, "/uploads/allsky/timelapses", "mp4"),
+            ("keogram", self.keograms_dir, "/uploads/allsky/keograms", "jpg"),
+            ("startrails", self.startrails_dir, "/uploads/allsky/startrails", "jpg"),
+        )
+        days: Dict[str, Dict[str, Any]] = {}
+        for kind, dir_path, url_prefix, ext in sources:
+            try:
+                names = os.listdir(dir_path)
+            except OSError:
+                continue
+            for name in names:
+                m = date_re.match(name)
+                if not m or m.group(2) != ext or m.group(1) >= today_str:
+                    continue
+                fpath = os.path.join(dir_path, name)
+                try:
+                    st = os.stat(fpath)
+                except OSError:
+                    continue
+                day = days.setdefault(m.group(1), {"date": m.group(1)})
+                day[kind] = {
+                    "url": f"{url_prefix}/{name}",
+                    "size_kb": round(st.st_size / 1024.0, 1),
+                    "timestamp": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(),
+                }
+        return [days[d] for d in sorted(days, reverse=True)]
 
     def get_events(self, limit: int = 20) -> Dict[str, Any]:
         """List detected meteor streak events."""

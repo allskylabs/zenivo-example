@@ -119,6 +119,8 @@ class DayNightAutoExposure:
         self.current_profile = DayNightProfile.NIGHT
         self.solar_elevation = -20.0
         self.damping_factor = 0.25
+        # Shortest exposure the live camera accepts (e.g. 26 us on a Pi IMX708); only ever lowers the 50 us floor
+        self.hw_min_exposure_s: Optional[float] = None
 
     def update_profile(self, solar_elevation_deg: float) -> str:
         """
@@ -245,6 +247,8 @@ class DayNightAutoExposure:
         is_live_camera_frame = live_camera if live_camera is not None else frame_bgr.shape[0] >= 1000
         if is_live_camera_frame:
             min_exp = 0.00005
+            if isinstance(self.hw_min_exposure_s, (int, float)) and self.hw_min_exposure_s > 0:
+                min_exp = max(1e-6, min(min_exp, float(self.hw_min_exposure_s)))
             max_exp = 15.0
             min_gain = 0.0
             max_gain = 48.0
