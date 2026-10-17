@@ -291,6 +291,67 @@ class TestTimelapsePipeline:
         assert os.path.exists(video_path)
         assert os.path.getsize(video_path) > 500
 
+    def test_compile_timelapse_skips_corrupt_jpeg(self, temp_output_dir):
+        """A truncated frame on disk is skipped instead of failing the whole timelapse."""
+        paths = []
+        for i in range(5):
+            p = os.path.join(temp_output_dir, f"frame_{i:02d}.jpg")
+            cv2.imwrite(p, np.full((120, 160, 3), i * 40, dtype=np.uint8))
+            paths.append(p)
+        with open(paths[2], "r+b") as fp:
+            fp.truncate(20)
+        out = os.path.join(temp_output_dir, "skip.mp4")
+        compile_timelapse(paths, out, fps=12.0)
+        cap = cv2.VideoCapture(out)
+        n = 0
+        while cap.read()[0]:
+            n += 1
+        cap.release()
+        assert n == 4
+
+    def test_compile_timelapse_all_frames_unreadable_raises(self, temp_output_dir):
+        p = os.path.join(temp_output_dir, "bad.jpg")
+        with open(p, "wb") as fp:
+            fp.write(b"\xff\xd8nope")
+        with pytest.raises(ValueError):
+            compile_timelapse([p], os.path.join(temp_output_dir, "bad.mp4"))
+
+    def test_refused_hw_encoder_falls_back_to_x264(self, temp_output_dir, monkeypatch):
+        """If h264_v4l2m2m is refused mid-stream, ffmpeg is rerun with libx264 and hw is disabled."""
+        import shutil
+        import src.pipeline.timelapse as tl
+
+        if shutil.which("ffmpeg") is None:
+            pytest.skip("ffmpeg not installed")
+        monkeypatch.setattr(tl, "_HW_ENCODER_OK", True)
+        monkeypatch.setattr(tl, "_HW_ENCODER_CHECKED", 0.0)
+        real = tl._ffmpeg_video_args
+        seen = []
+
+        def fake_args(ffmpeg_bin, crf, allow_hw=True):
+            args = real(ffmpeg_bin, crf, allow_hw)
+            if "h264_v4l2m2m" in args:
+                args = ["-c:v", "h264_v4l2m2m", "-no_such_option", "1"]  # ffmpeg exits non-zero like a refused hw encoder
+            seen.append(args[1])
+            return args
+
+        monkeypatch.setattr(tl, "_ffmpeg_video_args", fake_args)
+        frames = [np.full((120, 160, 3), i * 20, dtype=np.uint8) for i in range(6)]
+        out = os.path.join(temp_output_dir, "fallback.mp4")
+        compile_timelapse(frames, out, fps=12.0)
+        assert seen == ["h264_v4l2m2m", "libx264"]
+        assert tl._HW_ENCODER_OK is False and os.path.getsize(out) > 500
+
+    def test_compile_timelapse_removes_stale_temp_files(self, temp_output_dir):
+        stale = os.path.join(temp_output_dir, ".latest_tmp_99999.mp4")
+        other = os.path.join(temp_output_dir, ".other_tmp_99999.mp4")
+        for p in (stale, other):
+            with open(p, "wb") as fp:
+                fp.write(b"x" * 10)
+        frames = [np.full((120, 160, 3), i * 20, dtype=np.uint8) for i in range(4)]
+        compile_timelapse(frames, os.path.join(temp_output_dir, "latest.mp4"), fps=12.0)
+        assert not os.path.exists(stale) and os.path.exists(other)
+
     def test_compile_timelapse_empty_raises(self, temp_output_dir):
         with pytest.raises(ValueError):
             compile_timelapse([], os.path.join(temp_output_dir, "empty.mp4"))
