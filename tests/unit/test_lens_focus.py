@@ -35,6 +35,8 @@ class LensSimCamera(SimulatedIMX335Controller):
         self.lens_position_target = None
         self.lens_position = 1.0
         self.moves = []
+        self.drift_per_frame = 0.0  # seeing / dusk: the whole scene softens steadily while sweeping
+        self.frames = 0
 
     def set_lens_position(self, d):
         pos = round(min(12.0, max(0.0, float(d))), 4)
@@ -51,7 +53,8 @@ class LensSimCamera(SimulatedIMX335Controller):
 
     def capture_frame(self):
         _, meta = super().capture_frame()
-        sigma = 0.9 + 9.0 * abs(self.lens_position - TRUE_FOCUS)
+        self.frames += 1
+        sigma = 0.9 + 9.0 * abs(self.lens_position - TRUE_FOCUS) + self.drift_per_frame * self.frames
         meta["lens_position"] = self.lens_position
         return _star_field(sigma, self.width, self.height), meta
 
@@ -68,8 +71,10 @@ def lens_client():
     AllSkyService.reset_instance()
 
 
-def test_sweep_finds_real_focus_not_nominal_infinity(lens_client):
+@pytest.mark.parametrize("drift", [0.0, 0.006])
+def test_sweep_finds_real_focus_not_nominal_infinity(lens_client, drift):
     client, svc, cam = lens_client
+    cam.drift_per_frame = drift
     assert client.get("/api/focus").json()["lens"]["available"]
     client.post("/api/focus/start", json={"roi_size": 384, "method": "stars"})
     r = client.post("/api/focus/lens/autofocus", json={"mode": "sweep"})

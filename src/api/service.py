@@ -2543,23 +2543,31 @@ class AllSkyService:
                 self._lens_finish(pos_back, "failed", f"nothing measurable in the zoom region ({method}); lens put back", "sweep")
                 return
 
-            # Fine: +-1 coarse step around the peak in 0.02 D steps, then a parabola through the best three
+            # Fine: +-1 coarse step around the peak in 0.02 D steps, walked up and then back down. The scene
+            # drifts while sweeping (dusk, AE-free exposure, lights), and averaging the two directions cancels
+            # a linear drift that would otherwise favour whichever end was measured first.
             sw["phase"] = "fine"
-            fine = [p for p in np.arange(best_pos - step, best_pos + step + 1e-9, 0.02) if lo - 1e-9 <= p <= hi + 1e-9]
-            fine_pts = []
-            for i, pos in enumerate(fine):
+            fine = [float(p) for p in np.arange(best_pos - step, best_pos + step + 1e-9, 0.02) if lo - 1e-9 <= p <= hi + 1e-9]
+            order = fine + fine[::-1]
+            samples: Dict[float, List[float]] = {p: [] for p in fine}
+            for i, pos in enumerate(order):
                 if self.focus.sweep_cancel:
                     raise InterruptedError
-                fine_pts.append((float(pos), quality(measure(float(pos), "fine"))))
-                sw["progress"] = 0.7 + 0.28 * (i + 1) / len(fine)
+                samples[pos].append(quality(measure(pos, "fine")))
+                sw["progress"] = 0.7 + 0.28 * (i + 1) / len(order)
+            fine_pts = [(p, float(np.mean(v)) if all(np.isfinite(v)) else float("-inf")) for p, v in samples.items()]
             k = int(np.argmax([q for _, q in fine_pts]))
             final = fine_pts[k][0]
-            if 0 < k < len(fine_pts) - 1 and all(np.isfinite(q) for _, q in fine_pts[k - 1:k + 2]):
-                (x1, y1), (x2, y2), (x3, y3) = fine_pts[k - 1:k + 2]
-                denom = (y1 - 2 * y2 + y3)
-                if denom < 0:
-                    final = x2 + 0.5 * (x2 - x1) * (y1 - y3) / denom
-                    final = min(x3, max(x1, final))
+            # Least-squares parabola through all finite fine points: steadier than the best three alone
+            fx = np.array([p for p, q in fine_pts if np.isfinite(q)])
+            fy = np.array([q for p, q in fine_pts if np.isfinite(q)])
+            if len(fx) >= 5:
+                a2, a1, _ = np.polyfit(fx - final, fy, 2)
+                if a2 < 0:
+                    vertex = final - a1 / (2 * a2)
+                    if fx.min() <= vertex <= fx.max():
+                        final = float(vertex)
+            sw["fine_mean"] = [{"pos": round(p, 4), "q": (round(q, 4) if np.isfinite(q) else None)} for p, q in fine_pts]
             best_score = -fine_pts[k][1] if lower else fine_pts[k][1]
             unit = "px HFR" if lower else "contrast"
             dist = f"{1 / final:.1f} m" if final > 0.05 else "infinity"

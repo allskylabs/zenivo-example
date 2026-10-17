@@ -144,8 +144,10 @@ def _point_sources(gray: np.ndarray, lights: bool, max_sources: int = 25) -> Lis
 
 
 def _contrast(gray: np.ndarray) -> float:
-    """Brightness-normalised Tenengrad: mean squared gradient / mean^2 (exposure-independent)."""
-    g = gray.astype(np.float32)
+    """Brightness-normalised Tenengrad: mean squared gradient / mean^2 (exposure-independent).
+    A light sigma=1 blur first keeps sensor noise (dominant at night and high gain) from swamping the
+    gradients; on a live daytime crop it kept ~70 % of the raw sensitivity to defocus."""
+    g = cv2.GaussianBlur(gray.astype(np.float32), (0, 0), 1.0)
     gx = cv2.Sobel(g, cv2.CV_32F, 1, 0, ksize=3)
     gy = cv2.Sobel(g, cv2.CV_32F, 0, 1, ksize=3)
     mean = float(g.mean())
