@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllSky Observatory — Edge Dashboard</title>
-    <link rel="stylesheet" href="/style.css?v=20261017f1">
+    <link rel="stylesheet" href="/style.css?v=20261017f7">
 </head>
 <body class="dark-mode">
     <!-- Top Navigation Header -->
@@ -691,37 +691,37 @@
                 </div>
             </div>
         </section>
-        <!-- TAB: Focus assistant -->
+        <!-- TAB: Focus assistant (zoom, score and curve fit in one screen) -->
         <section id="tab-focus" class="tab-content">
-            <div class="dashboard-grid focus-grid">
-                <div class="main-viewport-col">
-                    <div class="card">
-                        <div class="card-header">
-                            <h2>Focus Zoom <span class="text-muted" id="focus-zoom-label"></span></h2>
-                            <div class="header-actions focus-actions">
-                                <label class="checkbox-label"><input type="checkbox" id="focus-stretch" checked> Stretch</label>
-                                <label class="checkbox-label"><input type="checkbox" id="focus-markers" checked> Markers</label>
-                                <label class="checkbox-label"><input type="checkbox" id="focus-crosshair"> Crosshair</label>
-                            </div>
+            <div class="focus-layout" id="focus-layout">
+                <div class="card focus-main">
+                    <div class="card-header">
+                        <h2>Focus Zoom <span class="text-muted" id="focus-zoom-label"></span></h2>
+                        <div class="header-actions focus-actions">
+                            <label class="checkbox-label"><input type="checkbox" id="focus-stretch" checked> Stretch</label>
+                            <label class="checkbox-label"><input type="checkbox" id="focus-markers" checked> Markers</label>
+                            <label class="checkbox-label"><input type="checkbox" id="focus-crosshair"> Crosshair</label>
                         </div>
-                        <div class="focus-zoom-wrap" id="focus-zoom-wrap">
-                            <canvas id="focus-zoom-canvas"></canvas>
-                            <div class="focus-zoom-empty" id="focus-zoom-empty"><span>Press <strong>Start focus mode</strong> to stream a native-resolution crop.</span></div>
-                        </div>
-                        <div class="focus-statline" id="focus-statline">—</div>
                     </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <h2>Focus Curve</h2>
-                            <div class="header-actions">
-                                <span class="text-muted focus-hint" id="focus-curve-hint">Turn the lens slowly through best focus and back</span>
-                                <button class="btn btn-sm btn-outline" id="focus-reset">Reset best (R)</button>
-                            </div>
-                        </div>
-                        <canvas id="focus-chart" class="focus-chart"></canvas>
+                    <div class="focus-zoom-wrap" id="focus-zoom-wrap">
+                        <canvas id="focus-zoom-canvas"></canvas>
+                        <div class="focus-zoom-empty" id="focus-zoom-empty"><span>Press <strong>Start focus mode</strong> to stream a native-resolution crop.</span></div>
                     </div>
+                    <div class="focus-statline" id="focus-statline">—</div>
+                    <div class="focus-chart-head">
+                        <strong>Focus curve</strong>
+                        <div class="focus-stats">
+                            <span>Now <b id="focus-stat-now">—</b></span>
+                            <span class="good">Best <b id="focus-stat-best">—</b></span>
+                            <span>Min <b id="focus-stat-min">—</b></span>
+                            <span>Max <b id="focus-stat-max">—</b></span>
+                            <span>Frames <b id="focus-stat-n">0</b></span>
+                        </div>
+                        <button class="btn btn-sm btn-outline" id="focus-reset" title="Forget the curve and best score (R)">Reset (R)</button>
+                    </div>
+                    <canvas id="focus-chart" class="focus-chart"></canvas>
                 </div>
-                <div class="side-panel-col">
+                <div class="focus-side">
                     <div class="card">
                         <div class="card-header">
                             <h2>Focus Mode</h2>
@@ -732,7 +732,7 @@
                             <div class="focus-score-label" id="focus-score-label">Score</div>
                             <div class="focus-score-value" id="focus-score-value">—</div>
                             <div class="focus-score-sub" id="focus-score-sub">&nbsp;</div>
-                            <div class="focus-meter"><div class="focus-meter-fill" id="focus-meter-fill"></div></div>
+                            <div class="focus-meter" title="Bar spans 80–100 % of the best score"><div class="focus-meter-fill" id="focus-meter-fill"></div></div>
                             <div class="focus-score-sub"><span id="focus-quality">—</span> of best <span id="focus-best">—</span> <span class="focus-trend" id="focus-trend"></span></div>
                         </div>
                         <div class="focus-field">
@@ -764,7 +764,7 @@
                     <div class="card">
                         <div class="card-header">
                             <h2>Overview</h2>
-                            <span class="text-muted focus-hint">Click: move zoom · ←↑↓→ nudge</span>
+                            <span class="text-muted focus-hint">Click: move zoom · arrow keys nudge</span>
                         </div>
                         <div class="focus-overview-wrap" id="focus-overview-wrap">
                             <img id="focus-overview" alt="Whole frame">
@@ -837,6 +837,6 @@
     <script src="/static/sky_catalog.js"></script>
     <script src="/app.js?v=20261017c2"></script>
     <script src="/static/activity.js?v=20261016h"></script>
-    <script src="/static/focus.js?v=20261017f2"></script>
+    <script src="/static/focus.js?v=20261017f7"></script>
 </body>
 </html>

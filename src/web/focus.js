@@ -137,9 +137,8 @@
         const bmp = st.bitmap;
         if (!bmp) return;
         const dpr = window.devicePixelRatio || 1;
-        const cssW = wrap.clientWidth;
-        const cssH = Math.min(cssW, Math.max(320, window.innerHeight - 260));
-        const side = Math.min(cssW, cssH);
+        // Largest square that fits the zoom area (which fills what the curve below leaves free)
+        const side = Math.max(120, Math.min(wrap.clientWidth, wrap.clientHeight));
         canvas.style.width = side + "px";
         canvas.style.height = side + "px";
         if (canvas.width !== Math.round(side * dpr)) {
@@ -195,7 +194,8 @@
         $("focus-quality").textContent = q === null || q === undefined ? "—" : q.toFixed(1) + " %";
         $("focus-best").textContent = fmtScore(res, res.best);
         const fill = $("focus-meter-fill");
-        fill.style.width = (q || 0) + "%";
+        // The bar spans 80-100 % of best: the last few percent are what fine focusing is about
+        fill.style.width = Math.max(0, Math.min(100, ((q || 0) - 80) * 5)) + "%";
         fill.className = "focus-meter-fill " + (q >= 97 ? "good" : q >= 85 ? "near" : "far");
 
         // Trend from a 3-frame average against the 3 frames before it
@@ -220,6 +220,17 @@
             `${fps ? fps.toFixed(1) + " fps" : "…"} · exposure ${exp} · gain ${res.gain_db.toFixed(1)} dB · ` +
             `${res.capture_path || ""} · ROI ${res.roi[2]} px at (${res.roi[0]}, ${res.roi[1]}) · ` +
             `bg ${res.background} · noise ${res.noise} · ${res.calc_ms} ms`;
+        updateStats(res);
+    }
+
+    function updateStats(res) {
+        const vals = st.history.map((p) => p.score);
+        const f = (v) => (res ? fmtScore(res, v) : "—");
+        $("focus-stat-now").textContent = res ? f(res.smoothed ?? res.score) : "—";
+        $("focus-stat-best").textContent = res ? f(res.best) : "—";
+        $("focus-stat-min").textContent = vals.length ? f(Math.min(...vals)) : "—";
+        $("focus-stat-max").textContent = vals.length ? f(Math.max(...vals)) : "—";
+        $("focus-stat-n").textContent = String(vals.length);
     }
 
     function drawChart() {
@@ -263,6 +274,22 @@
             c.beginPath(); c.moveTo(pad.l, y(res.best)); c.lineTo(w - pad.r, y(res.best)); c.stroke();
             c.setLineDash([]);
         }
+        // Sharpest and softest frames, so the lens can be turned back to where the peak was
+        const iBest = vals.indexOf(lower ? lo : hi), iWorst = vals.indexOf(lower ? hi : lo);
+        const mark = (i, color, text, above) => {
+            const px = x(i), py = y(vals[i]);
+            c.strokeStyle = color;
+            c.setLineDash([2, 3]);
+            c.beginPath(); c.moveTo(px, pad.t); c.lineTo(px, h - pad.b); c.stroke();
+            c.setLineDash([]);
+            c.fillStyle = color;
+            c.beginPath(); c.arc(px, py, 4, 0, Math.PI * 2); c.fill();
+            const tw = c.measureText(text).width;
+            const tx = Math.min(Math.max(pad.l, px - tw / 2), w - pad.r - tw);
+            c.fillText(text, tx, above ? Math.max(pad.t + 9, py - 8) : Math.min(h - 4, py + 16));
+        };
+        mark(iWorst, "rgba(239,68,68,0.85)", `softest ${fmtScore(res, vals[iWorst])}`, false);
+        mark(iBest, "rgba(16,185,129,0.95)", `sharpest ${fmtScore(res, vals[iBest])}`, true);
         // Raw points and 3-frame moving average
         c.fillStyle = "rgba(56,189,248,0.55)";
         pts.forEach((p, i) => { c.beginPath(); c.arc(x(i), y(p.score), 2, 0, Math.PI * 2); c.fill(); });
@@ -275,8 +302,11 @@
             if (i === 0) c.moveTo(x(i), y(v)); else c.lineTo(x(i), y(v));
         });
         c.stroke();
+        const last = pts.length - 1;
+        c.fillStyle = "#f1f5f9";
+        c.beginPath(); c.arc(x(last), y(vals[last]), 4, 0, Math.PI * 2); c.fill();
         c.fillStyle = "#64748b";
-        c.fillText("sharper ↑", w - pad.r - 64, pad.t + 10);
+        c.fillText("sharper ↑", w - pad.r - 64, h - 4);
     }
 
     function placeRoiBox() {
@@ -310,6 +340,7 @@
         try {
             applyState(await api("/api/focus/config", { method: "POST", body }));
         } catch (e) { console.warn(e); }
+        updateStats(null);
         drawChart();
     }
 
@@ -359,7 +390,7 @@
         configure({ cx, cy });
     });
     overviewImg.addEventListener("load", placeRoiBox);
-    window.addEventListener("resize", () => { placeRoiBox(); drawZoom(); drawChart(); });
+    window.addEventListener("resize", () => { fitLayout(); placeRoiBox(); drawZoom(); drawChart(); });
 
     document.addEventListener("keydown", (ev) => {
         if (ev.target.closest("input, select, textarea")) return;
@@ -390,6 +421,15 @@
         const exp = parseFloat($("focus-exp").value), gain = parseFloat($("focus-gain").value);
         if (exp > 0 && gain >= 0) setExposure(exp, gain);
     });
+
+    const layout = $("focus-layout");
+    function fitLayout() {
+        // Measured once the page section is shown (app.js reveals it on DOMContentLoaded, after this runs)
+        const top = layout.getBoundingClientRect().top + window.scrollY;
+        if (top > 0) layout.style.setProperty("--focus-top", top + "px");
+    }
+    document.addEventListener("DOMContentLoaded", fitLayout);
+    window.addEventListener("load", fitLayout);
 
     (async function init() {
         try {

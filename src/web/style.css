@@ -1184,17 +1184,53 @@ a.tab-btn {
 
 /* Focus assistant (/focus) */
 .focus-actions { flex-wrap: wrap; gap: 0.65rem; }
+.focus-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    grid-template-rows: minmax(0, 1fr); /* columns scroll inside instead of stretching the row */
+    gap: 1rem;
+    /* The rest of the viewport below the nav (--focus-top is measured by focus.js) */
+    height: calc(100vh - var(--focus-top, 170px) - 12px);
+    min-height: 520px;
+}
+.focus-layout > .card, .focus-side > .card { margin-bottom: 0; }
+.focus-main { display: flex; flex-direction: column; min-height: 0; }
+.focus-main .card-header { margin-bottom: 0.6rem; }
+.focus-side { display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; min-height: 0; }
+@media (max-width: 1280px) {
+    .focus-layout { grid-template-columns: minmax(0, 1fr) 320px; }
+}
+@media (max-width: 860px) {
+    .focus-layout { grid-template-columns: 1fr; grid-template-rows: auto; height: auto; }
+    .focus-main { height: 85vh; }
+}
+.focus-chart-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    margin-top: 0.6rem;
+    font-size: 0.85rem;
+}
+.focus-stats { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; flex: 1; font-size: 0.78rem; color: var(--text-secondary); }
+.focus-stats b { font-family: var(--font-mono); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.focus-stats .good b { color: var(--success); }
 .focus-zoom-wrap {
     position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 320px;
+    flex: 1;
+    min-height: 200px;
     background: #000;
     border-radius: 8px;
     overflow: hidden;
 }
-.focus-zoom-wrap canvas { display: block; image-rendering: pixelated; cursor: crosshair; }
+.focus-zoom-wrap canvas {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: block;
+    image-rendering: pixelated;
+}
 .focus-zoom-empty {
     position: absolute;
     inset: 0;
@@ -1213,7 +1249,7 @@ a.tab-btn {
     color: var(--text-secondary);
     overflow-wrap: anywhere;
 }
-.focus-chart { width: 100%; height: 180px; display: block; }
+.focus-chart { width: 100%; height: clamp(110px, 22vh, 220px); flex: none; display: block; margin-top: 0.3rem; }
 .focus-hint { font-size: 0.75rem; }
 .focus-badge {
     font-family: var(--font-mono);
@@ -1226,7 +1262,7 @@ a.tab-btn {
 }
 .focus-badge.on { color: #070a13; background: var(--success); border-color: var(--success); }
 #focus-toggle.btn-danger { background: var(--danger); color: #fff; }
-.focus-score { margin: 1rem 0; text-align: center; }
+.focus-score { margin: 0.75rem 0; text-align: center; }
 .focus-score-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); }
 .focus-score-value {
     font-family: var(--font-mono);
@@ -1238,7 +1274,7 @@ a.tab-btn {
 }
 .focus-score-sub { font-size: 0.78rem; color: var(--text-secondary); min-height: 1.2em; }
 .focus-meter { height: 10px; margin: 0.5rem 0 0.35rem; background: var(--bg-card-sub); border-radius: 5px; overflow: hidden; }
-.focus-meter-fill { height: 100%; width: 0; transition: width 0.25s; background: var(--danger); }
+.focus-meter-fill { height: 100%; width: 0; background: var(--danger); }
 .focus-meter-fill.near { background: var(--warning); }
 .focus-meter-fill.good { background: var(--success); }
 .focus-trend { margin-left: 0.4rem; font-weight: 700; }
