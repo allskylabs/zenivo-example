@@ -799,6 +799,26 @@ input[type="range"] {
     font-family: var(--font-mono);
 }
 
+.event-thumb {
+    display: block;
+    max-width: 120px;
+    max-height: 80px;
+    border-radius: 4px;
+    background: #000;
+}
+
+.events-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+}
+
+.events-filter .btn.active {
+    background: var(--accent);
+    color: #000;
+}
+
 /* Helpers */
 .text-success { color: var(--success) !important; }
 .text-accent { color: var(--accent) !important; }

@@ -2934,11 +2934,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 renderGallery(data);
             }
 
-            const resEvents = await fetch("/api/events/meteors?limit=25");
-            if (resEvents.ok) {
-                const evData = await resEvents.json();
-                renderEvents(evData);
-            }
+            await loadEvents();
         } catch (err) {
             console.error("Failed to load gallery/events:", err);
         }
@@ -3081,28 +3077,106 @@ document.addEventListener("DOMContentLoaded", () => {
         if (e.key === "Escape" && !viewer.classList.contains("hidden")) closeViewer();
     });
 
+    const EVENT_LABELS = {
+        meteor: "☄️ Meteor", plane: "✈️ Aircraft", satellite: "🛰️ Satellite", clouds: "☁️ Clouds", flash: "⚡ Flash",
+    };
+
+    function eventDetails(ev) {
+        if (ev.type === "clouds") return `Sky turned ${ev.state} (${Number(ev.cloud_cover_pct).toFixed(0)}% cloud)`;
+        if (ev.type === "flash") return `Sky brightness ${ev.sky_mean_before} → ${ev.sky_mean}`;
+        const parts = [`${Number(ev.length_px || 0).toFixed(0)} px`];
+        if (ev.frames > 1) parts.push(`${ev.frames} frames`);
+        if (ev.dashes > 1) parts.push(`${ev.dashes} dashes`);
+        if (ev.peak_dn) parts.push(`peak +${ev.peak_dn} DN`);
+        return parts.join(" · ");
+    }
+
     function renderEvents(evData) {
         eventsTableBody.innerHTML = "";
         const events = evData.events || [];
-        eventCountBadge.textContent = `${evData.total_count || events.length} Events`;
+        eventCountBadge.textContent = `${evData.total_count || 0} Events`;
 
         if (events.length === 0) {
-            eventsTableBody.innerHTML = `<tr><td colspan="7" class="text-muted" style="text-align:center;">No meteor streaks detected yet.</td></tr>`;
+            const on = Object.entries(evData.enabled || {}).filter(([, v]) => v).map(([k]) => EVENT_LABELS[k] || k);
+            eventsTableBody.innerHTML = `<tr><td colspan="5" class="text-muted" style="text-align:center;">No events yet. Detecting: ${on.join(", ") || "nothing (turn types on in Settings)"}.</td></tr>`;
             return;
         }
 
         events.forEach((ev) => {
             const tr = document.createElement("tr");
+            const when = new Date(ev.timestamp);
+            const thumb = ev.thumbnail_url
+                ? `<a href="${ev.thumbnail_url}" target="_blank" rel="noopener"><img class="event-thumb" src="${ev.thumbnail_url}" alt="${ev.type}" loading="lazy" /></a>`
+                : "--";
             tr.innerHTML = `
-                <td><strong>${ev.event_id}</strong></td>
-                <td>${ev.timestamp}</td>
-                <td>${ev.length_px ? ev.length_px.toFixed(1) : "--"}</td>
-                <td>${ev.aspect_ratio ? ev.aspect_ratio.toFixed(2) : "--"}</td>
-                <td>${ev.peak_dn || "--"}</td>
-                <td>${ev.bbox ? `[${ev.bbox.join(", ")}]` : "--"}</td>
-                <td><a href="/api/live/snapshot.jpg" target="_blank" class="btn btn-sm btn-outline">View</a></td>
+                <td>${thumb}</td>
+                <td><strong>${EVENT_LABELS[ev.type] || ev.type}</strong></td>
+                <td title="${ev.timestamp}">${when.toLocaleString()}</td>
+                <td>${eventDetails(ev)}</td>
+                <td>${ev.sky_url ? `<a href="${ev.sky_url}" target="_blank" rel="noopener" class="btn btn-sm btn-outline">View</a>` : "--"}</td>
             `;
             eventsTableBody.appendChild(tr);
         });
     }
+
+    let eventsFilterType = "";
+    const eventsFilter = document.getElementById("events-filter");
+    if (eventsFilter) {
+        eventsFilter.addEventListener("click", async (e) => {
+            const btn = e.target.closest("button[data-type]");
+            if (!btn) return;
+            eventsFilterType = btn.dataset.type;
+            eventsFilter.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
+            await loadEvents();
+        });
+    }
+
+    async function loadEvents() {
+        const q = eventsFilterType ? `&type=${eventsFilterType}` : "";
+        const res = await fetch(`/api/events?limit=50${q}`);
+        if (res.ok) renderEvents(await res.json());
+    }
+
+    // Settings → Event detection
+    const eventToggles = [...document.querySelectorAll("input[data-event]")];
+
+    function syncEventConfigUI(data) {
+        if (!data || !data.enabled) return;
+        eventToggles.forEach((el) => { el.checked = !!data.enabled[el.dataset.event]; });
+        const st = document.getElementById("evt-status");
+        if (st) {
+            st.textContent = data.night
+                ? `Watching now: ${data.frames_compared} of ${data.frames_seen} frames compared tonight.`
+                : "Daytime: streak detection is idle.";
+        }
+    }
+
+    async function loadEventConfig() {
+        if (!eventToggles.length) return;
+        try {
+            const res = await fetch("/api/events/config");
+            syncEventConfigUI(await res.json());
+        } catch (err) {
+            showAlert(stationAlert, `❌ Could not load event detection settings: ${err.message}`, "error", true);
+        }
+    }
+
+    eventToggles.forEach((el) => {
+        el.addEventListener("change", async () => {
+            try {
+                const res = await fetch("/api/events/config", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ [el.dataset.event]: el.checked }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(JSON.stringify(data.detail || "Unknown error"));
+                syncEventConfigUI(data);
+            } catch (err) {
+                showAlert(stationAlert, `❌ Failed to save event detection: ${err.message}`, "error", true);
+                loadEventConfig();
+            }
+        });
+    });
+    if (currentPage === "tab-settings") loadEventConfig();
 });

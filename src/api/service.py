@@ -31,7 +31,7 @@ from src.pipeline.star_boost import GAMMA_RAW10, GAMMA_SRGB, STAR_BOOST_BINS, sk
 from src.calibration.dark import DarkCalibrationEngine
 from src.analytics.cloud_cover import CloudReference, analyze_cloud_cover
 from src.analytics.cloud_history import CloudHistory
-from src.analytics.meteor import MeteorDetector
+from src.analytics.sky_events import EVENT_TYPES, SkyEventDetector
 from src.analytics.focus_tracker import FocusTracker, TempCompensation
 from src.analytics.focus import FocusSession, LOWER_IS_BETTER, display_stretch, find_best_star, measure_focus
 from src.api.histogram import compute_fast_histogram
@@ -201,11 +201,24 @@ class AllSkyService:
         if os.environ.get("PYTEST_CURRENT_TEST") or "pytest" in sys.modules:
             import tempfile
 
+            _tmp = tempfile.mkdtemp(prefix="allsky-test-")
             self.cloud_reference = CloudReference(None)
-            self.cloud_history = CloudHistory(os.path.join(tempfile.mkdtemp(prefix="allsky-test-"), "cloud_history.jsonl"))
+            self.cloud_history = CloudHistory(os.path.join(_tmp, "cloud_history.jsonl"))
+            self.events_dir = os.path.join(_tmp, "events")
         else:
             self.cloud_reference = CloudReference(os.path.join(self.output_dir, "calibration", "cloud_reference.json"))
             self.cloud_history = CloudHistory(os.path.join(self.output_dir, "logs", "cloud_history.jsonl"))
+            self.events_dir = os.path.join(self.uploads_dir, "events")
+
+        # Sky events (meteors, aircraft, ...): streaks are looked for at night on every new frame,
+        # cloud changes come from the cloud cover samples; stored per UTC day under events_dir
+        self.sky_events = SkyEventDetector()
+        self._events_lock = threading.Lock()
+        self._events_cache: Optional[List[Dict[str, Any]]] = None  # newest first, loaded on first use
+        self._events_night = False
+        self._events_sun_ts = 0.0
+        self._event_seq = 0
+        self._cloud_state: Optional[str] = None
 
         # Observational products pipeline accumulators (Keogram, Startrails, Timelapse)
         self.keogram_gen = KeogramGenerator(slice_width=3, max_slices=2880)
@@ -239,20 +252,6 @@ class AllSkyService:
         self._retention_stop = threading.Event()
         if not os.environ.get("PYTEST_CURRENT_TEST"):
             threading.Thread(target=self._retention_worker, name="retention", daemon=True).start()
-
-        # Initial events database
-        self.events_db: List[Dict[str, Any]] = [
-            {
-                "event_id": "meteor_20261014_214512_001",
-                "type": "meteor",
-                "timestamp": "2026-10-14T21:45:12.430Z",
-                "length_px": 145.2,
-                "aspect_ratio": 7.4,
-                "peak_dn": 248,
-                "bbox": [200, 150, 95, 110],
-                "thumbnail_url": "/api/events/crops/meteor_20261014_214512_001.jpg",
-            }
-        ]
 
         # Initial capture to prime caches
         self._prime_cache()
@@ -597,6 +596,10 @@ class AllSkyService:
                     self._track_focus(frame, meta, now)
                 except Exception:
                     pass
+                try:
+                    self._detect_sky_events(frame, meta, now)
+                except Exception:
+                    pass
 
             return frame, meta
 
@@ -753,6 +756,11 @@ class AllSkyService:
             "stars": int(stats.get("star_count", 0)),
             "sun": round(sun_elev, 1),
         })
+        if not is_pytest and stats.get("cloud_cover_pct") is not None:
+            try:
+                self._cloud_event(frame, float(stats["cloud_cover_pct"]), now)
+            except Exception:
+                pass
         # Live telemetry keeps showing the last measured value when this frame could not be judged
         if stats.get("cloud_cover_pct") is None:
             stats["cloud_cover_pct"] = last_cc
@@ -1837,14 +1845,143 @@ class AllSkyService:
                 }
         return [days[d] for d in sorted(days, reverse=True)]
 
-    def get_events(self, limit: int = 20) -> Dict[str, Any]:
-        """List detected meteor streak events."""
-        with self.lock:
-            events_slice = self.events_db[:limit]
-            return {
-                "events": events_slice,
-                "total_count": len(self.events_db),
-            }
+    # ------------------------------------------------------------------
+    # Sky events: meteors, aircraft, satellites, flashes, cloud changes
+    # ------------------------------------------------------------------
+    EVENT_DEFAULTS: Dict[str, int] = {"meteor": 1, "plane": 1, "satellite": 0, "clouds": 0, "flash": 0}
+    EVENT_NIGHT_SUN_ELEV = -8.0  # streak / flash detection only below this sun elevation
+    EVENT_KEEP_IN_MEMORY = 500
+
+    def get_event_config(self) -> Dict[str, Any]:
+        cfg = dict(self.EVENT_DEFAULTS)
+        cfg.update({k: int(bool(v)) for k, v in (self.station_config.get("event_detection") or {}).items() if k in cfg})
+        return {
+            "enabled": cfg, "defaults": dict(self.EVENT_DEFAULTS), "night_sun_elev_deg": self.EVENT_NIGHT_SUN_ELEV,
+            "night": self._events_night, "frames_seen": self.sky_events.frames_seen,
+            "frames_compared": self.sky_events.frames_compared,
+        }
+
+    def set_event_config(self, **flags: Optional[bool]) -> Dict[str, Any]:
+        clean = {}
+        for key, val in flags.items():
+            if val is None:
+                continue
+            if key not in self.EVENT_DEFAULTS:
+                raise ValueError(f"Unknown event type {key}")
+            clean[key] = int(bool(val))
+        if clean:
+            self.station_config.setdefault("event_detection", {}).update(clean)
+            self._save_station_config()
+            on = [k for k, v in self.get_event_config()["enabled"].items() if v]
+            self.activity.info("events", "Event detection: " + (", ".join(on) if on else "all off"))
+            if not on:
+                self.sky_events.reset()
+        return {"success": True, **self.get_event_config()}
+
+    def _detect_sky_events(self, frame: np.ndarray, meta: Dict[str, Any], now: float) -> None:
+        """Streak / flash detection on a new frame at night (a few ms on a ~640 px gray copy)."""
+        enabled = {k for k, v in self.get_event_config()["enabled"].items() if v and k != "clouds"}
+        if now - self._events_sun_ts >= 60.0:
+            from src.calibration.auto_exposure import calculate_solar_elevation
+            self._events_sun_ts = now
+            night = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon) < self.EVENT_NIGHT_SUN_ELEV
+            if self._events_night and not night:
+                self.sky_events.reset()  # daybreak: drop the reference frame, free its memory
+            self._events_night = night
+        if not enabled or not self._events_night:
+            return
+        events = self.sky_events.process(
+            frame, enabled, ts=now,
+            exposure_s=float(meta.get("actual_exposure_s", getattr(self.camera, "current_exposure_s", 0.0))),
+            gain_db=float(meta.get("gain_db", getattr(self.camera, "current_gain_db", 0.0))),
+            sky_polygons=self.station_config.get("sky_mask"),
+        )
+        for ev in events:
+            self._record_sky_event(ev)
+
+    def _cloud_event(self, frame: np.ndarray, cc: float, now: float) -> None:
+        """Clouds arriving / clearing, from the (already sampled) cloud cover, with hysteresis."""
+        state = "cloudy" if cc >= 60.0 else "clear" if cc <= 30.0 else self._cloud_state
+        prev, self._cloud_state = self._cloud_state, state
+        if prev is None or state == prev or not self.get_event_config()["enabled"].get("clouds"):
+            return
+        h, w = frame.shape[:2]
+        overview = cv2.resize(frame, (640, max(1, round(h * 640 / w))), interpolation=cv2.INTER_AREA) if w > 640 else frame
+        self._record_sky_event({
+            "type": "clouds", "ts": now, "start_ts": now, "frames": 1, "state": state,
+            "cloud_cover_pct": round(cc, 1), "_overview": overview,
+        })
+
+    def _record_sky_event(self, ev: Dict[str, Any]) -> Dict[str, Any]:
+        """Save the event's images + a JSON line under events/<UTC day>/ and log it."""
+        import json
+
+        crop, overview = ev.pop("_crop", None), ev.pop("_overview", None)
+        dt = datetime.fromtimestamp(float(ev.get("start_ts", ev["ts"])), tz=timezone.utc)
+        day = dt.strftime("%Y-%m-%d")
+        self._event_seq = (self._event_seq + 1) % 1000
+        eid = f"{ev['type']}_{dt.strftime('%Y%m%d_%H%M%S')}_{self._event_seq:03d}"
+        day_dir = os.path.join(self.events_dir, day)
+        os.makedirs(day_dir, exist_ok=True)
+        rec = {"event_id": eid, "type": ev["type"], "timestamp": dt.isoformat(),
+               **{k: v for k, v in ev.items() if k not in ("type", "ts")}}
+        if crop is not None and cv2.imwrite(os.path.join(day_dir, f"{eid}.jpg"), crop, [cv2.IMWRITE_JPEG_QUALITY, 90]):
+            rec["thumbnail_url"] = f"/api/events/img/{day}/{eid}.jpg"
+        if overview is not None and cv2.imwrite(os.path.join(day_dir, f"{eid}_sky.jpg"), overview, [cv2.IMWRITE_JPEG_QUALITY, 85]):
+            rec["sky_url"] = f"/api/events/img/{day}/{eid}_sky.jpg"
+            rec.setdefault("thumbnail_url", rec["sky_url"])
+        with open(os.path.join(day_dir, "events.jsonl"), "a", encoding="utf-8") as fp:
+            fp.write(json.dumps(rec) + "\n")
+        with self._events_lock:
+            if self._events_cache is not None:
+                self._events_cache.insert(0, rec)
+                del self._events_cache[self.EVENT_KEEP_IN_MEMORY:]
+        if ev["type"] == "clouds":
+            msg = f"Sky turned {ev['state']} (cloud cover {ev['cloud_cover_pct']:.0f}%)"
+        elif ev["type"] == "flash":
+            msg = f"Flash: sky brightness {ev['sky_mean_before']} -> {ev['sky_mean']}"
+        else:
+            msg = (f"{ev['type'].capitalize()} detected: {ev.get('length_px', 0):.0f} px streak"
+                   + (f" over {ev['frames']} frames" if ev.get("frames", 1) > 1 else ""))
+        self.activity.info("events", msg, event_id=eid)
+        return rec
+
+    def _load_events(self) -> List[Dict[str, Any]]:
+        import json
+
+        with self._events_lock:
+            if self._events_cache is None:
+                items: List[Dict[str, Any]] = []
+                days = sorted(os.listdir(self.events_dir), reverse=True) if os.path.isdir(self.events_dir) else []
+                for day in days:
+                    try:
+                        with open(os.path.join(self.events_dir, day, "events.jsonl"), encoding="utf-8") as fp:
+                            day_items = [json.loads(line) for line in fp if line.strip()]
+                    except (OSError, ValueError):
+                        continue
+                    items.extend(reversed(day_items))
+                    if len(items) >= self.EVENT_KEEP_IN_MEMORY:
+                        break
+                self._events_cache = items[: self.EVENT_KEEP_IN_MEMORY]
+            return list(self._events_cache)
+
+    def get_events(self, limit: int = 20, event_type: Optional[str] = None) -> Dict[str, Any]:
+        """Detected sky events, newest first (optionally one type)."""
+        events = self._load_events()
+        if event_type:
+            events = [e for e in events if e.get("type") == event_type]
+        counts: Dict[str, int] = {}
+        for e in self._load_events():
+            counts[e.get("type", "?")] = counts.get(e.get("type", "?"), 0) + 1
+        return {"events": events[:limit], "total_count": len(events), "counts": counts, **self.get_event_config()}
+
+    def event_image_path(self, day: str, name: str) -> Optional[str]:
+        import re
+
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) or not re.fullmatch(r"[a-z]+_\d{8}_\d{6}_\d{3}(_sky)?\.jpg", name):
+            return None
+        path = os.path.join(self.events_dir, day, name)
+        return path if os.path.isfile(path) else None
 
     def _load_station_config(self) -> Dict[str, Any]:
         """Load persisted station coordinates and plate-solving optical parameters from disk."""

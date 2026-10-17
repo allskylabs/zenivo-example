@@ -72,6 +72,15 @@ class PerformanceSettingsRequest(BaseModel):
     stream_jpeg_quality: Optional[int] = Field(None, ge=40, le=95, description="Live stream JPEG quality")
 
 
+class EventConfigRequest(BaseModel):
+    """Turn detection of each sky event type on or off; omitted types stay unchanged."""
+    meteor: Optional[bool] = None
+    plane: Optional[bool] = None
+    satellite: Optional[bool] = None
+    clouds: Optional[bool] = None
+    flash: Optional[bool] = None
+
+
 class CloudConfigRequest(BaseModel):
     """Request payload for cloud cover analysis: sky region and/or forgetting the learned clear-sky reference."""
     sky_roi: Optional[List[float]] = Field(

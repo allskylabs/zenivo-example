@@ -81,7 +81,7 @@ class RetentionManager:
         self.data_dir = os.path.abspath(data_dir)
         self.frames_dir = os.path.join(self.data_dir, "frames")
         uploads = os.path.join(self.data_dir, "uploads", "allsky")
-        self.product_dirs = [os.path.join(uploads, d) for d in ("keograms", "startrails", "timelapses")]
+        self.product_dirs = [os.path.join(uploads, d) for d in ("keograms", "startrails", "timelapses", "events")]
         self.policy = merge_policy(policy)
         self.last_report: Dict[str, Any] = {}
 

@@ -17,6 +17,7 @@ from src.api.schemas import (
     ImageTransformRequest,
     OutputResolutionRequest,
     PerformanceSettingsRequest,
+    EventConfigRequest,
     StarBoostRequest,
     WhiteBalanceRequest,
     StoragePolicyRequest,
@@ -541,12 +542,36 @@ def generate_gallery_products(
 @router.get("/api/events/meteors")
 def get_meteor_events(
     limit: int = Query(default=20, ge=1, le=100),
+    type: Optional[str] = Query(default=None, pattern="^(meteor|plane|satellite|clouds|flash)$"),
     service: AllSkyService = Depends(get_service),
 ):
     """
-    List detected meteor events with geometrical streak properties and crop coordinates.
+    List detected sky events (meteors, aircraft, satellites, cloud changes, flashes), newest first.
     """
-    return service.get_events(limit=limit)
+    return service.get_events(limit=limit, event_type=type)
+
+
+@router.get("/api/events/config")
+def get_event_config(service: AllSkyService = Depends(get_service)):
+    """Which sky event types are detected."""
+    return service.get_event_config()
+
+
+@router.post("/api/events/config")
+def set_event_config(req: EventConfigRequest, service: AllSkyService = Depends(get_service)):
+    """Turn detection of sky event types on or off (persisted)."""
+    return service.set_event_config(**req.model_dump(exclude_none=True))
+
+
+@router.get("/api/events/img/{day}/{name}")
+def get_event_image(day: str, name: str, service: AllSkyService = Depends(get_service)):
+    """Crop or whole-sky JPEG saved with an event."""
+    from fastapi.responses import FileResponse
+
+    path = service.event_image_path(day, name)
+    if not path:
+        raise HTTPException(status_code=404, detail="Event image not found")
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
 
 
 # ----------------------------------------------------------------------

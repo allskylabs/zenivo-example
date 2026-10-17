@@ -197,6 +197,47 @@ class TestGalleryAndEventsAPI:
         assert "total_count" in data
         assert isinstance(data["events"], list)
 
+    def test_sky_event_recording_config_and_images(self, api_client, monkeypatch):
+        import numpy as np
+
+        service = AllSkyService.get_instance()
+        monkeypatch.setattr(service, "_save_station_config", lambda: None)
+        monkeypatch.setitem(service.station_config, "event_detection", {})
+        cfg = api_client.get("/api/events/config").json()
+        assert cfg["enabled"] == {"meteor": 1, "plane": 1, "satellite": 0, "clouds": 0, "flash": 0}
+        res = api_client.post("/api/events/config", json={"satellite": True, "plane": False})
+        assert res.status_code == 200 and res.json()["enabled"]["satellite"] == 1 and res.json()["enabled"]["plane"] == 0
+
+        rec = service._record_sky_event({
+            "type": "meteor", "ts": 1792245758.6, "start_ts": 1792245758.6, "end_ts": 1792245758.6, "frames": 1,
+            "length_px": 120.0, "peak_dn": 90, "mean_dn": 40.0, "dashes": 1, "line": [0.1, 0.2, 0.3, 0.4],
+            "bbox": [10, 20, 100, 60], "_crop": np.zeros((60, 100, 3), np.uint8), "_overview": np.zeros((360, 640, 3), np.uint8),
+        })
+        data = api_client.get("/api/events?limit=5&type=meteor").json()
+        assert data["events"][0]["event_id"] == rec["event_id"]
+        assert data["counts"]["meteor"] >= 1
+        img = api_client.get(rec["thumbnail_url"])
+        assert img.status_code == 200 and img.headers["content-type"] == "image/jpeg"
+        assert api_client.get(rec["sky_url"]).status_code == 200
+        assert api_client.get("/api/events/img/2026-10-17/..%2Fstation_config.json").status_code == 404
+        assert api_client.get("/api/events?type=bogus").status_code == 422
+
+    def test_detect_sky_events_at_night_records_meteor(self, api_client, monkeypatch):
+        from tests.unit.test_sky_events import _sky
+        import cv2
+
+        service = AllSkyService.get_instance()
+        monkeypatch.setitem(service.station_config, "event_detection", {"meteor": 1})
+        service.sky_events.reset()
+        service._events_night, service._events_sun_ts = True, 2e9  # pretend night, skip the sun check
+        meta = {"actual_exposure_s": 10.0, "gain_db": 30.0}
+        frames = [_sky(i, i * 0.5) for i in range(4)]
+        cv2.line(frames[1], (300, 200), (520, 330), (230, 230, 230), 2)
+        before = api_client.get("/api/events?type=meteor").json()["total_count"]
+        for i, f in enumerate(frames):
+            service._detect_sky_events(f, meta, 1_800_000_000.0 + 15 * i)
+        assert api_client.get("/api/events?type=meteor").json()["total_count"] == before + 1
+
 
 class TestStreamingAndWebSockets:
     """Verifies MJPEG video stream and WebSocket broadcast."""

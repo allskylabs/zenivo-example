@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllSky Observatory — Edge Dashboard</title>
-    <link rel="stylesheet" href="/style.css?v=20261017fe">
+    <link rel="stylesheet" href="/style.css?v=20261018ev1">
 </head>
 <body class="dark-mode">
     <!-- Top Navigation Header -->
@@ -295,22 +295,28 @@
                     <!-- Injected dynamically via app.js -->
                 </div>
 
-                <!-- Meteor & Transient Streak Log -->
+                <!-- Sky events: meteors, aircraft, satellites, clouds, flashes -->
                 <div class="section-heading mt-4">
-                    <h2>Detected Meteor & Transient Streak Events</h2>
+                    <h2>Sky Events</h2>
                     <span class="badge" id="event-count-badge">0 Events</span>
+                </div>
+                <div class="events-filter" id="events-filter">
+                    <button type="button" class="btn btn-sm btn-outline active" data-type="">All</button>
+                    <button type="button" class="btn btn-sm btn-outline" data-type="meteor">☄️ Meteors</button>
+                    <button type="button" class="btn btn-sm btn-outline" data-type="plane">✈️ Aircraft</button>
+                    <button type="button" class="btn btn-sm btn-outline" data-type="satellite">🛰️ Satellites</button>
+                    <button type="button" class="btn btn-sm btn-outline" data-type="clouds">☁️ Clouds</button>
+                    <button type="button" class="btn btn-sm btn-outline" data-type="flash">⚡ Flashes</button>
                 </div>
                 <div class="events-table-wrapper">
                     <table class="events-table">
                         <thead>
                             <tr>
-                                <th>Event ID</th>
-                                <th>Timestamp (UTC)</th>
-                                <th>Length (px)</th>
-                                <th>Aspect Ratio</th>
-                                <th>Peak DN</th>
-                                <th>Bounding Box</th>
-                                <th>Thumbnail</th>
+                                <th>Image</th>
+                                <th>Type</th>
+                                <th>Time</th>
+                                <th>Details</th>
+                                <th>Whole sky</th>
                             </tr>
                         </thead>
                         <tbody id="events-table-body">
@@ -414,6 +420,34 @@
                             Raise the capture interval or lower the sizes if the computer runs hot; exposures longer than the interval are not affected.
                             Cloud cover is sampled day and night (stars only at night); each sample is plotted under Live → Cloud Cover History.
                             <span id="perf-bin-note"></span>
+                        </p>
+                    </fieldset>
+                    <!-- Sky event detection -->
+                    <fieldset class="settings-group">
+                        <legend>Event detection</legend>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="evt-meteor" data-event="meteor" checked /> ☄️ Meteors</label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="evt-plane" data-event="plane" checked /> ✈️ Aircraft</label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="evt-satellite" data-event="satellite" /> 🛰️ Satellites</label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="evt-flash" data-event="flash" /> ⚡ Flashes / lightning</label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="evt-clouds" data-event="clouds" /> ☁️ Clouds arriving / clearing</label>
+                            </div>
+                        </div>
+                        <p class="field-note">
+                            Streaks and flashes are looked for at night only (sun below −8°), on a 640 px gray copy of each new frame compared with the previous one: a few ms per frame.
+                            A streak in a single frame is a meteor; a dashed one or one that continues along the same line in the next frame is an aircraft (faint and steady: a satellite).
+                            Cloud changes reuse the cloud cover samples, so they need “Star count &amp; cloud cover” on. Set a sky mask (plate solving) to ignore roads and windows.
+                            Events are listed under Gallery &amp; Events.
+                            <span id="evt-status"></span>
                         </p>
                     </fieldset>
                     <!-- Cloud cover analysis -->
@@ -914,7 +948,7 @@
 
     <!-- App JavaScript -->
     <script src="/static/sky_catalog.js"></script>
-    <script src="/app.js?v=20261018ov1"></script>
+    <script src="/app.js?v=20261018ev2"></script>
     <script src="/static/activity.js?v=20261016h"></script>
     <script src="/static/focus.js?v=20261017fe"></script>
 </body>
