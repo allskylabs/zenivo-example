@@ -77,12 +77,20 @@ def _background(gray: np.ndarray):
 def _point_sources(gray: np.ndarray, lights: bool, max_sources: int = 25) -> List[Dict[str, Any]]:
     """Detect point sources and measure each one's HFR on a background-subtracted stamp."""
     h, w = gray.shape
-    bg, noise = _background(gray)
     sat_level = 250 if gray.dtype == np.uint8 else float(gray.max()) * 0.98
+    # Local background by morphological opening (removes anything smaller than the kernel): the residual
+    # (white top-hat) holds the point sources, and its noise is not inflated by buildings, trees or glow
+    k = 31 if lights else 15
+    opened = cv2.morphologyEx(gray, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    resid = cv2.subtract(gray, opened)
+    # Pixel noise from horizontal neighbour differences: edges are a minority, so the MAD ignores them
+    rows = gray[::2] if gray.size > 65536 else gray
+    d = rows[:, 1:].astype(np.int16) - rows[:, :-1].astype(np.int16)
+    noise = max(1.4826 * float(np.median(np.abs(d - np.median(d)))) / np.sqrt(2.0), 0.75)
     # Light smoothing for peak finding only; a median filter would erase a perfectly focused star
-    smooth = cv2.GaussianBlur(gray, (3, 3), 0)
+    smooth = cv2.GaussianBlur(resid, (3, 3), 0)
     k_sigma = 8.0 if lights else 5.0
-    thr = bg + max(k_sigma * noise, 12.0 if lights else 4.0)
+    thr = max(k_sigma * noise, 20.0 if lights else 4.0)
     win = 15 if lights else 7
     dil = cv2.dilate(smooth, np.ones((win, win), np.uint8))
     ys, xs = np.nonzero((smooth == dil) & (smooth > thr))
