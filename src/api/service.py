@@ -31,7 +31,8 @@ from src.calibration.dark import DarkCalibrationEngine
 from src.analytics.cloud_cover import CloudReference, analyze_cloud_cover
 from src.analytics.cloud_history import CloudHistory
 from src.analytics.meteor import MeteorDetector
-from src.analytics.focus import FocusSession, display_stretch, find_best_star
+from src.analytics.focus_tracker import FocusTracker
+from src.analytics.focus import FocusSession, LOWER_IS_BETTER, display_stretch, find_best_star, measure_focus
 from src.api.histogram import compute_fast_histogram
 from src.pipeline.keogram import KeogramGenerator
 from src.pipeline.startrails import StartrailsAccumulator
@@ -156,6 +157,7 @@ class AllSkyService:
         # fed to auto-exposure; it ends by itself when no focus page has polled for FOCUS_IDLE_S
         self.focus = FocusSession()
         self._focus_lock = threading.Lock()
+        self.focus_tracker = FocusTracker()
         # Two profiles' worth: a master dark plus its hot-pixel map each
         self._dark_cache: Dict[str, np.ndarray] = _BoundedCache(max_items=4)
 
@@ -580,6 +582,10 @@ class AllSkyService:
             if not is_pytest and self.calibration_status.get("state") != "running" and not self.focus.active:
                 try:
                     self._maybe_archive_frame_and_update_products(frame, meta)
+                except Exception:
+                    pass
+                try:
+                    self._track_focus(frame, meta, now)
                 except Exception:
                     pass
 
@@ -1968,6 +1974,7 @@ class AllSkyService:
 
     def _sync_camera_identity(self) -> None:
         """Align station sensor spec, optical centre and output size with the camera actually attached."""
+        self._restore_lens()
         info = describe_camera(self.camera)
         if info.get("backend") in ("rts5869", "simulator"):
             return
@@ -2103,6 +2110,7 @@ class AllSkyService:
     # A forgotten /focus tab keeps polling, so also end focus mode this long after the last user action:
     # auto-exposure is paused meanwhile and the sky would go dark (or white) as the light changes
     FOCUS_MAX_UNATTENDED_S = 900.0
+    FOCUS_FPS = 10.0  # CSI cameras otherwise run at their 5 fps CPU-saving ceiling
 
     def get_focus_state(self) -> Dict[str, Any]:
         state = self.focus.state()
@@ -2110,6 +2118,7 @@ class AllSkyService:
         state["gain_db"] = float(getattr(self.camera, "current_gain_db", 0.0))
         state["mode"] = self.mode
         state["limits"] = camera_limits(self.camera)
+        state["lens"] = self.get_lens_state()
         if self.focus.active:
             state["expires_in_s"] = round(max(0.0, self.focus.last_action + self.FOCUS_MAX_UNATTENDED_S - time.time()), 1)
         frame = self.last_frame
@@ -2127,6 +2136,8 @@ class AllSkyService:
                 self.focus.started_at = time.time()
                 self.focus.reset_stats()
                 self._update_raw10_bin()
+                if hasattr(self.camera, "set_max_fps"):
+                    self.camera.set_max_fps(self.FOCUS_FPS)
                 self.last_capture_time = 0.0
                 if not os.environ.get("PYTEST_CURRENT_TEST"):
                     self.activity.info("camera", "Focus mode started (native resolution, auto-exposure and archiving paused)")
@@ -2137,7 +2148,10 @@ class AllSkyService:
         with self._focus_lock:
             if self.focus.active:
                 self.focus.active = False
+                self.focus.sweep_cancel = True
                 self._update_raw10_bin()
+                if hasattr(self.camera, "set_max_fps"):
+                    self.camera.set_max_fps(getattr(self.camera, "MAX_FPS", 5.0))
                 self.last_capture_time = 0.0
                 self.focus.crop_jpeg = self.focus.overview_jpeg = None
                 if not os.environ.get("PYTEST_CURRENT_TEST"):
@@ -2272,6 +2286,289 @@ class AllSkyService:
         state["metering"] = steps
         self.activity.info("camera", f"Focus metering: exposure {state['exposure_s']:.4g} s, gain {state['gain_db']:.1f} dB")
         return state
+
+    # ------------------------------------------------------------------
+    # Motorised lens (Pi Camera Module 3 and other autofocus CSI cameras)
+    # ------------------------------------------------------------------
+    def _lens_supported(self) -> bool:
+        return bool(getattr(self.camera, "lens_range", None)) and hasattr(self.camera, "set_lens_position")
+
+    def _restore_lens(self) -> None:
+        """Re-apply the saved lens position: libcamera's own default (IMX708: 1.0 D, ~1 m) is not the sky."""
+        cfg = self.station_config.get("lens_focus") or {}
+        saved = cfg.get("position")
+        self.focus_tracker.enabled = bool(cfg.get("tracking", True))
+        if saved is None or not hasattr(self.camera, "set_lens_position"):
+            return
+        self.focus_tracker.reset(float(cfg.get("base_position", saved)))
+        try:
+            self.camera.lens_position_target = float(saved)
+            if getattr(self.camera, "lens_range", None):
+                self.camera.set_lens_position(float(saved))
+        except Exception:
+            pass
+
+    def _save_lens(self, position: float, source: str) -> None:
+        prev = self.station_config.get("lens_focus") or {}
+        temp = self.last_metadata.get("sensor_temp_c")
+        self.station_config["lens_focus"] = {
+            "position": round(float(position), 4),
+            "source": source,
+            "sensor_temp_c": temp,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            # Where the last full sweep / manual focus put it: night tracking stays within reach of this
+            "base_position": round(float(position), 4) if source != "tracking" else prev.get("base_position", position),
+            "tracking": bool(self.focus_tracker.enabled),
+        }
+        if source != "tracking":
+            self.focus_tracker.reset(float(position), time.time())
+        if not os.environ.get("PYTEST_CURRENT_TEST"):
+            self._save_station_config()
+
+    def get_lens_state(self) -> Dict[str, Any]:
+        if not self._lens_supported():
+            return {"available": False}
+        info = dict(self.camera.lens_info() or {})
+        if hasattr(self.camera, "af_status"):
+            info.update(self.camera.af_status())
+        info["saved"] = self.station_config.get("lens_focus")
+        info["tracking"] = self.focus_tracker.state()
+        if self.focus_tracker.next_ts:
+            info["tracking"]["next_in_s"] = round(max(0.0, self.focus_tracker.next_ts - time.time()))
+        info["sweep"] = dict(self.focus.sweep) if self.focus.sweep else None
+        return info
+
+    def set_lens(self, position: Optional[float] = None, delta: Optional[float] = None,
+                 tracking: Optional[bool] = None) -> Dict[str, Any]:
+        if not self._lens_supported():
+            raise RuntimeError("This camera has no motorised lens")
+        if tracking is not None:
+            self.focus_tracker.enabled = bool(tracking)
+            cfg = self.station_config.setdefault("lens_focus", {})
+            cfg["tracking"] = bool(tracking)
+            if not os.environ.get("PYTEST_CURRENT_TEST"):
+                self._save_station_config()
+            if position is None and delta is None:
+                return self.get_focus_state()
+        if self.focus.sweep and self.focus.sweep.get("state") == "running":
+            raise RuntimeError("A focus sweep is running")
+        cur = getattr(self.camera, "lens_position_target", None)
+        if cur is None:
+            cur = getattr(self.camera, "lens_position", None)
+        if cur is None:
+            cur = self.camera.lens_range[2]
+        target = float(position) if position is not None else float(cur) + float(delta or 0.0)
+        pos = self.camera.set_lens_position(target)
+        self._save_lens(pos, "manual")
+        self.focus.last_action = time.time()
+        with self._focus_lock:
+            self.focus.reset_stats()
+        return self.get_focus_state()
+
+    def _focus_sensor_window(self) -> Tuple[float, float, float, float]:
+        """The focus ROI as fractions (x, y, w, h) of the sensor field, undoing the display mirror/flip."""
+        frame = self.last_frame
+        fh, fw = (frame.shape[:2] if frame is not None else (self.camera.height, self.camera.width))
+        x0, y0, rw, rh = self.focus.roi_rect(fw, fh)
+        fx, fy, ww, hh = x0 / fw, y0 / fh, rw / fw, rh / fh
+        tf = self.station_config.get("image_transform") or {}
+        rot180 = int(tf.get("rotate_deg", 0)) % 360 == 180
+        if bool(tf.get("flip_horizontal")) != rot180:
+            fx = 1.0 - fx - ww
+        if bool(tf.get("flip_vertical")) != rot180:
+            fy = 1.0 - fy - hh
+        return fx, fy, ww, hh
+
+    def start_lens_autofocus(self, mode: str = "sweep") -> Dict[str, Any]:
+        """Autofocus the motorised lens on the focus ROI and keep the result.
+
+        mode "camera": libcamera's own scan (phase-detect + contrast). Fast and fine in daylight, but it
+        rarely locks on stars. mode "sweep": step the lens and pick the best of this app's own score (star
+        HFR at night, edge contrast by day), which works on stars and point lights too."""
+        if not self._lens_supported():
+            raise RuntimeError("This camera has no motorised lens")
+        if not self.focus.active:
+            raise RuntimeError("Start focus mode first")
+        if self.focus.sweep and self.focus.sweep.get("state") == "running":
+            raise RuntimeError("Autofocus is already running")
+        self.focus.last_action = time.time()
+        self.focus.sweep_cancel = False
+        self.focus.sweep = {"state": "running", "mode": mode, "phase": "start", "progress": 0.0, "points": [],
+                            "started_at": time.time()}
+        target = self._lens_camera_af if mode == "camera" else self._lens_sweep
+        threading.Thread(target=target, name=f"lens-af-{mode}", daemon=True).start()
+        return self.get_focus_state()
+
+    def cancel_lens_autofocus(self) -> Dict[str, Any]:
+        self.focus.sweep_cancel = True
+        return self.get_focus_state()
+
+    def _lens_finish(self, position: Optional[float], state: str, message: str, source: str) -> None:
+        sw = self.focus.sweep
+        if position is not None:
+            position = self.camera.set_lens_position(position)
+            self._save_lens(position, source)
+            sw["best_position"] = position
+        sw.update({"state": state, "message": message, "progress": 1.0, "finished_at": time.time()})
+        with self._focus_lock:
+            self.focus.reset_stats()
+        lvl = "success" if state == "done" else "warning"
+        if not os.environ.get("PYTEST_CURRENT_TEST"):
+            self.activity.log(lvl, "camera", f"Lens autofocus ({sw.get('mode')}): {message}")
+
+    def _track_focus(self, frame: np.ndarray, meta: Dict[str, Any], now: float) -> None:
+        """Night focus tracking on ordinary captures (see FocusTracker); needs a saved focus position."""
+        if not self._lens_supported() or not self.focus_tracker.enabled or self.focus_tracker.base is None:
+            return
+        from src.calibration.auto_exposure import calculate_solar_elevation
+        is_night = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon) < -12.0
+        temp = meta.get("sensor_temp_c")
+        before = self.focus_tracker.phase
+        new = self.focus_tracker.step(
+            now, frame, meta.get("lens_position"), getattr(self.camera, "lens_position_target", None),
+            self.camera.lens_range, is_night, temp,
+        )
+        if new is None:
+            return
+        self.camera.set_lens_position(new)
+        if before == "minus" and self.focus_tracker.phase is None:
+            entry = self.focus_tracker.log[-1] if self.focus_tracker.log else {}
+            if abs(float(entry.get("to", new)) - float(entry.get("from", new))) >= 0.001:
+                self._save_lens(new, "tracking")
+                self.activity.info(
+                    "camera", f"Focus tracking: lens {entry.get('from')} -> {new} D at {temp} °C (HFR {entry.get('hfr')})"
+                )
+
+    def _lens_camera_af(self) -> None:
+        sw = self.focus.sweep
+        try:
+            if not self.camera.start_autofocus(self._focus_sensor_window()):
+                raise RuntimeError("camera refused autofocus")
+            sw["phase"] = "camera scan"
+            deadline = time.time() + 15.0
+            since = self.last_capture_time
+            while time.time() < deadline and not self.focus.sweep_cancel:
+                _, meta, since = self._focus_new_frame(since, timeout_s=5.0)
+                st = self.camera.af_status()
+                sw["progress"] = min(0.95, (time.time() - sw["started_at"]) / 6.0)
+                if st.get("lens_position") is not None:
+                    sw["points"].append({"pos": st["lens_position"], "score": None})
+                if not st.get("scanning"):
+                    ok = st.get("af_state") == 2
+                    pos = st.get("lens_position")
+                    self._lens_finish(pos, "done" if ok else "failed",
+                                      f"{'focused' if ok else 'no lock, lens held'} at {pos:.3f} D" if pos is not None
+                                      else "no lens position reported", "camera_af")
+                    return
+            pos = getattr(self.camera, "lens_position", None)
+            self._lens_finish(pos, "cancelled" if self.focus.sweep_cancel else "failed",
+                              "cancelled" if self.focus.sweep_cancel else "timed out", "camera_af")
+        except Exception as exc:
+            self._lens_finish(None, "failed", str(exc), "camera_af")
+
+    def _lens_score(self, pos: float, method: str, settle: int, frames: int, since: float):
+        """Move the lens, drop frames exposed while it moved, then the median ROI score of the next ones."""
+        pos = self.camera.set_lens_position(pos)
+        wait = 10.0 + 3 * float(getattr(self.camera, "current_exposure_s", 0.0))
+        # Controls reach the sensor a few frames late: wait until frames report the new position
+        # (when the camera reports one), then drop `settle` more exposed while the lens was moving
+        for _ in range(8):
+            _, meta, since = self._focus_new_frame(since, timeout_s=wait)
+            reported = meta.get("lens_position")
+            if reported is None or abs(float(reported) - pos) < 0.006:
+                break
+        for _ in range(settle):
+            _, _, since = self._focus_new_frame(since, timeout_s=wait)
+        scores = []
+        for _ in range(frames):
+            frame, _, since = self._focus_new_frame(since, timeout_s=wait)
+            self.focus.last_poll = time.time()
+            fh, fw = frame.shape[:2]
+            x0, y0, rw, rh = self.focus.roi_rect(fw, fh)
+            res = measure_focus(frame[y0:y0 + rh, x0:x0 + rw], method)
+            if res.get("score") is not None:
+                scores.append(float(res["score"]))
+        return (float(np.median(scores)) if scores else None), since
+
+    def _lens_sweep(self) -> None:
+        sw = self.focus.sweep
+        try:
+            lo, hi, _ = self.camera.lens_range
+            start_pos = getattr(self.camera, "lens_position_target", None)
+            # Lock the measure for the whole sweep (auto could flip between stars and contrast)
+            frame, _, since = self._focus_new_frame(self.last_capture_time, timeout_s=15.0)
+            fh, fw = frame.shape[:2]
+            x0, y0, rw, rh = self.focus.roi_rect(fw, fh)
+            method = self.focus.method
+            if method == "auto":
+                method = measure_focus(frame[y0:y0 + rh, x0:x0 + rw], "auto")["method"]
+            lower = LOWER_IS_BETTER[method]
+            sw["method"] = method
+            exp = float(getattr(self.camera, "current_exposure_s", 0.1))
+            settle, frames = (0, 2) if exp >= 0.4 else (1, 3)
+
+            def quality(score):
+                return float("-inf") if score is None else (-score if lower else score)
+
+            def measure(pos, phase):
+                nonlocal since
+                score, since = self._lens_score(pos, method, settle, frames, since)
+                sw["points"].append({"pos": round(pos, 4), "score": score, "phase": phase})
+                return score
+
+            # Coarse: from infinity outwards (the sky is at 0 D) until well past the peak
+            coarse_hi = min(hi, lo + 2.5)
+            step = 0.1
+            positions = list(np.arange(lo, coarse_hi + 1e-9, step))
+            best_q, best_pos, worse_run = float("-inf"), None, 0
+            sw["phase"] = "coarse"
+            for i, pos in enumerate(positions):
+                if self.focus.sweep_cancel:
+                    raise InterruptedError
+                q = quality(measure(float(pos), "coarse"))
+                sw["progress"] = 0.7 * (i + 1) / len(positions)
+                if q > best_q:
+                    best_q, best_pos, worse_run = q, float(pos), 0
+                elif best_pos is not None and np.isfinite(best_q):
+                    # Clearly past the peak (30 % worse, or the sources vanished) for 3 steps in a row
+                    if lower:
+                        worse = (not np.isfinite(q)) or abs(q) > abs(best_q) * 1.3
+                    else:
+                        worse = q < best_q * 0.7
+                    worse_run = worse_run + 1 if worse else 0
+                    if worse_run >= 3:
+                        break
+            if best_pos is None or not np.isfinite(best_q):
+                pos_back = start_pos if start_pos is not None else lo
+                self._lens_finish(pos_back, "failed", f"nothing measurable in the zoom region ({method}); lens put back", "sweep")
+                return
+
+            # Fine: +-1 coarse step around the peak in 0.02 D steps, then a parabola through the best three
+            sw["phase"] = "fine"
+            fine = [p for p in np.arange(best_pos - step, best_pos + step + 1e-9, 0.02) if lo - 1e-9 <= p <= hi + 1e-9]
+            fine_pts = []
+            for i, pos in enumerate(fine):
+                if self.focus.sweep_cancel:
+                    raise InterruptedError
+                fine_pts.append((float(pos), quality(measure(float(pos), "fine"))))
+                sw["progress"] = 0.7 + 0.28 * (i + 1) / len(fine)
+            k = int(np.argmax([q for _, q in fine_pts]))
+            final = fine_pts[k][0]
+            if 0 < k < len(fine_pts) - 1 and all(np.isfinite(q) for _, q in fine_pts[k - 1:k + 2]):
+                (x1, y1), (x2, y2), (x3, y3) = fine_pts[k - 1:k + 2]
+                denom = (y1 - 2 * y2 + y3)
+                if denom < 0:
+                    final = x2 + 0.5 * (x2 - x1) * (y1 - y3) / denom
+                    final = min(x3, max(x1, final))
+            best_score = -fine_pts[k][1] if lower else fine_pts[k][1]
+            unit = "px HFR" if lower else "contrast"
+            dist = f"{1 / final:.1f} m" if final > 0.05 else "infinity"
+            self._lens_finish(final, "done", f"best at {final:.3f} D ({dist}), {best_score:.3g} {unit}", "sweep")
+        except InterruptedError:
+            pos_back = getattr(self.camera, "lens_position_target", None)
+            self._lens_finish(None, "cancelled", f"cancelled, lens left at {pos_back}", "sweep")
+        except Exception as exc:
+            self._lens_finish(None, "failed", str(exc), "sweep")
 
     def focus_auto_roi(self, lights: bool = False) -> Dict[str, Any]:
         """Centre the focus ROI on the best point source in the whole frame (stars, else bright lights)."""

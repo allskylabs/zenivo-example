@@ -86,6 +86,17 @@ class PiCameraController(CameraDriverInterface):
         self.max_gain_db = 24.0
         self.pixel_array_size: Tuple[int, int] = (0, 0)
         self._last_ts: Optional[float] = None
+        # Frame rate ceiling; focus mode raises it for a responsive zoom view
+        self.max_fps = self.MAX_FPS
+        # Motorised lens (Camera Module 3 / IMX708, IMX519, ...): LensPosition in dioptres (0 = infinity).
+        # None = leave the lens where libcamera puts it (IMX708 tuning default is 1.0 D, i.e. ~1 m).
+        self.lens_range: Optional[Tuple[float, float, float]] = None
+        self.lens_position_target: Optional[float] = None
+        self.lens_position: Optional[float] = None
+        self.af_state: Optional[int] = None
+        self.focus_fom: Optional[int] = None
+        self._af_running = False
+        self._scaler_crop: Optional[Tuple[int, int, int, int]] = None
 
     # ------------------------------------------------------------------
     def _pick_sensor_mode(self, cam) -> Dict[str, Any]:
@@ -122,6 +133,9 @@ class PiCameraController(CameraDriverInterface):
         raw_cfg = {"size": tuple(mode["size"])} if mode else {}
 
         ctrl_info = cam.camera_controls or {}
+        if "LensPosition" in ctrl_info and "AfMode" in ctrl_info:
+            lp_min, lp_max, lp_def = ctrl_info["LensPosition"]
+            self.lens_range = (float(lp_min), float(lp_max), float(lp_def if lp_def is not None else lp_min))
         exp_min, exp_max, _ = ctrl_info.get("ExposureTime", (100, 60_000_000, None))
         g_min, g_max, _ = ctrl_info.get("AnalogueGain", (1.0, 16.0, None))
         self.min_exposure_s = max(1e-5, float(exp_min) / 1e6)
@@ -147,6 +161,8 @@ class PiCameraController(CameraDriverInterface):
             self.min_exposure_s, self.max_exposure_s, self.max_gain_db,
         )
         self.set_hardware_exposure(self.current_exposure_s, self.current_gain_db)
+        if self.lens_range and self.lens_position_target is not None:
+            self.set_lens_position(self.lens_position_target)
         return True
 
     def close(self) -> None:
@@ -181,8 +197,8 @@ class PiCameraController(CameraDriverInterface):
                 # at MAX_FPS: the app needs one frame every few seconds, and every extra frame is ISP and
                 # Python work (at 30 fps the libcamera/Picamera2 threads alone cost ~30% of a Pi 4 core).
                 "FrameDurationLimits": (
-                    max(int(1e6 / self.MAX_FPS), exp_us + 1000),
-                    max(int(1e6 / self.MAX_FPS), exp_us + 1000),
+                    max(int(1e6 / self.max_fps), exp_us + 1000),
+                    max(int(1e6 / self.max_fps), exp_us + 1000),
                 ),
             })
         return {
@@ -255,6 +271,19 @@ class PiCameraController(CameraDriverInterface):
             "simulator": False,
             "camera_backend": self.backend,
         }
+        if md.get("LensPosition") is not None:
+            self.lens_position = round(float(md["LensPosition"]), 4)
+            meta["lens_position"] = self.lens_position
+        if md.get("AfState") is not None:
+            self.af_state = int(md["AfState"])
+            meta["af_state"] = self.af_state
+            if self._af_running and self.af_state in (2, 3) and self.lens_position is not None:
+                # Scan finished (focused or failed): hold the lens there instead of hunting further
+                self.set_lens_position(self.lens_position)
+        if md.get("ScalerCrop") is not None:
+            self._scaler_crop = tuple(int(v) for v in md["ScalerCrop"])
+        if md.get("FocusFoM") is not None:
+            self.focus_fom = int(md["FocusFoM"])
         if md.get("DigitalGain") is not None:
             meta["digital_gain"] = round(float(md["DigitalGain"]), 3)
         if md.get("SensorTemperature") is not None:
@@ -262,6 +291,65 @@ class PiCameraController(CameraDriverInterface):
         if md.get("ColourGains") is not None:
             meta["colour_gains"] = [round(float(g), 3) for g in md["ColourGains"]]
         return frame, meta
+
+    # ------------------------------------------------------------------
+    # Motorised lens
+    # ------------------------------------------------------------------
+    def set_max_fps(self, fps: float) -> None:
+        self.max_fps = max(0.5, float(fps))
+        self.set_hardware_exposure(self.current_exposure_s, self.current_gain_db)
+
+    def set_lens_position(self, dioptres: float) -> Optional[float]:
+        """Manual focus: hold the lens at this position (dioptres = 1 / distance in m; 0 = infinity)."""
+        if not self.lens_range:
+            return None
+        lo, hi, _ = self.lens_range
+        pos = round(min(hi, max(lo, float(dioptres))), 4)
+        self.lens_position_target = pos
+        self._af_running = False
+        if self.picam is not None:
+            self.picam.set_controls({"AfMode": 0, "LensPosition": pos})
+        return pos
+
+    def start_autofocus(self, window: Optional[Tuple[float, float, float, float]] = None) -> bool:
+        """One libcamera autofocus scan (PDAF + contrast, good in daylight), optionally metered on a window
+        given as fractions (x, y, w, h) of the sensor field. Poll af_status() until it is no longer scanning."""
+        if not self.lens_range or self.picam is None:
+            return False
+        ctrls: Dict[str, Any] = {"AfMode": 1, "AfRange": 0, "AfSpeed": 1}
+        crop = self._scaler_crop
+        if window and crop:
+            cx, cy, cw, ch = crop
+            fx, fy, fw, fh = window
+            ctrls["AfMetering"] = 1
+            ctrls["AfWindows"] = [(int(cx + fx * cw), int(cy + fy * ch), max(16, int(fw * cw)), max(16, int(fh * ch)))]
+        else:
+            ctrls["AfMetering"] = 0
+        self.picam.set_controls(ctrls)
+        self.picam.set_controls({"AfTrigger": 0})
+        self._af_running = True
+        return True
+
+    def af_status(self) -> Dict[str, Any]:
+        """AfState 0 idle, 1 scanning, 2 focused, 3 failed, updated from captured frames' metadata (keep
+        capturing while polling). Once a scan ends the lens is held (manual) at the position it found."""
+        return {"af_state": self.af_state, "lens_position": self.lens_position, "scanning": self._af_running}
+
+    def lens_info(self) -> Optional[Dict[str, Any]]:
+        if not self.lens_range:
+            return None
+        lo, hi, default = self.lens_range
+        return {
+            "available": True,
+            "min": lo,
+            "max": hi,
+            "default": default,
+            "position": self.lens_position if self.lens_position is not None else self.lens_position_target,
+            "held": self.lens_position_target,
+            "af_state": self.af_state,
+            "focus_fom": self.focus_fom,
+            "camera_af": True,
+        }
 
     # ------------------------------------------------------------------
     def get_info(self) -> Dict[str, Any]:

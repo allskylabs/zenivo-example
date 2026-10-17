@@ -84,6 +84,17 @@ class FocusConfigRequest(BaseModel):
     reset: bool = Field(False, description="Forget the score history and best score")
 
 
+class LensRequest(BaseModel):
+    """Manual focus of a motorised lens, in dioptres (1 / distance in m; 0 = infinity)."""
+    position: Optional[float] = Field(None, ge=0.0, le=32.0, description="Absolute lens position (D)")
+    delta: Optional[float] = Field(None, ge=-5.0, le=5.0, description="Relative move (D)")
+    tracking: Optional[bool] = Field(None, description="Night focus tracking (temperature drift) on/off")
+
+
+class LensAutofocusRequest(BaseModel):
+    mode: str = Field("sweep", pattern="^(sweep|camera)$", description="sweep: this app's score; camera: libcamera AF")
+
+
 class StationLocationRequest(BaseModel):
     """Request payload for setting station coordinates and/or manually adjusting optical & orientation parameters."""
     latitude_deg: Optional[float] = Field(default=None, ge=-90.0, le=90.0, description="Station latitude in degrees (-90 to +90)")

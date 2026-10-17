@@ -21,6 +21,8 @@ from src.api.schemas import (
     StoragePolicyRequest,
     CloudConfigRequest,
     FocusConfigRequest,
+    LensRequest,
+    LensAutofocusRequest,
 )
 from src.api.service import AllSkyService
 from src.api.stream import mjpeg_frame_generator, handle_live_websocket, sse_event_generator
@@ -413,6 +415,29 @@ def get_focus_frame(
     headers = dict(_NO_STORE)
     headers["X-Focus"] = json.dumps(result, separators=(",", ":"))
     return Response(content=jpeg, media_type="image/jpeg", headers=headers)
+
+
+@router.post("/api/focus/lens")
+def set_focus_lens(req: LensRequest, service: AllSkyService = Depends(get_service)):
+    """Move a motorised lens (Pi Camera Module 3 ...) and keep it there; the position is saved."""
+    try:
+        return service.set_lens(position=req.position, delta=req.delta, tracking=req.tracking)
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.post("/api/focus/lens/autofocus")
+def start_lens_autofocus(req: LensAutofocusRequest, service: AllSkyService = Depends(get_service)):
+    """Autofocus the lens on the focus region; progress and result are in GET /api/focus (lens.sweep)."""
+    try:
+        return service.start_lens_autofocus(req.mode)
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.post("/api/focus/lens/cancel")
+def cancel_lens_autofocus(service: AllSkyService = Depends(get_service)):
+    return service.cancel_lens_autofocus()
 
 
 @router.get("/api/focus/overview.jpg")

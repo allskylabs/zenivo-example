@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllSky Observatory — Edge Dashboard</title>
-    <link rel="stylesheet" href="/style.css?v=20261017fb">
+    <link rel="stylesheet" href="/style.css?v=20261017fc">
 </head>
 <body class="dark-mode">
     <!-- Top Navigation Header -->
@@ -773,6 +773,35 @@
                             <button class="btn btn-sm btn-outline" id="focus-center">Centre</button>
                         </div>
                     </div>
+                    <div class="card" id="focus-lens-card" hidden>
+                        <div class="card-header">
+                            <h2>Lens (motorised)</h2>
+                            <span class="text-muted focus-hint" id="focus-lens-af">—</span>
+                        </div>
+                        <div class="focus-lens-pos"><b id="focus-lens-pos">—</b> <span class="text-muted" id="focus-lens-dist"></span></div>
+                        <div class="focus-hint text-muted" id="focus-lens-saved">&nbsp;</div>
+                        <input type="range" id="focus-lens-slider" min="0" max="3" step="0.005" value="0" aria-label="Lens position (dioptres)">
+                        <div class="btn-group focus-btns focus-lens-nudge">
+                            <button class="btn btn-sm btn-outline" data-lens-delta="-0.1">−0.1</button>
+                            <button class="btn btn-sm btn-outline" data-lens-delta="-0.02">−0.02</button>
+                            <button class="btn btn-sm btn-outline" data-lens-delta="-0.005">−0.005</button>
+                            <button class="btn btn-sm btn-outline" data-lens-delta="0.005">+0.005</button>
+                            <button class="btn btn-sm btn-outline" data-lens-delta="0.02">+0.02</button>
+                            <button class="btn btn-sm btn-outline" data-lens-delta="0.1">+0.1</button>
+                        </div>
+                        <div class="btn-group focus-btns">
+                            <button class="btn btn-sm btn-primary" id="focus-lens-sweep" title="Step the lens through its range and keep the position with the best score in the zoom region (works on stars, lights and daytime scenes)">Sweep autofocus</button>
+                            <button class="btn btn-sm btn-outline" id="focus-lens-camaf" title="libcamera's own phase-detect autofocus on the zoom region: fast, daylight only">Camera AF</button>
+                            <button class="btn btn-sm btn-outline" id="focus-lens-cancel" hidden>Cancel</button>
+                        </div>
+                        <div class="focus-meter" id="focus-lens-progress-wrap" hidden><div class="focus-meter-fill good" id="focus-lens-progress"></div></div>
+                        <div class="focus-hint" id="focus-lens-msg">&nbsp;</div>
+                        <canvas id="focus-lens-chart" class="focus-lens-chart" hidden></canvas>
+                        <label class="checkbox-label focus-hint" title="Every 20 min at night, probe ±0.04 D on two normal frames and move toward sharper stars (follows temperature drift)">
+                            <input type="checkbox" id="focus-lens-track"> Keep focus at night (temperature drift)
+                        </label>
+                        <div class="focus-hint text-muted" id="focus-lens-track-msg"></div>
+                    </div>
                     <div class="card">
                         <div class="card-header">
                             <h2>Overview</h2>
@@ -850,6 +879,6 @@
     <script src="/static/sky_catalog.js"></script>
     <script src="/app.js?v=20261017c2"></script>
     <script src="/static/activity.js?v=20261016h"></script>
-    <script src="/static/focus.js?v=20261017fb"></script>
+    <script src="/static/focus.js?v=20261017fc"></script>
 </body>
 </html>

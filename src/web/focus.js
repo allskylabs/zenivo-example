@@ -102,6 +102,7 @@
         badge.textContent = st.active ? "LIVE" : "OFF";
         badge.classList.toggle("on", st.active);
         showExpiry(s.expires_in_s);
+        if (s.lens) applyLens(s.lens);
         emptyMsg.hidden = st.active && !!st.bitmap;
         placeRoiBox();
     }
@@ -511,6 +512,130 @@
     }
     document.addEventListener("DOMContentLoaded", fitLayout);
     window.addEventListener("load", fitLayout);
+
+    // ------------------------------------------------------------------
+    // Motorised lens (Pi Camera Module 3 ...)
+    // ------------------------------------------------------------------
+    const lensCard = $("focus-lens-card");
+    const lensSlider = $("focus-lens-slider");
+    let lensPoll = null;
+    let lensSweepRunning = false;
+
+    function fmtDist(d) {
+        if (d === null || d === undefined) return "";
+        return d < 0.02 ? "(nominal ∞)" : `(≈ ${(1 / d).toFixed(d > 1 ? 2 : 1)} m)`;
+    }
+
+    function applyLens(L) {
+        lensCard.hidden = !L.available;
+        if (!L.available) return;
+        const pos = L.position ?? L.held;
+        $("focus-lens-pos").textContent = pos === null || pos === undefined ? "—" : `${pos.toFixed(3)} D`;
+        $("focus-lens-dist").textContent = fmtDist(pos);
+        lensSlider.max = Math.min(L.max, 3);
+        lensSlider.min = L.min;
+        if (document.activeElement !== lensSlider && pos !== null && pos !== undefined) lensSlider.value = pos;
+        const AF = { 0: "AF idle", 1: "AF scanning", 2: "AF focused", 3: "AF failed" };
+        $("focus-lens-af").textContent = L.af_state !== null && L.af_state !== undefined ? AF[L.af_state] || "" : "";
+        const sv = L.saved;
+        $("focus-lens-saved").textContent = sv
+            ? `saved ${sv.position.toFixed(3)} D by ${sv.source}${sv.sensor_temp_c != null ? ` at ${sv.sensor_temp_c} °C` : ""} · ${new Date(sv.updated_at).toLocaleString()}`
+            : `not saved yet — libcamera default ${L.default} D (≈ ${(1 / Math.max(L.default, 0.01)).toFixed(1)} m), not the sky`;
+        const tr = L.tracking || {};
+        const trk = $("focus-lens-track");
+        if (document.activeElement !== trk) trk.checked = !!tr.enabled;
+        const last = (tr.log || [])[tr.log ? tr.log.length - 1 : 0];
+        $("focus-lens-track-msg").textContent = !tr.enabled ? "" : tr.base === null || tr.base === undefined
+            ? "Run a sweep first: tracking follows the swept position."
+            : `around ${tr.base.toFixed(3)} D ±${tr.max_offset} · ` +
+              (last ? `last ${new Date(last.t * 1000).toLocaleTimeString()}: ${last.from} → ${last.to} D${last.temp_c != null ? ` at ${last.temp_c} °C` : ""}` : "no check yet") +
+              (tr.next_in_s != null ? ` · next in ${Math.round(tr.next_in_s / 60)} min (night only)` : "");
+
+        const sw = L.sweep;
+        const running = !!sw && sw.state === "running";
+        $("focus-lens-cancel").hidden = !running;
+        $("focus-lens-sweep").disabled = running;
+        $("focus-lens-camaf").disabled = running;
+        $("focus-lens-progress-wrap").hidden = !running;
+        if (sw) {
+            $("focus-lens-progress").style.width = Math.round((sw.progress || 0) * 100) + "%";
+            $("focus-lens-msg").textContent = running
+                ? `${sw.mode === "camera" ? "Camera AF" : "Sweep"} · ${sw.phase}${sw.method ? " · " + sw.method : ""} · ${(sw.points || []).length} steps`
+                : `${sw.mode === "camera" ? "Camera AF" : "Sweep"} ${sw.state}: ${sw.message || ""}`;
+            drawLensChart(sw);
+        }
+        if (running !== lensSweepRunning) {
+            lensSweepRunning = running;
+            setLensPoll(running ? 700 : 5000);
+            if (!running) { st.history = []; st.lastResult = null; updateStats(null); drawChart(); }
+        }
+    }
+
+    function drawLensChart(sw) {
+        const cv = $("focus-lens-chart");
+        const pts = (sw.points || []).filter((p) => p.score !== null && p.score !== undefined);
+        cv.hidden = sw.mode === "camera" || pts.length < 2;
+        if (cv.hidden) return;
+        const dpr = window.devicePixelRatio || 1;
+        const w = cv.clientWidth, h = cv.clientHeight;
+        if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+        const c = cv.getContext("2d");
+        c.setTransform(dpr, 0, 0, dpr, 0, 0);
+        c.clearRect(0, 0, w, h);
+        const lower = sw.method !== "contrast";
+        const xs = pts.map((p) => p.pos), ys = pts.map((p) => p.score);
+        const x0 = Math.min(...xs), x1 = Math.max(...xs, x0 + 0.05);
+        const y0 = Math.min(...ys), y1 = Math.max(...ys, y0 * 1.01 + 1e-6);
+        const X = (v) => 30 + ((v - x0) / (x1 - x0)) * (w - 38);
+        const Y = (v) => { const f = (v - y0) / (y1 - y0); return 6 + (lower ? f : 1 - f) * (h - 22); };
+        c.fillStyle = "#64748b";
+        c.font = "10px ui-monospace, monospace";
+        c.fillText(`${x0.toFixed(2)} D`, 30, h - 3);
+        c.fillText(`${x1.toFixed(2)} D`, w - 46, h - 3);
+        c.fillText("sharp", 0, 12);
+        pts.forEach((p) => {
+            c.fillStyle = p.phase === "fine" ? "#10b981" : "#38bdf8";
+            c.beginPath(); c.arc(X(p.pos), Y(p.score), 2.5, 0, Math.PI * 2); c.fill();
+        });
+        if (sw.best_position !== undefined && sw.best_position !== null) {
+            c.strokeStyle = "#f1f5f9";
+            c.setLineDash([3, 3]);
+            c.beginPath(); c.moveTo(X(sw.best_position), 4); c.lineTo(X(sw.best_position), h - 14); c.stroke();
+            c.setLineDash([]);
+        }
+    }
+
+    function setLensPoll(ms) {
+        clearInterval(lensPoll);
+        if (lensCard.hidden && !lensSweepRunning) ms = 15000;
+        lensPoll = setInterval(async () => {
+            try { const s = await api("/api/focus"); if (s.lens) applyLens(s.lens); } catch (e) { /* retry */ }
+        }, ms);
+    }
+
+    async function lensCmd(path, body) {
+        try {
+            const s = await api(path, { method: "POST", body });
+            applyState(s);
+            st.history = []; st.lastResult = null; updateStats(null); drawChart();
+        } catch (e) { alert(`Lens: ${e.message}`); }
+    }
+    document.querySelectorAll("[data-lens-delta]").forEach((b) =>
+        b.addEventListener("click", () => lensCmd("/api/focus/lens", { delta: parseFloat(b.dataset.lensDelta) })));
+    lensSlider.addEventListener("change", () => lensCmd("/api/focus/lens", { position: parseFloat(lensSlider.value) }));
+    $("focus-lens-sweep").addEventListener("click", () => {
+        if (!st.active) { alert("Start focus mode first, and put the zoom on stars, a light or a detailed distant object."); return; }
+        lensCmd("/api/focus/lens/autofocus", { mode: "sweep" });
+        setLensPoll(700);
+    });
+    $("focus-lens-camaf").addEventListener("click", () => {
+        if (!st.active) { alert("Start focus mode first."); return; }
+        lensCmd("/api/focus/lens/autofocus", { mode: "camera" });
+        setLensPoll(700);
+    });
+    $("focus-lens-cancel").addEventListener("click", () => lensCmd("/api/focus/lens/cancel"));
+    $("focus-lens-track").addEventListener("change", (e) => lensCmd("/api/focus/lens", { tracking: e.target.checked }));
+    setLensPoll(5000);
 
     // Any click or key press on this page counts as someone focusing (keeps focus mode from timing out)
     let lastTouch = 0;

@@ -228,6 +228,8 @@ class FocusSession:
         self.started_at = 0.0
         self.last_poll = 0.0
         self.last_action = 0.0  # last start/config/metering/exposure change by a user
+        self.sweep: Optional[Dict[str, Any]] = None  # lens autofocus status (motorised lenses)
+        self.sweep_cancel = False
         self.cx = 0.5          # ROI centre, normalised to the native frame
         self.cy = 0.5
         self.roi_size = 256    # native pixels
