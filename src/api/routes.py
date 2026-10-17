@@ -421,7 +421,8 @@ def get_focus_frame(
 def set_focus_lens(req: LensRequest, service: AllSkyService = Depends(get_service)):
     """Move a motorised lens (Pi Camera Module 3 ...) and keep it there; the position is saved."""
     try:
-        return service.set_lens(position=req.position, delta=req.delta, tracking=req.tracking)
+        return service.set_lens(position=req.position, delta=req.delta, tracking=req.tracking,
+                                mode=req.mode, reset_learning=req.reset_learning)
     except RuntimeError as e:
         raise HTTPException(status_code=409, detail=str(e))
 

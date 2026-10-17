@@ -126,3 +126,48 @@ class FocusTracker:
             "max_offset": self.max_offset,
             "log": list(self.log)[-12:],
         }
+
+
+class TempCompensation:
+    """Learned focus-vs-temperature model for a motorised lens.
+
+    Every verified focus (sweep, night tracking check, or a manual set in auto mode) is a sample
+    (sensor temperature, lens position). With at least MIN_SAMPLES spanning MIN_SPAN_C, a least-squares
+    line gives the drift in dioptres per degree; the lens then follows temperature from the latest
+    verified position (the anchor) without any test frames. Until then the slope is 0 (no compensation).
+    """
+
+    MAX_SAMPLES = 80
+    MIN_SAMPLES = 3
+    MIN_SPAN_C = 3.0
+    MAX_SLOPE = 0.02  # D per degree C; anything steeper is noise or a disturbed mount
+
+    def __init__(self, samples=None):
+        self.samples = [dict(s) for s in (samples or []) if s.get("temp_c") is not None]
+
+    def add(self, temp_c: Optional[float], pos: float, source: str, t: float) -> None:
+        if temp_c is None:
+            return
+        self.samples.append({"t": round(t, 1), "temp_c": round(float(temp_c), 2), "pos": round(float(pos), 4),
+                             "source": source})
+        self.samples = self.samples[-self.MAX_SAMPLES:]
+
+    def fit(self) -> Dict[str, Any]:
+        temps = np.array([s["temp_c"] for s in self.samples], np.float64)
+        pos = np.array([s["pos"] for s in self.samples], np.float64)
+        span = float(temps.max() - temps.min()) if len(temps) else 0.0
+        out = {"n": len(temps), "span_c": round(span, 2), "slope": 0.0, "learned": False}
+        if len(temps) >= self.MIN_SAMPLES and span >= self.MIN_SPAN_C:
+            slope, _ = np.polyfit(temps, pos, 1)
+            resid = pos - np.polyval(np.polyfit(temps, pos, 1), temps)
+            out.update({
+                "slope": round(float(np.clip(slope, -self.MAX_SLOPE, self.MAX_SLOPE)), 5),
+                "learned": True,
+                "rms_d": round(float(np.sqrt(np.mean(resid ** 2))), 4),
+            })
+        return out
+
+    def target(self, anchor_pos: float, anchor_temp: Optional[float], temp_c: Optional[float]) -> float:
+        if anchor_temp is None or temp_c is None:
+            return anchor_pos
+        return anchor_pos + self.fit()["slope"] * (float(temp_c) - float(anchor_temp))

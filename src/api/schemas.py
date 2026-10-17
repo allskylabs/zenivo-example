@@ -89,6 +89,8 @@ class LensRequest(BaseModel):
     position: Optional[float] = Field(None, ge=0.0, le=32.0, description="Absolute lens position (D)")
     delta: Optional[float] = Field(None, ge=-5.0, le=5.0, description="Relative move (D)")
     tracking: Optional[bool] = Field(None, description="Night focus tracking (temperature drift) on/off")
+    mode: Optional[str] = Field(None, pattern="^(auto|manual)$", description="auto: temperature compensation + nightly star checks; manual: hold")
+    reset_learning: bool = Field(False, description="Forget the learned focus-vs-temperature samples")
 
 
 class LensAutofocusRequest(BaseModel):

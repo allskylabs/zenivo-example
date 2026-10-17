@@ -128,3 +128,37 @@ def test_tracker_restores_lens_at_dawn_and_skips_cloud():
     assert tr.step(2.0, _star_field(1.0), 0.34, 0.34, (0, 12), is_night=False) == 0.3
     cloud = np.full((480, 640, 3), 40, np.uint8)
     assert tr.step(3.0, cloud, 0.3, 0.3, (0, 12), is_night=True) is None and tr.next_ts > 3.0
+
+
+def test_temperature_model_learns_slope_and_clamps():
+    from src.analytics.focus_tracker import TempCompensation
+    comp = TempCompensation()
+    comp.add(20.0, 0.30, "sweep", 1)
+    comp.add(21.0, 0.305, "tracking", 2)
+    assert comp.fit()["learned"] is False  # too few samples / too little span
+    comp.add(26.0, 0.33, "tracking", 3)
+    fit = comp.fit()
+    assert fit["learned"] and abs(fit["slope"] - 0.005) < 0.001
+    assert abs(comp.target(0.33, 26.0, 30.0) - 0.35) < 0.005
+    steep = TempCompensation([{"temp_c": 0, "pos": 0}, {"temp_c": 5, "pos": 1}, {"temp_c": 10, "pos": 2}])
+    assert steep.fit()["slope"] == TempCompensation.MAX_SLOPE
+
+
+def test_auto_mode_follows_temperature_manual_holds(lens_client):
+    client, svc, cam = lens_client
+    client.post("/api/focus/lens", json={"mode": "auto"})
+    svc.last_metadata["sensor_temp_c"] = 20.0
+    client.post("/api/focus/lens", json={"position": 0.30})  # manual set in auto mode = verified sample
+    svc.lens_comp.add(30.0, 0.35, "tracking", 2)
+    svc.lens_comp.add(25.0, 0.325, "tracking", 3)
+    frame = _star_field(1.0)
+    svc._track_focus(frame, {"sensor_temp_c": 30.0, "lens_position": cam.lens_position}, time.time())
+    assert abs(cam.lens_position_target - 0.35) < 0.006
+    state = client.get("/api/focus").json()["lens"]
+    assert state["mode"] == "auto" and state["compensation"]["learned"]
+    client.post("/api/focus/lens", json={"mode": "manual"})
+    held = cam.lens_position_target
+    svc._track_focus(frame, {"sensor_temp_c": 10.0, "lens_position": held}, time.time())
+    assert cam.lens_position_target == held
+    client.post("/api/focus/lens", json={"reset_learning": True})
+    assert svc.lens_comp.samples == []

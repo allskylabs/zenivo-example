@@ -1338,3 +1338,23 @@ a.tab-btn {
 .focus-lens-nudge .btn { padding: 0.2rem 0.45rem; font-family: var(--font-mono); }
 .focus-lens-chart { width: 100%; height: 110px; display: block; margin: 0.4rem 0; }
 .focus-lens-chart[hidden], #focus-lens-card[hidden], #focus-lens-progress-wrap[hidden] { display: none; }
+
+/* Dark, thin scrollbars matching the theme (page and inner scrolling panels) */
+html, .focus-side, .log-list {
+    scrollbar-width: thin;
+    scrollbar-color: #334155 transparent;
+}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: #475569; background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+.focus-side { padding-right: 4px; scrollbar-gutter: stable; }
+
+/* .btn sets display, which would override the hidden attribute */
+.btn[hidden] { display: none !important; }

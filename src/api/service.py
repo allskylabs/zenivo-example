@@ -31,7 +31,7 @@ from src.calibration.dark import DarkCalibrationEngine
 from src.analytics.cloud_cover import CloudReference, analyze_cloud_cover
 from src.analytics.cloud_history import CloudHistory
 from src.analytics.meteor import MeteorDetector
-from src.analytics.focus_tracker import FocusTracker
+from src.analytics.focus_tracker import FocusTracker, TempCompensation
 from src.analytics.focus import FocusSession, LOWER_IS_BETTER, display_stretch, find_best_star, measure_focus
 from src.api.histogram import compute_fast_histogram
 from src.pipeline.keogram import KeogramGenerator
@@ -158,6 +158,7 @@ class AllSkyService:
         self.focus = FocusSession()
         self._focus_lock = threading.Lock()
         self.focus_tracker = FocusTracker()
+        self.lens_comp = TempCompensation()
         # Two profiles' worth: a master dark plus its hot-pixel map each
         self._dark_cache: Dict[str, np.ndarray] = _BoundedCache(max_items=4)
 
@@ -2293,12 +2294,23 @@ class AllSkyService:
     def _lens_supported(self) -> bool:
         return bool(getattr(self.camera, "lens_range", None)) and hasattr(self.camera, "set_lens_position")
 
+    def _lens_cfg(self) -> Dict[str, Any]:
+        cfg = self.station_config.setdefault("lens_focus", {})
+        if "mode" not in cfg:
+            cfg["mode"] = "auto" if cfg.get("tracking", True) else "manual"
+        if cfg.get("position") is not None and "anchor_position" not in cfg:
+            cfg["anchor_position"], cfg["anchor_temp_c"] = cfg["position"], cfg.get("sensor_temp_c")
+        return cfg
+
     def _restore_lens(self) -> None:
         """Re-apply the saved lens position: libcamera's own default (IMX708: 1.0 D, ~1 m) is not the sky."""
-        cfg = self.station_config.get("lens_focus") or {}
+        if not hasattr(self.camera, "set_lens_position"):
+            return
+        cfg = self._lens_cfg()
+        self.focus_tracker.enabled = cfg["mode"] == "auto"
+        self.lens_comp = TempCompensation(cfg.get("samples"))
         saved = cfg.get("position")
-        self.focus_tracker.enabled = bool(cfg.get("tracking", True))
-        if saved is None or not hasattr(self.camera, "set_lens_position"):
+        if saved is None:
             return
         self.focus_tracker.reset(float(cfg.get("base_position", saved)))
         try:
@@ -2309,21 +2321,46 @@ class AllSkyService:
             pass
 
     def _save_lens(self, position: float, source: str) -> None:
-        prev = self.station_config.get("lens_focus") or {}
+        """Remember a lens position. Sweeps, tracking checks and sets made by hand are verified focus: they
+        re-anchor temperature compensation and become samples of the temperature model."""
+        cfg = self._lens_cfg()
         temp = self.last_metadata.get("sensor_temp_c")
-        self.station_config["lens_focus"] = {
-            "position": round(float(position), 4),
+        pos = round(float(position), 4)
+        now = time.time()
+        cfg.update({
+            "position": pos,
             "source": source,
             "sensor_temp_c": temp,
             "updated_at": datetime.now(timezone.utc).isoformat(),
-            # Where the last full sweep / manual focus put it: night tracking stays within reach of this
-            "base_position": round(float(position), 4) if source != "tracking" else prev.get("base_position", position),
-            "tracking": bool(self.focus_tracker.enabled),
-        }
-        if source != "tracking":
-            self.focus_tracker.reset(float(position), time.time())
+            "anchor_position": pos,
+            "anchor_temp_c": temp,
+        })
+        if source in ("sweep", "camera_af", "manual"):
+            # Night tracking and compensation stay within reach of where a person or a sweep put the lens
+            cfg["base_position"] = pos
+            self.focus_tracker.reset(pos, now)
+        if source in ("sweep", "tracking") or (source == "manual" and cfg["mode"] == "auto"):
+            self.lens_comp.add(temp, pos, source, now)
+            cfg["samples"] = self.lens_comp.samples
         if not os.environ.get("PYTEST_CURRENT_TEST"):
             self._save_station_config()
+
+    def set_lens_mode(self, mode: str, reset_learning: bool = False) -> Dict[str, Any]:
+        """auto: follow temperature (learned model) and re-check focus on stars every night;
+        manual: hold the lens exactly where it was put."""
+        cfg = self._lens_cfg()
+        cfg["mode"] = "auto" if mode == "auto" else "manual"
+        cfg["tracking"] = cfg["mode"] == "auto"
+        self.focus_tracker.enabled = cfg["mode"] == "auto"
+        if reset_learning:
+            self.lens_comp = TempCompensation()
+            cfg["samples"] = []
+        if cfg["mode"] == "manual" and self.focus_tracker.phase is not None and self.focus_tracker.p0 is not None:
+            self.camera.set_lens_position(self.focus_tracker.p0)  # abandon a probe mid-cycle
+            self.focus_tracker.phase = None
+        if not os.environ.get("PYTEST_CURRENT_TEST"):
+            self._save_station_config()
+        return self.get_focus_state()
 
     def get_lens_state(self) -> Dict[str, Any]:
         if not self._lens_supported():
@@ -2331,7 +2368,21 @@ class AllSkyService:
         info = dict(self.camera.lens_info() or {})
         if hasattr(self.camera, "af_status"):
             info.update(self.camera.af_status())
-        info["saved"] = self.station_config.get("lens_focus")
+        cfg = self._lens_cfg()
+        info["saved"] = {k: v for k, v in cfg.items() if k != "samples"}
+        info["mode"] = cfg["mode"]
+        fit = self.lens_comp.fit()
+        temp = self.last_metadata.get("sensor_temp_c")
+        anchor = cfg.get("anchor_position", cfg.get("position"))
+        info["compensation"] = {
+            **fit,
+            "temp_c": temp,
+            "anchor_position": anchor,
+            "anchor_temp_c": cfg.get("anchor_temp_c"),
+            "target": round(self.lens_comp.target(float(anchor), cfg.get("anchor_temp_c"), temp), 4)
+            if anchor is not None else None,
+            "samples": self.lens_comp.samples[-20:],
+        }
         info["tracking"] = self.focus_tracker.state()
         if self.focus_tracker.next_ts:
             info["tracking"]["next_in_s"] = round(max(0.0, self.focus_tracker.next_ts - time.time()))
@@ -2339,15 +2390,14 @@ class AllSkyService:
         return info
 
     def set_lens(self, position: Optional[float] = None, delta: Optional[float] = None,
-                 tracking: Optional[bool] = None) -> Dict[str, Any]:
+                 tracking: Optional[bool] = None, mode: Optional[str] = None,
+                 reset_learning: bool = False) -> Dict[str, Any]:
         if not self._lens_supported():
             raise RuntimeError("This camera has no motorised lens")
-        if tracking is not None:
-            self.focus_tracker.enabled = bool(tracking)
-            cfg = self.station_config.setdefault("lens_focus", {})
-            cfg["tracking"] = bool(tracking)
-            if not os.environ.get("PYTEST_CURRENT_TEST"):
-                self._save_station_config()
+        if tracking is not None and mode is None:
+            mode = "auto" if tracking else "manual"
+        if mode is not None or reset_learning:
+            self.set_lens_mode(mode or self._lens_cfg()["mode"], reset_learning)
             if position is None and delta is None:
                 return self.get_focus_state()
         if self.focus.sweep and self.focus.sweep.get("state") == "running":
@@ -2417,24 +2467,36 @@ class AllSkyService:
             self.activity.log(lvl, "camera", f"Lens autofocus ({sw.get('mode')}): {message}")
 
     def _track_focus(self, frame: np.ndarray, meta: Dict[str, Any], now: float) -> None:
-        """Night focus tracking on ordinary captures (see FocusTracker); needs a saved focus position."""
-        if not self._lens_supported() or not self.focus_tracker.enabled or self.focus_tracker.base is None:
+        """Auto lens mode on ordinary captures: follow temperature with the learned model (any time of day),
+        and at night re-check focus on stars every 20 min (FocusTracker). Needs a saved focus position."""
+        if not self._lens_supported():
             return
+        cfg = self._lens_cfg()
+        if cfg["mode"] != "auto" or cfg.get("position") is None or self.focus_tracker.base is None:
+            return
+        temp = meta.get("sensor_temp_c")
+        cur = getattr(self.camera, "lens_position_target", None)
+        if self.focus_tracker.phase is None and cur is not None and cfg.get("anchor_position") is not None:
+            lo, hi = self.camera.lens_range[0], self.camera.lens_range[1]
+            base = self.focus_tracker.base
+            tgt = self.lens_comp.target(float(cfg["anchor_position"]), cfg.get("anchor_temp_c"), temp)
+            tgt = round(min(hi, max(lo, min(base + self.focus_tracker.max_offset, max(base - self.focus_tracker.max_offset, tgt)))), 4)
+            if abs(tgt - float(cur)) >= 0.004:
+                # Temperature moved the focus: follow it now; the next frames show the corrected lens
+                self.camera.set_lens_position(tgt)
+                return
         from src.calibration.auto_exposure import calculate_solar_elevation
         is_night = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon) < -12.0
-        temp = meta.get("sensor_temp_c")
         before = self.focus_tracker.phase
-        new = self.focus_tracker.step(
-            now, frame, meta.get("lens_position"), getattr(self.camera, "lens_position_target", None),
-            self.camera.lens_range, is_night, temp,
-        )
+        new = self.focus_tracker.step(now, frame, meta.get("lens_position"), cur, self.camera.lens_range, is_night, temp)
         if new is None:
             return
         self.camera.set_lens_position(new)
         if before == "minus" and self.focus_tracker.phase is None:
             entry = self.focus_tracker.log[-1] if self.focus_tracker.log else {}
+            # A completed check is verified focus at this temperature, moved or not
+            self._save_lens(new, "tracking")
             if abs(float(entry.get("to", new)) - float(entry.get("from", new))) >= 0.001:
-                self._save_lens(new, "tracking")
                 self.activity.info(
                     "camera", f"Focus tracking: lens {entry.get('from')} -> {new} D at {temp} °C (HFR {entry.get('hfr')})"
                 )

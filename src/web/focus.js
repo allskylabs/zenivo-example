@@ -542,14 +542,23 @@
             ? `saved ${sv.position.toFixed(3)} D by ${sv.source}${sv.sensor_temp_c != null ? ` at ${sv.sensor_temp_c} °C` : ""} · ${new Date(sv.updated_at).toLocaleString()}`
             : `not saved yet — libcamera default ${L.default} D (≈ ${(1 / Math.max(L.default, 0.01)).toFixed(1)} m), not the sky`;
         const tr = L.tracking || {};
-        const trk = $("focus-lens-track");
-        if (document.activeElement !== trk) trk.checked = !!tr.enabled;
+        const auto = L.mode === "auto";
+        document.querySelectorAll("#focus-lens-mode button").forEach((b) => b.classList.toggle("active", b.dataset.lensMode === L.mode));
+        const cp = L.compensation || {};
+        $("focus-lens-comp").textContent = !auto
+            ? "Manual: the lens stays exactly where you put it."
+            : cp.learned
+                ? `Temperature compensation: ${(cp.slope * 1000).toFixed(1)} mD/°C from ${cp.n} checks over ${cp.span_c} °C` +
+                  ` (fit ±${cp.rms_d} D) · now ${cp.temp_c ?? "?"} °C → ${cp.target?.toFixed(3)} D`
+                : `Learning temperature drift: ${cp.n || 0} checks over ${cp.span_c || 0} °C (needs 3 over 3 °C)` +
+                  (cp.temp_c != null ? ` · sensor ${cp.temp_c} °C` : "");
+        $("focus-lens-reset-learning").hidden = !auto || !(cp.n > 0);
         const last = (tr.log || [])[tr.log ? tr.log.length - 1 : 0];
-        $("focus-lens-track-msg").textContent = !tr.enabled ? "" : tr.base === null || tr.base === undefined
+        $("focus-lens-track-msg").textContent = !auto ? "" : tr.base === null || tr.base === undefined
             ? "Run a sweep first: tracking follows the swept position."
             : `around ${tr.base.toFixed(3)} D ±${tr.max_offset} · ` +
               (last ? `last ${new Date(last.t * 1000).toLocaleTimeString()}: ${last.from} → ${last.to} D${last.temp_c != null ? ` at ${last.temp_c} °C` : ""}` : "no check yet") +
-              (tr.next_in_s != null ? ` · next in ${Math.round(tr.next_in_s / 60)} min (night only)` : "");
+              (tr.next_in_s != null ? ` · next star check in ${Math.round(tr.next_in_s / 60)} min (night only)` : "");
 
         const sw = L.sweep;
         const running = !!sw && sw.state === "running";
@@ -634,7 +643,11 @@
         setLensPoll(700);
     });
     $("focus-lens-cancel").addEventListener("click", () => lensCmd("/api/focus/lens/cancel"));
-    $("focus-lens-track").addEventListener("change", (e) => lensCmd("/api/focus/lens", { tracking: e.target.checked }));
+    document.querySelectorAll("#focus-lens-mode button").forEach((b) =>
+        b.addEventListener("click", () => lensCmd("/api/focus/lens", { mode: b.dataset.lensMode })));
+    $("focus-lens-reset-learning").addEventListener("click", () => {
+        if (confirm("Forget all focus-vs-temperature samples?")) lensCmd("/api/focus/lens", { reset_learning: true });
+    });
     setLensPoll(5000);
 
     // Any click or key press on this page counts as someone focusing (keeps focus mode from timing out)

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllSky Observatory — Edge Dashboard</title>
-    <link rel="stylesheet" href="/style.css?v=20261017fc">
+    <link rel="stylesheet" href="/style.css?v=20261017fd">
 </head>
 <body class="dark-mode">
     <!-- Top Navigation Header -->
@@ -797,10 +797,16 @@
                         <div class="focus-meter" id="focus-lens-progress-wrap" hidden><div class="focus-meter-fill good" id="focus-lens-progress"></div></div>
                         <div class="focus-hint" id="focus-lens-msg">&nbsp;</div>
                         <canvas id="focus-lens-chart" class="focus-lens-chart" hidden></canvas>
-                        <label class="checkbox-label focus-hint" title="Every 20 min at night, probe ±0.04 D on two normal frames and move toward sharper stars (follows temperature drift)">
-                            <input type="checkbox" id="focus-lens-track"> Keep focus at night (temperature drift)
-                        </label>
+                        <div class="focus-field focus-lens-mode">
+                            <span class="focus-field-label">Lens focus</span>
+                            <div class="focus-seg" id="focus-lens-mode">
+                                <button data-lens-mode="auto" title="Follow temperature with the learned model, re-check on stars every 20 min at night">Auto</button>
+                                <button data-lens-mode="manual" title="Hold the lens exactly where it is put">Manual</button>
+                            </div>
+                        </div>
+                        <div class="focus-hint text-muted" id="focus-lens-comp"></div>
                         <div class="focus-hint text-muted" id="focus-lens-track-msg"></div>
+                        <button class="btn btn-sm btn-outline" id="focus-lens-reset-learning" title="Forget the focus-vs-temperature samples, e.g. after moving or refitting the camera">Reset temperature learning</button>
                     </div>
                     <div class="card">
                         <div class="card-header">
@@ -879,6 +885,6 @@
     <script src="/static/sky_catalog.js"></script>
     <script src="/app.js?v=20261017c2"></script>
     <script src="/static/activity.js?v=20261016h"></script>
-    <script src="/static/focus.js?v=20261017fc"></script>
+    <script src="/static/focus.js?v=20261017fd"></script>
 </body>
 </html>
