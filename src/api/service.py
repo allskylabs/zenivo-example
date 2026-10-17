@@ -8,6 +8,7 @@ import math
 import os
 import re
 import shutil
+import sys
 import time
 import threading
 from collections import OrderedDict
@@ -182,8 +183,9 @@ class AllSkyService:
         self._sync_camera_identity()
         self._update_raw10_bin()
 
-        # Cloud cover: learned clear-sky reference + time series (tests keep theirs out of data/)
-        if os.environ.get("PYTEST_CURRENT_TEST"):
+        # Cloud cover: learned clear-sky reference + time series (tests keep theirs out of data/). Checking for the
+        # pytest module, not PYTEST_CURRENT_TEST: test modules may build the app at import, before that is set.
+        if os.environ.get("PYTEST_CURRENT_TEST") or "pytest" in sys.modules:
             import tempfile
 
             self.cloud_reference = CloudReference(None)
