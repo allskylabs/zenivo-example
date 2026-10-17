@@ -20,6 +20,7 @@ from src.api.schemas import (
     WhiteBalanceRequest,
     StoragePolicyRequest,
     CloudConfigRequest,
+    FocusConfigRequest,
 )
 from src.api.service import AllSkyService
 from src.api.stream import mjpeg_frame_generator, handle_live_websocket, sse_event_generator
@@ -360,6 +361,63 @@ def get_snapshot_jpeg(service: AllSkyService = Depends(get_service)):
         return Response(content=jpeg_bytes, media_type="image/jpeg", headers=_NO_STORE)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Snapshot generation failed: {e}")
+
+
+# ----------------------------------------------------------------------
+# Focus assistant
+# ----------------------------------------------------------------------
+
+@router.get("/api/focus")
+def get_focus_state(service: AllSkyService = Depends(get_service)):
+    """Focus mode state: active flag, ROI, method, best score, exposure."""
+    return service.get_focus_state()
+
+
+@router.post("/api/focus/start")
+def start_focus(req: Optional[FocusConfigRequest] = None, service: AllSkyService = Depends(get_service)):
+    """Enter focus mode (native resolution, fastest frame rate, auto-exposure and archiving paused)."""
+    cfg = req.model_dump(exclude_none=True, exclude={"reset"}) if req else {}
+    return service.start_focus(**cfg)
+
+
+@router.post("/api/focus/stop")
+def stop_focus(service: AllSkyService = Depends(get_service)):
+    return service.stop_focus("stopped by user")
+
+
+@router.post("/api/focus/config")
+def configure_focus(req: FocusConfigRequest, service: AllSkyService = Depends(get_service)):
+    cfg = req.model_dump(exclude_none=True, exclude={"reset"})
+    return service.configure_focus(reset=req.reset, **cfg)
+
+
+@router.post("/api/focus/auto-roi")
+def focus_auto_roi(lights: bool = Query(False), service: AllSkyService = Depends(get_service)):
+    """Move the focus ROI onto the best star (or bright light) in the current frame."""
+    return service.focus_auto_roi(lights=lights)
+
+
+@router.get("/api/focus/frame")
+def get_focus_frame(
+    since: float = Query(0.0, description="Wait for a frame captured after this timestamp"),
+    stretch: bool = Query(False, description="Auto-stretch the crop for display"),
+    service: AllSkyService = Depends(get_service),
+):
+    """Native-resolution ROI crop as JPEG; the focus measurement is in the X-Focus header (JSON)."""
+    import json
+
+    try:
+        jpeg, result = service.get_focus_frame(since_ts=since, stretch=stretch)
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    headers = dict(_NO_STORE)
+    headers["X-Focus"] = json.dumps(result, separators=(",", ":"))
+    return Response(content=jpeg, media_type="image/jpeg", headers=headers)
+
+
+@router.get("/api/focus/overview.jpg")
+def get_focus_overview(width: int = Query(800, ge=320, le=1600), service: AllSkyService = Depends(get_service)):
+    return Response(content=service.get_focus_overview(width), media_type="image/jpeg", headers=_NO_STORE)
 
 
 @router.get("/api/stream/histogram")

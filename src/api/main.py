@@ -67,6 +67,7 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         @app.get("/settings")
         @app.get("/calibration")
         @app.get("/logs")
+        @app.get("/focus")
         def serve_section_page():
             return FileResponse(os.path.join(web_dir, "index.html"), media_type="text/html", headers=no_cache)
 

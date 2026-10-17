@@ -200,6 +200,7 @@ document.addEventListener("DOMContentLoaded", () => {
         "/settings": "tab-settings",
         "/calibration": "tab-calibration",
         "/logs": "tab-logs",
+        "/focus": "tab-focus",
     };
     const PAGE_TITLES = {
         "tab-live": "Live Observatory",
@@ -207,6 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
         "tab-settings": "Settings",
         "tab-calibration": "Master Dark",
         "tab-logs": "Activity Log",
+        "tab-focus": "Focus",
     };
     const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
     const currentPage = PAGES[currentPath] || "tab-live";

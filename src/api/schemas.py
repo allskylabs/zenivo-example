@@ -74,6 +74,15 @@ class CloudConfigRequest(BaseModel):
     reset_reference: bool = Field(False, description="Forget the learned clear-sky reference (after re-aiming the camera)")
 
 
+class FocusConfigRequest(BaseModel):
+    """Focus assistant region of interest and measurement method."""
+    cx: Optional[float] = Field(None, ge=0.0, le=1.0, description="ROI centre x as a fraction of the frame width")
+    cy: Optional[float] = Field(None, ge=0.0, le=1.0, description="ROI centre y as a fraction of the frame height")
+    roi_size: Optional[int] = Field(None, ge=64, le=1024, description="ROI side in native pixels")
+    method: Optional[str] = Field(None, pattern="^(auto|stars|lights|contrast)$", description="Focus measure")
+    reset: bool = Field(False, description="Forget the score history and best score")
+
+
 class StationLocationRequest(BaseModel):
     """Request payload for setting station coordinates and/or manually adjusting optical & orientation parameters."""
     latitude_deg: Optional[float] = Field(default=None, ge=-90.0, le=90.0, description="Station latitude in degrees (-90 to +90)")

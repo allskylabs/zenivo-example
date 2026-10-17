@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllSky Observatory — Edge Dashboard</title>
-    <link rel="stylesheet" href="/style.css?v=20261017c1">
+    <link rel="stylesheet" href="/style.css?v=20261017f1">
 </head>
 <body class="dark-mode">
     <!-- Top Navigation Header -->
@@ -41,6 +41,7 @@
         <a class="tab-btn" href="/live" data-tab="tab-live">Live Observatory</a>
         <a class="tab-btn" href="/gallery" data-tab="tab-gallery">Gallery &amp; Events</a>
         <a class="tab-btn" href="/settings" data-tab="tab-settings">Settings</a>
+        <a class="tab-btn" href="/focus" data-tab="tab-focus">Focus</a>
         <a class="tab-btn" href="/calibration" data-tab="tab-calibration">Master Dark</a>
         <a class="tab-btn" href="/logs" data-tab="tab-logs">Activity Log <span class="log-badge" id="log-error-badge" hidden>0</span></a>
     </nav>
@@ -690,6 +691,105 @@
                 </div>
             </div>
         </section>
+        <!-- TAB: Focus assistant -->
+        <section id="tab-focus" class="tab-content">
+            <div class="dashboard-grid focus-grid">
+                <div class="main-viewport-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Focus Zoom <span class="text-muted" id="focus-zoom-label"></span></h2>
+                            <div class="header-actions focus-actions">
+                                <label class="checkbox-label"><input type="checkbox" id="focus-stretch" checked> Stretch</label>
+                                <label class="checkbox-label"><input type="checkbox" id="focus-markers" checked> Markers</label>
+                                <label class="checkbox-label"><input type="checkbox" id="focus-crosshair"> Crosshair</label>
+                            </div>
+                        </div>
+                        <div class="focus-zoom-wrap" id="focus-zoom-wrap">
+                            <canvas id="focus-zoom-canvas"></canvas>
+                            <div class="focus-zoom-empty" id="focus-zoom-empty"><span>Press <strong>Start focus mode</strong> to stream a native-resolution crop.</span></div>
+                        </div>
+                        <div class="focus-statline" id="focus-statline">—</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Focus Curve</h2>
+                            <div class="header-actions">
+                                <span class="text-muted focus-hint" id="focus-curve-hint">Turn the lens slowly through best focus and back</span>
+                                <button class="btn btn-sm btn-outline" id="focus-reset">Reset best (R)</button>
+                            </div>
+                        </div>
+                        <canvas id="focus-chart" class="focus-chart"></canvas>
+                    </div>
+                </div>
+                <div class="side-panel-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Focus Mode</h2>
+                            <span class="focus-badge" id="focus-badge">OFF</span>
+                        </div>
+                        <button class="btn btn-primary btn-block" id="focus-toggle">Start focus mode</button>
+                        <div class="focus-score">
+                            <div class="focus-score-label" id="focus-score-label">Score</div>
+                            <div class="focus-score-value" id="focus-score-value">—</div>
+                            <div class="focus-score-sub" id="focus-score-sub">&nbsp;</div>
+                            <div class="focus-meter"><div class="focus-meter-fill" id="focus-meter-fill"></div></div>
+                            <div class="focus-score-sub"><span id="focus-quality">—</span> of best <span id="focus-best">—</span> <span class="focus-trend" id="focus-trend"></span></div>
+                        </div>
+                        <div class="focus-field">
+                            <span class="focus-field-label">Measure</span>
+                            <div class="focus-seg" id="focus-method">
+                                <button data-method="auto" class="active" title="Pick stars, lights or contrast from the image">Auto</button>
+                                <button data-method="stars" title="Half-flux radius of unsaturated stars (night sky)">Stars</button>
+                                <button data-method="lights" title="Half-flux radius of bright point lights, saturated allowed (night town)">Lights</button>
+                                <button data-method="contrast" title="Edge contrast (daytime: buildings, trees, antennas)">Day</button>
+                            </div>
+                        </div>
+                        <div class="focus-field">
+                            <span class="focus-field-label">Zoom region</span>
+                            <select id="focus-roi-size">
+                                <option value="128">128 px (max zoom)</option>
+                                <option value="192">192 px</option>
+                                <option value="256" selected>256 px</option>
+                                <option value="384">384 px</option>
+                                <option value="512">512 px</option>
+                                <option value="768">768 px</option>
+                            </select>
+                        </div>
+                        <div class="btn-group focus-btns">
+                            <button class="btn btn-sm btn-outline" id="focus-pick-star" title="Centre the zoom on the best unsaturated star">Find star</button>
+                            <button class="btn btn-sm btn-outline" id="focus-pick-light" title="Centre the zoom on the brightest point light">Find light</button>
+                            <button class="btn btn-sm btn-outline" id="focus-center">Centre</button>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Overview</h2>
+                            <span class="text-muted focus-hint">Click: move zoom · ←↑↓→ nudge</span>
+                        </div>
+                        <div class="focus-overview-wrap" id="focus-overview-wrap">
+                            <img id="focus-overview" alt="Whole frame">
+                            <div class="focus-roi-box" id="focus-roi-box"></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Exposure While Focusing</h2>
+                        </div>
+                        <p class="text-muted focus-hint">Auto-exposure pauses in focus mode. Short exposures refresh faster and blur less.</p>
+                        <div class="btn-group focus-btns">
+                            <button class="btn btn-sm btn-outline focus-exp-preset" data-exp="1.0" data-gain="36">Stars 1 s · 36 dB</button>
+                            <button class="btn btn-sm btn-outline focus-exp-preset" data-exp="0.1" data-gain="24">Lights 0.1 s · 24 dB</button>
+                            <button class="btn btn-sm btn-outline focus-exp-preset" data-exp="0.005" data-gain="0">Day 5 ms</button>
+                        </div>
+                        <div class="focus-exp-row">
+                            <label>Exposure (s) <input type="number" id="focus-exp" min="0.00015" max="30" step="any"></label>
+                            <label>Gain (dB) <input type="number" id="focus-gain" min="0" max="72" step="0.5"></label>
+                            <button class="btn btn-sm btn-primary" id="focus-exp-apply">Apply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
         <!-- TAB 5: Activity Log -->
         <section id="tab-logs" class="tab-content">
             <div class="card">
@@ -737,5 +837,6 @@
     <script src="/static/sky_catalog.js"></script>
     <script src="/app.js?v=20261017c2"></script>
     <script src="/static/activity.js?v=20261016h"></script>
+    <script src="/static/focus.js?v=20261017f2"></script>
 </body>
 </html>

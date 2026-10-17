@@ -344,6 +344,9 @@ class V4L2MmapCaptureSession:
         # MJPG frames can be decoded straight at 1/2, 1/4 or 1/8 size when the output is that small anyway
         # (libjpeg skips most of the IDCT work, and white balance / flips then touch 4-64x fewer pixels)
         self.decode_reduce: int = 1
+        # Focus mode: with unchanged registers a single fresh buffer is a valid frame, so skip the
+        # extra settle reads (6 for short MJPG exposures) and deliver frames at the stream rate
+        self.fast_reads: bool = False
 
     def configure_device(self):
         """Configure video resolution (2592x1944 YUYV for RAW10 or MJPG) and manual exposure."""
@@ -617,6 +620,8 @@ class V4L2MmapCaptureSession:
             else:
                 max_reads = 4 if self.raw10_mode else (6 if exposure_s < 0.25 else 2)
                 min_reads = (2 if drained_count >= len(self.mm_bufs) else 1) if self.raw10_mode else (6 if exposure_s < 0.25 else 2)
+                if self.fast_reads:
+                    min_reads = 2 if drained_count >= len(self.mm_bufs) else 1
 
         for idx in range(max_reads):
             rlist, _, _ = select.select([self.fd], [], [], max(12.0, poll_timeout_s))

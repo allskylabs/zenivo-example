@@ -31,6 +31,7 @@ from src.calibration.dark import DarkCalibrationEngine
 from src.analytics.cloud_cover import CloudReference, analyze_cloud_cover
 from src.analytics.cloud_history import CloudHistory
 from src.analytics.meteor import MeteorDetector
+from src.analytics.focus import FocusSession, find_best_star
 from src.api.histogram import compute_fast_histogram
 from src.pipeline.keogram import KeogramGenerator
 from src.pipeline.startrails import StartrailsAccumulator
@@ -151,6 +152,10 @@ class AllSkyService:
         self._last_live_webp_write_ts: float = 0.0
         self._performance_overrides: Dict[str, float] = {}
         self.last_capture_time = 0.0
+        # Focus assistant: while active, frames stay at native resolution and are neither archived nor
+        # fed to auto-exposure; it ends by itself when no focus page has polled for FOCUS_IDLE_S
+        self.focus = FocusSession()
+        self._focus_lock = threading.Lock()
         # Two profiles' worth: a master dark plus its hot-pixel map each
         self._dark_cache: Dict[str, np.ndarray] = _BoundedCache(max_items=4)
 
@@ -435,7 +440,10 @@ class AllSkyService:
 
         now = time.time()
         is_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST"))
-        cache_ttl = 0.05 if is_pytest else max(self.performance["min_capture_interval_s"], getattr(self.camera, "current_exposure_s", 0.5) * 0.9)
+        if is_pytest or self.focus.active:
+            cache_ttl = 0.05
+        else:
+            cache_ttl = max(self.performance["min_capture_interval_s"], getattr(self.camera, "current_exposure_s", 0.5) * 0.9)
         if not force_refresh and self.last_frame is not None and (now - self.last_capture_time) < cache_ttl:
             return self.last_frame, self.last_metadata
 
@@ -504,7 +512,9 @@ class AllSkyService:
             # Mirror / flip / rotate after dark subtraction (darks stay in native sensor orientation)
             isp_frame = self._is_isp_frame(bayer10)
             meta["capture_path"] = "isp" if isp_frame else "raw10" if bayer10 is not None else "native"
-            frame = self._apply_output_resolution(self._apply_image_transform(frame, isp_frame))
+            frame = self._apply_image_transform(frame, isp_frame)
+            if not self.focus.active:
+                frame = self._apply_output_resolution(frame)
             meta["image_transform"] = dict(self.station_config.get("image_transform", {}))
             meta["output_resolution"] = {"width": int(frame.shape[1]), "height": int(frame.shape[0])}
 
@@ -525,7 +535,7 @@ class AllSkyService:
                     pass
 
             # If auto-exposure is active (and not calibrating), update exposure and gain dynamically
-            if self.mode == "auto" and self.calibration_status.get("state") != "running":
+            if self.mode == "auto" and self.calibration_status.get("state") != "running" and not self.focus.active:
                 try:
                     self.auto_exposure.exposure_s = float(getattr(self.camera, "current_exposure_s", self.auto_exposure.exposure_s))
                     self.auto_exposure.gain_db = float(getattr(self.camera, "current_gain_db", self.auto_exposure.gain_db))
@@ -559,11 +569,15 @@ class AllSkyService:
                 except Exception:
                     pass
 
-            ret, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            if ret:
-                self.last_jpeg = jpeg.tobytes()
+            if self.focus.active:
+                # A native 5 MP encode per frame would halve the focus frame rate; snapshots encode lazily
+                self.last_jpeg = None
+            else:
+                ret, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                if ret:
+                    self.last_jpeg = jpeg.tobytes()
 
-            if not is_pytest and self.calibration_status.get("state") != "running":
+            if not is_pytest and self.calibration_status.get("state") != "running" and not self.focus.active:
                 try:
                     self._maybe_archive_frame_and_update_products(frame, meta)
                 except Exception:
@@ -685,6 +699,7 @@ class AllSkyService:
             },
             "calibration": self.get_calibration_status(),
             "station": self.get_station_config(),
+            "focus": {"active": self.focus.active},
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -1895,7 +1910,9 @@ class AllSkyService:
         out_w = int(res.get("width", 0) or 0)
         cam_w = int(getattr(self.camera, "width", 0) or 0)
         factor = 1
-        if out_w > 0 and cam_w > 0:
+        if hasattr(session, "fast_reads"):
+            session.fast_reads = self.focus.active
+        if out_w > 0 and cam_w > 0 and not self.focus.active:
             for f in (8, 4, 2):
                 if cam_w // f >= out_w:
                     factor = f
@@ -2037,8 +2054,8 @@ class AllSkyService:
         tw = int(res.get("width", 0) or 0)
         native_w = int(getattr(self.camera, "width", 0) or 0)
         ratio = native_w / tw if tw > 0 and native_w > 0 else 1.0
-        if describe_camera(self.camera).get("backend") != "rts5869":
-            ratio = 1.0  # only the RTS5869 delivers RAW10 Bayer frames
+        if describe_camera(self.camera).get("backend") != "rts5869" or self.focus.active:
+            ratio = 1.0  # only the RTS5869 delivers RAW10 Bayer frames; focusing needs every pixel
         set_raw10_bin(4 if ratio >= 4 else 2 if ratio >= 2 else 1)
 
     @property
@@ -2076,6 +2093,145 @@ class AllSkyService:
         else:
             self._performance_overrides.update(clean)
         return {"success": True, "message": "Performance settings updated.", **self.get_performance()}
+
+    # ------------------------------------------------------------------
+    # Focus assistant
+    # ------------------------------------------------------------------
+    FOCUS_IDLE_S = 60.0
+
+    def get_focus_state(self) -> Dict[str, Any]:
+        state = self.focus.state()
+        state["exposure_s"] = float(getattr(self.camera, "current_exposure_s", 0.0))
+        state["gain_db"] = float(getattr(self.camera, "current_gain_db", 0.0))
+        state["mode"] = self.mode
+        state["limits"] = camera_limits(self.camera)
+        frame = self.last_frame
+        if frame is not None:
+            state["frame_width"], state["frame_height"] = int(frame.shape[1]), int(frame.shape[0])
+        return state
+
+    def start_focus(self, **config: Any) -> Dict[str, Any]:
+        """Enter focus mode: native resolution, fastest capture rate, auto-exposure and archiving paused."""
+        with self._focus_lock:
+            self.focus.configure(**config)
+            self.focus.last_poll = time.time()
+            if not self.focus.active:
+                self.focus.active = True
+                self.focus.started_at = time.time()
+                self.focus.reset_stats()
+                self._update_raw10_bin()
+                self.last_capture_time = 0.0
+                if not os.environ.get("PYTEST_CURRENT_TEST"):
+                    self.activity.info("camera", "Focus mode started (native resolution, auto-exposure and archiving paused)")
+                threading.Thread(target=self._focus_watchdog, name="focus-watchdog", daemon=True).start()
+        return self.get_focus_state()
+
+    def stop_focus(self, reason: str = "stopped") -> Dict[str, Any]:
+        with self._focus_lock:
+            if self.focus.active:
+                self.focus.active = False
+                self._update_raw10_bin()
+                self.last_capture_time = 0.0
+                self.focus.crop_jpeg = self.focus.overview_jpeg = None
+                if not os.environ.get("PYTEST_CURRENT_TEST"):
+                    self.activity.info("camera", f"Focus mode ended ({reason})")
+        return self.get_focus_state()
+
+    def _focus_watchdog(self) -> None:
+        started = self.focus.started_at
+        while self.focus.active and self.focus.started_at == started:
+            time.sleep(2.0)
+            if self.focus.active and time.time() - self.focus.last_poll > self.FOCUS_IDLE_S:
+                self.stop_focus("no focus viewer for 60 s")
+                return
+
+    def configure_focus(self, reset: bool = False, **config: Any) -> Dict[str, Any]:
+        with self._focus_lock:
+            self.focus.configure(**config)
+            if reset:
+                self.focus.reset_stats()
+            self.focus.result_key = None
+        return self.get_focus_state()
+
+    def _focus_new_frame(self, since_ts: float, timeout_s: float) -> Tuple[np.ndarray, Dict[str, Any], float]:
+        """Return a frame newer than since_ts (capturing as needed), or the latest one on timeout."""
+        deadline = time.time() + max(0.0, timeout_s)
+        while True:
+            frame, meta = self.capture_frame()
+            ts = self.last_capture_time
+            if ts > since_ts or time.time() >= deadline:
+                return frame, meta, ts
+            time.sleep(0.02)
+
+    def get_focus_frame(self, since_ts: float = 0.0, stretch: bool = False, timeout_s: float = 20.0) -> Tuple[bytes, Dict[str, Any]]:
+        """Native-resolution ROI crop (JPEG) of the next frame plus its focus measurement."""
+        if not self.focus.active:
+            raise RuntimeError("Focus mode is not active")
+        self.focus.last_poll = time.time()
+        frame, meta, ts = self._focus_new_frame(since_ts, timeout_s)
+        self.focus.last_poll = time.time()
+        fh, fw = frame.shape[:2]
+        x0, y0, rw, rh = self.focus.roi_rect(fw, fh)
+        key = (ts, x0, y0, rw, self.focus.method, bool(stretch))
+        with self._focus_lock:
+            if self.focus.result_key == key and self.focus.crop_jpeg is not None and self.focus.last_result:
+                return self.focus.crop_jpeg, self.focus.last_result
+            crop = frame[y0:y0 + rh, x0:x0 + rw]
+            result = self.focus.record(self.focus.measure(crop), ts)
+            view = crop
+            if stretch:
+                lo, hi = np.percentile(crop[::2, ::2], (1.0, 99.7))
+                if hi - lo >= 2:
+                    view = cv2.convertScaleAbs(crop, alpha=255.0 / (hi - lo), beta=-lo * 255.0 / (hi - lo))
+            ok, jpeg = cv2.imencode(".jpg", view, [cv2.IMWRITE_JPEG_QUALITY, 93])
+            prev_ts = (self.focus.last_result or {}).get("frame_ts", 0.0)
+            result.update({
+                "frame_ts": ts,
+                "frame_interval_s": round(ts - prev_ts, 3) if 0 < prev_ts < ts else None,
+                "roi": [x0, y0, rw, rh],
+                "frame_width": fw,
+                "frame_height": fh,
+                "exposure_s": float(meta.get("actual_exposure_s", getattr(self.camera, "current_exposure_s", 0.0))),
+                "gain_db": float(meta.get("gain_db", getattr(self.camera, "current_gain_db", 0.0))),
+                "capture_path": meta.get("capture_path"),
+            })
+            self.focus.last_result = result
+            self.focus.crop_jpeg = jpeg.tobytes() if ok else b""
+            self.focus.result_key = key
+            return self.focus.crop_jpeg, result
+
+    def get_focus_overview(self, width: int = 800) -> bytes:
+        """Small whole-frame JPEG for choosing the focus region (encoded once per frame)."""
+        # Only frame polls keep focus mode alive: an idle /focus tab refreshing this must not
+        frame = self.last_frame
+        if frame is None:
+            frame, _ = self.capture_frame()
+        ts = self.last_capture_time
+        if self.focus.overview_key == (ts, width) and self.focus.overview_jpeg:
+            return self.focus.overview_jpeg
+        h, w = frame.shape[:2]
+        small = cv2.resize(frame, (width, int(h * width / w)), interpolation=cv2.INTER_AREA) if w > width else frame
+        ok, jpeg = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        self.focus.overview_key, self.focus.overview_jpeg = (ts, width), jpeg.tobytes() if ok else b""
+        return self.focus.overview_jpeg
+
+    def focus_auto_roi(self, lights: bool = False) -> Dict[str, Any]:
+        """Centre the focus ROI on the best point source in the whole frame (stars, else bright lights)."""
+        frame = self.last_frame
+        if frame is None:
+            frame, _ = self.capture_frame()
+        h, w = frame.shape[:2]
+        # Search a half-size copy (keeps the cost ~20 ms on 5 MP) and skip the frame's outer 3 %
+        scale = 2 if w > 1600 else 1
+        small = cv2.resize(frame, (w // scale, h // scale), interpolation=cv2.INTER_AREA) if scale > 1 else frame
+        mh, mw = int(small.shape[0] * 0.03), int(small.shape[1] * 0.03)
+        star = find_best_star(small[mh:small.shape[0] - mh, mw:small.shape[1] - mw], lights=lights)
+        if star is None:
+            return {"found": False, **self.get_focus_state()}
+        cx = (star["x"] + mw + 0.5) * scale / w
+        cy = (star["y"] + mh + 0.5) * scale / h
+        state = self.configure_focus(cx=cx, cy=cy)
+        return {"found": True, "source": star, **state}
 
     def get_white_balance(self) -> Dict[str, Any]:
         """Return RAW10 white balance settings and the gains currently applied."""
