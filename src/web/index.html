@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllSky Observatory — Edge Dashboard</title>
-    <link rel="stylesheet" href="/style.css?v=20261017fd">
+    <link rel="stylesheet" href="/style.css?v=20261017fe">
 </head>
 <body class="dark-mode">
     <!-- Top Navigation Header -->
@@ -323,6 +323,13 @@
 
         <!-- PAGE: Settings (/settings) -->
         <section id="tab-settings" class="tab-content">
+            <div class="card settings-card" id="settings-focus-card">
+                <div class="card-header">
+                    <h2>Focus</h2>
+                    <a class="btn btn-sm btn-outline" href="/focus">Open focus assistant</a>
+                </div>
+                <div class="focus-history" id="settings-focus-history"><span class="text-muted">No focus saved yet.</span></div>
+            </div>
             <!-- Image Output Card: resolution + orientation -->
             <div class="card settings-card">
                 <div class="card-header">
@@ -703,9 +710,19 @@
                             <label class="checkbox-label"><input type="checkbox" id="focus-crosshair"> Crosshair</label>
                         </div>
                     </div>
-                    <div class="focus-zoom-wrap" id="focus-zoom-wrap">
-                        <canvas id="focus-zoom-canvas"></canvas>
-                        <div class="focus-zoom-empty" id="focus-zoom-empty"><span>Press <strong>Start focus mode</strong> to stream a native-resolution crop.</span></div>
+                    <div class="focus-view-row">
+                        <div class="focus-zoom-wrap" id="focus-zoom-wrap">
+                            <canvas id="focus-zoom-canvas"></canvas>
+                            <div class="focus-zoom-empty" id="focus-zoom-empty"><span>Press <strong>Start focus mode</strong> to stream a native-resolution crop.</span></div>
+                        </div>
+                        <aside class="focus-aside">
+                            <div class="focus-aside-title">Overview <span class="text-muted">click to move · arrow keys nudge</span></div>
+                            <div class="focus-overview-wrap" id="focus-overview-wrap">
+                                <img id="focus-overview" alt="Whole frame">
+                                <div class="focus-roi-box" id="focus-roi-box"></div>
+                            </div>
+                            <div class="focus-saved-box" id="focus-saved-box"></div>
+                        </aside>
                     </div>
                     <div class="focus-statline" id="focus-statline">—</div>
                     <div class="focus-chart-head">
@@ -728,7 +745,10 @@
                             <h2>Focus Mode</h2>
                             <span class="focus-badge" id="focus-badge">OFF</span>
                         </div>
-                        <button class="btn btn-primary btn-block" id="focus-toggle">Start focus mode</button>
+                        <div class="focus-actions-row">
+                            <button class="btn btn-primary" id="focus-toggle">Start focus mode</button>
+                            <button class="btn btn-success" id="focus-finish" hidden title="Save the lens position and this result to Settings, then leave focus mode">Finish &amp; save</button>
+                        </div>
                         <button class="btn btn-sm btn-outline btn-block focus-keep" id="focus-keep" hidden>Still focusing — keep focus mode on</button>
                         <div class="focus-score">
                             <div class="focus-score-label" id="focus-score-label">Score</div>
@@ -808,20 +828,8 @@
                         <div class="focus-hint text-muted" id="focus-lens-track-msg"></div>
                         <button class="btn btn-sm btn-outline" id="focus-lens-reset-learning" title="Forget the focus-vs-temperature samples, e.g. after moving or refitting the camera">Reset temperature learning</button>
                     </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <h2>Overview</h2>
-                            <span class="text-muted focus-hint">Click: move zoom · arrow keys nudge</span>
-                        </div>
-                        <div class="focus-overview-wrap" id="focus-overview-wrap">
-                            <img id="focus-overview" alt="Whole frame">
-                            <div class="focus-roi-box" id="focus-roi-box"></div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <h2>Exposure While Focusing</h2>
-                        </div>
+                    <details class="card focus-details">
+                        <summary>Exposure while focusing <span class="text-muted" id="focus-exp-summary"></span></summary>
                         <p class="text-muted focus-hint">Auto-exposure pauses in focus mode so the score stays comparable. If the light changed, meter once. Short exposures refresh faster and blur less.</p>
                         <div class="btn-group focus-btns">
                             <button class="btn btn-sm btn-primary" id="focus-auto-exp" title="Meter the zoom region (brightest parts to ~80 %), then hold that exposure">Auto expose</button>
@@ -834,7 +842,11 @@
                             <label>Gain (dB) <input type="number" id="focus-gain" min="0" max="72" step="0.5"></label>
                             <button class="btn btn-sm btn-primary" id="focus-exp-apply">Apply</button>
                         </div>
-                    </div>
+                    </details>
+                    <details class="card focus-details" id="focus-history-details">
+                        <summary>Saved focus history <span class="text-muted" id="focus-history-count"></span></summary>
+                        <div class="focus-history" id="focus-history"></div>
+                    </details>
                 </div>
             </div>
         </section>
@@ -885,6 +897,6 @@
     <script src="/static/sky_catalog.js"></script>
     <script src="/app.js?v=20261017fd"></script>
     <script src="/static/activity.js?v=20261016h"></script>
-    <script src="/static/focus.js?v=20261017fd"></script>
+    <script src="/static/focus.js?v=20261017fe"></script>
 </body>
 </html>

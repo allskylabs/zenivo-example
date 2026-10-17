@@ -1358,3 +1358,41 @@ html, .focus-side, .log-list {
 
 /* .btn sets display, which would override the hidden attribute */
 .btn[hidden] { display: none !important; }
+
+/* Focus page layout v2: overview beside the zoom, compact side column */
+.focus-view-row { display: flex; gap: 0.75rem; flex: 1; min-height: 0; }
+.focus-view-row .focus-zoom-wrap { flex: 1; min-width: 0; }
+.focus-aside { width: 280px; flex: none; display: flex; flex-direction: column; gap: 0.5rem; overflow-y: auto; }
+.focus-aside-title { font-size: 0.8rem; font-weight: 600; display: flex; justify-content: space-between; gap: 0.5rem; }
+.focus-aside-title .text-muted { font-weight: 400; font-size: 0.7rem; }
+.focus-saved-box { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.45; }
+.focus-saved-box b { color: var(--text-primary); font-family: var(--font-mono); }
+.focus-saved-box .ok { color: var(--success); font-weight: 600; }
+@media (max-width: 1200px) {
+    .focus-view-row { flex-direction: column; }
+    .focus-aside { width: auto; flex-direction: row; flex-wrap: wrap; max-height: none; }
+    .focus-aside .focus-overview-wrap { width: 220px; }
+    .focus-saved-box { flex: 1; min-width: 180px; }
+}
+.focus-actions-row { display: flex; gap: 0.5rem; }
+.focus-actions-row .btn { flex: 1; }
+.btn-success { background: var(--success); color: #04120c; }
+.btn-success:hover { filter: brightness(1.1); }
+.focus-side .card { padding: 1rem; }
+.focus-side .card-header { margin-bottom: 0.6rem; }
+.focus-lens-nudge { display: grid !important; grid-template-columns: repeat(6, 1fr); gap: 0.3rem; }
+.focus-lens-nudge .btn { padding: 0.2rem 0; }
+.focus-details { padding: 0.75rem 1rem; }
+.focus-details > summary { cursor: pointer; font-weight: 600; font-size: 0.95rem; list-style: none; }
+.focus-details > summary::-webkit-details-marker { display: none; }
+.focus-details > summary::before { content: "▸ "; color: var(--text-muted); }
+.focus-details[open] > summary::before { content: "▾ "; }
+.focus-details[open] > summary { margin-bottom: 0.6rem; }
+.focus-details > summary .text-muted { font-weight: 400; font-size: 0.75rem; }
+.focus-history { font-size: 0.78rem; overflow-x: auto; }
+.focus-history table { width: 100%; border-collapse: collapse; }
+.focus-history th, .focus-history td { text-align: left; padding: 0.3rem 0.4rem; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+.focus-history th { color: var(--text-muted); font-weight: 500; }
+.focus-history td.num { font-family: var(--font-mono); }
+.focus-history tr.latest td { color: var(--success); }
+.focus-history .btn { padding: 0.1rem 0.5rem; }

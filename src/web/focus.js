@@ -8,7 +8,56 @@
     "use strict";
 
     const onFocusPage = (window.location.pathname.replace(/\/+$/, "") || "/") === "/focus";
+
+    // Saved focus results (station config focus_history), shown on the focus page and in Settings
+    function fmtRecScore(r) {
+        if (r.score === null || r.score === undefined) return "—";
+        return r.unit === "px HFR" ? `${r.score.toFixed(2)} px` : r.score.toPrecision(4);
+    }
+    function fmtRecLens(r) {
+        if (r.lens_position === null || r.lens_position === undefined) return "—";
+        return `${r.lens_position.toFixed(3)} D` + (r.lens_distance_m ? ` (≈${r.lens_distance_m} m)` : " (∞)");
+    }
+    function fmtExp(e) {
+        if (!e) return "—";
+        return e < 0.1 ? `${(e * 1000).toFixed(1)} ms` : `${e.toFixed(2)} s`;
+    }
+    function renderHistory(el, records, onUse) {
+        if (!el) return;
+        if (!records || !records.length) { el.innerHTML = '<span class="text-muted">No focus saved yet.</span>'; return; }
+        const rows = records.slice().reverse().map((r, i) => {
+            const idx = records.length - 1 - i;
+            const when = new Date(r.finished_at);
+            return `<tr class="${i === 0 ? "latest" : ""}">
+                <td>${when.toLocaleDateString()} ${when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
+                <td>${r.source}</td><td>${r.method || "—"}</td>
+                <td class="num">${fmtRecScore(r)}</td><td class="num">${fmtRecLens(r)}</td>
+                <td class="num">${r.sensor_temp_c ?? "—"}${r.sensor_temp_c != null ? " °C" : ""}</td>
+                <td class="num">${fmtExp(r.exposure_s)} · ${(r.gain_db ?? 0).toFixed(0)} dB</td>
+                <td class="num">${r.roi ? `${r.roi.size}px @ ${(r.roi.cx * 100).toFixed(0)},${(r.roi.cy * 100).toFixed(0)}%` : "—"}</td>
+                <td>${onUse ? `<button class="btn btn-sm btn-outline" data-use="${idx - records.length}" title="Reuse this lens position, zoom region, measure and exposure">Use</button>` : ""}</td>
+            </tr>`;
+        }).join("");
+        el.innerHTML = `<table><thead><tr><th>When</th><th>How</th><th>Measure</th><th>Score</th><th>Lens</th><th>Temp</th><th>Exposure</th><th>Zoom</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+        if (onUse) el.querySelectorAll("[data-use]").forEach((b) => b.addEventListener("click", () => onUse(parseInt(b.dataset.use, 10))));
+    }
+    async function useRecord(index) {
+        const r = await fetch(`/api/focus/apply-record?index=${index}`, { method: "POST" });
+        if (!r.ok) { alert(`Use saved focus: HTTP ${r.status}`); return null; }
+        return r.json();
+    }
+
     if (!onFocusPage) {
+        const settingsHist = document.getElementById("settings-focus-history");
+        if (settingsHist) {
+            const load = async () => {
+                try {
+                    const s = await (await fetch("/api/focus", { cache: "no-store" })).json();
+                    renderHistory(settingsHist, s.history_records, async (i) => { if (await useRecord(i)) load(); });
+                } catch (e) { /* offline */ }
+            };
+            load();
+        }
         // Other pages: warn while focus mode holds the exposure (auto-exposure and archiving are paused)
         const bar = document.createElement("div");
         bar.className = "focus-banner";
@@ -97,7 +146,9 @@
         if (s.smooth) document.querySelectorAll("#focus-smooth button").forEach((b) => b.classList.toggle("active", +b.dataset.smooth === s.smooth));
         if (s.exposure_s !== undefined && document.activeElement !== $("focus-exp")) $("focus-exp").value = +s.exposure_s.toPrecision(4);
         if (s.gain_db !== undefined && document.activeElement !== $("focus-gain")) $("focus-gain").value = +s.gain_db.toFixed(1);
-        toggleBtn.textContent = st.active ? "Stop focus mode" : "Start focus mode";
+        toggleBtn.textContent = st.active ? "Stop" : "Start focus mode";
+        $("focus-finish").hidden = !st.active;
+        renderSaved(s);
         toggleBtn.classList.toggle("btn-danger", st.active);
         badge.textContent = st.active ? "LIVE" : "OFF";
         badge.classList.toggle("on", st.active);
@@ -138,6 +189,27 @@
             }
         }
         st.running = false;
+    }
+
+    function renderSaved(s) {
+        const box = $("focus-saved-box");
+        const r = s.last_record;
+        $("focus-exp-summary").textContent = s.exposure_s ? `· now ${fmtExp(s.exposure_s)}, ${(s.gain_db || 0).toFixed(0)} dB` : "";
+        const hist = s.history_records || [];
+        $("focus-history-count").textContent = hist.length ? `· ${hist.length}` : "";
+        renderHistory($("focus-history"), hist, async (i) => {
+            const ns = await useRecord(i);
+            if (ns) { st.history = []; st.lastResult = null; applyState(ns); }
+        });
+        if (!r) { box.innerHTML = '<span class="text-muted">No saved focus yet. Focus, then <b>Finish &amp; save</b> (a successful sweep saves by itself).</span>'; return; }
+        const when = new Date(r.finished_at);
+        const fresh = Date.now() - when.getTime() < 10 * 60 * 1000 && !s.active;
+        box.innerHTML =
+            (fresh ? '<div class="ok">✓ Focus saved to Settings, focus mode off</div>' : "") +
+            `<div>Last saved <b>${when.toLocaleString()}</b> (${r.source})</div>` +
+            `<div>${r.method || "—"} <b>${fmtRecScore(r)}</b>${r.fwhm_px ? ` · FWHM ${r.fwhm_px} px` : ""}</div>` +
+            (r.lens_position != null ? `<div>Lens <b>${fmtRecLens(r)}</b>${r.lens_mode ? ` · ${r.lens_mode}` : ""}</div>` : "") +
+            `<div>${r.sensor_temp_c != null ? `${r.sensor_temp_c} °C · ` : ""}${fmtExp(r.exposure_s)}, ${(r.gain_db ?? 0).toFixed(0)} dB</div>`;
     }
 
     function showExpiry(sec) {
@@ -402,6 +474,21 @@
         updateStats(null);
         drawChart();
     }
+
+    $("focus-finish").addEventListener("click", async () => {
+        const b = $("focus-finish");
+        b.disabled = true;
+        try {
+            const r = await api("/api/focus/finish", { method: "POST" });
+            st.active = false;
+            applyState(r);
+            startOverviewTimer();
+        } catch (e) {
+            alert(`Finish focus: ${e.message}`);
+        } finally {
+            b.disabled = false;
+        }
+    });
 
     toggleBtn.addEventListener("click", async () => {
         toggleBtn.disabled = true;

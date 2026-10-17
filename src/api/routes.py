@@ -387,6 +387,24 @@ def stop_focus(service: AllSkyService = Depends(get_service)):
     return service.stop_focus("stopped by user")
 
 
+@router.post("/api/focus/finish")
+def finish_focus(service: AllSkyService = Depends(get_service)):
+    """Done focusing: save the result (and the lens position) to settings, notify, turn focus mode off."""
+    if not service.focus.active:
+        raise HTTPException(status_code=409, detail="Focus mode is not active")
+    return service.finish_focus("manual")
+
+
+@router.post("/api/focus/apply-record")
+def apply_focus_record(index: int = Query(-1, ge=-20, le=19), exposure: bool = Query(True),
+                       service: AllSkyService = Depends(get_service)):
+    """Reuse a saved focus (lens position, zoom region, measure, exposure) from the focus history."""
+    try:
+        return service.apply_focus_record(index, exposure)
+    except (RuntimeError, IndexError) as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
 @router.post("/api/focus/config")
 def configure_focus(req: FocusConfigRequest, service: AllSkyService = Depends(get_service)):
     cfg = req.model_dump(exclude_none=True, exclude={"reset"})

@@ -2120,6 +2120,8 @@ class AllSkyService:
         state["mode"] = self.mode
         state["limits"] = camera_limits(self.camera)
         state["lens"] = self.get_lens_state()
+        state["last_record"] = self.station_config.get("focus_record")
+        state["history_records"] = (self.station_config.get("focus_history") or [])[-10:]
         if self.focus.active:
             state["expires_in_s"] = round(max(0.0, self.focus.last_action + self.FOCUS_MAX_UNATTENDED_S - time.time()), 1)
         frame = self.last_frame
@@ -2128,7 +2130,16 @@ class AllSkyService:
         return state
 
     def start_focus(self, **config: Any) -> Dict[str, Any]:
-        """Enter focus mode: native resolution, fastest capture rate, auto-exposure and archiving paused."""
+        """Enter focus mode: native resolution, fastest capture rate, auto-exposure and archiving paused.
+        Without explicit settings the zoom region and measure of the last saved focus are reused."""
+        if not config and not self.focus.active:
+            rec = self.station_config.get("focus_record") or {}
+            roi = rec.get("roi") or {}
+            if roi:
+                config = {"cx": roi.get("cx"), "cy": roi.get("cy"), "roi_size": roi.get("size")}
+                if rec.get("method"):
+                    config["method"] = rec["method"] if self.focus.method == "auto" else None
+                config = {k: v for k, v in config.items() if v is not None}
         with self._focus_lock:
             self.focus.configure(**config)
             self.focus.last_poll = self.focus.last_action = time.time()
@@ -2459,12 +2470,96 @@ class AllSkyService:
             position = self.camera.set_lens_position(position)
             self._save_lens(position, source)
             sw["best_position"] = position
-        sw.update({"state": state, "message": message, "progress": 1.0, "finished_at": time.time()})
         with self._focus_lock:
             self.focus.reset_stats()
-        lvl = "success" if state == "done" else "warning"
+        if state == "done" and self.focus.active:
+            sw["phase"] = "saving"
+            # Measure the result where the lens now sits, record it in settings, tell the user, leave focus mode
+            score = None
+            method = sw.get("method") or (self.focus.method if self.focus.method != "auto" else None)
+            try:
+                if method:
+                    score, _ = self._lens_score(float(position), method, 1, 3, self.last_capture_time)
+            except Exception:
+                pass
+            sw["final_score"] = score
+            self.finish_focus(source, method=method, score=score, note=message)
+            sw.update({"state": state, "message": message + " · saved, focus mode off", "progress": 1.0,
+                       "finished_at": time.time()})
+            return
+        sw.update({"state": state, "message": message, "progress": 1.0, "finished_at": time.time()})
         if not os.environ.get("PYTEST_CURRENT_TEST"):
-            self.activity.log(lvl, "camera", f"Lens autofocus ({sw.get('mode')}): {message}")
+            self.activity.log("warning", "camera", f"Lens autofocus ({sw.get('mode')}): {message}")
+
+    def apply_focus_record(self, index: int = -1, exposure: bool = True) -> Dict[str, Any]:
+        """Reuse a saved focus: lens position (held, saved), zoom region and measure, and optionally its
+        exposure/gain (only while focus mode is on, since auto-exposure owns it otherwise)."""
+        hist = self.station_config.get("focus_history") or []
+        if not hist:
+            raise RuntimeError("No saved focus yet")
+        rec = hist[index]
+        if rec.get("lens_position") is not None and self._lens_supported():
+            self.set_lens(position=float(rec["lens_position"]))
+        roi = rec.get("roi") or {}
+        cfg = {"cx": roi.get("cx"), "cy": roi.get("cy"), "roi_size": roi.get("size"), "method": rec.get("method")}
+        self.configure_focus(**{k: v for k, v in cfg.items() if v is not None})
+        if exposure and self.focus.active and rec.get("exposure_s"):
+            self.set_exposure(float(rec["exposure_s"]), float(rec.get("gain_db") or 0.0))
+        self.activity.info("camera", f"Reused saved focus from {rec.get('finished_at', '?')[:16]} ({rec.get('source')})")
+        return self.get_focus_state()
+
+    def finish_focus(self, source: str = "manual", method: Optional[str] = None, score: Optional[float] = None,
+                     note: str = "") -> Dict[str, Any]:
+        """End a focusing session: store what was achieved in settings (station config focus_record and a
+        short history), log it as a success (shown as a notification on every page) and turn focus mode off."""
+        res = dict(self.focus.last_result or {})
+        method = method or res.get("method")
+        if score is None:
+            score = res.get("smoothed", res.get("score"))
+        lens_pos = None
+        if self._lens_supported():
+            lens_pos = getattr(self.camera, "lens_position_target", None)
+            if lens_pos is None:
+                lens_pos = getattr(self.camera, "lens_position", None)
+            if source == "manual" and lens_pos is not None:
+                self._save_lens(float(lens_pos), "manual")
+        temp = self.last_metadata.get("sensor_temp_c")
+        lower = LOWER_IS_BETTER.get(method or "", False)
+        rec = {
+            "finished_at": datetime.now(timezone.utc).isoformat(),
+            "source": source,
+            "camera": describe_camera(self.camera).get("sensor"),
+            "method": method,
+            "score": round(float(score), 4) if score is not None else None,
+            "unit": ("px HFR" if lower else "contrast") if method else None,
+            "fwhm_px": round(2.0 * float(score), 2) if (score is not None and lower) else None,
+            "best_in_session": self.focus.best,
+            "lens_position": round(float(lens_pos), 4) if lens_pos is not None else None,
+            "lens_distance_m": round(1.0 / float(lens_pos), 2) if lens_pos and lens_pos > 0.02 else None,
+            "lens_mode": self._lens_cfg().get("mode") if self._lens_supported() else None,
+            "sensor_temp_c": temp,
+            "roi": {"cx": round(self.focus.cx, 4), "cy": round(self.focus.cy, 4), "size": self.focus.roi_size},
+            "exposure_s": float(getattr(self.camera, "current_exposure_s", 0.0)),
+            "gain_db": float(getattr(self.camera, "current_gain_db", 0.0)),
+            "note": note,
+        }
+        self.station_config["focus_record"] = rec
+        hist = self.station_config.setdefault("focus_history", [])
+        hist.append(rec)
+        del hist[:-20]
+        if not os.environ.get("PYTEST_CURRENT_TEST"):
+            self._save_station_config()
+        parts = []
+        if rec["lens_position"] is not None:
+            dist = f"≈{rec['lens_distance_m']} m" if rec["lens_distance_m"] else "nominal ∞"
+            parts.append(f"lens {rec['lens_position']:.3f} D ({dist})")
+        if rec["score"] is not None:
+            parts.append(f"{method} {rec['score']:.3g}{' px HFR' if lower else ''}")
+        if temp is not None:
+            parts.append(f"{temp} °C")
+        self.activity.success("camera", f"Focus saved ({source}): {', '.join(parts) or 'no measurement'} — focus mode off")
+        self.stop_focus("focus finished and saved")
+        return {"record": rec, **self.get_focus_state()}
 
     def _track_focus(self, frame: np.ndarray, meta: Dict[str, Any], now: float) -> None:
         """Auto lens mode on ordinary captures: follow temperature with the learned model (any time of day),

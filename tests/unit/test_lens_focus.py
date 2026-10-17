@@ -90,6 +90,10 @@ def test_sweep_finds_real_focus_not_nominal_infinity(lens_client, drift):
     assert saved["source"] == "sweep" and saved["base_position"] == saved["position"]
     # Early stop: it never needs to walk the whole 0..2.5 D range
     assert max(p["pos"] for p in sw["points"]) < 1.2
+    # A successful sweep records the result in settings and leaves focus mode
+    rec = svc.station_config["focus_record"]
+    assert not svc.focus.active and rec["source"] == "sweep" and abs(rec["lens_position"] - TRUE_FOCUS) <= 0.03
+    assert rec["method"] == "stars" and rec["score"] is not None
 
 
 def test_manual_lens_moves_and_requires_lens(lens_client):
@@ -162,3 +166,20 @@ def test_auto_mode_follows_temperature_manual_holds(lens_client):
     assert cam.lens_position_target == held
     client.post("/api/focus/lens", json={"reset_learning": True})
     assert svc.lens_comp.samples == []
+
+
+def test_finish_saves_and_record_can_be_reused(lens_client):
+    client, svc, cam = lens_client
+    assert client.post("/api/focus/finish").status_code == 409
+    client.post("/api/focus/start", json={"cx": 0.3, "cy": 0.6, "roi_size": 192, "method": "stars"})
+    client.post("/api/focus/lens", json={"position": 0.41})
+    client.get("/api/focus/frame")
+    out = client.post("/api/focus/finish").json()
+    assert not out["active"] and out["record"]["lens_position"] == 0.41 and out["record"]["roi"]["size"] == 192
+    assert client.get("/api/focus").json()["last_record"]["source"] == "manual"
+    # Next session starts from the saved zoom region and measure
+    st = client.post("/api/focus/start", json={}).json()
+    assert st["cx"] == 0.3 and st["roi_size"] == 192 and st["method"] == "stars"
+    client.post("/api/focus/lens", json={"position": 1.5})
+    st = client.post("/api/focus/apply-record?index=-1").json()
+    assert cam.lens_position_target == 0.41 and st["active"]
