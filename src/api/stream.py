@@ -210,7 +210,7 @@ async def _build_full_binary_packet(service: AllSkyService, packet_type: int = 1
     telem = await asyncio.to_thread(service.get_telemetry)
     status = await asyncio.to_thread(service.get_status)
     jpeg_bytes = b""
-    frame, frame_ts = service.last_frame, service.last_capture_time
+    frame, frame_ts = service.get_display_frame()
     if frame is not None:
         # Viewers poll faster than the camera delivers; encode each frame once and share it
         cached = _stream_jpeg_cache

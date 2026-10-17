@@ -27,6 +27,7 @@ from src.hardware.v4l2_mmap import (
     set_raw10_bin,
 )
 from src.calibration.auto_exposure import DayNightAutoExposure
+from src.pipeline.star_boost import GAMMA_RAW10, GAMMA_SRGB, STAR_BOOST_BINS, sky_polygon_mask, star_bin_boost
 from src.calibration.dark import DarkCalibrationEngine
 from src.analytics.cloud_cover import CloudReference, analyze_cloud_cover
 from src.analytics.cloud_history import CloudHistory
@@ -149,6 +150,10 @@ class AllSkyService:
         self.last_telemetry_frame_ts: float = -1.0
         self.last_jpeg: Optional[bytes] = None
         self.last_webp: Optional[bytes] = None
+        # Viewer copy of last_frame (star boost applied at night); analysis always reads last_frame
+        self.display_frame: Optional[np.ndarray] = None
+        self._display_frame_ts: float = -1.0
+        self._star_mask_cache: Tuple[Any, Optional[np.ndarray]] = (None, None)
         self._webp_frame_ts: float = -1.0
         self._last_live_webp_write_ts: float = 0.0
         self._performance_overrides: Dict[str, float] = {}
@@ -560,6 +565,9 @@ class AllSkyService:
                 except Exception:
                     pass
 
+            display = self._star_boost_frame(frame, meta.get("capture_path") == "raw10") if not self.focus.active else frame
+            self.display_frame, self._display_frame_ts = display, self.last_capture_time
+
             # Update cached snapshots after RAW10 subtraction + demosaic. A full-res WebP encode costs
             # ~250 ms of single-core CPU, so it is encoded lazily in get_snapshot_webp() and the
             # data/live/latest.webp copy (not read by the app itself) is refreshed at most every 120 s.
@@ -576,7 +584,7 @@ class AllSkyService:
                 # A native 5 MP encode per frame would halve the focus frame rate; snapshots encode lazily
                 self.last_jpeg = None
             else:
-                ret, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                ret, jpeg = cv2.imencode(".jpg", display, [cv2.IMWRITE_JPEG_QUALITY, 85])
                 if ret:
                     self.last_jpeg = jpeg.tobytes()
 
@@ -1257,8 +1265,8 @@ class AllSkyService:
         return self._encode_webp()
 
     def _encode_webp(self) -> bytes:
-        """Encode last_frame to WebP at most once per captured frame (lock-free, like get_status)."""
-        frame, frame_ts = self.last_frame, self.last_capture_time
+        """Encode the display frame to WebP at most once per captured frame (lock-free, like get_status)."""
+        frame, frame_ts = self.get_display_frame()
         cached, cached_ts = self.last_webp, self._webp_frame_ts
         if cached is not None and cached_ts == frame_ts:
             return cached
@@ -1271,9 +1279,10 @@ class AllSkyService:
 
     def get_snapshot_jpeg(self) -> bytes:
         """Return valid JPEG binary payload, refreshing via capture_frame() when TTL expires."""
-        frame, _ = self.capture_frame()
+        self.capture_frame()
         if self.last_jpeg is not None:
             return self.last_jpeg
+        frame, _ = self.get_display_frame()
         ret, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
         if not ret:
             raise RuntimeError("JPEG compression failed")
@@ -2774,6 +2783,51 @@ class AllSkyService:
         cy = (star["y"] + mh + 0.5) * scale / h
         state = self.configure_focus(cx=cx, cy=cy)
         return {"found": True, "source": star, **state}
+
+    def get_display_frame(self) -> Tuple[Optional[np.ndarray], float]:
+        """(frame, capture timestamp) for viewers: the star-boosted copy when it belongs to the latest capture."""
+        frame, ts = self.last_frame, self.last_capture_time
+        display = self.display_frame
+        if display is not None and self._display_frame_ts == ts:
+            return display, ts
+        return frame, ts
+
+    def _star_boost_frame(self, frame: np.ndarray, raw10: bool = True) -> np.ndarray:
+        """Sum-bin stars for viewers at night (sun below -6 deg), limited to the station sky mask."""
+        cfg = self.station_config.get("star_boost") or {}
+        if not cfg.get("enabled") or frame is None or frame.ndim != 3:
+            return frame
+        try:
+            from src.calibration.auto_exposure import calculate_solar_elevation
+            if calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon) >= -6.0:
+                return frame
+            user_mask = self.station_config.get("sky_mask")
+            key = (frame.shape[:2], repr(user_mask))
+            if self._star_mask_cache[0] != key:
+                self._star_mask_cache = (key, sky_polygon_mask(frame.shape, user_mask))
+            return star_bin_boost(frame, int(cfg.get("bin", 3)), sky_mask=self._star_mask_cache[1],
+                                  gamma=GAMMA_RAW10 if raw10 else GAMMA_SRGB)
+        except Exception:
+            return frame
+
+    def get_star_boost(self) -> Dict[str, Any]:
+        cfg = self.station_config.get("star_boost") or {}
+        return {"enabled": bool(cfg.get("enabled", False)), "bin": int(cfg.get("bin", 3)), "bins": list(STAR_BOOST_BINS)}
+
+    def set_star_boost(self, enabled: Optional[bool] = None, bin_factor: Optional[int] = None) -> Dict[str, Any]:
+        """Turn night star boost (software sum-binning of the viewer frame) on/off and pick the NxN window."""
+        if bin_factor is not None and int(bin_factor) not in STAR_BOOST_BINS:
+            raise ValueError(f"Unsupported star boost bin {bin_factor}")
+        with self.lock:
+            cfg = self.station_config.setdefault("star_boost", {"enabled": False, "bin": 3})
+            if enabled is not None:
+                cfg["enabled"] = bool(enabled)
+            if bin_factor is not None:
+                cfg["bin"] = int(bin_factor)
+            self._save_station_config()
+            self.activity.info("camera", f"Star boost: {'on' if cfg['enabled'] else 'off'}, bin {cfg['bin']}x{cfg['bin']}")
+            self.last_capture_time = 0.0
+        return {"success": True, "message": "Star boost updated.", **self.get_star_boost()}
 
     def get_white_balance(self) -> Dict[str, Any]:
         """Return RAW10 white balance settings and the gains currently applied."""

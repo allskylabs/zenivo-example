@@ -352,6 +352,25 @@
                         </div>
                         <p class="field-note" id="output-res-note">Timelapse, keogram and startrails are always stored at 1296 × 972, so changing the resolution does not affect them.</p>
                     </fieldset>
+                    <!-- Star boost: software sum-binning of the night live view -->
+                    <fieldset class="settings-group">
+                        <legend>Star boost (night)</legend>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="star-boost-enabled">Live view &amp; snapshots</label>
+                                <label class="checkbox-label"><input type="checkbox" id="star-boost-enabled" /> Brighten stars by binning</label>
+                            </div>
+                            <div class="field">
+                                <label for="star-boost-bin">Bin window</label>
+                                <select id="star-boost-bin">
+                                    <option value="2">2 × 2 (sharpest)</option>
+                                    <option value="3">3 × 3</option>
+                                    <option value="4">4 × 4 (brightest)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <p class="field-note">Sums each star's light over an N×N window above the sky background (stars ~N² brighter, noise only ~N×), so faint stars survive the downscaled live view. Only while the sun is below −6°, only inside the sky mask; the image size, star count, cloud cover and archived frames are unchanged.</p>
+                    </fieldset>
                     <!-- Performance: CPU vs. live-view quality -->
                     <fieldset class="settings-group">
                         <legend>Performance</legend>
@@ -895,7 +914,7 @@
 
     <!-- App JavaScript -->
     <script src="/static/sky_catalog.js"></script>
-    <script src="/app.js?v=20261017fd"></script>
+    <script src="/app.js?v=20261018ov1"></script>
     <script src="/static/activity.js?v=20261016h"></script>
     <script src="/static/focus.js?v=20261017fe"></script>
 </body>

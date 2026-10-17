@@ -17,6 +17,7 @@ from src.api.schemas import (
     ImageTransformRequest,
     OutputResolutionRequest,
     PerformanceSettingsRequest,
+    StarBoostRequest,
     WhiteBalanceRequest,
     StoragePolicyRequest,
     CloudConfigRequest,
@@ -154,6 +155,24 @@ def set_camera_resolution(
     """Select the output resolution (downscaled from the native 2592x1944 frame)."""
     try:
         return service.set_output_resolution(req.width, req.height)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.get("/api/camera/star-boost")
+def get_star_boost(service: AllSkyService = Depends(get_service)):
+    """Return night star boost settings (software sum-binning of the viewer frame)."""
+    return service.get_star_boost()
+
+
+@router.post("/api/camera/star-boost")
+def set_star_boost(
+    req: StarBoostRequest,
+    service: AllSkyService = Depends(get_service),
+):
+    """Turn night star boost on/off and choose the NxN sum-binning window."""
+    try:
+        return service.set_star_boost(req.enabled, req.bin)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 

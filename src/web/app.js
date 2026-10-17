@@ -783,6 +783,48 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ------------------------------------------------------------------
+    // Star boost (night sum-binning of the live view)
+    // ------------------------------------------------------------------
+    const starBoostEnabled = document.getElementById("star-boost-enabled");
+    const starBoostBin = document.getElementById("star-boost-bin");
+
+    async function loadStarBoost() {
+        if (!starBoostEnabled) return;
+        try {
+            const data = await (await fetch("/api/camera/star-boost")).json();
+            starBoostEnabled.checked = !!data.enabled;
+            starBoostBin.value = String(data.bin || 3);
+        } catch (err) {
+            showAlert(stationAlert, `❌ Could not load star boost: ${err.message}`, "error", true);
+        }
+    }
+
+    async function saveStarBoost() {
+        starBoostEnabled.disabled = starBoostBin.disabled = true;
+        try {
+            const res = await fetch("/api/camera/star-boost", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ enabled: starBoostEnabled.checked, bin: Number(starBoostBin.value) }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.detail || "Unknown error");
+            starBoostEnabled.checked = !!data.enabled;
+            starBoostBin.value = String(data.bin);
+        } catch (err) {
+            showAlert(stationAlert, `❌ Failed to set star boost: ${err.message}`, "error", true);
+            loadStarBoost();
+        } finally {
+            starBoostEnabled.disabled = starBoostBin.disabled = false;
+        }
+    }
+
+    if (starBoostEnabled) {
+        starBoostEnabled.addEventListener("change", saveStarBoost);
+        starBoostBin.addEventListener("change", saveStarBoost);
+    }
+
+    // ------------------------------------------------------------------
     // Performance (capture interval, analysis and live-view size)
     // ------------------------------------------------------------------
     const perfFields = {
@@ -1725,40 +1767,165 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const catalog = window.ALLSKY_CATALOG || { constellations: [], stars: [], messier: [] };
+        // The canvas sits in the CSS-zoomed stage: 1 screen px = u canvas px (keeps strokes and text screen-sized)
+        const u = 1 / Math.max(1, view.zoom);
         const occupiedBoxes = [];
 
-        function canPlaceLabel(x, y, textWidth, textHeight) {
-            const box = {
-                x1: x - 3,
-                y1: y - textHeight,
-                x2: x + textWidth + 3,
-                y2: y + 3,
-            };
-            if (box.x1 < offsetX + 4 || box.x2 > offsetX + renderW - 4 || box.y1 < offsetY + 4 || box.y2 > offsetY + renderH - 4) {
+        // Collision test + register for a label box given by its top-left corner (canvas px)
+        function placeBox(x, y, bw, bh, pad = 2 * u) {
+            const box = { x1: x - pad, y1: y - pad, x2: x + bw + pad, y2: y + bh + pad };
+            if (box.x1 < offsetX + 4 * u || box.x2 > offsetX + renderW - 4 * u || box.y1 < offsetY + 4 * u || box.y2 > offsetY + renderH - 4 * u) {
                 return false;
             }
             for (let i = 0; i < occupiedBoxes.length; i++) {
                 const b = occupiedBoxes[i];
-                if (!(box.x2 < b.x1 || box.x1 > b.x2 || box.y2 < b.y1 || box.y1 > b.y2)) {
-                    return false;
-                }
+                if (!(box.x2 < b.x1 || box.x1 > b.x2 || box.y2 < b.y1 || box.y1 > b.y2)) return false;
             }
             occupiedBoxes.push(box);
             return true;
+        }
+        // Reserve the top-left summary badge so labels avoid it
+        occupiedBoxes.push({ x1: offsetX, y1: offsetY, x2: offsetX + 560 * u, y2: offsetY + 36 * u });
+
+        const roundedRect = (x, y, rw, rh, r) => {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + rw, y, x + rw, y + rh, r);
+            ctx.arcTo(x + rw, y + rh, x, y + rh, r);
+            ctx.arcTo(x, y + rh, x, y, r);
+            ctx.arcTo(x, y, x + rw, y, r);
+            ctx.closePath();
+        };
+
+        // Bright-star lookup so stick-figure vertices know their magnitude (line weight, reticle rim gap)
+        const starVertices = new Map();
+        const vertexKey = (ra, dec) => `${Math.round(ra * 10)},${Math.round(dec * 10)}`;
+        (catalog.stars || []).forEach((s) => {
+            const k = vertexKey(s.ra, s.dec);
+            if (!starVertices.has(k)) starVertices.set(k, s);
+        });
+        const findVertexStar = (ra, dec) => {
+            const r0 = Math.round(ra * 10), d0 = Math.round(dec * 10);
+            for (let dr = -2; dr <= 2; dr++) {
+                for (let dd = -2; dd <= 2; dd++) {
+                    const s = starVertices.get(`${r0 + dr},${d0 + dd}`);
+                    if (s && Math.abs(s.ra - ra) < 0.25 && Math.abs(s.dec - dec) < 0.25) return s;
+                }
+            }
+            return null;
+        };
+        const starWeight = (mag) => Math.max(0.24, Math.min(1.0, (5.2 - mag) / 4.5));
+        const reticleRadius = (mag) => (Math.max(1.4, Math.min(4.8, 3.8 - mag * 0.65)) + 4) * u;
+
+        // Bi-tapered, magnitude-weighted constellation filament (after the hoan.uk plate-solving viewer):
+        // anchored at each star's reticle rim, a soft bloom, a gradient body and a fine core, screen-blended
+        const lw = 1.6;
+        function drawFilament(v1, v2) {
+            const dx = v2.x - v1.x;
+            const dy = v2.y - v1.y;
+            const segLen = Math.hypot(dx, dy);
+            if (segLen / u < 7) return;
+            const ux = dx / segLen, uy = dy / segLen;
+            const nx = -uy, ny = ux;
+            const b1 = starWeight(v1.mag), b2 = starWeight(v2.mag);
+            const bAvg = Math.sqrt(b1 * b2);
+            const g1 = Math.min(segLen * 0.26, v1.rRing + 0.15 * u);
+            const g2 = Math.min(segLen * 0.26, v2.rRing + 0.15 * u);
+            const x1 = v1.x + ux * g1, y1 = v1.y + uy * g1;
+            const x2 = v2.x - ux * g2, y2 = v2.y - uy * g2;
+            const effLen = Math.hypot(x2 - x1, y2 - y1);
+            const effScreen = effLen / u;
+            if (effLen <= 1e-2 || effScreen < 2.5) return;
+
+            // Short spans stay fine, long spans stay strong but slightly softer
+            const distW = effScreen < 36 ? 0.68 + (effScreen / 36) * 0.32 : effScreen > 180 ? Math.max(0.88, 1.0 - (effScreen - 180) / 1100) : 1.0;
+            const distA = effScreen > 160 ? Math.max(0.84, 1.0 - (effScreen - 160) / 900) : 1.0;
+            const taperLen = Math.min(effLen * 0.28, Math.max(4.5, Math.min(17.0, Math.sqrt(effScreen) * 1.12)) * u);
+            const tStop = Math.max(0.04, Math.min(0.24, taperLen / effLen));
+            const tx1 = x1 + ux * taperLen, ty1 = y1 + uy * taperLen;
+            const tx2 = x2 - ux * taperLen, ty2 = y2 - uy * taperLen;
+            const midX = (x1 + x2) * 0.5, midY = (y1 + y2) * 0.5;
+
+            const ribbon = (tipW1, bodyW1, midW, bodyW2, tipW2) => {
+                ctx.beginPath();
+                ctx.moveTo(x1 + nx * tipW1, y1 + ny * tipW1);
+                ctx.quadraticCurveTo(tx1 + nx * bodyW1, ty1 + ny * bodyW1, midX + nx * midW, midY + ny * midW);
+                ctx.quadraticCurveTo(tx2 + nx * bodyW2, ty2 + ny * bodyW2, x2 + nx * tipW2, y2 + ny * tipW2);
+                ctx.lineTo(x2 - nx * tipW2, y2 - ny * tipW2);
+                ctx.quadraticCurveTo(tx2 - nx * bodyW2, ty2 - ny * bodyW2, midX - nx * midW, midY - ny * midW);
+                ctx.quadraticCurveTo(tx1 - nx * bodyW1, ty1 - ny * bodyW1, x1 - nx * tipW1, y1 - ny * tipW1);
+                ctx.closePath();
+            };
+
+            const wBase = distW * lw * u;
+            const tipW1 = (0.14 + 0.12 * b1) * wBase, tipW2 = (0.14 + 0.12 * b2) * wBase;
+            const bodyW1 = (0.30 + 0.34 * b1) * wBase, bodyW2 = (0.30 + 0.34 * b2) * wBase;
+            const midW = (0.34 + 0.36 * bAvg) * wBase * (0.88 + 0.12 * distA);
+            const aTip1 = Math.min(0.68, (0.20 + 0.24 * b1) * distA);
+            const aShld1 = Math.min(0.76, (0.38 + 0.28 * b1) * distA);
+            const aMid = Math.min(0.80, (0.42 + 0.28 * bAvg) * distA);
+            const aShld2 = Math.min(0.76, (0.38 + 0.28 * b2) * distA);
+            const aTip2 = Math.min(0.68, (0.20 + 0.24 * b2) * distA);
+
+            ctx.save();
+            ctx.globalCompositeOperation = "screen";
+            // 1) soft bloom
+            const glow = ctx.createLinearGradient(x1, y1, x2, y2);
+            glow.addColorStop(0, `rgba(56, 189, 248, ${(aTip1 * 0.16).toFixed(3)})`);
+            glow.addColorStop(tStop, `rgba(56, 189, 248, ${(aShld1 * 0.22).toFixed(3)})`);
+            glow.addColorStop(0.5, `rgba(125, 211, 252, ${(aMid * 0.25).toFixed(3)})`);
+            glow.addColorStop(1 - tStop, `rgba(56, 189, 248, ${(aShld2 * 0.22).toFixed(3)})`);
+            glow.addColorStop(1, `rgba(56, 189, 248, ${(aTip2 * 0.16).toFixed(3)})`);
+            ribbon(tipW1 * 2.15, bodyW1 * 2.25, midW * 2.35, bodyW2 * 2.25, tipW2 * 2.15);
+            ctx.fillStyle = glow;
+            ctx.fill();
+            // 2) tapered body
+            const body = ctx.createLinearGradient(x1, y1, x2, y2);
+            body.addColorStop(0, `rgba(56, 189, 248, ${aTip1.toFixed(3)})`);
+            body.addColorStop(tStop, `rgba(125, 211, 252, ${aShld1.toFixed(3)})`);
+            body.addColorStop(0.5, `rgba(186, 230, 253, ${aMid.toFixed(3)})`);
+            body.addColorStop(1 - tStop, `rgba(125, 211, 252, ${aShld2.toFixed(3)})`);
+            body.addColorStop(1, `rgba(56, 189, 248, ${aTip2.toFixed(3)})`);
+            ribbon(tipW1, bodyW1, midW, bodyW2, tipW2);
+            ctx.fillStyle = body;
+            ctx.fill();
+            // 3) fine continuous core reaching both rims
+            ctx.strokeStyle = body;
+            ctx.lineWidth = (0.34 + 0.28 * bAvg) * wBase;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            // 4) contact glint on prominent rims
+            if (effScreen >= 24) {
+                [[b1, x1, y1], [b2, x2, y2]].forEach(([b, gx, gy]) => {
+                    if (b < 0.42) return;
+                    ctx.fillStyle = `rgba(186, 230, 253, ${(0.28 + 0.26 * b).toFixed(3)})`;
+                    ctx.beginPath();
+                    ctx.arc(gx, gy, (0.36 + 0.24 * b) * wBase, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+            ctx.restore();
         }
 
         let visibleConstellationsCount = 0;
         let visibleStarsCount = 0;
 
-        // 2. Draw IAU Constellation Stick Figures & Collect Visible Constellation Centroids
+        // 2. IAU constellation stick figures (one filament per unique edge) & visible constellation centroids
         const visibleConstellationLabels = [];
         if ((showSky || showLabels) && Array.isArray(catalog.constellations)) {
-            ctx.save();
-            ctx.strokeStyle = "rgba(56, 189, 248, 0.52)";
-            ctx.lineWidth = 1.35;
-            ctx.lineCap = "round";
-
             const maxSegLen = isRectilinear ? renderW * (isFisheyePointing ? 0.35 : 0.6) : r90Canvas * 0.65;
+            const drawnEdges = new Set();
+            const resolveVertex = (ra, dec) => {
+                const p = projectRaDecToCanvas(ra, dec);
+                const star = findVertexStar(ra, dec);
+                const mag = star ? Number(star.mag) : 3.8;
+                p.mag = mag;
+                p.rRing = star && mag <= 3.0 ? reticleRadius(mag) : 2.8 * u;
+                return p;
+            };
 
             catalog.constellations.forEach((con) => {
                 let sumX = 0;
@@ -1769,17 +1936,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (Array.isArray(con.lines)) {
                     con.lines.forEach((seg) => {
                         if (!Array.isArray(seg) || seg.length < 2) return;
-                        const p1 = projectRaDecToCanvas(seg[0][0], seg[0][1]);
-                        const p2 = projectRaDecToCanvas(seg[1][0], seg[1][1]);
+                        const p1 = resolveVertex(seg[0][0], seg[0][1]);
+                        const p2 = resolveVertex(seg[1][0], seg[1][1]);
                         if (p1.alt >= 0.0 && p2.alt >= 0.0 && (p1.visible || p2.visible)) {
                             const segDist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
                             if (segDist <= maxSegLen) {
                                 anySegmentVisible = true;
-                                if (showSky) {
-                                    ctx.beginPath();
-                                    ctx.moveTo(p1.x, p1.y);
-                                    ctx.lineTo(p2.x, p2.y);
-                                    ctx.stroke();
+                                const k1 = `${Math.round(p1.x * 2)},${Math.round(p1.y * 2)}`;
+                                const k2 = `${Math.round(p2.x * 2)},${Math.round(p2.y * 2)}`;
+                                const eKey = k1 < k2 ? `${k1}|${k2}` : `${k2}|${k1}`;
+                                if (showSky && !drawnEdges.has(eKey)) {
+                                    drawnEdges.add(eKey);
+                                    drawFilament(p1, p2);
                                 }
                                 sumX += p1.x + p2.x;
                                 sumY += p1.y + p2.y;
@@ -1806,51 +1974,82 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 }
             });
-            ctx.restore();
         }
 
-        // 3. Draw Messier Deep-Sky Objects (DSOs)
+        // 3. Messier deep-sky objects: screen-blended diamond with a soft halo
         const visibleMessier = [];
         if ((showSky || showLabels) && Array.isArray(catalog.messier)) {
             ctx.save();
+            ctx.globalCompositeOperation = "screen";
             catalog.messier.forEach((dso) => {
                 const pt = projectRaDecToCanvas(dso.ra, dso.dec);
                 if (!pt.visible || pt.alt < 5.0) return;
                 visibleMessier.push({ ...dso, x: pt.x, y: pt.y, alt: pt.alt });
                 if (showSky) {
-                    ctx.strokeStyle = "rgba(250, 204, 21, 0.6)";
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.moveTo(pt.x, pt.y - 5);
-                    ctx.lineTo(pt.x + 5, pt.y);
-                    ctx.lineTo(pt.x, pt.y + 5);
-                    ctx.lineTo(pt.x - 5, pt.y);
-                    ctx.closePath();
+                    const r = 4.5 * u;
+                    const diamond = () => {
+                        ctx.beginPath();
+                        ctx.moveTo(pt.x, pt.y - r);
+                        ctx.lineTo(pt.x + r, pt.y);
+                        ctx.lineTo(pt.x, pt.y + r);
+                        ctx.lineTo(pt.x - r, pt.y);
+                        ctx.closePath();
+                    };
+                    ctx.strokeStyle = "rgba(253, 224, 71, 0.14)";
+                    ctx.lineWidth = 2.6 * u;
+                    diamond();
+                    ctx.stroke();
+                    ctx.strokeStyle = "rgba(253, 224, 71, 0.62)";
+                    ctx.lineWidth = 0.8 * u;
+                    diamond();
                     ctx.stroke();
                 }
             });
             ctx.restore();
         }
 
-        // 4. Mark bright navigation stars (thin rings, never covering the star itself)
+        // 4. Bright stars: four-arc reticles (open, so the real star stays visible), gold + ticks for the brightest
         const visibleBrightStars = [];
         if ((showSky || showLabels) && Array.isArray(catalog.stars)) {
             ctx.save();
+            ctx.globalCompositeOperation = "screen";
+            const gapRad = 0.28;
+            const arcs = (x, y, r) => {
+                for (let q = 0; q < 4; q++) {
+                    ctx.beginPath();
+                    ctx.arc(x, y, r, q * (Math.PI / 2) + gapRad, (q + 1) * (Math.PI / 2) - gapRad);
+                    ctx.stroke();
+                }
+            };
             catalog.stars.forEach((star) => {
                 const pt = projectRaDecToCanvas(star.ra, star.dec);
                 if (!pt.visible || pt.alt < 1.0) return;
                 visibleStarsCount++;
 
                 const mag = Number(star.mag !== undefined ? star.mag : 3.0);
-                const radius = Math.max(1.4, Math.min(4.8, 3.8 - mag * 0.65));
+                const rRing = reticleRadius(mag);
+                const prominent = mag <= 1.5;
+                const hasTicks = mag <= 1.0;
 
                 if (showSky && mag <= 3.0) {
-                    // Thin open ring around the catalog position: the real (often faint) star stays visible inside
-                    ctx.strokeStyle = "rgba(186, 230, 253, 0.55)";
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.arc(pt.x, pt.y, radius + 4, 0, 2 * Math.PI);
-                    ctx.stroke();
+                    const b = Math.max(0.32, starWeight(mag));
+                    ctx.strokeStyle = prominent ? "rgba(253, 224, 71, 0.12)" : "rgba(56, 189, 248, 0.10)";
+                    ctx.lineWidth = (prominent ? 1.85 : 1.45) * lw * u;
+                    arcs(pt.x, pt.y, rRing);
+                    ctx.strokeStyle = prominent
+                        ? `rgba(253, 224, 71, ${(0.40 + 0.18 * b).toFixed(2)})`
+                        : `rgba(125, 211, 252, ${(0.28 + 0.22 * b).toFixed(2)})`;
+                    ctx.lineWidth = (prominent ? 0.68 + 0.24 * b : 0.48 + 0.22 * b) * lw * u;
+                    arcs(pt.x, pt.y, rRing);
+                    if (hasTicks) {
+                        const tIn = rRing + 1.2 * u, tOut = rRing + 3.6 * u;
+                        ctx.beginPath();
+                        ctx.moveTo(pt.x - tOut, pt.y); ctx.lineTo(pt.x - tIn, pt.y);
+                        ctx.moveTo(pt.x + tIn, pt.y); ctx.lineTo(pt.x + tOut, pt.y);
+                        ctx.moveTo(pt.x, pt.y - tOut); ctx.lineTo(pt.x, pt.y - tIn);
+                        ctx.moveTo(pt.x, pt.y + tIn); ctx.lineTo(pt.x, pt.y + tOut);
+                        ctx.stroke();
+                    }
                 }
 
                 if (star.name && mag <= 2.55) {
@@ -1860,70 +2059,107 @@ document.addEventListener("DOMContentLoaded", () => {
                         mag: mag,
                         x: pt.x,
                         y: pt.y,
-                        r: radius,
-                        color: star.color || "#f8fafc",
+                        rRing: rRing,
+                        prominent: prominent,
+                        hasTicks: hasTicks,
                     });
                 }
             });
             ctx.restore();
         }
 
-        // 5. Draw Labels (Constellation Names, Bright Navigation Stars, Iconic Messier DSOs)
+        // 5. Labels with collision avoidance (constellation pill badges, star names with leader filaments, DSOs)
         if (showLabels) {
             ctx.save();
-            ctx.shadowColor = "rgba(2, 6, 23, 0.95)";
-            ctx.shadowBlur = 4;
+            ctx.textBaseline = "middle";
 
-            // 5a. Constellation Labels (prioritize highest altitude near zenith)
-            visibleConstellationLabels.sort((a, b) => b.alt - a.alt);
-            ctx.font = "bold 11px Inter, system-ui, sans-serif";
-            ctx.textAlign = "center";
-
-            visibleConstellationLabels.forEach((con) => {
-                const labelText = con.common
-                    ? `${con.name.toUpperCase()} (${con.common})`
-                    : con.name.toUpperCase();
-                const metrics = ctx.measureText(labelText);
-                const tw = metrics.width;
-                const th = 13;
-                const lx = con.x - tw / 2;
-                const ly = con.y;
-
-                if (canPlaceLabel(lx, ly, tw, th)) {
-                    ctx.fillStyle = "rgba(15, 23, 42, 0.32)";
-                    ctx.fillRect(lx - 4, ly - 11, tw + 8, 14);
-                    ctx.fillStyle = "rgba(125, 211, 252, 0.85)";
-                    ctx.fillText(labelText, con.x, ly);
-                }
-            });
-
-            // 5b. Bright Star Labels (sorted brightest first)
+            // 5a. Bright star names first (sorted brightest first): try 8 positions just outside the reticle
             visibleBrightStars.sort((a, b) => a.mag - b.mag);
-            ctx.font = "500 10.5px Inter, system-ui, sans-serif";
-            ctx.textAlign = "left";
-
-            visibleBrightStars.forEach((stItem) => {
-                const labelText = stItem.name;
-                const tw = ctx.measureText(labelText).width;
-                const lx = stItem.x + stItem.r + 8;
-                const ly = stItem.y + 3;
-
-                if (canPlaceLabel(lx, ly, tw, 12)) {
-                    ctx.fillStyle = "rgba(254, 249, 195, 0.85)";
-                    ctx.fillText(labelText, lx, ly);
+            visibleBrightStars.forEach((s) => {
+                const fs = (s.prominent ? 11.2 : 10.0) * u;
+                ctx.font = `${s.prominent ? 600 : 500} ${fs}px Inter, system-ui, sans-serif`;
+                const tw = ctx.measureText(s.name).width;
+                const th = 14 * u;
+                const rim = s.rRing + (s.hasTicks ? 4.2 : 1.0) * u;
+                const dist = rim + 6.5 * u;
+                const diag = rim * 0.72 + 6.0 * u;
+                const cands = [
+                    { bx: s.x + dist, by: s.y - th / 2, tx: s.x + dist, ty: s.y, align: "left", ux: 1, uy: 0 },
+                    { bx: s.x + diag, by: s.y - diag - th + 2 * u, tx: s.x + diag, ty: s.y - diag - th / 2 + 2 * u, align: "left", ux: 0.707, uy: -0.707 },
+                    { bx: s.x + diag, by: s.y + diag - 2 * u, tx: s.x + diag, ty: s.y + diag + th / 2 - 2 * u, align: "left", ux: 0.707, uy: 0.707 },
+                    { bx: s.x - dist - tw, by: s.y - th / 2, tx: s.x - dist, ty: s.y, align: "right", ux: -1, uy: 0 },
+                    { bx: s.x - diag - tw, by: s.y - diag - th + 2 * u, tx: s.x - diag, ty: s.y - diag - th / 2 + 2 * u, align: "right", ux: -0.707, uy: -0.707 },
+                    { bx: s.x - diag - tw, by: s.y + diag - 2 * u, tx: s.x - diag, ty: s.y + diag + th / 2 - 2 * u, align: "right", ux: -0.707, uy: 0.707 },
+                    { bx: s.x - tw / 2, by: s.y - dist - th, tx: s.x, ty: s.y - dist - th / 2, align: "center", ux: 0, uy: -1 },
+                    { bx: s.x - tw / 2, by: s.y + dist, tx: s.x, ty: s.y + dist + th / 2, align: "center", ux: 0, uy: 1 },
+                ];
+                for (const c of cands) {
+                    if (!placeBox(c.bx, c.by, tw, th)) continue;
+                    // Subtle leader filament from just outside the reticle rim toward the label
+                    ctx.save();
+                    ctx.globalCompositeOperation = "screen";
+                    ctx.strokeStyle = s.prominent ? "rgba(253, 224, 71, 0.28)" : "rgba(125, 211, 252, 0.25)";
+                    ctx.lineWidth = 0.65 * u;
+                    ctx.beginPath();
+                    ctx.moveTo(s.x + c.ux * (rim + 1.0 * u), s.y + c.uy * (rim + 1.0 * u));
+                    ctx.lineTo(s.x + c.ux * (rim + 4.5 * u), s.y + c.uy * (rim + 4.5 * u));
+                    ctx.stroke();
+                    ctx.restore();
+                    ctx.fillStyle = s.prominent ? "rgba(254, 243, 199, 0.88)" : "rgba(224, 242, 254, 0.80)";
+                    ctx.shadowColor = "rgba(2, 6, 23, 0.72)";
+                    ctx.shadowBlur = 4;
+                    ctx.textAlign = c.align;
+                    ctx.fillText(s.name, c.tx, c.ty);
+                    ctx.shadowBlur = 0;
+                    break;
                 }
             });
 
-            // 5c. Iconic Messier DSO Labels (M45, M42, M31, M44, etc.)
-            ctx.font = "600 10px monospace";
+            // 5b. Constellation names as translucent pill badges (highest altitude first), nudged around the centroid
+            visibleConstellationLabels.sort((a, b) => b.alt - a.alt);
+            visibleConstellationLabels.forEach((con) => {
+                const labelText = con.common ? `${con.name.toUpperCase()} · ${con.common}` : con.name.toUpperCase();
+                const fs = 10.5 * u;
+                ctx.font = `600 ${fs}px Inter, system-ui, sans-serif`;
+                const tw = ctx.measureText(labelText).width;
+                const padX = 7 * u;
+                const bw = tw + padX * 2;
+                const bh = 18 * u;
+                const offs = [[0, 0], [0, -22], [0, 22], [-40, 0], [40, 0], [0, -44], [0, 44]];
+                for (const [ox, oy] of offs) {
+                    const bx = con.x - bw / 2 + ox * u;
+                    const by = con.y - bh / 2 + oy * u;
+                    if (!placeBox(bx, by, bw, bh)) continue;
+                    roundedRect(bx, by, bw, bh, 5 * u);
+                    ctx.fillStyle = "rgba(15, 23, 42, 0.46)";
+                    ctx.fill();
+                    ctx.strokeStyle = "rgba(56, 189, 248, 0.30)";
+                    ctx.lineWidth = 0.75 * u;
+                    ctx.stroke();
+                    ctx.fillStyle = "rgba(186, 230, 253, 0.88)";
+                    ctx.textAlign = "center";
+                    ctx.shadowColor = "rgba(2, 6, 23, 0.75)";
+                    ctx.shadowBlur = 3;
+                    ctx.fillText(labelText, bx + bw / 2, by + bh / 2 + 0.5 * u);
+                    ctx.shadowBlur = 0;
+                    break;
+                }
+            });
+
+            // 5c. Messier labels (M45, M42, M31, M44, ...)
+            ctx.font = `600 ${9.5 * u}px Inter, system-ui, sans-serif`;
+            ctx.textAlign = "left";
+            ctx.shadowColor = "rgba(2, 6, 23, 0.72)";
             visibleMessier.forEach((dso) => {
                 const labelText = `${dso.id} ${dso.name}`;
                 const tw = ctx.measureText(labelText).width;
-                const lx = dso.x + 7;
-                const ly = dso.y + 3;
-                if (canPlaceLabel(lx, ly, tw, 11)) {
-                    ctx.fillStyle = "rgba(253, 224, 71, 0.8)";
-                    ctx.fillText(labelText, lx, ly);
+                const th = 12 * u;
+                const lx = dso.x + 8 * u;
+                if (placeBox(lx, dso.y - th / 2, tw, th)) {
+                    ctx.fillStyle = "rgba(254, 240, 138, 0.85)";
+                    ctx.shadowBlur = 3;
+                    ctx.fillText(labelText, lx, dso.y);
+                    ctx.shadowBlur = 0;
                 }
             });
 
@@ -2409,6 +2645,7 @@ document.addEventListener("DOMContentLoaded", () => {
     loadStationConfig();
     if (currentPage === "tab-settings") {
         loadResolutionOptions();
+        loadStarBoost();
         loadPerformance();
         loadWhiteBalance();
         setInterval(loadWhiteBalance, 5000);

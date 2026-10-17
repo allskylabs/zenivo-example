@@ -54,6 +54,12 @@ class OutputResolutionRequest(BaseModel):
     height: int = Field(..., ge=240, le=1944, description="Output height in pixels")
 
 
+class StarBoostRequest(BaseModel):
+    """Request payload for night star boost (software sum-binning of the viewer frame)."""
+    enabled: Optional[bool] = Field(None, description="Turn star boost on or off")
+    bin: Optional[int] = Field(None, ge=2, le=4, description="NxN sum-binning window")
+
+
 class PerformanceSettingsRequest(BaseModel):
     """Request payload for CPU/quality trade-offs; omitted fields stay unchanged."""
     min_capture_interval_s: Optional[float] = Field(None, ge=0.4, le=60, description="Minimum seconds between captures")
