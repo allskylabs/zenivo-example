@@ -80,6 +80,7 @@ class FocusConfigRequest(BaseModel):
     cy: Optional[float] = Field(None, ge=0.0, le=1.0, description="ROI centre y as a fraction of the frame height")
     roi_size: Optional[int] = Field(None, ge=64, le=1024, description="ROI side in native pixels")
     method: Optional[str] = Field(None, pattern="^(auto|stars|lights|contrast)$", description="Focus measure")
+    smooth: Optional[int] = Field(None, ge=1, le=30, description="Frames in the robust running average of the score")
     reset: bool = Field(False, description="Forget the score history and best score")
 
 

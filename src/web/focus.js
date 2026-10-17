@@ -40,7 +40,7 @@
         method: "auto",
         frameW: 0,
         frameH: 0,
-        history: [],      // {t, score}
+        history: [],      // {t, score (raw), sm (running average from the server)}
         family: null,
         lastResult: null,
         bitmap: null,
@@ -72,6 +72,7 @@
         if (s.frame_width) { st.frameW = s.frame_width; st.frameH = s.frame_height; }
         roiSizeSel.value = String(s.roi_size);
         document.querySelectorAll("#focus-method button").forEach((b) => b.classList.toggle("active", b.dataset.method === s.method));
+        if (s.smooth) document.querySelectorAll("#focus-smooth button").forEach((b) => b.classList.toggle("active", +b.dataset.smooth === s.smooth));
         if (s.exposure_s !== undefined && document.activeElement !== $("focus-exp")) $("focus-exp").value = +s.exposure_s.toPrecision(4);
         if (s.gain_db !== undefined && document.activeElement !== $("focus-gain")) $("focus-gain").value = +s.gain_db.toFixed(1);
         toggleBtn.textContent = st.active ? "Stop focus mode" : "Start focus mode";
@@ -117,7 +118,7 @@
         const fam = familyOf(res.method);
         if (fam !== st.family) { st.history = []; st.family = fam; }
         if (res.score !== null && res.score !== undefined) {
-            st.history.push({ t: res.frame_ts, score: res.score });
+            st.history.push({ t: res.frame_ts, score: res.score, sm: res.smoothed ?? res.score });
             if (st.history.length > HISTORY_MAX) st.history.shift();
         }
         const now = performance.now();
@@ -183,11 +184,13 @@
     }
 
     function updateReadout(res) {
+        const shown = res.smoothed ?? res.score;
         $("focus-score-label").textContent = METHOD_LABEL[res.method] || res.method;
-        $("focus-score-value").textContent = fmtScore(res, res.score);
+        $("focus-score-value").textContent = fmtScore(res, shown);
         let sub = "";
-        if (res.method === "contrast") sub = "higher is sharper";
-        else if (res.score !== null && res.score !== undefined) sub = `FWHM ≈ ${res.fwhm} px · ${res.n_sources} source${res.n_sources === 1 ? "" : "s"} · lower is sharper`;
+        const avg = res.smooth > 1 ? `avg of ${res.smooth} frames · this frame ${fmtScore(res, res.score)}` : "single frame";
+        if (res.method === "contrast") sub = `${avg} · higher is sharper`;
+        else if (res.score !== null && res.score !== undefined) sub = `${avg} · FWHM ≈ ${res.fwhm} px · ${res.n_sources} source${res.n_sources === 1 ? "" : "s"} · lower is sharper`;
         else sub = "no point sources in the zoom region — move it or use Find star";
         $("focus-score-sub").textContent = sub;
         const q = res.quality_pct;
@@ -198,15 +201,16 @@
         fill.style.width = Math.max(0, Math.min(100, ((q || 0) - 80) * 5)) + "%";
         fill.className = "focus-meter-fill " + (q >= 97 ? "good" : q >= 85 ? "near" : "far");
 
-        // Trend from a 3-frame average against the 3 frames before it
+        // Trend: averaged score now against the average one window ago, ignoring changes within the noise
         const h = st.history;
+        const n = Math.max(3, res.smooth || 1);
         let trend = "";
-        if (h.length >= 6) {
-            const avg = (a) => a.reduce((x, p) => x + p.score, 0) / a.length;
-            const now = avg(h.slice(-3)), before = avg(h.slice(-6, -3));
+        if (h.length > n) {
+            const now = h[h.length - 1].sm, before = h[h.length - 1 - n].sm;
             const lower = res.method !== "contrast";
-            const rel = (now - before) / Math.max(1e-9, Math.abs(before));
-            if (Math.abs(rel) > 0.02) trend = (lower ? rel < 0 : rel > 0) ? "▲ sharper" : "▼ softer";
+            const rel = (100 * (now - before)) / Math.max(1e-9, Math.abs(before));
+            const thr = Math.max(0.5, 1.5 * (res.noise_pct || 0) / Math.sqrt(n));
+            if (Math.abs(rel) > thr) trend = (lower ? rel < 0 : rel > 0) ? "▲ sharper" : "▼ softer";
             else trend = "■ steady";
         }
         const tr = $("focus-trend");
@@ -224,8 +228,9 @@
     }
 
     function updateStats(res) {
-        const vals = st.history.map((p) => p.score);
+        const vals = st.history.map((p) => p.sm);
         const f = (v) => (res ? fmtScore(res, v) : "—");
+        $("focus-stat-noise").textContent = res && res.noise_pct != null ? `±${res.noise_pct.toFixed(1)} %` : "—";
         $("focus-stat-now").textContent = res ? f(res.smoothed ?? res.score) : "—";
         $("focus-stat-best").textContent = res ? f(res.best) : "—";
         $("focus-stat-min").textContent = vals.length ? f(Math.min(...vals)) : "—";
@@ -236,7 +241,10 @@
     function drawChart() {
         const dpr = window.devicePixelRatio || 1;
         const w = chart.clientWidth, h = chart.clientHeight;
-        if (chart.width !== Math.round(w * dpr)) { chart.width = Math.round(w * dpr); chart.height = Math.round(h * dpr); }
+        if (chart.width !== Math.round(w * dpr) || chart.height !== Math.round(h * dpr)) {
+            chart.width = Math.round(w * dpr);
+            chart.height = Math.round(h * dpr);
+        }
         const c = chartCtx;
         c.setTransform(dpr, 0, 0, dpr, 0, 0);
         c.clearRect(0, 0, w, h);
@@ -248,37 +256,62 @@
             c.fillText("Score history appears here", 12, h / 2);
             return;
         }
-        const pad = { l: 52, r: 10, t: 10, b: 18 };
-        const vals = pts.map((p) => p.score);
-        let lo = Math.min(...vals), hi = Math.max(...vals);
-        if (hi - lo < 1e-9) { hi += Math.abs(hi) * 0.05 + 1e-3; lo -= Math.abs(lo) * 0.05 + 1e-3; }
+        const pad = { l: 56, r: 10, t: 14, b: 16 };
+        const sm = pts.map((p) => p.sm);
+        const raw = pts.map((p) => p.score);
         const lower = res.method !== "contrast";
+        // Scale on the averaged curve, never tighter than ±8 % of its level (or 4x the frame noise):
+        // otherwise a steady lens fills the chart with noise and every frame looks like a big jump
+        let lo = Math.min(...sm), hi = Math.max(...sm);
+        const mid = (lo + hi) / 2;
+        const minSpan = Math.abs(mid) * Math.max(0.16, (8 * (res.noise_pct || 0)) / 100);
+        if (hi - lo < minSpan) { lo = mid - minSpan / 2; hi = mid + minSpan / 2; }
+        const padV = (hi - lo) * 0.08;
+        lo -= padV; hi += padV;
         const x = (i) => pad.l + (i / (HISTORY_MAX - 1)) * (w - pad.l - pad.r);
-        // Sharper is always up: HFR axis is inverted
+        // Sharper is always up: the HFR axis is inverted
         const y = (v) => {
-            const f = (v - lo) / (hi - lo);
+            const f = (Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo);
             return pad.t + (lower ? f : 1 - f) * (h - pad.t - pad.b);
         };
         c.strokeStyle = "#1e293b";
         c.fillStyle = "#64748b";
         c.font = "11px ui-monospace, monospace";
         c.lineWidth = 1;
-        [lo, (lo + hi) / 2, hi].forEach((v) => {
+        [lo, mid, hi].forEach((v) => {
             const yy = y(v);
             c.beginPath(); c.moveTo(pad.l, yy); c.lineTo(w - pad.r, yy); c.stroke();
-            c.fillText(lower ? v.toFixed(2) : v.toPrecision(3), 4, yy + 4);
+            c.fillText(lower ? v.toFixed(2) : v.toPrecision(4), 4, yy + 4);
         });
-        if (res.best !== null && res.best !== undefined && res.best >= lo && res.best <= hi) {
+        // Noise band around the current average: changes inside it mean nothing
+        if (res.noise_pct) {
+            const cur = sm[sm.length - 1];
+            const band = (Math.abs(cur) * res.noise_pct) / 100 / Math.sqrt(Math.max(1, res.smooth || 1));
+            const y1 = y(cur - band), y2 = y(cur + band);
+            c.fillStyle = "rgba(148,163,184,0.10)";
+            c.fillRect(pad.l, Math.min(y1, y2), w - pad.l - pad.r, Math.max(1, Math.abs(y2 - y1)));
+        }
+        if (res.best !== null && res.best !== undefined) {
             c.strokeStyle = "rgba(16,185,129,0.7)";
             c.setLineDash([4, 4]);
             c.beginPath(); c.moveTo(pad.l, y(res.best)); c.lineTo(w - pad.r, y(res.best)); c.stroke();
             c.setLineDash([]);
         }
-        // Sharpest and softest frames, so the lens can be turned back to where the peak was
-        const iBest = vals.indexOf(lower ? lo : hi), iWorst = vals.indexOf(lower ? hi : lo);
+        // Raw frames as faint dots, the averaged score as the line
+        c.fillStyle = "rgba(56,189,248,0.28)";
+        raw.forEach((v, i) => { c.beginPath(); c.arc(x(i), y(v), 1.6, 0, Math.PI * 2); c.fill(); });
+        c.strokeStyle = "#38bdf8";
+        c.lineWidth = 2.5;
+        c.beginPath();
+        sm.forEach((v, i) => { if (i === 0) c.moveTo(x(i), y(v)); else c.lineTo(x(i), y(v)); });
+        c.stroke();
+        // Sharpest and softest (averaged) points, so the lens can be turned back to where the peak was
+        const sMin = Math.min(...sm), sMax = Math.max(...sm);
+        const iBest = sm.indexOf(lower ? sMin : sMax), iWorst = sm.indexOf(lower ? sMax : sMin);
         const mark = (i, color, text, above) => {
-            const px = x(i), py = y(vals[i]);
+            const px = x(i), py = y(sm[i]);
             c.strokeStyle = color;
+            c.lineWidth = 1;
             c.setLineDash([2, 3]);
             c.beginPath(); c.moveTo(px, pad.t); c.lineTo(px, h - pad.b); c.stroke();
             c.setLineDash([]);
@@ -286,27 +319,15 @@
             c.beginPath(); c.arc(px, py, 4, 0, Math.PI * 2); c.fill();
             const tw = c.measureText(text).width;
             const tx = Math.min(Math.max(pad.l, px - tw / 2), w - pad.r - tw);
-            c.fillText(text, tx, above ? Math.max(pad.t + 9, py - 8) : Math.min(h - 4, py + 16));
+            c.fillText(text, tx, above ? Math.max(pad.t - 2, py - 8) : Math.min(h - 3, py + 16));
         };
-        mark(iWorst, "rgba(239,68,68,0.85)", `softest ${fmtScore(res, vals[iWorst])}`, false);
-        mark(iBest, "rgba(16,185,129,0.95)", `sharpest ${fmtScore(res, vals[iBest])}`, true);
-        // Raw points and 3-frame moving average
-        c.fillStyle = "rgba(56,189,248,0.55)";
-        pts.forEach((p, i) => { c.beginPath(); c.arc(x(i), y(p.score), 2, 0, Math.PI * 2); c.fill(); });
-        c.strokeStyle = "#38bdf8";
-        c.lineWidth = 2;
-        c.beginPath();
-        pts.forEach((p, i) => {
-            const win = pts.slice(Math.max(0, i - 2), i + 1);
-            const v = win.reduce((a, q) => a + q.score, 0) / win.length;
-            if (i === 0) c.moveTo(x(i), y(v)); else c.lineTo(x(i), y(v));
-        });
-        c.stroke();
-        const last = pts.length - 1;
+        if (iWorst !== iBest) mark(iWorst, "rgba(239,68,68,0.85)", `softest ${fmtScore(res, sm[iWorst])}`, false);
+        mark(iBest, "rgba(16,185,129,0.95)", `sharpest ${fmtScore(res, sm[iBest])}`, true);
+        const last = sm.length - 1;
         c.fillStyle = "#f1f5f9";
-        c.beginPath(); c.arc(x(last), y(vals[last]), 4, 0, Math.PI * 2); c.fill();
+        c.beginPath(); c.arc(x(last), y(sm[last]), 4.5, 0, Math.PI * 2); c.fill();
         c.fillStyle = "#64748b";
-        c.fillText("sharper ↑", w - pad.r - 64, h - 4);
+        c.fillText("sharper ↑", w - pad.r - 64, h - 3);
     }
 
     function placeRoiBox() {
@@ -364,6 +385,8 @@
 
     document.querySelectorAll("#focus-method button").forEach((b) =>
         b.addEventListener("click", () => configure({ method: b.dataset.method })));
+    document.querySelectorAll("#focus-smooth button").forEach((b) =>
+        b.addEventListener("click", () => configure({ smooth: parseInt(b.dataset.smooth, 10) })));
     roiSizeSel.addEventListener("change", () => configure({ roi_size: parseInt(roiSizeSel.value, 10) }));
     $("focus-reset").addEventListener("click", () => configure({ reset: true }));
     $("focus-center").addEventListener("click", () => configure({ cx: 0.5, cy: 0.5 }));

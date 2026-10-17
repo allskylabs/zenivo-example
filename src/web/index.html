@@ -715,6 +715,7 @@
                             <span class="good">Best <b id="focus-stat-best">—</b></span>
                             <span>Min <b id="focus-stat-min">—</b></span>
                             <span>Max <b id="focus-stat-max">—</b></span>
+                            <span title="Frame-to-frame score noise; changes smaller than this mean nothing">Noise <b id="focus-stat-noise">—</b></span>
                             <span>Frames <b id="focus-stat-n">0</b></span>
                         </div>
                         <button class="btn btn-sm btn-outline" id="focus-reset" title="Forget the curve and best score (R)">Reset (R)</button>
@@ -742,6 +743,16 @@
                                 <button data-method="stars" title="Half-flux radius of unsaturated stars (night sky)">Stars</button>
                                 <button data-method="lights" title="Half-flux radius of bright point lights, saturated allowed (night town)">Lights</button>
                                 <button data-method="contrast" title="Edge contrast (daytime: buildings, trees, antennas)">Day</button>
+                            </div>
+                        </div>
+                        <div class="focus-field">
+                            <span class="focus-field-label" title="Robust running average (min and max dropped) of the last N frames">Smoothing</span>
+                            <div class="focus-seg" id="focus-smooth">
+                                <button data-smooth="1" title="Every frame as measured">Off</button>
+                                <button data-smooth="3">3</button>
+                                <button data-smooth="5" class="active">5</button>
+                                <button data-smooth="9">9</button>
+                                <button data-smooth="15" title="Steadiest, but lags ~1.5 s at 10 fps">15</button>
                             </div>
                         </div>
                         <div class="focus-field">
@@ -837,6 +848,6 @@
     <script src="/static/sky_catalog.js"></script>
     <script src="/app.js?v=20261017c2"></script>
     <script src="/static/activity.js?v=20261016h"></script>
-    <script src="/static/focus.js?v=20261017f7"></script>
+    <script src="/static/focus.js?v=20261017f8"></script>
 </body>
 </html>

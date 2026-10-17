@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from src.analytics.focus import FocusSession, find_best_star, measure_focus
+from src.analytics.focus import FocusSession, find_best_star, measure_focus, score_noise_pct, smooth_scores
 from src.api.main import create_app
 from src.api.service import AllSkyService
 from src.hardware.simulator import SimulatedIMX335Controller
@@ -52,7 +52,8 @@ def test_daytime_contrast_drops_with_blur():
 
 def test_session_best_uses_smoothed_score_and_resets_on_new_roi():
     fs = FocusSession()
-    for sigma in (3.0, 2.0, 1.0, 1.0, 1.0, 2.5):
+    fs.configure(smooth=3)
+    for sigma in (3.0, 2.0, 1.0, 1.0, 1.0, 2.5, 2.5):
         out = fs.record(fs.measure(_stars(sigma)), 0.0)
     assert out["quality_pct"] < 90 and fs.best < 1.6
     fs.configure(cx=0.2)
@@ -91,3 +92,12 @@ def test_focus_api_roundtrip(client):
     assert client.get("/api/status").json()["focus"]["active"]
     assert not client.post("/api/focus/stop").json()["active"]
     assert client.get("/focus").status_code == 200
+
+
+def test_smoothing_rejects_outliers_and_noise_ignores_slow_trend():
+    assert smooth_scores([10, 10, 50, 10, 10]) == 10.0
+    rng = np.random.default_rng(0)
+    steady = list(100 + rng.normal(0, 2, 40))
+    ramp = [v + 3 * i for i, v in enumerate(steady)]  # lens being turned: big slow change, same noise
+    assert 1.0 < score_noise_pct(steady) < 3.5
+    assert score_noise_pct(ramp) < 2.5

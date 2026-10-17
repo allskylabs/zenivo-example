@@ -23,6 +23,28 @@ LOWER_IS_BETTER = {"stars": True, "lights": True, "contrast": False}
 # Scores within one family share a scale (stars and lights are both HFR in px)
 FAMILY = {"stars": "hfr", "lights": "hfr", "contrast": "contrast"}
 ROI_SIZES = (128, 192, 256, 384, 512, 768)
+SMOOTH_FRAMES = (1, 3, 5, 9, 15)
+
+
+def smooth_scores(scores: List[float]) -> float:
+    """Robust average of the last frames: trimmed mean (min and max dropped) from 5 frames up, so one
+    frame spoiled by heat shimmer, wind shake or a passing light does not move the result."""
+    vals = sorted(scores)
+    if len(vals) >= 5:
+        vals = vals[1:-1]
+    return float(np.mean(vals))
+
+
+def score_noise_pct(scores: List[float]) -> Optional[float]:
+    """Frame-to-frame score noise in % of the score: robust spread of consecutive differences / sqrt 2.
+    Differences cancel the slow change from turning the lens, so this is the noise even mid-adjustment."""
+    if len(scores) < 6:
+        return None
+    arr = np.asarray(scores, np.float64)
+    d = np.diff(arr)
+    sigma = 1.4826 * float(np.median(np.abs(d - np.median(d)))) / np.sqrt(2.0)
+    ref = abs(float(np.median(arr)))
+    return round(100.0 * sigma / ref, 2) if ref > 0 else None
 
 
 def _to_gray(img: np.ndarray) -> np.ndarray:
@@ -196,6 +218,7 @@ class FocusSession:
         self.cy = 0.5
         self.roi_size = 256    # native pixels
         self.method = "auto"
+        self.smooth = 5        # frames in the robust running average
         self.history: Deque[Dict[str, Any]] = deque(maxlen=self.HISTORY)
         self.best: Optional[float] = None
         self.best_method: Optional[str] = None
@@ -212,8 +235,14 @@ class FocusSession:
         self.best_method = None
         self.result_key = None
 
-    def configure(self, cx=None, cy=None, roi_size=None, method=None) -> None:
+    def configure(self, cx=None, cy=None, roi_size=None, method=None, smooth=None) -> None:
         changed = False
+        if smooth is not None:
+            n = int(smooth)
+            n = min(SMOOTH_FRAMES, key=lambda s: abs(s - n))
+            if n != self.smooth:
+                self.smooth = n
+                changed = True
         if cx is not None:
             self.cx = min(1.0, max(0.0, float(cx)))
             changed = True
@@ -270,18 +299,23 @@ class FocusSession:
         smoothed = None
         if score is not None:
             self.history.append({"t": round(ts, 3), "score": score})
-            # Best and quality use a 3-frame mean: single-frame noise (seeing, JPEG, sensor) is a few %,
-            # enough to set an unreachable "best" from one lucky frame
-            recent = [p["score"] for p in list(self.history)[-3:]]
-            smoothed = float(np.mean(recent))
+            # Best and quality use the running average: single-frame noise (heat shimmer, camera JPEG,
+            # sensor) is a few %, enough to set an unreachable "best" from one lucky frame
+            raw = [p["score"] for p in self.history]
+            recent = raw[-self.smooth:]
+            smoothed = smooth_scores(recent)
+            self.history[-1]["smoothed"] = round(smoothed, 4)
             lower = LOWER_IS_BETTER.get(method, False)
-            if len(recent) >= min(3, len(self.history)) and (
+            if len(recent) >= min(self.smooth, len(raw)) and (
                 self.best is None or (smoothed < self.best if lower else smoothed > self.best)
             ):
                 self.best = round(smoothed, 4)
         out = dict(result)
         out["best"] = self.best
         out["smoothed"] = round(smoothed, 4) if smoothed is not None else None
+        out["smooth"] = self.smooth
+        noise = score_noise_pct([p["score"] for p in list(self.history)[-30:]])
+        out["noise_pct"] = noise
         if smoothed is not None and self.best:
             lower = LOWER_IS_BETTER.get(method, False)
             ratio = (self.best / smoothed) if lower else (smoothed / self.best)
@@ -303,6 +337,8 @@ class FocusSession:
             "roi_sizes": list(ROI_SIZES),
             "method": self.method,
             "methods": list(METHODS),
+            "smooth": self.smooth,
+            "smooth_frames": list(SMOOTH_FRAMES),
             "best": self.best,
             "best_method": self.best_method,
             "history": list(self.history),
