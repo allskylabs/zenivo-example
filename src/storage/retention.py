@@ -15,7 +15,7 @@ import os
 import re
 import shutil
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 logger = logging.getLogger("allsky.retention")
@@ -136,7 +136,7 @@ class RetentionManager:
     # ------------------------------------------------------------------
     def run(self, today=None) -> Dict[str, Any]:
         p = self.policy
-        today = today or datetime.now(timezone.utc).date()
+        today = today or datetime.now().astimezone().date()
         deleted: List[str] = []
         freed = 0
 
@@ -180,7 +180,7 @@ class RetentionManager:
             deleted.append(path)
 
         self.last_report = {
-            "at": datetime.now(timezone.utc).isoformat(),
+            "at": datetime.now().astimezone().isoformat(),
             "deleted_count": len(deleted),
             "freed_mb": round(freed / 1e6, 1),
             "deleted": deleted[:50],
@@ -194,7 +194,7 @@ class RetentionManager:
         """Dated sub-directories (YYYY-MM-DD*) older than keep_days, else plain files by mtime."""
         if not root or not os.path.isdir(root):
             return []
-        cutoff_date = datetime.now(timezone.utc).date() - timedelta(days=max(1, int(keep_days)))
+        cutoff_date = datetime.now().astimezone().date() - timedelta(days=max(1, int(keep_days)))
         cutoff_ts = time.time() - keep_days * 86400
         out = []
         for name in os.listdir(root):

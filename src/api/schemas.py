@@ -89,6 +89,16 @@ class CloudConfigRequest(BaseModel):
     reset_reference: bool = Field(False, description="Forget the learned clear-sky reference (after re-aiming the camera)")
 
 
+class SkyMaskRequest(BaseModel):
+    """Plate-solve sky mask: polygons in frame fractions [[x, y], ...] (0..1, x right, y down)."""
+    sky: List[List[List[float]]] = Field(
+        default_factory=list, max_length=16, description="Open-sky polygons (none = the whole frame)"
+    )
+    obstruction: List[List[List[float]]] = Field(
+        default_factory=list, max_length=16, description="Buildings, trees and lit facades to ignore"
+    )
+
+
 class FocusConfigRequest(BaseModel):
     """Focus assistant region of interest and measurement method."""
     cx: Optional[float] = Field(None, ge=0.0, le=1.0, description="ROI centre x as a fraction of the frame width")

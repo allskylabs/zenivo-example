@@ -9,7 +9,7 @@ import os
 import shutil
 import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Optional, Tuple, Union, Dict, Any
 import numpy as np
 import cv2
@@ -48,7 +48,7 @@ def render_metadata_overlay(
     )
 
     # Format text parts
-    ts_str = (timestamp or datetime.now(timezone.utc)).strftime("UTC %Y-%m-%d %H:%M:%S")
+    ts_str = (timestamp or datetime.now()).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
     parts = [station_name, ts_str]
 
     if telemetry:

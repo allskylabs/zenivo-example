@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 from src.hardware.driver_interface import CameraDriverInterface
 from src.api.service import AllSkyService
@@ -54,11 +54,41 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         # Mount static directory
         app.mount("/static", StaticFiles(directory=web_dir), name="static")
 
+        index_path = os.path.join(web_dir, "index.html")
+        viewport_tag = '<div class="viewport-wrapper" id="viewport-container">'
+        shell_cache = {"mtime": None, "html": ""}
+
+        def frame_aspect() -> Optional[str]:
+            # Live frame size if one exists, else the driver's configured output size
+            frame = service.last_frame
+            if frame is not None:
+                h, w = frame.shape[:2]
+            else:
+                w, h = getattr(service.camera, "width", 0), getattr(service.camera, "height", 0)
+            return f"{int(w)} / {int(h)}" if w and h else None
+
+        def page_shell() -> HTMLResponse:
+            # Pre-size the live viewport to the camera's aspect ratio so the page doesn't jump (CLS)
+            mtime = os.path.getmtime(index_path)
+            if shell_cache["mtime"] != mtime:
+                with open(index_path, encoding="utf-8") as f:
+                    shell_cache["html"] = f.read()
+                shell_cache["mtime"] = mtime
+            html = shell_cache["html"]
+            ratio = frame_aspect()
+            if ratio:
+                html = html.replace(
+                    viewport_tag,
+                    f'<div class="viewport-wrapper" id="viewport-container" '
+                    f'style="aspect-ratio: {ratio}" data-frame-ratio="{ratio}">',
+                    1,
+                )
+            return HTMLResponse(html, headers=no_cache)
+
         @app.get("/")
         def serve_root():
-            index_path = os.path.join(web_dir, "index.html")
             if os.path.exists(index_path):
-                return FileResponse(index_path, media_type="text/html", headers=no_cache)
+                return page_shell()
             return {"status": "online", "message": "IMX335 AllSky Edge API"}
 
         # Each UI section has its own URL; all share the same page shell
@@ -69,11 +99,11 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         @app.get("/logs")
         @app.get("/focus")
         def serve_section_page():
-            return FileResponse(os.path.join(web_dir, "index.html"), media_type="text/html", headers=no_cache)
+            return page_shell()
 
         @app.get("/index.html")
         def serve_index_html():
-            return FileResponse(os.path.join(web_dir, "index.html"), media_type="text/html", headers=no_cache)
+            return page_shell()
 
         @app.get("/app.js")
         def serve_app_js():

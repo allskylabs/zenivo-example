@@ -22,6 +22,7 @@ from src.api.schemas import (
     WhiteBalanceRequest,
     StoragePolicyRequest,
     CloudConfigRequest,
+    SkyMaskRequest,
     FocusConfigRequest,
     LensRequest,
     LensAutofocusRequest,
@@ -674,6 +675,21 @@ def download_activity_log():
     if not path or not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="No activity log file yet")
     return FileResponse(path, media_type="application/x-ndjson", filename="allsky-activity.jsonl")
+
+
+@router.get("/api/station/sky-mask")
+def get_station_sky_mask(service: AllSkyService = Depends(get_service)):
+    """User sky/obstruction polygons the plate solver intersects with its automatic sky mask."""
+    return service.get_sky_mask()
+
+
+@router.post("/api/station/sky-mask")
+def set_station_sky_mask(req: SkyMaskRequest, service: AllSkyService = Depends(get_service)):
+    """Save sky/obstruction polygons (frame fractions); send both lists empty to clear the mask."""
+    try:
+        return service.set_sky_mask(sky=req.sky, obstruction=req.obstruction)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
 @router.post("/api/station/plate-solve/start")

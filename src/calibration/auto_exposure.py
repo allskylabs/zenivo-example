@@ -203,7 +203,7 @@ class DayNightAutoExposure:
 
         Args:
             frame_bgr: Current captured image (H, W, 3) uint8.
-            dt: Optional datetime for ephemeris calculation (defaults to utcnow).
+            dt: Optional datetime for ephemeris calculation (defaults to now).
 
         Returns:
             tuple: (new_exposure_s, new_gain_db, telemetry_dict)

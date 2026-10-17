@@ -27,8 +27,8 @@
                 <span class="pill-value text-accent" id="nav-camera-mode">AUTO</span>
             </div>
             <div class="nav-pill">
-                <span class="pill-label">UTC</span>
-                <span class="pill-value" id="nav-utc-clock">00:00:00 UTC</span>
+                <span class="pill-label">Local</span>
+                <span class="pill-value" id="nav-utc-clock">00:00:00</span>
             </div>
             <button id="btn-night-vision" class="btn btn-outline" title="Preserve night vision adaptation (>650nm red light filter)">
                 <span class="icon">●</span> Red Vision Mode
@@ -648,6 +648,25 @@
 
                 <div id="station-alert" class="alert-box hidden mt-3"></div>
 
+                <details class="params-summary" id="sky-mask-editor">
+                    <summary>Plate-solve sky mask (outline the open sky)</summary>
+                    <p class="field-note">Click on the frame to outline open sky (green) and lit buildings, trees or
+                        poles to ignore (red). The plate solver only uses stars inside the sky and outside obstructions,
+                        on top of its own automatic sky detection.</p>
+                    <div class="settings-actions">
+                        <button id="mask-new-sky" class="btn btn-sm btn-outline" type="button">＋ Sky polygon</button>
+                        <button id="mask-new-obs" class="btn btn-sm btn-outline" type="button">＋ Obstruction</button>
+                        <button id="mask-undo" class="btn btn-sm btn-outline" type="button">↶ Undo point</button>
+                        <button id="mask-clear" class="btn btn-sm btn-outline" type="button">🗑 Clear all</button>
+                        <button id="mask-save" class="btn btn-sm btn-primary" type="button">💾 Save mask</button>
+                    </div>
+                    <div class="mask-canvas-wrap">
+                        <img id="mask-img" alt="Live frame for drawing the sky mask">
+                        <canvas id="mask-canvas"></canvas>
+                    </div>
+                    <div id="mask-alert" class="alert-box hidden mt-3"></div>
+                </details>
+
                 <details class="params-summary">
                     <summary>Camera, lens &amp; station parameter summary</summary>
                     <div class="params-grid">
@@ -721,7 +740,7 @@
                                 <th>Exposure &amp; Gain</th>
                                 <th>Stack Frames</th>
                                 <th>Status</th>
-                                <th>File / Updated (UTC)</th>
+                                <th>File / Updated (local)</th>
                             </tr>
                         </thead>
                         <tbody id="dark-profiles-matrix-body">
@@ -740,7 +759,7 @@
                             <tr>
                                 <th>Filename</th>
                                 <th>Size</th>
-                                <th>Last Updated (UTC)</th>
+                                <th>Last Updated (local)</th>
                                 <th>Full Path</th>
                             </tr>
                         </thead>

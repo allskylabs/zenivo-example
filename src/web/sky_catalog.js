@@ -109,6 +109,7 @@ window.ALLSKY_CATALOG = {
         { name: "Menkent", bayer: "θ Cen", con: "Cen", ra: 211.6708, dec: -36.37, mag: 2.06, color: "#fed7aa" },
         { name: "Alpheratz", bayer: "α And", con: "And", ra: 2.0971, dec: 29.0906, mag: 2.07, color: "#bae6fd" },
         { name: "Mirach", bayer: "β And", con: "And", ra: 17.4329, dec: 35.6206, mag: 2.07, color: "#fca5a5" },
+        { name: "Tiaki", bayer: "β Gru", con: "Gru", ra: 340.6671, dec: -46.8847, mag: 2.07, color: "#fca5a5" },
         { name: "Saiph", bayer: "κ Ori", con: "Ori", ra: 86.9392, dec: -9.6697, mag: 2.07, color: "#93c5fd" },
         { name: "Kochab", bayer: "β UMi", con: "UMi", ra: 222.6763, dec: 74.1556, mag: 2.08, color: "#fdba74" },
         { name: "Rasalhague", bayer: "α Oph", con: "Oph", ra: 263.7337, dec: 12.56, mag: 2.08, color: "#e0f2fe" },

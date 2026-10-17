@@ -6,7 +6,7 @@ geometric moment analysis (aspect ratio, length, peak DN), and discriminates aga
 
 import math
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any
 import numpy as np
 import cv2
@@ -116,7 +116,7 @@ def detect_meteors(
                 "aspect_ratio": round(float(aspect_ratio), 2),
                 "peak_dn": peak_val,
                 "integrated_flux": total_flux,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now().astimezone().isoformat(),
             }
             detected_events.append(event)
 

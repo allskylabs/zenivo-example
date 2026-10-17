@@ -13,7 +13,7 @@ import time
 import threading
 from collections import OrderedDict
 from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime, timezone
+from datetime import datetime
 import numpy as np
 import cv2
 
@@ -211,7 +211,7 @@ class AllSkyService:
             self.events_dir = os.path.join(self.uploads_dir, "events")
 
         # Sky events (meteors, aircraft, ...): streaks are looked for at night on every new frame,
-        # cloud changes come from the cloud cover samples; stored per UTC day under events_dir
+        # cloud changes come from the cloud cover samples; stored per local day under events_dir
         self.sky_events = SkyEventDetector()
         self._events_lock = threading.Lock()
         self._events_cache: Optional[List[Dict[str, Any]]] = None  # newest first, loaded on first use
@@ -229,7 +229,7 @@ class AllSkyService:
         self._last_timelapse_compile_ts: float = os.path.getmtime(_tl_latest) if os.path.isfile(_tl_latest) else 0.0
         self._timelapse_compiling: bool = False
         self._timelapse_lock = threading.Lock()
-        self._archived_date_str: str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        self._archived_date_str: str = datetime.now().astimezone().strftime("%Y-%m-%d")
 
         self.calibration_status: Dict[str, Any] = {
             "state": "idle",
@@ -242,7 +242,7 @@ class AllSkyService:
             "gain_db": 36.0,
             "message": "Checking Master Dark Calibration Library...",
             "last_result": None,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now().astimezone().isoformat(),
         }
         self._load_existing_calibration_summary()
 
@@ -363,7 +363,7 @@ class AllSkyService:
                     "file_path": fpath,
                     "size_bytes": st.st_size,
                     "size_kb": round(st.st_size / 1024.0, 1),
-                    "modified_at": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(),
+                    "modified_at": datetime.fromtimestamp(st.st_mtime).astimezone().isoformat(),
                     "_mtime": st.st_mtime,
                 })
             files_info.sort(key=lambda x: x["_mtime"], reverse=True)
@@ -718,7 +718,7 @@ class AllSkyService:
             "calibration": self.get_calibration_status(),
             "station": self.get_station_config(),
             "focus": {"active": self.focus.active},
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now().astimezone().isoformat(),
         }
 
     def _sky_stats(self, frame: np.ndarray, is_pytest: bool, meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -829,7 +829,7 @@ class AllSkyService:
             and self.last_telemetry_frame_ts == self.last_capture_time
         ):
             cached = dict(self.last_telemetry)
-            cached["timestamp"] = datetime.now(timezone.utc).isoformat()
+            cached["timestamp"] = datetime.now().astimezone().isoformat()
             cached["mode"] = self.mode
             cached["calibration"] = self.get_calibration_status()
             return cached
@@ -843,7 +843,7 @@ class AllSkyService:
         fps = round(1000.0 / max(1.0, hw_delta), 2) if hw_delta > 0 else 1.0
 
         telem = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now().astimezone().isoformat(),
             "exposure_s": meta.get("actual_exposure_s", self.camera.current_exposure_s),
             "gain_db": meta.get("gain_db", self.camera.current_gain_db),
             "hw_frame_delta_ms": hw_delta,
@@ -948,7 +948,7 @@ class AllSkyService:
             "exposure_s": exposure_s,
             "gain_db": gain_db,
             "message": f"Configuring sensor ({exposure_s:.2f}s @ {gain_db:.0f} dB) — preparing {num_frames} frames...",
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now().astimezone().isoformat(),
         })
 
         self.activity.info("calibration", f"Master dark started: {num_frames} frames at {exposure_s:.2f}s / {gain_db:.0f} dB")
@@ -972,7 +972,7 @@ class AllSkyService:
                         "total_frames": total,
                         "progress_pct": pct,
                         "message": f"Capturing RAW10 dark frame {idx} / {total} ({exposure_s:.2f}s @ {gain_db:.0f} dB)...",
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                        "updated_at": datetime.now().astimezone().isoformat(),
                     })
 
                 if hasattr(self.camera, "capture_frame_stack") and not bool(os.environ.get("PYTEST_CURRENT_TEST")):
@@ -995,7 +995,7 @@ class AllSkyService:
                     "total_frames": num_frames,
                     "progress_pct": 90.0,
                     "message": f"Median stacking {num_frames} 10-bit Bayer RAW frames & extracting hot pixel map...",
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now().astimezone().isoformat(),
                 })
 
                 raw_filename = f"master_dark_raw10_exp{exposure_s:.1f}s_gain{gain_db:.0f}dB.npy"
@@ -1039,7 +1039,7 @@ class AllSkyService:
                 # Cache in memory for fast live dark subtraction
                 self._dark_cache[hot_map_filename] = hot_mask
 
-                completed_at = datetime.now(timezone.utc).isoformat()
+                completed_at = datetime.now().astimezone().isoformat()
                 result = {
                     "success": True,
                     "filename": filename,
@@ -1075,7 +1075,7 @@ class AllSkyService:
                 return result
         except Exception as exc:
             self.activity.error("calibration", f"Master dark failed ({exposure_s:.2f}s / {gain_db:.0f} dB): {exc}")
-            err_time = datetime.now(timezone.utc).isoformat()
+            err_time = datetime.now().astimezone().isoformat()
             self.calibration_status.update({
                 "state": "error",
                 "progress_pct": 0.0,
@@ -1105,7 +1105,7 @@ class AllSkyService:
                 "state": "completed",
                 "progress_pct": 100.0,
                 "message": f"All {total}/{total} Standard 10-bit RAW Master Dark Profiles are already built and ready!",
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now().astimezone().isoformat(),
             })
             return {
                 "success": True,
@@ -1140,7 +1140,7 @@ class AllSkyService:
                     "gain_db": gain_db,
                     "progress_pct": round(base_pct + 2.0, 1),
                     "message": f"[Profile {p_idx}/{total_targets}: {label} — {exp_s:.1f}s @ {gain_db:.0f}dB] Configuring RAW10 sensor...",
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now().astimezone().isoformat(),
                 })
 
                 with self.lock:
@@ -1167,7 +1167,7 @@ class AllSkyService:
                                 f"[Profile {p_idx}/{total_targets}: {label} — {exp_s:.1f}s @ {gain_db:.0f}dB] "
                                 f"Capturing RAW10 frame {idx}/{total}..."
                             ),
-                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                            "updated_at": datetime.now().astimezone().isoformat(),
                         })
 
                     if hasattr(self.camera, "capture_frame_stack") and not bool(os.environ.get("PYTEST_CURRENT_TEST")):
@@ -1227,7 +1227,7 @@ class AllSkyService:
                         "success": True,
                         **item_res,
                         "file_path": file_path,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now().astimezone().isoformat(),
                     }
 
             if self.mode == "auto":
@@ -1248,7 +1248,7 @@ class AllSkyService:
                 "total_profiles": total_targets,
                 "progress_pct": 100.0,
                 "message": done_msg,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now().astimezone().isoformat(),
             })
             self.activity.success("calibration", done_msg)
             return {
@@ -1263,7 +1263,7 @@ class AllSkyService:
             self.calibration_status.update({
                 "state": "error",
                 "message": f"Auto-library build failed: {exc}",
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now().astimezone().isoformat(),
             })
             raise
 
@@ -1401,13 +1401,13 @@ class AllSkyService:
 
     def _get_today_frames_dir(self, date_str: Optional[str] = None) -> str:
         """Return directory path for today's archived timelapse frames."""
-        d_str = date_str or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        d_str = date_str or datetime.now().astimezone().strftime("%Y-%m-%d")
         day_dir = os.path.join(self.frames_archive_root, d_str)
         os.makedirs(day_dir, exist_ok=True)
         return day_dir
 
     def _list_today_frame_paths(self, date_str: Optional[str] = None) -> List[str]:
-        """Return sorted list of archived frame JPEG paths for the given UTC date."""
+        """Return sorted list of archived frame JPEG paths for the given local date."""
         day_dir = self._get_today_frames_dir(date_str)
         if not os.path.isdir(day_dir):
             return []
@@ -1451,7 +1451,7 @@ class AllSkyService:
         those two files (two decodes) instead of re-decoding up to 600 archived frames; the frame
         decode path is only the fallback when a dated product is missing or does not line up."""
         try:
-            today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            today_str = datetime.now().astimezone().strftime("%Y-%m-%d")
             self._archived_date_str = today_str
             paths = self._list_today_frame_paths(today_str)
             if not paths:
@@ -1460,7 +1460,7 @@ class AllSkyService:
 
             def _ts(p: str) -> datetime:
                 ts_iso = meta_map.get(os.path.basename(p), {}).get("timestamp")
-                return datetime.fromisoformat(ts_iso) if ts_iso else datetime.fromtimestamp(os.path.getmtime(p), tz=timezone.utc)
+                return datetime.fromisoformat(ts_iso) if ts_iso else datetime.fromtimestamp(os.path.getmtime(p)).astimezone()
 
             last = cv2.imread(paths[-1], cv2.IMREAD_COLOR)
             if last is None:
@@ -1533,7 +1533,7 @@ class AllSkyService:
             return None
 
         now = time.time()
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today_str = datetime.now().astimezone().strftime("%Y-%m-%d")
         if today_str != self._archived_date_str:
             prev_day = self._archived_date_str
             n_prev = len(self._list_today_frame_paths(prev_day))
@@ -1549,7 +1549,7 @@ class AllSkyService:
             return None
 
         self._last_archive_ts = now
-        now_dt = datetime.now(timezone.utc)
+        now_dt = datetime.now().astimezone()
 
         # Standardize archive resolution to 1296x972 (4:3 half-res of 2592x1944) for fast H.264 compilation
         h, w = frame.shape[:2]
@@ -1650,7 +1650,7 @@ class AllSkyService:
         archived frames. If fewer than 4 frames exist and ensure_min_frames=True, captures/archives
         initial frames immediately so the user gets a playable video right away.
         """
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today_str = datetime.now().astimezone().strftime("%Y-%m-%d")
         paths = self._list_today_frame_paths(today_str)
 
         if ensure_min_frames and len(paths) < 4:
@@ -1685,9 +1685,9 @@ class AllSkyService:
                     rec = meta_map.get(fname, {})
                     ts_iso = rec.get("timestamp")
                     try:
-                        ts_dt = datetime.fromisoformat(ts_iso) if ts_iso else datetime.fromtimestamp(os.path.getmtime(p), tz=timezone.utc)
+                        ts_dt = datetime.fromisoformat(ts_iso) if ts_iso else datetime.fromtimestamp(os.path.getmtime(p)).astimezone()
                     except Exception:
-                        ts_dt = datetime.now(timezone.utc)
+                        ts_dt = datetime.now().astimezone()
                     timestamps.append(ts_dt)
                     telemetry_list.append(rec)
 
@@ -1741,14 +1741,14 @@ class AllSkyService:
                     "timelapse_url": "/uploads/allsky/timelapses/latest.mp4",
                     "keogram_url": "/uploads/allsky/keograms/latest.jpg",
                     "startrails_url": "/uploads/allsky/startrails/latest.jpg",
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now().astimezone().isoformat(),
                 }
             finally:
                 self._timelapse_compiling = False
 
     def get_gallery(self) -> Dict[str, Any]:
         """List astronomical observational products with live file status and frame counts."""
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today_str = datetime.now().astimezone().strftime("%Y-%m-%d")
         is_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST"))
 
         latest_mp4 = os.path.join(self.timelapses_dir, "latest.mp4")
@@ -1768,9 +1768,9 @@ class AllSkyService:
         def _file_meta(fpath: str) -> Tuple[bool, float, str]:
             if os.path.isfile(fpath):
                 sz_kb = round(os.path.getsize(fpath) / 1024.0, 1)
-                mtime_iso = datetime.fromtimestamp(os.path.getmtime(fpath), tz=timezone.utc).isoformat()
+                mtime_iso = datetime.fromtimestamp(os.path.getmtime(fpath)).astimezone().isoformat()
                 return True, sz_kb, mtime_iso
-            return False, 0.0, datetime.now(timezone.utc).isoformat()
+            return False, 0.0, datetime.now().astimezone().isoformat()
 
         tl_exists, tl_kb, tl_ts = _file_meta(latest_mp4)
         keo_exists, keo_kb, keo_ts = _file_meta(keo_jpg)
@@ -1841,7 +1841,7 @@ class AllSkyService:
                 day[kind] = {
                     "url": f"{url_prefix}/{name}",
                     "size_kb": round(st.st_size / 1024.0, 1),
-                    "timestamp": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(),
+                    "timestamp": datetime.fromtimestamp(st.st_mtime).astimezone().isoformat(),
                 }
         return [days[d] for d in sorted(days, reverse=True)]
 
@@ -1913,11 +1913,11 @@ class AllSkyService:
         })
 
     def _record_sky_event(self, ev: Dict[str, Any]) -> Dict[str, Any]:
-        """Save the event's images + a JSON line under events/<UTC day>/ and log it."""
+        """Save the event's images + a JSON line under events/<local day>/ and log it."""
         import json
 
         crop, overview = ev.pop("_crop", None), ev.pop("_overview", None)
-        dt = datetime.fromtimestamp(float(ev.get("start_ts", ev["ts"])), tz=timezone.utc)
+        dt = datetime.fromtimestamp(float(ev.get("start_ts", ev["ts"]))).astimezone()
         day = dt.strftime("%Y-%m-%d")
         self._event_seq = (self._event_seq + 1) % 1000
         eid = f"{ev['type']}_{dt.strftime('%Y%m%d_%H%M%S')}_{self._event_seq:03d}"
@@ -2488,7 +2488,7 @@ class AllSkyService:
             "position": pos,
             "source": source,
             "sensor_temp_c": temp,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now().astimezone().isoformat(),
             "anchor_position": pos,
             "anchor_temp_c": temp,
         })
@@ -2672,7 +2672,7 @@ class AllSkyService:
         temp = self.last_metadata.get("sensor_temp_c")
         lower = LOWER_IS_BETTER.get(method or "", False)
         rec = {
-            "finished_at": datetime.now(timezone.utc).isoformat(),
+            "finished_at": datetime.now().astimezone().isoformat(),
             "source": source,
             "camera": describe_camera(self.camera).get("sensor"),
             "method": method,
@@ -3065,6 +3065,11 @@ class AllSkyService:
                 optics["lens_model"] = str(manual_overrides["lens_model"]).strip()
             if manual_overrides.get("focal_length_mm") is not None:
                 fl = round(float(manual_overrides["focal_length_mm"]), 3)
+                old_fl = float(optics.get("focal_length_mm") or 0.0)
+                if optics.get("focal_length_px") and fl > 0 and abs(fl - old_fl) > 0.005 * max(old_fl, 1e-6):
+                    # A new lens: keep the fixed-lens solver and the overlay on the user's focal length
+                    pitch = float((self.station_config.get("camera_sensor") or {}).get("pixel_pitch_um") or 2.0)
+                    optics["focal_length_px"] = round(fl * 1000.0 / pitch, 2)
                 optics["focal_length_mm"] = fl
                 if fl > 0 and manual_overrides.get("pixel_scale_arcsec_px") is None:
                     optics["pixel_scale_arcsec_px"] = round(206.265 * 2.0 / fl, 2)
@@ -3088,12 +3093,12 @@ class AllSkyService:
             if manual_overrides.get("azimuth_deg") is not None:
                 orientation["azimuth_deg"] = round(float(manual_overrides["azimuth_deg"]) % 360.0, 2)
             if manual_overrides.get("altitude_deg") is not None:
-                alt = max(0.0, min(90.0, float(manual_overrides["altitude_deg"])))
+                alt = max(-90.0, min(90.0, float(manual_overrides["altitude_deg"])))  # a horizon-facing camera can point below 0°
                 orientation["altitude_deg"] = round(alt, 2)
                 if manual_overrides.get("zenith_tilt_deg") is None:
                     orientation["zenith_tilt_deg"] = round(90.0 - alt, 2)
             if manual_overrides.get("zenith_tilt_deg") is not None:
-                tilt = max(0.0, min(90.0, float(manual_overrides["zenith_tilt_deg"])))
+                tilt = max(0.0, min(180.0, float(manual_overrides["zenith_tilt_deg"])))
                 orientation["zenith_tilt_deg"] = round(tilt, 2)
                 if manual_overrides.get("altitude_deg") is None:
                     orientation["altitude_deg"] = round(90.0 - tilt, 2)
@@ -3147,9 +3152,9 @@ class AllSkyService:
                 return dict(self.plate_solve_status)
             self.plate_solve_status = {
                 "state": "running",
-                "started_at": datetime.now(timezone.utc).isoformat(),
+                "started_at": datetime.now().astimezone().isoformat(),
                 "finished_at": None,
-                "message": "Capturing a frame and sending it to the plate solver (usually 1-3 minutes)...",
+                "message": "Capturing a series of long exposures and matching the stars (usually 2-3 minutes)...",
             }
         self.activity.info("station", "Plate-solve started")
 
@@ -3161,7 +3166,7 @@ class AllSkyService:
             except Exception as exc:
                 self.activity.error("station", f"Plate-solve crashed: {exc}")
                 update = {"state": "failed", "message": f"Plate-solve crashed: {exc}", "error": str(exc)}
-            update["finished_at"] = datetime.now(timezone.utc).isoformat()
+            update["finished_at"] = datetime.now().astimezone().isoformat()
             with self._plate_solve_lock:
                 self.plate_solve_status.update(update)
 
@@ -3174,10 +3179,144 @@ class AllSkyService:
         out["station_config"] = self.get_station_config()
         return out
 
-    def _solve_bright_star_pattern(self, frame: np.ndarray, lat: float, lon: float) -> Optional[Dict[str, Any]]:
-        """Match the brightest stars against the catalog; apply and return the result, or None if unsure."""
-        from src.calibration.bright_star_solver import solve_bright_stars
+    def get_sky_mask(self) -> Dict[str, Any]:
+        m = self.station_config.get("sky_mask") or {}
+        return {"sky": list(m.get("sky") or []), "obstruction": list(m.get("obstruction") or [])}
 
+    def set_sky_mask(self, sky: Optional[List] = None, obstruction: Optional[List] = None) -> Dict[str, Any]:
+        """Save the plate-solve sky/obstruction polygons (frame fractions); both empty clears the mask."""
+        def clean(polys):
+            out = []
+            for poly in polys or []:
+                if not 3 <= len(poly) <= 64:
+                    raise ValueError("each polygon needs 3 to 64 points")
+                pts = []
+                for pt in poly:
+                    if len(pt) != 2:
+                        raise ValueError("polygon points are [x, y] fractions of the frame")
+                    pts.append([round(min(1.0, max(0.0, float(pt[0]))), 4), round(min(1.0, max(0.0, float(pt[1]))), 4)])
+                out.append(pts)
+            if len(out) > 16:
+                raise ValueError("at most 16 polygons")
+            return out
+
+        mask = {"sky": clean(sky), "obstruction": clean(obstruction)}
+        if mask["sky"] or mask["obstruction"]:
+            self.station_config["sky_mask"] = mask
+        else:
+            self.station_config.pop("sky_mask", None)
+        self._save_station_config()
+        self.activity.info("station", f"Plate-solve sky mask saved: {len(mask['sky'])} sky, "
+                           f"{len(mask['obstruction'])} obstruction polygon(s)")
+        return {"success": True, **self.get_sky_mask()}
+
+    def _lens_intrinsics(self, frame_w: int) -> Optional[Dict[str, Any]]:
+        """Solved lens intrinsics scaled to a frame of this width, or None if the lens was never solved."""
+        optics = self.station_config.get("optics") or {}
+        sensor = self.station_config.get("camera_sensor") or {}
+        try:
+            f = float(optics["focal_length_px"])
+            proj = str(optics["lens_projection"])
+            k = frame_w / float(sensor.get("width_px") or frame_w)
+            return {"f": f * k, "cx": float(optics["optical_center_x_px"]) * k,
+                    "cy": float(optics["optical_center_y_px"]) * k,
+                    "k": float(optics.get("distortion_k") or 0.0), "proj": proj}
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    def _capture_plate_solve_frames(self, n_frames: int = 6, exposure_s: float = 10.0,
+                                    min_span_s: float = 90.0, target_level: float = 150.0
+                                    ) -> Tuple[List[np.ndarray], List[float]]:
+        """A short series of long exposures for star tracking; just one frame by day, in tests or on the simulator.
+
+        Stars drift ~6 px over 90 s on a fisheye while hot pixels stay put, so the frames are spread over
+        min_span_s. Exposure (up to exposure_s) and gain are scaled from the current frame so the sky background
+        sits near target_level (of 255, gamma-encoded output) instead of saturating under city light. Frames are kept as grayscale
+        to save memory; exposure mode and settings are restored afterwards.
+        """
+        frame, meta = self.capture_frame(force_refresh=True)
+        if os.environ.get("PYTEST_CURRENT_TEST") or getattr(self.camera, "simulator", False):
+            return [frame], [time.time()]
+        try:
+            from src.calibration.auto_exposure import calculate_solar_elevation
+            if calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon) > -6.0:
+                return [frame], [time.time()]
+        except Exception:
+            return [frame], [time.time()]
+
+        old_mode = self.mode
+        old_exp = float(getattr(self.camera, "current_exposure_s", exposure_s))
+        old_gain = float(getattr(self.camera, "current_gain_db", 12.0))
+        min_gain = float(getattr(self.camera, "min_gain_db", 0.0) or 0.0)
+
+        def settings_for(img, exp0, gain0):
+            """Exposure/gain putting the sky median at target_level (signal ~ exposure * 10^(gain/20))."""
+            g = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img
+            level = float(np.median(g[::8, ::8]))
+            ratio = 0.25 if level >= 250 else target_level / max(level, 2.0)  # saturated: cut hard, re-check
+            want = exp0 * 10 ** (gain0 / 20.0) * ratio
+            gain = min(max(20.0 * math.log10(want / exposure_s), min_gain), old_gain + 12.0)
+            exp = min(exposure_s, max(0.5, want / 10 ** (gain / 20.0)))
+            return exp, gain
+
+        exp, gain = settings_for(frame, float(meta.get("actual_exposure_s", old_exp)), float(meta.get("gain_db", old_gain)))
+        frames: List[np.ndarray] = []
+        times: List[float] = []
+        try:
+            self.mode = "manual"  # keep auto-exposure from changing the series
+            with self.lock:
+                self.camera.set_hardware_exposure(exp, gain)
+            interval = min_span_s / max(1, n_frames - 1)
+            t0, adjustments = None, 0
+            for _ in range(n_frames + 6):  # spares for frames still at old settings or re-exposed
+                if t0 is not None:
+                    wait = t0 + len(frames) * interval - time.time()
+                    if wait > 0:
+                        time.sleep(wait)
+                frame, meta = self.capture_frame(force_refresh=True)
+                got = float(meta.get("actual_exposure_s", exp))
+                if abs(got - exp) > 0.2 * exp:
+                    continue  # still the previous exposure
+                g = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) if frame.ndim == 3 else frame.copy()
+                level = float(np.median(g[::8, ::8]))
+                if (level > 225.0 or level < target_level / 3.0) and adjustments < 3 and len(frames) < 2:
+                    adjustments += 1  # sky brighter/darker than predicted: re-expose and restart the series
+                    exp, gain = settings_for(g, got, float(meta.get("gain_db", gain)))
+                    with self.lock:
+                        self.camera.set_hardware_exposure(exp, gain)
+                    frames, times, t0 = [], [], None
+                    continue
+                frames.append(g)
+                times.append(time.time() - got / 2.0)
+                t0 = t0 or times[-1]
+                if len(frames) >= n_frames:
+                    break
+        finally:
+            with self.lock:
+                self.camera.set_hardware_exposure(old_exp, old_gain)
+            self.mode = old_mode
+            self.last_capture_time = 0.0
+        self.activity.info("station", f"Plate-solve series: {len(frames)} frames of {exp:.1f} s at {gain:.1f} dB")
+        if len(frames) < 3:
+            return [frame], [time.time()]
+        if self.station_config.get("plate_solve_debug"):
+            dbg = os.path.join(self.output_dir, "plate_solve_debug")
+            os.makedirs(dbg, exist_ok=True)
+            for i, (g, t) in enumerate(zip(frames, times)):
+                cv2.imwrite(os.path.join(dbg, f"f{i}_{t:.1f}.png"), g)
+        return frames, times
+
+    def _solve_bright_star_pattern(self, frame: np.ndarray, lat: float, lon: float,
+                                   frames: Optional[List[np.ndarray]] = None,
+                                   times: Optional[List[float]] = None) -> Optional[Dict[str, Any]]:
+        """Match the brightest stars against the catalog; apply and return the result, or None if unsure.
+
+        With a frame series, only points that persist and drift with the sky are used (hot pixels are
+        static). With already-solved lens intrinsics, only the rotation is fitted first (needs 3-4 stars).
+        """
+        from src.calibration import bright_star_solver as bss
+
+        h, w = frame.shape[:2]
         optics0 = self.station_config.get("optics") or {}
         is_fisheye = bool(re.search(r"fisheye|equidistant", str(optics0.get("projection_type", "")), re.I)) or (
             optics0.get("lens_projection") == "equidistant"
@@ -3185,18 +3324,46 @@ class AllSkyService:
         attempts = [("equidistant", range(120, 244, 6)), ("rectilinear", range(50, 125, 4))]
         if not is_fisheye:
             attempts.reverse()
+        intr = self._lens_intrinsics(w)
         try:
+            mask = bss.combined_sky_mask(frame, self.station_config.get("sky_mask"))
+            tracked, when = None, None
+            if frames is not None and len(frames) >= 3:
+                hfov = float(optics0.get("fov_horizontal_deg") or 90.0)
+                f_est = intr["f"] if intr else (w / 2.0) / math.radians(min(hfov, 200.0) / 2.0)
+                tracked = bss.track_sidereal_points(frames, times, f_est, sky_mask=mask)
+                when = datetime.fromtimestamp(tracked["time"]).astimezone()
+                self.activity.info(
+                    "station",
+                    f"Star tracking over {len(frames)} frames ({tracked['span_s']:.0f} s): "
+                    f"{tracked['persistent']} persistent points, {tracked['static']} static (hot pixels), "
+                    f"{len(tracked['points'])} drifting with the sky "
+                    f"(points per frame: {', '.join(map(str, tracked['detections_per_frame']))})",
+                )
             res = {"success": False, "error": "not run"}
-            for proj, fovs in attempts:
-                res = solve_bright_stars(frame, lat, lon, projection=proj, hfov_candidates_deg=fovs)
-                if res.get("success"):
-                    break
+            if intr is not None:
+                pts = tracked["points"] if tracked is not None else bss.detect_bright_points(
+                    frame, max_points=30, sky_mask=mask, sigma=3.5)
+                res = bss.solve_fixed_lens(
+                    pts, (w, h), lat, lon, when, intr["f"], (intr["cx"], intr["cy"]), intr["k"], intr["proj"],
+                    velocity=tracked["velocity"] if tracked is not None else None, sky_mask=mask)
+                if not res.get("success"):
+                    self.activity.info("station", f"Fixed-lens solve: {res.get('error')}; trying a full lens solve")
+            if not res.get("success"):
+                det = tracked["points"] if tracked is not None and len(tracked["points"]) >= 5 else None
+                for proj, fovs in attempts:
+                    res = bss.solve_bright_stars(frame, lat, lon, when=when, projection=proj, hfov_candidates_deg=fovs,
+                                                 detections=det, sky_mask=mask)
+                    if res.get("success"):
+                        break
         except Exception as exc:
             self.activity.warning("station", f"Bright-star solve crashed: {exc}")
             return None
         if not res.get("success"):
             self.activity.info("station", f"Bright-star solve: {res.get('error')}; trying the hoan.uk plate solver")
             return None
+        if res.get("mode") == "fixed_lens":
+            return self._apply_fixed_lens_solution(res)
 
         h, w = frame.shape[:2]
         sensor = self.station_config.get("camera_sensor") or {}
@@ -3271,13 +3438,51 @@ class AllSkyService:
         self.activity.success("station", msg)
         return {"success": True, "message": msg, "solution": res, "station_config": self.get_station_config()}
 
+    def _apply_fixed_lens_solution(self, res: Dict[str, Any]) -> Dict[str, Any]:
+        """Store the pointing from a fixed-lens solve; the solved lens intrinsics stay as they are."""
+        names = [m["name"] for m in res["matched_stars"]]
+        ra, dec, roll = res["center_ra_deg"], res["center_dec_deg"], res["roll_deg"]
+        ra_h, dec_abs = ra / 15.0, abs(dec)
+        orientation = dict(self.station_config.get("orientation") or {})
+        orientation.update({
+            "center_ra_deg": ra,
+            "center_dec_deg": dec,
+            "center_ra_hms": f"{int(ra_h):02d}h {int(ra_h % 1 * 60):02d}m {(ra_h * 60 % 1) * 60:04.1f}s",
+            "center_dec_dms": f"{'+' if dec >= 0 else '-'}{int(dec_abs):02d}° {int(dec_abs % 1 * 60):02d}' {(dec_abs * 60 % 1) * 60:04.1f}\"",
+            "azimuth_deg": res["pointing_az_deg"],
+            "altitude_deg": res["pointing_alt_deg"],
+            "zenith_tilt_deg": round(90.0 - res["pointing_alt_deg"], 2),
+            "north_position_angle_deg": roll,
+            "rotation_deg": roll,
+        })
+        optics = dict(self.station_config.get("optics") or {})
+        optics["pointing_model"] = True
+        self.station_config.update({
+            "plate_solver_endpoint": "local bright-star pattern solver",
+            "solve_source": "live_frame (bright-star pattern, fixed lens)",
+            "solved_at": res["solved_at"],
+            "optics": optics,
+            "orientation": orientation,
+            "matched_stars_count": len(names),
+            "constellations_in_fov": [],
+            "bright_star_solution": res,
+        })
+        self._save_station_config()
+        msg = (
+            f"Solved with the known lens from {len(names)} stars/planets ({', '.join(names)}), RMS {res['rms_px']} px: "
+            f"camera points Az {res['pointing_az_deg']}°, Alt {res['pointing_alt_deg']}°, roll {roll}°."
+        )
+        self.activity.success("station", msg)
+        return {"success": True, "message": msg, "solution": res, "station_config": self.get_station_config()}
+
     def run_station_plate_solve(self, fov_hint: str = "auto") -> Dict[str, Any]:
         """
         Capture/fetch frame and invoke https://hoan.uk/astronomy/plate-solving when user clicks Plate-Solve on Web UI.
         """
         from src.calibration.station_solver import solve_station_parameters
 
-        frame, _ = self.capture_frame()
+        frames, times = self._capture_plate_solve_frames()
+        frame = frames[-1]
         if (fov_hint or "auto") == "auto":
             # A known lens FOV narrows the solver's scale search (it scans 0.35x..2.5x of the hint)
             hfov = (self.station_config.get("optics") or {}).get("fov_horizontal_deg")
@@ -3288,9 +3493,12 @@ class AllSkyService:
         elev = float(self.station_config.get("elevation_m", 20.0))
 
         # 1. Local bright-star pattern solve: seconds, and works under city light pollution
-        bright = self._solve_bright_star_pattern(frame, lat, lon)
+        bright = self._solve_bright_star_pattern(frame, lat, lon, frames, times) if len(frames) >= 3 else \
+            self._solve_bright_star_pattern(frame, lat, lon)
         if bright is not None:
             return bright
+        if frame.ndim == 2:
+            frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
         # 2. Full blind solve on the hoan.uk plate solver (needs many stars, takes minutes)
         solved = solve_station_parameters(

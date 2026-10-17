@@ -1416,3 +1416,22 @@ html, .focus-side, .log-list {
 .focus-history td.num { font-family: var(--font-mono); }
 .focus-history tr.latest td { color: var(--success); }
 .focus-history .btn { padding: 0.1rem 0.5rem; }
+
+/* Plate-solve sky mask editor */
+.mask-canvas-wrap {
+    position: relative;
+    margin-top: 0.5rem;
+}
+.mask-canvas-wrap img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+.mask-canvas-wrap canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    touch-action: manipulation;
+}

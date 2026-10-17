@@ -5,7 +5,7 @@ and builds diurnal / nocturnal spatio-temporal strips.
 """
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Optional, Tuple, Union
 import numpy as np
 import cv2
@@ -95,7 +95,7 @@ class KeogramGenerator:
         Returns:
             Extracted slice array (H, slice_width, 3).
         """
-        ts = timestamp or datetime.now(timezone.utc)
+        ts = timestamp or datetime.now().astimezone()
         sl = extract_meridian_slice(frame, slice_width=self.slice_width)
         self.slices.append(sl)
         self.timestamps.append(ts)
@@ -140,7 +140,7 @@ class KeogramGenerator:
             cv2.line(ruler, (x_pos, 0), (x_pos, 8), (200, 200, 200), 1)
 
             if i < len(self.timestamps):
-                ts_str = self.timestamps[i].strftime("%H:%M")
+                ts_str = self.timestamps[i].astimezone().strftime("%H:%M")
                 cv2.putText(
                     ruler,
                     ts_str,

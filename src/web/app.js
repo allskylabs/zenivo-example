@@ -139,9 +139,21 @@ document.addEventListener("DOMContentLoaded", () => {
     // ------------------------------------------------------------------
     // Clock & Night Vision
     // ------------------------------------------------------------------
+    // Local wall-clock time for an ISO timestamp (any offset, incl. older UTC records): "YYYY-MM-DD HH:MM:SS"
+    function fmtLocalIso(iso, timeOnly) {
+        const d = new Date(iso);
+        if (isNaN(d)) return iso || "";
+        const p = (n) => String(n).padStart(2, "0");
+        const hms = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+        return timeOnly ? hms : `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${hms}`;
+    }
+    const tzLabel = (() => {
+        const m = -new Date().getTimezoneOffset();
+        return `UTC${m >= 0 ? "+" : "-"}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ":" + String(Math.abs(m) % 60).padStart(2, "0") : ""}`;
+    })();
+
     function updateClock() {
-        const now = new Date();
-        navClock.textContent = now.toUTCString().split(" ")[4] + " UTC";
+        navClock.textContent = `${fmtLocalIso(new Date().toISOString(), true)} ${tzLabel}`;
     }
     setInterval(updateClock, 1000);
     updateClock();
@@ -422,7 +434,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         badgeHtml = `<span class="badge badge-success">✅ READY (${p.size_kb} KB)</span>`;
                     }
                     const updatedStr = p.modified_at
-                        ? `${p.raw_filename || p.filename} • ${p.modified_at.replace("T", " ").split(".")[0]} UTC`
+                        ? `${p.raw_filename || p.filename} • ${fmtLocalIso(p.modified_at)}`
                         : `${p.raw_filename || p.filename}`;
                     return `
                         <tr>
@@ -446,7 +458,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <tr>
                             <td><strong class="text-accent">${f.filename}</strong></td>
                             <td>${f.size_kb} KB</td>
-                            <td>${f.modified_at ? f.modified_at.replace("T", " ").split(".")[0] + " UTC" : "--"}</td>
+                            <td>${f.modified_at ? fmtLocalIso(f.modified_at) : "--"}</td>
                             <td class="text-muted">${f.file_path}</td>
                         </tr>`
                     )
@@ -1125,14 +1137,14 @@ document.addEventListener("DOMContentLoaded", () => {
         btnStationSolve.addEventListener("click", async () => {
             const payload = readManualStationPayload("manual", true);
             btnStationSolve.disabled = true;
-            btnStationSolve.textContent = "⏳ Capturing & plate-solving via hoan.uk...";
+            btnStationSolve.textContent = "⏳ Capturing & plate-solving...";
             if (stationSolveBadge) {
                 stationSolveBadge.textContent = "SOLVING...";
                 stationSolveBadge.className = "badge badge-warning";
             }
             showAlert(
                 stationAlert,
-                `⏳ Capturing a frame and sending it to the hoan.uk plate solver (can take up to a minute)...`,
+                `⏳ Capturing a series of long exposures and matching the stars (about 2-3 minutes at night)...`,
                 "info",
                 true
             );
@@ -1179,6 +1191,103 @@ document.addEventListener("DOMContentLoaded", () => {
             } finally {
                 btnStationSolve.disabled = false;
                 btnStationSolve.textContent = "🔭 Capture & Auto Plate-Solve";
+            }
+        });
+    }
+
+    // Plate-solve sky mask editor: polygons stored as frame fractions in station_config.sky_mask
+    const maskEditor = document.getElementById("sky-mask-editor");
+    if (maskEditor) {
+        const maskImg = document.getElementById("mask-img");
+        const maskCanvas = document.getElementById("mask-canvas");
+        const maskAlert = document.getElementById("mask-alert");
+        const mask = { sky: [], obstruction: [] };
+        let current = { kind: "sky", pts: [] };
+
+        const finishCurrent = () => {
+            if (current.pts.length >= 3) mask[current.kind].push(current.pts);
+            current = { kind: current.kind, pts: [] };
+        };
+        const drawMask = () => {
+            const w = maskImg.clientWidth, h = maskImg.clientHeight;
+            if (!w || !h) return;
+            maskCanvas.width = w;
+            maskCanvas.height = h;
+            const ctx = maskCanvas.getContext("2d");
+            ctx.clearRect(0, 0, w, h);
+            const poly = (pts, kind, closed) => {
+                if (!pts.length) return;
+                const color = kind === "sky" ? "34,197,94" : "239,68,68";
+                ctx.beginPath();
+                pts.forEach(([x, y], i) => (i ? ctx.lineTo(x * w, y * h) : ctx.moveTo(x * w, y * h)));
+                if (closed) {
+                    ctx.closePath();
+                    ctx.fillStyle = `rgba(${color},0.18)`;
+                    ctx.fill();
+                }
+                ctx.strokeStyle = `rgb(${color})`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.fillStyle = `rgb(${color})`;
+                pts.forEach(([x, y]) => ctx.fillRect(x * w - 3, y * h - 3, 6, 6));
+            };
+            mask.sky.forEach((p) => poly(p, "sky", true));
+            mask.obstruction.forEach((p) => poly(p, "obstruction", true));
+            poly(current.pts, current.kind, false);
+        };
+        const loadMask = async () => {
+            maskImg.src = `/api/live/snapshot.jpg?t=${Date.now()}`;
+            try {
+                const res = await fetch("/api/station/sky-mask");
+                if (res.ok) {
+                    const data = await res.json();
+                    mask.sky = data.sky || [];
+                    mask.obstruction = data.obstruction || [];
+                    current = { kind: "sky", pts: [] };
+                    drawMask();
+                }
+            } catch (e) {}
+        };
+        maskEditor.addEventListener("toggle", () => { if (maskEditor.open) loadMask(); });
+        maskImg.addEventListener("load", drawMask);
+        window.addEventListener("resize", drawMask);
+        maskCanvas.addEventListener("click", (ev) => {
+            const r = maskCanvas.getBoundingClientRect();
+            const x = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
+            const y = Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height));
+            current.pts.push([Math.round(x * 10000) / 10000, Math.round(y * 10000) / 10000]);
+            drawMask();
+        });
+        document.getElementById("mask-new-sky").addEventListener("click", () => { finishCurrent(); current.kind = "sky"; drawMask(); });
+        document.getElementById("mask-new-obs").addEventListener("click", () => { finishCurrent(); current.kind = "obstruction"; drawMask(); });
+        document.getElementById("mask-undo").addEventListener("click", () => {
+            if (current.pts.length) current.pts.pop();
+            else {
+                const last = mask[current.kind].pop();
+                if (last) current.pts = last.slice(0, -1);
+            }
+            drawMask();
+        });
+        document.getElementById("mask-clear").addEventListener("click", () => {
+            mask.sky = [];
+            mask.obstruction = [];
+            current = { kind: "sky", pts: [] };
+            drawMask();
+        });
+        document.getElementById("mask-save").addEventListener("click", async () => {
+            finishCurrent();
+            drawMask();
+            try {
+                const res = await fetch("/api/station/sky-mask", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(mask),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+                showAlert(maskAlert, `✅ Sky mask saved: ${data.sky.length} sky, ${data.obstruction.length} obstruction polygon(s)`, "success");
+            } catch (err) {
+                showAlert(maskAlert, `❌ Could not save the sky mask: ${err.message}`, "error", true);
             }
         });
     }
@@ -2222,6 +2331,19 @@ document.addEventListener("DOMContentLoaded", () => {
     if (chkSkyOverlay) chkSkyOverlay.addEventListener("change", drawReticle);
     if (chkSkyLabels) chkSkyLabels.addEventListener("change", drawReticle);
     if (chkGridOverlay) chkGridOverlay.addEventListener("change", drawReticle);
+    // Match the viewport box to the camera's real aspect ratio (4:3 IMX335, 16:9 IMX708, ...)
+    function fitViewportToFrame() {
+        if (!liveImg || !viewportContainer || !liveImg.naturalWidth || !liveImg.naturalHeight) return;
+        const ratio = `${liveImg.naturalWidth} / ${liveImg.naturalHeight}`;
+        // The server pre-sizes the box (data-frame-ratio); only touch it if the camera's ratio differs
+        const [pw, ph] = (viewportContainer.dataset.frameRatio || "").split("/").map(Number);
+        if (pw && ph && Math.abs(pw / ph - liveImg.naturalWidth / liveImg.naturalHeight) < 0.01) return;
+        viewportContainer.dataset.frameRatio = ratio;
+        viewportContainer.style.aspectRatio = ratio;
+        applyView(false);
+    }
+    if (liveImg) liveImg.addEventListener("load", fitViewportToFrame);
+    fitViewportToFrame();
     if (liveImg) liveImg.addEventListener("load", drawReticle);
     window.addEventListener("resize", drawReticle);
     document.addEventListener("fullscreenchange", () => setTimeout(drawReticle, 80));
@@ -2362,7 +2484,7 @@ document.addEventListener("DOMContentLoaded", () => {
             telemTemp.textContent = data.sensor_temp_c.toFixed(1) + " °C";
         }
         if (data.timestamp) {
-            telemTimestamp.textContent = data.timestamp.split("T")[1].replace("Z", "");
+            telemTimestamp.textContent = fmtLocalIso(data.timestamp, true);
         }
         if (data.histogram) {
             drawHistogram(data.histogram);
@@ -2943,7 +3065,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderGallery(data) {
         productsGrid.innerHTML = "";
         if (galleryDateEl && data && data.date) {
-            galleryDateEl.textContent = `Archive: ${data.date} (UTC)`;
+            galleryDateEl.textContent = `Archive: ${data.date} (${tzLabel})`;
         }
         if (galleryFrameCountEl && data && data.archived_frames_count !== undefined) {
             galleryFrameCountEl.textContent = `${data.archived_frames_count} Frames Archived Today`;
@@ -2961,7 +3083,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const mediaUrl = `${item.url}?t=${cacheBust}`;
             const sizeBadge = item.size_kb ? `${item.size_kb.toFixed(1)} KB` : "Pending";
             const framesBadge = item.frame_count !== undefined ? `${item.frame_count} frames` : "";
-            const tsFormatted = item.timestamp ? item.timestamp.replace("T", " ").slice(0, 19) + " UTC" : "";
+            const tsFormatted = item.timestamp ? fmtLocalIso(item.timestamp) : "";
 
             let mediaHtml = "";
             if (item.type === "timelapse") {

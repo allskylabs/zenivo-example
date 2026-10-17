@@ -14,7 +14,7 @@ import os
 import threading
 import time
 from collections import deque
-from datetime import datetime, timezone
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from typing import Any, Deque, Dict, List, Optional
 
@@ -82,12 +82,12 @@ class ActivityLog:
                     break
                 if prev["level"] == level and prev["category"] == category and prev["message"] == message:
                     prev["repeat"] = prev.get("repeat", 1) + 1
-                    prev["last_ts"] = datetime.now(timezone.utc).isoformat()
+                    prev["last_ts"] = datetime.now().astimezone().isoformat()
                     prev["_t"] = now
                     return prev
             entry = {
                 "id": self._next_id,
-                "ts": datetime.now(timezone.utc).isoformat(),
+                "ts": datetime.now().astimezone().isoformat(),
                 "level": level,
                 "category": category,
                 "message": message,

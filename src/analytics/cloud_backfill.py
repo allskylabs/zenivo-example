@@ -14,7 +14,7 @@ import glob
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 
 import cv2
 
@@ -70,9 +70,12 @@ def main() -> int:
         last_t = 0.0
         for path in sorted(glob.glob(os.path.join(day_dir, "frame_*.jpg"))):
             name = os.path.basename(path)
+            # Telemetry carries the offset (older archives were named in UTC); bare names are local time
             try:
-                dt = datetime.strptime(name[6:21], "%Y%m%d_%H%M%S").replace(tzinfo=timezone.utc)
-            except ValueError:
+                ts_iso = tel.get(name, {}).get("timestamp")
+                dt = datetime.fromisoformat(ts_iso) if ts_iso else datetime.strptime(name[6:21], "%Y%m%d_%H%M%S")
+                dt = dt.astimezone()
+            except (ValueError, TypeError):
                 continue
             t = dt.timestamp()
             if t - last_t < every:

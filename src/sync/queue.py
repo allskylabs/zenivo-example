@@ -12,7 +12,7 @@ import json
 import sqlite3
 import random
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 
 
 class SyncQueue:
@@ -101,8 +101,8 @@ class SyncQueue:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                INSERT INTO sync_queue (event_type, priority, payload_json, file_path, status, next_retry_at)
-                VALUES (?, ?, ?, ?, 'pending', datetime('now'))
+                INSERT INTO sync_queue (event_type, priority, payload_json, file_path, status, next_retry_at, created_at)
+                VALUES (?, ?, ?, ?, 'pending', datetime('now', 'localtime'), datetime('now', 'localtime'))
                 """,
                 (event_type, prio, payload_str, file_path),
             )
@@ -121,7 +121,7 @@ class SyncQueue:
                 """
                 SELECT id, event_type, priority, payload_json, file_path, retry_count, next_retry_at
                 FROM sync_queue
-                WHERE status = 'pending' AND next_retry_at <= datetime('now')
+                WHERE status = 'pending' AND next_retry_at <= datetime('now', 'localtime')
                 ORDER BY priority ASC, id ASC
                 LIMIT ?
                 """,
@@ -163,7 +163,7 @@ class SyncQueue:
             new_retries = row["retry_count"] + 1
             delay_s = self.calculate_backoff_delay(new_retries)
 
-            next_retry = datetime.now(timezone.utc) + timedelta(seconds=delay_s)
+            next_retry = datetime.now().astimezone() + timedelta(seconds=delay_s)
             next_retry_str = next_retry.strftime("%Y-%m-%d %H:%M:%S")
 
             conn.execute(
