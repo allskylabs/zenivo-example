@@ -371,10 +371,11 @@ class FocusSession:
         }
 
 
-def find_focus_point(img: np.ndarray, grid_w: int = 12) -> Optional[Dict[str, Any]]:
+def find_focus_point(img: np.ndarray, grid_w: int = 12, sky_mask: Optional[np.ndarray] = None) -> Optional[Dict[str, Any]]:
     """Pick where to focus, as fractions of the frame: by night the best star (else the brightest point
     light), by day the tile with the most fine detail (buildings, rooftops, cloud edges), skipping blank
-    sky and the outermost tiles (frame edge, nearby walls). Runs on a ~768 px copy (a few ms)."""
+    sky and the outermost tiles (frame edge, nearby walls). sky_mask (1 = open sky, frame size) keeps the
+    night search off buildings, their windows and lamps. Runs on a ~768 px copy (a few ms)."""
     gray = _to_gray(img)
     h, w = gray.shape
     scale = min(1.0, 768.0 / w)
@@ -382,7 +383,16 @@ def find_focus_point(img: np.ndarray, grid_w: int = 12) -> Optional[Dict[str, An
     sh, sw = small.shape
     bright = float(np.percentile(small, 50))
     if bright < 60:
-        star = find_best_star(small)
+        search = small
+        if sky_mask is not None:
+            keep = cv2.resize(sky_mask.astype(np.uint8), (sw, sh), interpolation=cv2.INTER_NEAREST) > 0
+            keep = cv2.erode(keep.astype(np.uint8), np.ones((9, 9), np.uint8)) > 0  # not right at a roof edge
+            b = max(4, sw // 25)  # nor at the frame edge
+            keep[:b, :] = keep[-b:, :] = False
+            keep[:, :b] = keep[:, -b:] = False
+            if keep.mean() > 0.05:
+                search = np.where(keep, small, np.uint8(np.median(small)))
+        star = find_best_star(search)
         if star is not None:
             kind = "lights" if star["saturated"] else "stars"
             return {"cx": (star["x"] + 0.5) / sw, "cy": (star["y"] + 0.5) / sh, "method": kind, "detail": star}

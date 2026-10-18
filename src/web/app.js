@@ -49,11 +49,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const valExposure = document.getElementById("val-exposure");
     const rangeGain = document.getElementById("range-gain");
     const valGain = document.getElementById("val-gain");
-    const btnApplySettings = document.getElementById("btn-apply-settings");
     const controlAlert = document.getElementById("control-alert");
-    const btnModeManual = document.getElementById("btn-mode-manual");
-    const btnModeAuto = document.getElementById("btn-mode-auto");
     const activeProfileBadge = document.getElementById("active-profile-badge");
+    const btnLockExposure = document.getElementById("lock-exposure");
+    const btnLockGain = document.getElementById("lock-gain");
+    const rangeTarget = document.getElementById("range-target");
+    const valTarget = document.getElementById("val-target");
+    const btnLockTarget = document.getElementById("lock-target");
 
     // Telemetry Elements
     const telemExp = document.getElementById("telem-exp");
@@ -250,6 +252,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const exp = parseFloat(btn.getAttribute("data-exp"));
             rangeExposure.value = exp;
             valExposure.textContent = exp < 0.01 ? (exp * 1000).toFixed(2) + " ms" : exp < 0.1 ? (exp * 1000).toFixed(1) + " ms" : exp.toFixed(3) + " s";
+            rangeExposure.dispatchEvent(new Event("change"));
         });
     });
 
@@ -258,17 +261,78 @@ document.addEventListener("DOMContentLoaded", () => {
             const gain = parseFloat(btn.getAttribute("data-gain"));
             rangeGain.value = gain;
             valGain.textContent = gain.toFixed(1) + " dB";
+            rangeGain.dispatchEvent(new Event("change"));
         });
     });
 
-    // Mode Toggle
-    btnModeManual.addEventListener("click", async () => {
-        await setMode("manual");
+    // Exposure / gain locks replace the Auto/Manual switch: nothing locked = Auto computes both,
+    // one locked = Auto adjusts only the other, both locked = fixed (manual) exposure and gain
+    const isLocked = (knob) => state.aeLock === knob || state.aeLock === "both";
+    const lockName = (exp, gain) => (exp && gain ? "both" : exp ? "exposure" : gain ? "gain" : "none");
+    async function setAeLock(lock) {
+        const exposure_s = parseFloat(rangeExposure.value);
+        const gain_db = parseFloat(rangeGain.value);
+        try {
+            const res = await fetch("/api/camera/ae-lock", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ lock, value: lock === "gain" ? gain_db : exposure_s, exposure_s, gain_db }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+            state.mode = data.mode;
+            syncAeLock(data.ae_lock);
+        } catch (err) {
+            showAlert(controlAlert, `Could not change the lock: ${err.message}`, "error");
+        }
+    }
+    btnLockExposure.addEventListener("click", () => setAeLock(lockName(!isLocked("exposure"), isLocked("gain"))));
+    btnLockGain.addEventListener("click", () => setAeLock(lockName(isLocked("exposure"), !isLocked("gain"))));
+    // Grabbing a slider locks it at once (telemetry stops moving it); releasing it, or picking a preset,
+    // sends the lock with the chosen value
+    const paintLocks = () => syncModeButtons(state.aeLock === "both" ? "manual" : "auto");
+    // While a slider is held, the lock poll must not undo its local 🔒 before the value is sent
+    [rangeExposure, rangeGain, rangeTarget].forEach((el) => {
+        el.addEventListener("pointerdown", () => (state.dragging = true));
+        ["change", "pointerup", "pointercancel"].forEach((ev) => el.addEventListener(ev, () => (state.dragging = false)));
     });
+    rangeExposure.addEventListener("input", () => {
+        if (!isLocked("exposure")) { state.aeLock = lockName(true, isLocked("gain")); paintLocks(); }
+    });
+    rangeGain.addEventListener("input", () => {
+        if (!isLocked("gain")) { state.aeLock = lockName(isLocked("exposure"), true); paintLocks(); }
+    });
+    rangeExposure.addEventListener("change", () => setAeLock(lockName(true, isLocked("gain"))));
+    rangeGain.addEventListener("change", () => setAeLock(lockName(isLocked("exposure"), true)));
 
-    btnModeAuto.addEventListener("click", async () => {
-        await setMode("auto");
+    // Target brightness: unlocked it follows the measured brightness; locked, Auto aims for it
+    const paintTarget = () => {
+        valTarget.textContent = rangeTarget.value;
+        btnLockTarget.classList.toggle("locked", !!state.targetLocked);
+        btnLockTarget.textContent = state.targetLocked ? "🔒" : "🔓";
+    };
+    async function setTargetBrightness(value) {
+        try {
+            const res = await fetch("/api/camera/target-brightness", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ value }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+            syncAeLock(data.ae_lock);
+        } catch (err) {
+            showAlert(controlAlert, `Could not set the target brightness: ${err.message}`, "error");
+        }
+    }
+    rangeTarget.addEventListener("input", () => {
+        state.targetLocked = true;
+        paintTarget();
     });
+    rangeTarget.addEventListener("change", () => setTargetBrightness(parseFloat(rangeTarget.value)));
+    btnLockTarget.addEventListener("click", () =>
+        setTargetBrightness(state.targetLocked ? null : parseFloat(rangeTarget.value))
+    );
 
     function buildAsc1CommandPacket(cmdId, modeVal, exposureS, gainDb) {
         const buf = new ArrayBuffer(16);
@@ -285,64 +349,6 @@ document.addEventListener("DOMContentLoaded", () => {
         dv.setFloat32(12, Number(gainDb || 0), true);
         return buf;
     }
-
-    async function setMode(mode) {
-        if (state.wsConnected && state.ws && state.ws.readyState === WebSocket.OPEN) {
-            const modeVal = mode === "auto" ? 1 : 0;
-            state.ws.send(buildAsc1CommandPacket(1, modeVal, 0, 0));
-            syncModeButtons(mode);
-            return;
-        }
-        try {
-            const res = await fetch("/api/camera/mode", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ mode }),
-            });
-            if (res.ok) {
-                const data = await res.json();
-                syncModeButtons(data.mode);
-            }
-        } catch (err) {
-            console.error("Failed to toggle mode:", err);
-        }
-    }
-
-    // Apply Settings
-    btnApplySettings.addEventListener("click", async () => {
-        const exp = parseFloat(rangeExposure.value);
-        const gain = parseFloat(rangeGain.value);
-        btnApplySettings.disabled = true;
-        btnApplySettings.textContent = "Applying...";
-
-        if (state.wsConnected && state.ws && state.ws.readyState === WebSocket.OPEN) {
-            state.ws.send(buildAsc1CommandPacket(2, 0, exp, gain));
-            syncModeButtons("manual");
-            showAlert(controlAlert, "Exposure & Gain sent via 16-byte Binary Frame (ASC1)!", "success");
-            btnApplySettings.disabled = false;
-            btnApplySettings.textContent = "Apply Exposure & Gain";
-            return;
-        }
-
-        try {
-            const resExp = await fetch("/api/camera/exposure", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ exposure_s: exp, gain_db: gain }),
-            });
-
-            if (resExp.ok) {
-                showAlert(controlAlert, "Exposure & Gain successfully updated!", "success");
-            } else {
-                showAlert(controlAlert, `Failed to apply settings: HTTP ${resExp.status}`, "error");
-            }
-        } catch (err) {
-            showAlert(controlAlert, `Network error: ${err.message}`, "error");
-        } finally {
-            btnApplySettings.disabled = false;
-            btnApplySettings.textContent = "Apply Exposure & Gain";
-        }
-    });
 
     function showAlert(el, msg, type, persist = false) {
         if (!el) return;
@@ -548,6 +554,19 @@ document.addEventListener("DOMContentLoaded", () => {
         return dirs[idx];
     }
 
+    // Save is only needed for hand edits: plate-solve and locate save on the server themselves.
+    // While the form has unsaved edits, the periodic status refresh must not overwrite them.
+    let stationFormDirty = false;
+    function setStationFormDirty(dirty) {
+        stationFormDirty = dirty;
+        if (btnStationSave) btnStationSave.classList.toggle("hidden", !dirty);
+    }
+    if (btnStationSave) {
+        btnStationSave.closest(".card").querySelectorAll(".settings-grid input").forEach((el) =>
+            el.addEventListener("input", () => setStationFormDirty(true))
+        );
+    }
+
     function updateStationUI(st) {
         if (!st) return;
         state.station = st;
@@ -559,50 +578,52 @@ document.addEventListener("DOMContentLoaded", () => {
         const optics = st.optics || st.camera || {};
         const ori = st.orientation || {};
 
-        // Populate inputs if user is not actively typing in them
-        if (stationNameInput && document.activeElement !== stationNameInput) {
-            stationNameInput.value = nameVal;
-        }
-        if (stationLatInput && document.activeElement !== stationLatInput && latVal !== undefined) {
-            stationLatInput.value = Number(latVal).toFixed(4);
-        }
-        if (stationLonInput && document.activeElement !== stationLonInput && lonVal !== undefined) {
-            stationLonInput.value = Number(lonVal).toFixed(4);
-        }
-        if (stationElevInput && document.activeElement !== stationElevInput && st.elevation_m !== undefined) {
-            stationElevInput.value = Math.round(Number(st.elevation_m));
-        }
+        // Populate inputs unless the user has unsaved edits or is typing in them
+        if (!stationFormDirty) {
+            if (stationNameInput && document.activeElement !== stationNameInput) {
+                stationNameInput.value = nameVal;
+            }
+            if (stationLatInput && document.activeElement !== stationLatInput && latVal !== undefined) {
+                stationLatInput.value = Number(latVal).toFixed(4);
+            }
+            if (stationLonInput && document.activeElement !== stationLonInput && lonVal !== undefined) {
+                stationLonInput.value = Number(lonVal).toFixed(4);
+            }
+            if (stationElevInput && document.activeElement !== stationElevInput && st.elevation_m !== undefined) {
+                stationElevInput.value = Math.round(Number(st.elevation_m));
+            }
 
-        // Populate manual optical & orientation adjustment inputs
-        if (optFocalInput && document.activeElement !== optFocalInput && optics.focal_length_mm !== undefined) {
-            optFocalInput.value = Number(optics.focal_length_mm).toFixed(2);
-        }
-        if (optFovHInput && document.activeElement !== optFovHInput && optics.fov_horizontal_deg !== undefined) {
-            optFovHInput.value = Number(optics.fov_horizontal_deg).toFixed(1);
-        }
-        if (optFovVInput && document.activeElement !== optFovVInput && optics.fov_vertical_deg !== undefined) {
-            optFovVInput.value = Number(optics.fov_vertical_deg).toFixed(1);
-        }
-        if (optFovDInput && document.activeElement !== optFovDInput && optics.fov_diagonal_deg !== undefined) {
-            optFovDInput.value = Number(optics.fov_diagonal_deg).toFixed(1);
-        }
-        if (optCxInput && document.activeElement !== optCxInput && optics.optical_center_x_px !== undefined) {
-            optCxInput.value = Number(optics.optical_center_x_px).toFixed(1);
-        }
-        if (optCyInput && document.activeElement !== optCyInput && optics.optical_center_y_px !== undefined) {
-            optCyInput.value = Number(optics.optical_center_y_px).toFixed(1);
-        }
-        if (optR90Input && document.activeElement !== optR90Input && optics.horizon_radius_90_px !== undefined) {
-            optR90Input.value = Number(optics.horizon_radius_90_px).toFixed(1);
-        }
-        if (oriAzInput && document.activeElement !== oriAzInput && ori.azimuth_deg !== undefined) {
-            oriAzInput.value = Number(ori.azimuth_deg).toFixed(1);
-        }
-        if (oriTiltInput && document.activeElement !== oriTiltInput && ori.zenith_tilt_deg !== undefined) {
-            oriTiltInput.value = Number(ori.zenith_tilt_deg).toFixed(2);
-        }
-        if (oriNpaInput && document.activeElement !== oriNpaInput && ori.north_position_angle_deg !== undefined) {
-            oriNpaInput.value = Number(ori.north_position_angle_deg).toFixed(2);
+            // Populate manual optical & orientation adjustment inputs
+            if (optFocalInput && document.activeElement !== optFocalInput && optics.focal_length_mm !== undefined) {
+                optFocalInput.value = Number(optics.focal_length_mm).toFixed(2);
+            }
+            if (optFovHInput && document.activeElement !== optFovHInput && optics.fov_horizontal_deg !== undefined) {
+                optFovHInput.value = Number(optics.fov_horizontal_deg).toFixed(1);
+            }
+            if (optFovVInput && document.activeElement !== optFovVInput && optics.fov_vertical_deg !== undefined) {
+                optFovVInput.value = Number(optics.fov_vertical_deg).toFixed(1);
+            }
+            if (optFovDInput && document.activeElement !== optFovDInput && optics.fov_diagonal_deg !== undefined) {
+                optFovDInput.value = Number(optics.fov_diagonal_deg).toFixed(1);
+            }
+            if (optCxInput && document.activeElement !== optCxInput && optics.optical_center_x_px !== undefined) {
+                optCxInput.value = Number(optics.optical_center_x_px).toFixed(1);
+            }
+            if (optCyInput && document.activeElement !== optCyInput && optics.optical_center_y_px !== undefined) {
+                optCyInput.value = Number(optics.optical_center_y_px).toFixed(1);
+            }
+            if (optR90Input && document.activeElement !== optR90Input && optics.horizon_radius_90_px !== undefined) {
+                optR90Input.value = Number(optics.horizon_radius_90_px).toFixed(1);
+            }
+            if (oriAzInput && document.activeElement !== oriAzInput && ori.azimuth_deg !== undefined) {
+                oriAzInput.value = Number(ori.azimuth_deg).toFixed(1);
+            }
+            if (oriTiltInput && document.activeElement !== oriTiltInput && ori.zenith_tilt_deg !== undefined) {
+                oriTiltInput.value = Number(ori.zenith_tilt_deg).toFixed(2);
+            }
+            if (oriNpaInput && document.activeElement !== oriNpaInput && ori.north_position_angle_deg !== undefined) {
+                oriNpaInput.value = Number(ori.north_position_angle_deg).toFixed(2);
+            }
         }
 
         syncOrientationUI(st.image_transform);
@@ -846,6 +867,7 @@ document.addEventListener("DOMContentLoaded", () => {
         analysis_max_width: document.getElementById("perf-analysis-width"),
         stream_max_width: document.getElementById("perf-stream-width"),
         stream_jpeg_quality: document.getElementById("perf-stream-quality"),
+        background_capture_interval_s: document.getElementById("perf-bg-capture"),
     };
     const perfBinNote = document.getElementById("perf-bin-note");
 
@@ -1042,6 +1064,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     const data = await res.json();
                     const st = data.station_config || data.station;
                     if (res.ok && st) {
+                        setStationFormDirty(false);
                         updateStationUI(st);
                         showAlert(stationAlert, `✅ ${data.message || "Coordinates located successfully!"}`, "success", true);
                     } else {
@@ -1081,6 +1104,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             const data = await res.json();
                             const st = data.station_config || data.station;
                             if (res.ok && st) {
+                                setStationFormDirty(false);
                                 updateStationUI(st);
                                 showAlert(stationAlert, `✅ Browser GPS coordinates: ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E (${elev}m).`, "success", true);
                             }
@@ -1119,6 +1143,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const data = await res.json();
                 const st = data.station_config || data.station;
                 if (res.ok && st) {
+                    setStationFormDirty(false);
                     updateStationUI(st);
                     showAlert(stationAlert, `✅ ${data.message || "Configuration and manual adjustments saved!"}`, "success", true);
                 } else {
@@ -1170,14 +1195,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (!startRes.ok) throw new Error(`could not start plate-solve (HTTP ${startRes.status})`);
                 const t0 = Date.now();
                 let data = await startRes.json();
+                const STAGES = { quick: "Quick single-frame solve", metering: "1/3 Metering", capturing: "2/3 Capturing", matching: "3/3 Matching", online: "3/3 Online solve" };
+                let lastPoll = 0;
                 while (data.state === "running" && Date.now() - t0 < 6 * 60 * 1000) {
+                    // Re-render every second (countdown); ask the server every 3 s
                     const secs = Math.round((Date.now() - t0) / 1000);
-                    btnStationSolve.textContent = `⏳ Solving… ${secs}s`;
-                    showAlert(stationAlert, `⏳ ${data.message || "Plate-solving…"} (${secs}s elapsed)`, "info", true);
-                    await new Promise((r) => setTimeout(r, 3000));
-                    const stRes = await fetch("/api/station/plate-solve/status");
-                    if (stRes.ok) data = await stRes.json();
+                    const parts = [STAGES[data.stage] || "Starting"];
+                    if (data.stage === "capturing" && data.frames_total) parts.push(`frame ${Math.min(data.frame + 1, data.frames_total)}/${data.frames_total}`);
+                    if (data.eta_ts) parts.push(`~${Math.max(0, Math.round(data.eta_ts - Date.now() / 1000))} s left`);
+                    btnStationSolve.textContent = `⏳ ${parts.join(" · ")}`;
+                    showAlert(stationAlert, `⏳ ${parts.join(" · ")} — ${data.message || "Plate-solving…"} (${secs} s elapsed)`, "info", true);
+                    await new Promise((r) => setTimeout(r, 1000));
+                    if (Date.now() - lastPoll >= 3000) {
+                        lastPoll = Date.now();
+                        const stRes = await fetch("/api/station/plate-solve/status");
+                        if (stRes.ok) data = await stRes.json();
+                    }
                 }
+                if (data.state === "success") setStationFormDirty(false);
                 if (data.station_config) updateStationUI(data.station_config);
                 if (data.state === "success") {
                     showAlert(stationAlert, `✅ ${data.message || "Plate-solving complete!"}`, "success", true);
@@ -1300,7 +1335,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ------------------------------------------------------------------
-    // Live View Zoom & Pan (wheel / pinch / drag / double-click / + - 0 keys)
+    // Live View Zoom & Pan (wheel / pinch / drag / click / + - 0 keys)
     // ------------------------------------------------------------------
     const ZOOM_MIN = 1;
     const ZOOM_MAX = 8;
@@ -1372,8 +1407,14 @@ document.addEventListener("DOMContentLoaded", () => {
             { passive: false }
         );
 
-        viewportContainer.addEventListener("dblclick", (e) => {
-            if (e.target.closest(".zoom-controls")) return;
+        // Click toggles zoom (3× at the clicked point / back to fit); a drag or pinch is not a click
+        let tapStart = null;
+        viewportContainer.addEventListener("click", (e) => {
+            if (e.target.closest(".zoom-controls") || !tapStart) return;
+            const moved = Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y);
+            const wasMulti = tapStart.multi;
+            tapStart = null;
+            if (moved > 6 || wasMulti) return;
             const rect = viewportContainer.getBoundingClientRect();
             zoomAt(view.zoom > 1.001 ? 1 : 3, e.clientX - rect.left, e.clientY - rect.top);
         });
@@ -1383,6 +1424,8 @@ document.addEventListener("DOMContentLoaded", () => {
         let pinchStart = null;
         viewportContainer.addEventListener("pointerdown", (e) => {
             if (e.target.closest(".zoom-controls")) return;
+            if (pointers.size === 0) tapStart = { x: e.clientX, y: e.clientY, multi: false };
+            else if (tapStart) tapStart.multi = true;
             pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
             viewportContainer.setPointerCapture(e.pointerId);
             if (pointers.size === 2) {
@@ -2433,19 +2476,41 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!modeStr) return;
         const m = modeStr.toLowerCase();
         state.mode = m;
-        navMode.textContent = m.toUpperCase();
-        activeProfileBadge.textContent = m === "auto" ? "AUTO EPHEMERIS" : "MANUAL";
-        btnModeManual.classList.toggle("active", m === "manual");
-        btnModeManual.classList.toggle("btn-primary", m === "manual");
-        btnModeManual.classList.toggle("btn-outline", m !== "manual");
-        btnModeAuto.classList.toggle("active", m === "auto");
-        btnModeAuto.classList.toggle("btn-primary", m === "auto");
-        btnModeAuto.classList.toggle("btn-outline", m !== "auto");
+        if (m === "manual") state.aeLock = "both";
+        else if (state.aeLock === "both") state.aeLock = null;
+        const label = { both: "MANUAL", exposure: "AUTO GAIN", gain: "AUTO EXPOSURE" }[state.aeLock] || "AUTO";
+        navMode.textContent = label;
+        activeProfileBadge.textContent = state.aeLock ? `${label} • ${state.aeLock === "both" ? "BOTH" : state.aeLock.toUpperCase()} LOCKED` : "AUTO EPHEMERIS";
+        btnLockExposure.classList.toggle("locked", isLocked("exposure"));
+        btnLockGain.classList.toggle("locked", isLocked("gain"));
+        btnLockExposure.textContent = isLocked("exposure") ? "🔒" : "🔓";
+        btnLockGain.textContent = isLocked("gain") ? "🔒" : "🔓";
+    }
+
+    function syncAeLock(info) {
+        state.aeLock = (info && info.lock) || null;
+        // Show the held value on a locked slider (telemetry no longer moves it)
+        if (isLocked("exposure") && info.exposure_s != null && document.activeElement !== rangeExposure) {
+            rangeExposure.value = info.exposure_s;
+            rangeExposure.dispatchEvent(new Event("input"));
+        }
+        if (isLocked("gain") && info.gain_db != null && document.activeElement !== rangeGain) {
+            rangeGain.value = info.gain_db;
+            rangeGain.dispatchEvent(new Event("input"));
+        }
+        state.targetLocked = info ? info.target_brightness != null : false;
+        if (document.activeElement !== rangeTarget) {
+            const t = state.targetLocked ? info.target_brightness : info && info.brightness;
+            if (t != null) rangeTarget.value = Math.round(t);
+        }
+        paintTarget();
+        syncModeButtons(state.aeLock === "both" ? "manual" : "auto");
     }
 
     function updateTelemetryUI(data) {
         if (!data) return;
 
+        if (data.ae_lock !== undefined) syncAeLock(data.ae_lock);
         if (data.mode) {
             syncModeButtons(data.mode);
         }
@@ -2453,14 +2518,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if (data.exposure_s !== undefined) {
             const exp = data.exposure_s;
             telemExp.textContent = exp < 0.01 ? (exp * 1000).toFixed(2) + " ms" : exp < 0.1 ? (exp * 1000).toFixed(1) + " ms" : exp.toFixed(3) + " s";
-            if (state.mode === "auto") {
+            if (!isLocked("exposure") && document.activeElement !== rangeExposure) {
                 rangeExposure.value = exp;
                 valExposure.textContent = exp < 0.01 ? (exp * 1000).toFixed(2) + " ms" : exp < 0.1 ? (exp * 1000).toFixed(1) + " ms" : exp.toFixed(3) + " s";
             }
         }
         if (data.gain_db !== undefined) {
             telemGain.textContent = data.gain_db.toFixed(1) + " dB";
-            if (state.mode === "auto") {
+            if (!isLocked("gain") && document.activeElement !== rangeGain) {
                 rangeGain.value = data.gain_db;
                 valGain.textContent = data.gain_db.toFixed(1) + " dB";
             }
@@ -2523,7 +2588,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                 }
                 if (rangeExposure && hw.limits.max_exposure_s !== undefined) {
-                    rangeExposure.max = String(Math.min(Number(rangeExposure.max) || 15, hw.limits.max_exposure_s));
+                    rangeExposure.max = String(Math.min(60, hw.limits.max_exposure_s));
                 }
             }
         }
@@ -2536,6 +2601,7 @@ document.addEventListener("DOMContentLoaded", () => {
             regPgc.textContent = r.PGC;
         }
 
+        if (data.ae_lock !== undefined) syncAeLock(data.ae_lock);
         if (data.mode) {
             syncModeButtons(data.mode);
         }
@@ -2724,6 +2790,15 @@ document.addEventListener("DOMContentLoaded", () => {
             ws.onmessage = (event) => {
                 if (event.data instanceof ArrayBuffer) {
                     unpackAndRenderAsb1Packet(event.data);
+                } else if (typeof event.data === "string") {
+                    // Lock state / brightness, pushed by the server only when it changes
+                    try {
+                        const msg = JSON.parse(event.data);
+                        if (msg.type === "ae_lock" && !state.dragging) {
+                            syncModeButtons(msg.mode);
+                            syncAeLock(msg.ae_lock);
+                        }
+                    } catch (e) {}
                 }
             };
 
@@ -3213,6 +3288,195 @@ document.addEventListener("DOMContentLoaded", () => {
         return parts.join(" · ");
     }
 
+    function escapeHtml(v) {
+        return String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    // Flight named by ADS-B (callsign, altitude, distance), linked to a public flight tracker
+    function flightHtml(ev) {
+        const fl = ev.flight;
+        if (!fl) return "";
+        const name = escapeHtml(fl.callsign || fl.icao);
+        const url = `https://globe.adsbexchange.com/?icao=${encodeURIComponent(String(fl.icao).toLowerCase())}`;
+        return `<a class="flight-tag" href="${url}" target="_blank" rel="noopener" title="ICAO ${escapeHtml(fl.icao)} · az ${fl.az_deg}° alt ${fl.alt_deg}° · match ${fl.match_px} px">✈ ${name}</a>`
+            + ` <span class="flight-meta">${Number(fl.altitude_m).toLocaleString()} m · ${fl.distance_km} km</span>`;
+    }
+
+    const EVENT_COLORS = { meteor: "#f59e0b", plane: "#38bdf8", satellite: "#a78bfa", clouds: "#94a3b8", flash: "#facc15" };
+
+    function eventDuration(ev) {
+        const s = Number(ev.end_ts) - Number(ev.start_ts);
+        return Number.isFinite(s) && s > 0.5 ? s : 0;
+    }
+
+    function fmtSeconds(s) {
+        return s >= 90 ? `${Math.floor(s / 60)} min ${Math.round(s % 60)} s` : `${s.toFixed(s < 10 ? 1 : 0)} s`;
+    }
+
+    // One sentence a non-astronomer understands
+    function eventSummary(ev) {
+        const frames = Number(ev.frames || 1);
+        const dur = eventDuration(ev);
+        const fl = ev.flight;
+        switch (ev.type) {
+            case "meteor":
+                return "A bright streak appeared in a single frame and was gone in the next: the signature of a meteor (shooting star). "
+                    + "Car lights, lit windows and glints on the lens can look similar, so check the close-up.";
+            case "plane": {
+                let t = ev.moving_dot
+                    ? `A light moved steadily across the sky for ${frames} frames${dur ? ` (${fmtSeconds(dur)})` : ""}: an aircraft.`
+                    : frames > 1 ? `A streak continued along the same line over ${frames} frames: an aircraft.`
+                        : "A dashed streak (blinking navigation lights): an aircraft.";
+                if (ev.dashes > 1 && ev.moving_dot) t += " Its lights blinked on the way.";
+                if (fl) t += ` Identified from ADS-B as flight ${fl.callsign || fl.icao}, ${Number(fl.altitude_m).toLocaleString()} m up and ${fl.distance_km} km away.`;
+                if (ev.reclassified_from) t += ` (First detected as a ${ev.reclassified_from}.)`;
+                return t;
+            }
+            case "satellite":
+                return `A faint, steady light crossed the sky over ${frames} frames${dur ? ` (${fmtSeconds(dur)})` : ""} without blinking: most likely a satellite catching sunlight.`;
+            case "flash":
+                return `The whole sky brightened at once (${ev.sky_mean_before} → ${ev.sky_mean}): lightning, or a light shining on the camera.`;
+            case "clouds":
+                return ev.state === "cloudy"
+                    ? `Clouds moved in: ${Number(ev.cloud_cover_pct).toFixed(0)}% of the sky is now covered.`
+                    : `The sky cleared: cloud cover dropped to ${Number(ev.cloud_cover_pct).toFixed(0)}%.`;
+            default:
+                return "";
+        }
+    }
+
+    function eventFacts(ev) {
+        const facts = [];
+        const dur = eventDuration(ev);
+        if (ev.type === "clouds") {
+            facts.push(["Cloud cover", `${Number(ev.cloud_cover_pct).toFixed(0)}%`]);
+        } else if (ev.type === "flash") {
+            facts.push(["Sky brightness", `${ev.sky_mean_before} → ${ev.sky_mean}`]);
+        } else {
+            facts.push(["Seen in", `${ev.frames || 1} frame${(ev.frames || 1) > 1 ? "s" : ""}`]);
+            if (dur) facts.push(["Duration", fmtSeconds(dur)]);
+            if (ev.length_px) facts.push([ev.moving_dot ? "Path length" : "Streak length", `${Number(ev.length_px).toFixed(0)} px`]);
+            if (ev.speed_px_s) facts.push(["Speed", `${Number(ev.speed_px_s).toFixed(0)} px/s`]);
+            if (ev.peak_dn) facts.push(["Brightness", `+${ev.peak_dn} above the sky`]);
+            if (ev.dashes > 1) facts.push([ev.moving_dot ? "Blinks" : "Dashes", String(ev.dashes)]);
+        }
+        if (ev.sky_from && ev.sky_to) {
+            const d = (p) => `${COMPASS[Math.round(((p.az_deg % 360) + 360) % 360 / 45) % 8]} ${Math.round(p.alt_deg)}° up`;
+            facts.push(["Where in the sky", ev.frames > 1 ? `${d(ev.sky_from)} → ${d(ev.sky_to)}` : d(ev.sky_from)]);
+        }
+        const fl = ev.flight;
+        if (fl) {
+            facts.push(["Flight", flightHtml(ev)]);
+            facts.push(["Altitude", `${Number(fl.altitude_m).toLocaleString()} m`]);
+            if (fl.speed_kmh != null) facts.push(["Ground speed", `${fl.speed_kmh} km/h`]);
+            if (fl.heading_deg != null) facts.push(["Heading", `${fl.heading_deg}° (${COMPASS[Math.round(fl.heading_deg / 45) % 8]})`]);
+            if (fl.climb_m_min != null && Math.abs(fl.climb_m_min) > 60) facts.push([fl.climb_m_min > 0 ? "Climbing" : "Descending", `${Math.abs(fl.climb_m_min)} m/min`]);
+            facts.push(["Distance", `${fl.distance_km} km`]);
+            facts.push(["Direction", `az ${fl.az_deg}°, ${fl.alt_deg}° above horizon`]);
+        }
+        return facts;
+    }
+
+    const eventViewer = document.createElement("div");
+    eventViewer.className = "event-viewer hidden";
+    eventViewer.setAttribute("role", "dialog");
+    eventViewer.setAttribute("aria-modal", "true");
+    eventViewer.innerHTML = `
+        <div class="ev-panel">
+            <header class="ev-head">
+                <span class="ev-pill"></span>
+                <div class="ev-when"><strong></strong><span></span></div>
+                <div class="ev-nav">
+                    <button type="button" class="ev-prev" title="Newer event (←)">‹</button>
+                    <span class="ev-pos"></span>
+                    <button type="button" class="ev-next" title="Older event (→)">›</button>
+                    <button type="button" class="ev-close" title="Close (Esc)">✕</button>
+                </div>
+            </header>
+            <div class="ev-images">
+                <figure class="ev-fig ev-fig-crop"><img alt="Close-up" /><figcaption>Close-up</figcaption></figure>
+                <figure class="ev-fig ev-fig-sky"><img alt="Whole sky" /><figcaption>Whole sky, event boxed</figcaption></figure>
+            </div>
+            <p class="ev-summary"></p>
+            <dl class="ev-facts"></dl>
+            <div class="ev-actions">
+                <a class="btn btn-sm btn-outline ev-open-crop" target="_blank" rel="noopener">Open close-up ↗</a>
+                <a class="btn btn-sm btn-outline ev-open-sky" target="_blank" rel="noopener">Open whole sky ↗</a>
+            </div>
+        </div>`;
+    document.body.appendChild(eventViewer);
+    const evQ = (sel) => eventViewer.querySelector(sel);
+    let evList = [];
+    let evIndex = 0;
+
+    function showEvent(i) {
+        if (!evList.length) return;
+        evIndex = Math.max(0, Math.min(evList.length - 1, i));
+        const ev = evList[evIndex];
+        const when = new Date(ev.timestamp);
+        const pill = evQ(".ev-pill");
+        pill.textContent = EVENT_LABELS[ev.type] || ev.type;
+        pill.style.setProperty("--pill", EVENT_COLORS[ev.type] || "var(--accent)");
+        evQ(".ev-when strong").textContent = when.toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        evQ(".ev-when span").textContent = timeAgo(when);
+        evQ(".ev-pos").textContent = `${evIndex + 1} / ${evList.length}`;
+        evQ(".ev-prev").disabled = evIndex === 0;
+        evQ(".ev-next").disabled = evIndex === evList.length - 1;
+        const crop = ev.sky_url && ev.thumbnail_url !== ev.sky_url ? ev.thumbnail_url : null;
+        const figCrop = evQ(".ev-fig-crop"), figSky = evQ(".ev-fig-sky");
+        figCrop.hidden = !crop;
+        figSky.hidden = !ev.sky_url;
+        if (crop) figCrop.querySelector("img").src = crop;
+        if (ev.sky_url) figSky.querySelector("img").src = ev.sky_url;
+        figSky.querySelector("figcaption").textContent = ev.moving_dot ? "Whole sky, path marked" : (crop ? "Whole sky, event boxed" : "Whole sky");
+        evQ(".ev-images").classList.toggle("single", !crop || !ev.sky_url);
+        evQ(".ev-summary").textContent = eventSummary(ev);
+        evQ(".ev-facts").innerHTML = eventFacts(ev).map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+        const oc = evQ(".ev-open-crop"), os = evQ(".ev-open-sky");
+        oc.hidden = !crop; os.hidden = !ev.sky_url;
+        if (crop) oc.href = crop;
+        if (ev.sky_url) os.href = ev.sky_url;
+    }
+
+    function openEventViewer(list, i) {
+        evList = list || [];
+        if (!evList.length) return;
+        showEvent(i);
+        eventViewer.classList.remove("hidden");
+        document.body.classList.add("no-scroll");
+        evQ(".ev-close").focus({ preventScroll: true });
+    }
+
+    function closeEventViewer() {
+        eventViewer.classList.add("hidden");
+        document.body.classList.remove("no-scroll");
+        eventViewer.querySelectorAll("img").forEach((im) => im.removeAttribute("src"));
+    }
+
+    eventViewer.addEventListener("click", (e) => {
+        if (e.target === eventViewer || e.target.closest(".ev-close")) closeEventViewer();
+        else if (e.target.closest(".ev-prev")) showEvent(evIndex - 1);
+        else if (e.target.closest(".ev-next")) showEvent(evIndex + 1);
+    });
+    document.addEventListener("keydown", (e) => {
+        if (eventViewer.classList.contains("hidden")) return;
+        if (e.key === "Escape") closeEventViewer();
+        else if (e.key === "ArrowLeft") showEvent(evIndex - 1);
+        else if (e.key === "ArrowRight") showEvent(evIndex + 1);
+    });
+    // Swipe left/right on phones
+    let evTouchX = null;
+    eventViewer.addEventListener("touchstart", (e) => { evTouchX = e.touches[0].clientX; }, { passive: true });
+    eventViewer.addEventListener("touchend", (e) => {
+        if (evTouchX === null) return;
+        const dx = e.changedTouches[0].clientX - evTouchX;
+        evTouchX = null;
+        if (Math.abs(dx) > 60) showEvent(evIndex + (dx < 0 ? 1 : -1));
+    });
+
+    let tableEvents = [];
+    let liveEventsData = [];
+
     function renderEvents(evData) {
         eventsTableBody.innerHTML = "";
         const events = evData.events || [];
@@ -3224,22 +3488,32 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        events.forEach((ev) => {
+        tableEvents = events;
+        events.forEach((ev, i) => {
             const tr = document.createElement("tr");
+            tr.className = "event-row";
+            tr.dataset.eventIdx = i;
+            tr.title = "Click for details";
             const when = new Date(ev.timestamp);
             const thumb = ev.thumbnail_url
-                ? `<a href="${ev.thumbnail_url}" target="_blank" rel="noopener"><img class="event-thumb" src="${ev.thumbnail_url}" alt="${ev.type}" loading="lazy" /></a>`
+                ? `<img class="event-thumb" src="${ev.thumbnail_url}" alt="${ev.type}" loading="lazy" />`
                 : "--";
             tr.innerHTML = `
                 <td>${thumb}</td>
-                <td><strong>${EVENT_LABELS[ev.type] || ev.type}</strong></td>
-                <td title="${ev.timestamp}">${when.toLocaleString()}</td>
-                <td>${eventDetails(ev)}</td>
-                <td>${ev.sky_url ? `<a href="${ev.sky_url}" target="_blank" rel="noopener" class="btn btn-sm btn-outline">View</a>` : "--"}</td>
+                <td><span class="ev-pill" style="--pill:${EVENT_COLORS[ev.type] || "var(--accent)"}">${EVENT_LABELS[ev.type] || ev.type}</span></td>
+                <td title="${ev.timestamp}">${when.toLocaleString()}<br><span class="text-muted">${timeAgo(when)}</span></td>
+                <td>${eventDetails(ev)}${ev.flight ? `<br>${flightHtml(ev)}` : ""}</td>
+                <td><button type="button" class="btn btn-sm btn-outline">Details</button></td>
             `;
             eventsTableBody.appendChild(tr);
         });
     }
+
+    eventsTableBody.addEventListener("click", (e) => {
+        if (e.target.closest("a")) return; // flight link
+        const tr = e.target.closest("tr[data-event-idx]");
+        if (tr) openEventViewer(tableEvents, Number(tr.dataset.eventIdx));
+    });
 
     let eventsFilterType = "";
     const eventsFilter = document.getElementById("events-filter");
@@ -3257,6 +3531,144 @@ document.addEventListener("DOMContentLoaded", () => {
         const q = eventsFilterType ? `&type=${eventsFilterType}` : "";
         const res = await fetch(`/api/events?limit=50${q}`);
         if (res.ok) renderEvents(await res.json());
+    }
+
+    // Live page: feed of recent sky events on the left, refreshed every 20 s
+    const liveEventsList = document.getElementById("live-events-list");
+    const liveEventsStatus = document.getElementById("live-events-status");
+    const liveEventsCount = document.getElementById("live-events-count");
+    const liveEventsSeen = new Set();
+    let liveEventsFirst = true;
+
+    function timeAgo(date) {
+        const s = Math.max(0, (Date.now() - date.getTime()) / 1000);
+        if (s < 60) return "just now";
+        if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+        if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+        return date.toLocaleDateString();
+    }
+
+    function renderLiveEvents(evData) {
+        const events = evData.events || [];
+        // "Tonight": since noon today, or since noon yesterday before noon
+        const since = new Date();
+        if (since.getHours() < 12) since.setDate(since.getDate() - 1);
+        since.setHours(12, 0, 0, 0);
+        const tonight = events.filter((ev) => new Date(ev.timestamp) >= since).length;
+        liveEventsCount.textContent = `${tonight} tonight`;
+
+        const on = Object.entries(evData.enabled || {}).filter(([, v]) => v).map(([k]) => EVENT_LABELS[k] || k);
+        const night = evData.night;
+        liveEventsStatus.innerHTML = on.length
+            ? `<span class="dot ${night ? "on" : ""}"></span>${night ? "Watching" : "Paused until dark"} · ${on.map((l) => l.split(" ")[0]).join(" ")}`
+            : `<span class="dot"></span>Detection off (Settings → Event detection)`;
+
+        if (!events.length) {
+            liveEventsList.innerHTML = `<li class="live-events-empty">No events yet.<br>Meteors and aircraft show up here as soon as they are detected.</li>`;
+            return;
+        }
+        liveEventsList.innerHTML = "";
+        liveEventsData = events;
+        events.forEach((ev, i) => {
+            const when = new Date(ev.timestamp);
+            const li = document.createElement("li");
+            li.className = "live-event" + (!liveEventsFirst && !liveEventsSeen.has(ev.event_id) ? " fresh" : "");
+            li.dataset.eventIdx = i;
+            li.tabIndex = 0;
+            li.setAttribute("role", "button");
+            li.title = "Click for details";
+            li.style.setProperty("--pill", EVENT_COLORS[ev.type] || "var(--accent)");
+            liveEventsSeen.add(ev.event_id);
+            const label = EVENT_LABELS[ev.type] || ev.type;
+            const thumb = ev.thumbnail_url
+                ? `<img src="${ev.thumbnail_url}" alt="${ev.type}" loading="lazy" />`
+                : `<span class="no-thumb"></span>`;
+            li.innerHTML = `${thumb}<div>
+                <div class="ev-type">${label}</div>
+                <div class="ev-time" title="${when.toLocaleString()}">${when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · ${timeAgo(when)}</div>
+                <div class="ev-detail">${ev.flight ? flightHtml(ev) : eventDetails(ev)}</div></div>`;
+            liveEventsList.appendChild(li);
+        });
+        liveEventsFirst = false;
+    }
+
+    if (liveEventsList) {
+        const openLive = (e) => {
+            if (e.target.closest("a")) return;
+            const li = e.target.closest("li[data-event-idx]");
+            if (li) openEventViewer(liveEventsData, Number(li.dataset.eventIdx));
+        };
+        liveEventsList.addEventListener("click", openLive);
+        liveEventsList.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openLive(e); } });
+    }
+
+    async function loadLiveEvents() {
+        try {
+            const [evRes, cfgRes] = await Promise.all([fetch("/api/events?limit=40"), fetch("/api/events/config")]);
+            if (!evRes.ok) return;
+            const data = await evRes.json();
+            if (cfgRes.ok) {
+                const cfg = await cfgRes.json();
+                data.enabled = cfg.enabled;
+                data.night = cfg.night;
+            }
+            renderLiveEvents(data);
+        } catch (err) {
+            liveEventsStatus.textContent = "Events unavailable";
+        }
+    }
+
+    // Live page: aircraft heard by the ADS-B receiver, nearest in-view first, refreshed every 10 s
+    const flightsCard = document.getElementById("flights-card");
+    const flightsList = document.getElementById("flights-list");
+    const flightsStatus = document.getElementById("flights-status");
+    const flightsCount = document.getElementById("flights-count");
+    const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+    const compass = (az) => COMPASS[Math.round(((az % 360) + 360) % 360 / 45) % 8];
+
+    function renderFlights(d) {
+        if (!d || !d.enabled) { flightsCard.hidden = true; return; }
+        flightsCard.hidden = false;
+        const list = d.aircraft || [];
+        flightsCount.textContent = `${d.in_view || 0} in view · ${d.total || 0} heard`;
+        flightsStatus.textContent = d.connected ? "Live from the ADS-B receiver" : "Receiver not connected";
+        if (!list.length) {
+            flightsList.innerHTML = `<li class="live-events-empty">No aircraft heard right now.</li>`;
+            return;
+        }
+        flightsList.innerHTML = list.map((a) => {
+            const name = escapeHtml(a.callsign || a.icao);
+            const url = `https://globe.adsbexchange.com/?icao=${encodeURIComponent(String(a.icao).toLowerCase())}`;
+            const climb = a.climb_m_min == null ? "" : a.climb_m_min > 60 ? " ↗" : a.climb_m_min < -60 ? " ↘" : "";
+            const where = a.in_view ? `<span class="fl-inview">● in view</span>`
+                : a.above_horizon ? `${compass(a.az_deg)} ${Math.round(a.alt_deg)}° up` : "below horizon";
+            const hdg = a.heading_deg == null ? "" : `<span class="fl-hdg" style="transform:rotate(${a.heading_deg}deg)" title="Heading ${a.heading_deg}°">↑</span>`;
+            return `<li class="flight${a.in_view ? " in-view" : ""}">
+                <div class="fl-top"><a href="${url}" target="_blank" rel="noopener" class="flight-tag">✈ ${name}</a>${hdg}<span class="fl-where">${where}</span></div>
+                <div class="fl-meta">
+                    <span title="Altitude">${Number(a.altitude_m).toLocaleString()} m${climb}</span>
+                    <span title="Ground speed">${a.speed_kmh != null ? `${a.speed_kmh} km/h` : "-- km/h"}</span>
+                    <span title="Distance from the camera">${a.distance_km} km</span>
+                </div></li>`;
+        }).join("");
+    }
+
+    async function loadFlights() {
+        try {
+            const res = await fetch("/api/adsb/aircraft?limit=12");
+            if (res.ok) renderFlights(await res.json());
+        } catch (err) { /* optional feature */ }
+    }
+
+    if (currentPage === "tab-live" && flightsCard) {
+        loadFlights();
+        setInterval(() => { if (!document.hidden) loadFlights(); }, 10000);
+    }
+
+    if (currentPage === "tab-live" && liveEventsList) {
+        loadLiveEvents();
+        setInterval(() => { if (!document.hidden) loadLiveEvents(); }, 20000);
+        document.addEventListener("visibilitychange", () => { if (!document.hidden) loadLiveEvents(); });
     }
 
     // Settings → Event detection
@@ -3301,4 +3713,50 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
     if (currentPage === "tab-settings") loadEventConfig();
+
+    // Settings → ADS-B flight matching
+    const adsbHost = document.getElementById("adsb-host");
+    const adsbPort = document.getElementById("adsb-port");
+    const adsbEnabled = document.getElementById("adsb-enabled");
+    const adsbStatus = document.getElementById("adsb-status");
+
+    function syncAdsbUI(d) {
+        if (!d || !adsbHost) return;
+        adsbHost.value = d.host || "";
+        adsbPort.value = d.port || 30003;
+        adsbEnabled.checked = !!d.enabled;
+        const st = d.status;
+        let txt = !d.enabled ? "Off." : !st ? "Starting…"
+            : st.connected ? `Connected: ${st.with_position} aircraft with position.`
+            : st.last_error ? `Not connected: ${st.last_error}` : "Idle (reads the feed only at night with aircraft detection on).";
+        if (d.enabled && !d.pointing_solved) txt += " Needs a star-solved camera pointing (plate solve) to match flights.";
+        adsbStatus.textContent = txt;
+    }
+
+    async function loadAdsb() {
+        try {
+            const res = await fetch("/api/adsb");
+            if (res.ok) syncAdsbUI(await res.json());
+        } catch (err) { /* optional feature */ }
+    }
+
+    const adsbSave = document.getElementById("btn-adsb-save");
+    if (adsbSave) {
+        adsbSave.addEventListener("click", async () => {
+            try {
+                const res = await fetch("/api/adsb", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ host: adsbHost.value.trim(), port: Number(adsbPort.value) || 30003, enabled: adsbEnabled.checked }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(JSON.stringify(data.detail || "Unknown error"));
+                syncAdsbUI(data);
+                setTimeout(loadAdsb, 3000);
+            } catch (err) {
+                showAlert(stationAlert, `❌ Failed to save ADS-B settings: ${err.message}`, "error", true);
+            }
+        });
+    }
+    if (currentPage === "tab-settings") loadAdsb();
 });

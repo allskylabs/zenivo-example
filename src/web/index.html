@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllSky Observatory — Edge Dashboard</title>
-    <link rel="stylesheet" href="/style.css?v=20261018fk">
+    <link rel="stylesheet" href="/style.css?v=20261018lk1">
 </head>
 <body class="dark-mode">
     <!-- Top Navigation Header -->
@@ -51,7 +51,7 @@
         <!-- TAB 1: Live Observatory -->
         <section id="tab-live" class="tab-content">
             <div class="dashboard-grid">
-                <!-- Left/Center Column: Live View + Histogram -->
+                <!-- Left Column: Live View + Histogram -->
                 <div class="main-viewport-col">
                     <!-- Live View Card -->
                     <div class="card viewport-card">
@@ -126,8 +126,28 @@
                     </div>
                 </div>
 
-                <!-- Right Column: Hardware Controls + Telemetry HUD -->
+                <!-- Right Column: live sky events, Hardware Controls, Telemetry HUD -->
                 <div class="controls-col">
+                    <!-- Live feed of sky events -->
+                    <div class="card live-events-card">
+                        <div class="card-header">
+                            <h2>Live Events</h2>
+                            <span class="badge" id="live-events-count">0 tonight</span>
+                        </div>
+                        <div class="live-events-status" id="live-events-status">Loading…</div>
+                        <ul class="live-events-list" id="live-events-list"></ul>
+                        <a class="live-events-more" href="/gallery">All events →</a>
+                    </div>
+
+                    <!-- Aircraft heard by the ADS-B receiver -->
+                    <div class="card flights-card" id="flights-card" hidden>
+                        <div class="card-header">
+                            <h2>Flights Overhead</h2>
+                            <span class="badge" id="flights-count">--</span>
+                        </div>
+                        <div class="flights-status" id="flights-status">Loading…</div>
+                        <ul class="flights-list" id="flights-list"></ul>
+                    </div>
                     <!-- Hardware Control Panel -->
                     <div class="card control-card">
                         <div class="card-header">
@@ -135,28 +155,23 @@
                             <span class="badge badge-accent" id="active-profile-badge">AUTO EPHEMERIS</span>
                         </div>
 
-                        <!-- Mode Toggle -->
-                        <div class="control-group">
-                            <label class="control-label">Exposure Control Mode</label>
-                            <div class="btn-group">
-                                <button id="btn-mode-manual" class="btn btn-sm btn-outline">Manual</button>
-                                <button id="btn-mode-auto" class="btn btn-sm btn-primary active">Auto (Day/Night)</button>
-                            </div>
-                        </div>
-
                         <!-- Exposure Slider -->
                         <div class="control-group">
                             <div class="control-label-row">
                                 <label for="range-exposure">Exposure Duration (s)</label>
-                                <span class="range-value" id="val-exposure">2.000 s</span>
+                                <span class="range-value-row">
+                                    <span class="range-value" id="val-exposure">2.000 s</span>
+                                    <button id="lock-exposure" class="btn-lock" type="button" title="Lock exposure: Auto then adjusts only gain">🔓</button>
+                                </span>
                             </div>
-                            <input type="range" id="range-exposure" min="0.00015" max="15.0" step="0.00015" value="2.0" />
+                            <input type="range" id="range-exposure" min="0.00015" max="60.0" step="0.00015" value="2.0" />
                             <div class="range-presets">
                                 <button class="btn-preset" data-exp="0.0006">0.6ms (Day)</button>
                                 <button class="btn-preset" data-exp="0.5">0.5s</button>
                                 <button class="btn-preset" data-exp="2.0">2.0s</button>
                                 <button class="btn-preset" data-exp="8.0">8.0s</button>
                                 <button class="btn-preset" data-exp="15.0">15s</button>
+                                <button class="btn-preset" data-exp="60.0">60s</button>
                             </div>
                         </div>
 
@@ -164,7 +179,10 @@
                         <div class="control-group">
                             <div class="control-label-row">
                                 <label for="range-gain">Sensor Gain (dB)</label>
-                                <span class="range-value" id="val-gain">24.0 dB</span>
+                                <span class="range-value-row">
+                                    <span class="range-value" id="val-gain">24.0 dB</span>
+                                    <button id="lock-gain" class="btn-lock" type="button" title="Lock gain: Auto then adjusts only exposure">🔓</button>
+                                </span>
                             </div>
                             <input type="range" id="range-gain" min="0" max="72" step="0.5" value="24" />
                             <div class="range-presets">
@@ -175,7 +193,21 @@
                             </div>
                         </div>
 
-                        <button id="btn-apply-settings" class="btn btn-primary btn-block">Apply Exposure & Gain</button>
+                        <!-- Target brightness -->
+                        <div class="control-group">
+                            <div class="control-label-row">
+                                <label for="range-target">Target brightness (0-255)</label>
+                                <span class="range-value-row">
+                                    <span class="range-value" id="val-target">--</span>
+                                    <button id="lock-target" class="btn-lock" type="button" title="Lock the brightness Auto aims for">🔓</button>
+                                </span>
+                            </div>
+                            <input type="range" id="range-target" min="5" max="250" step="1" value="85" />
+                        </div>
+
+                        <p class="field-note">Touching a slider locks it at the chosen value; 🔒 unlocks. Nothing locked: the system computes both exposure and gain from the sky.
+                            Lock one (🔒) and it computes only the other.
+                            Exposure goes up to 60 s. Both locked holds the values fixed.</p>
                         <div id="control-alert" class="alert-box hidden"></div>
                     </div>
 
@@ -386,6 +418,10 @@
                                 <input type="number" id="perf-capture-interval" min="0.4" max="60" step="0.1" value="1.0" />
                             </div>
                             <div class="field">
+                                <label for="perf-bg-capture">Capture with no viewer (s, 0 = back to back)</label>
+                                <input type="number" id="perf-bg-capture" min="0" max="3600" step="1" value="0" />
+                            </div>
+                            <div class="field">
                                 <label for="perf-sky-enabled">Star count &amp; cloud cover</label>
                                 <label class="checkbox-label"><input type="checkbox" id="perf-sky-enabled" checked /> Sample day and night</label>
                             </div>
@@ -448,6 +484,26 @@
                             Cloud changes reuse the cloud cover samples, so they need “Star count &amp; cloud cover” on. Set a sky mask (plate solving) to ignore roads and windows.
                             Events are listed under Gallery &amp; Events.
                             <span id="evt-status"></span>
+                        </p>
+                        <div class="field-grid adsb-grid">
+                            <div class="field">
+                                <label for="adsb-host">ADS-B receiver (SBS-1 feed)</label>
+                                <input type="text" id="adsb-host" placeholder="e.g. 192.168.2.48" maxlength="253" />
+                            </div>
+                            <div class="field">
+                                <label for="adsb-port">Port</label>
+                                <input type="number" id="adsb-port" min="1" max="65535" value="30003" />
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="adsb-enabled" /> Name the flight</label>
+                                <button type="button" class="btn btn-sm btn-outline" id="btn-adsb-save">Save</button>
+                            </div>
+                        </div>
+                        <p class="field-note">
+                            With a local ADS-B receiver (dump1090, readsb or a Flightradar24 feeder: BaseStation port 30003), each aircraft event is matched
+                            to the flight whose position, projected with the star-solved camera pointing, lies on the streak. A “meteor” that matches a flight becomes an aircraft.
+                            The feed is only read at night while aircraft detection is on.
+                            <span id="adsb-status"></span>
                         </p>
                     </fieldset>
                     <!-- Cloud cover analysis -->
@@ -553,9 +609,10 @@
                     <span class="badge badge-accent" id="station-solve-badge">NOT SOLVED YET</span>
                 </div>
                 <p class="description">
-                    Station, lens and mounting parameters are saved when you click
-                    <strong>Save configuration</strong>, or determined automatically by
-                    <a href="https://hoan.uk/astronomy/plate-solving" target="_blank" rel="noopener">plate-solving</a> on a starry night.
+                    <a href="https://hoan.uk/astronomy/plate-solving" target="_blank" rel="noopener">Plate-solving</a>
+                    on a starry night measures the lens and mounting parameters and saves them automatically, as does
+                    <strong>Locate via GPS / IP</strong> for the coordinates. <strong>Save configuration</strong> appears
+                    only after you edit a field by hand.
                 </p>
 
                 <div class="settings-grid">
@@ -642,7 +699,7 @@
                 </div>
 
                 <div class="settings-actions">
-                    <button id="btn-station-save" class="btn btn-primary" type="button">💾 Save configuration</button>
+                    <button id="btn-station-save" class="btn btn-primary hidden" type="button">💾 Save configuration</button>
                     <button id="btn-station-solve" class="btn btn-outline" type="button">🔭 Capture &amp; Auto Plate-Solve</button>
                 </div>
 
@@ -958,7 +1015,7 @@
 
     <!-- App JavaScript -->
     <script src="/static/sky_catalog.js"></script>
-    <script src="/app.js?v=20261018ev2"></script>
+    <script src="/app.js?v=20261019ps2"></script>
     <script src="/static/activity.js?v=20261016h"></script>
     <script src="/static/focus.js?v=20261018fk"></script>
 </body>

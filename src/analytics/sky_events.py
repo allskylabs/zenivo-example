@@ -7,7 +7,8 @@ transform on the few changed pixels, then classified across frames:
 
 - meteor: a solid streak in one frame only (confirmed when the next frame shows no continuation)
 - plane: a dashed streak (strobe / navigation lights) or one that continues along the same line in the
-  next frame
+  next frame; with short exposures (bright city sky) an aircraft is only a dot per frame, so small moving
+  dots are also tracked: 4+ positions on a straight line at a steady speed make a plane (or satellite)
 - satellite: a solid, faint streak that continues along the same line
 - flash: the whole sky brightens at an unchanged exposure (lightning, headlights on the dome)
 
@@ -16,7 +17,8 @@ Frames whose exposure or gain changed, or where too much of the sky changed (mov
 
 import math
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from collections import deque
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -58,6 +60,14 @@ def _collinear(a: Tuple[float, ...], b: Tuple[float, ...], max_angle: float, max
         return False
     return (_perp_dist((a[0] + a[2]) / 2, (a[1] + a[3]) / 2, b) <= max_dist
             and _perp_dist((b[0] + b[2]) / 2, (b[1] + b[3]) / 2, a) <= max_dist)
+
+
+def _seg_dist_pt(px: float, py: float, seg: Tuple[float, ...]) -> float:
+    """Distance from a point to a segment."""
+    x1, y1, x2, y2 = seg
+    dx, dy = x2 - x1, y2 - y1
+    k = max(0.0, min(1.0, ((px - x1) * dx + (py - y1) * dy) / max(1e-9, dx * dx + dy * dy)))
+    return math.hypot(px - (x1 + k * dx), py - (y1 + k * dy))
 
 
 def _overlap_fraction(a: Tuple[float, ...], b: Tuple[float, ...]) -> float:
@@ -112,18 +122,64 @@ class SkyEventDetector:
         self.max_changed_frac = max_changed_frac
         self.max_gap_s = max_gap_s
         self.flash_ratio = flash_ratio
+        self._meteor_spots: Deque[Tuple[float, float, float]] = deque(maxlen=500)  # survives reset()
         self.frames_seen = 0      # frames given to process() since the last reset
         self.frames_compared = 0  # of those, compared with the previous frame
         self.reset()
 
+    METEOR_MIN_ELONGATION = 5.0
+    CLOUDY_SPECKS = 8.0          # running mean of brightening specks per frame above which the sky counts as cloudy
+    REPEAT_RADIUS_FRAC = 0.03   # ~20 px at 640: a "meteor" again within this of an earlier one is a glint
+    REPEAT_WINDOW_S = 3 * 3600.0
+
+    def _cloudy(self) -> bool:
+        """Broken cloud drifting over: many specks brighten every frame (clear sky: ~1 per frame, cloud: 25).
+        Single-frame streaks are then mostly cloud edges lighting up, and a meteor would be hidden anyway."""
+        return self._speck_ema >= self.CLOUDY_SPECKS
+
+    def _meteor_ok(self, p: Dict[str, Any]) -> bool:
+        """Final checks before a single-frame streak is called a meteor: a sharp line, and not at a spot
+        where single-frame streaks already appeared (lens smudges and raindrops glint again and again)."""
+        ev = p["event"]
+        if self._cloudy():
+            self.point_stats["meteors_rejected_cloudy_sky"] = self.point_stats.get("meteors_rejected_cloudy_sky", 0) + 1
+            return False
+        ln = p["line"]
+        w = self._mask.shape[1] if self._mask is not None else self.work_width
+        mx, my, ts = (ln[0] + ln[2]) / 2, (ln[1] + ln[3]) / 2, float(ev["ts"])
+        spots = self._meteor_spots
+        while spots and ts - spots[0][0] > self.REPEAT_WINDOW_S:
+            spots.popleft()
+        r = self.REPEAT_RADIUS_FRAC * w
+        repeat = any(math.hypot(mx - x, my - y) <= r for _, x, y in spots)
+        spots.append((ts, mx, my))
+        # On the path of an aircraft being tracked as moving dots: that aircraft, not a meteor
+        on_plane = any(len(t["pts"]) >= 2 and any(_seg_dist_pt(q[0], q[1], ln) <= r for q in t["pts"][-3:])
+                       for t in self._points)
+        if on_plane:
+            self.point_stats["meteors_rejected_plane"] = self.point_stats.get("meteors_rejected_plane", 0) + 1
+            return False
+        if repeat:
+            self.point_stats["meteors_rejected_repeat"] = self.point_stats.get("meteors_rejected_repeat", 0) + 1
+            return False
+        if p.get("elong", 99.0) < self.METEOR_MIN_ELONGATION:
+            self.point_stats["meteors_rejected_blob"] = self.point_stats.get("meteors_rejected_blob", 0) + 1
+            return False
+        return True
+
     def reset(self) -> None:
         self.frames_seen = self.frames_compared = 0
+        self.point_stats: Dict[str, Any] = {"frames": 0, "skipped": 0, "candidates": 0, "max_candidates": 0,
+                                            "last_thr": None, "tracks_rejected_static": 0}
         self._prev: Optional[np.ndarray] = None
         self._prev_ts = 0.0
         self._prev_key: Tuple[Any, ...] = ()
         self._prev_mean = 0.0
         self._pending: List[Dict[str, Any]] = []  # single-frame streaks waiting for the next frame
         self._tracks: List[Dict[str, Any]] = []   # moving objects seen in the previous frame
+        self._points: List[Dict[str, Any]] = []   # moving dots (short exposures): seeds and tracks
+        self._recent: Deque[Tuple[float, np.ndarray]] = deque(maxlen=self.POINT_MIN_POINTS)  # work-size frames
+        self._speck_ema = 0.0
         self._mask_key: Any = None
         self._mask: Optional[np.ndarray] = None
 
@@ -164,17 +220,23 @@ class SkyEventDetector:
 
     def _flush(self, enabled: set, ts: float) -> List[Dict[str, Any]]:
         """Finish everything that has not continued into the current frame."""
-        out = [p["event"] for p in self._pending if "meteor" in enabled]
+        out = [p["event"] for p in self._pending if "meteor" in enabled and self._meteor_ok(p)]
         for t in self._tracks:
             ev = self._finish_track(t, enabled)
             if ev:
                 out.append(ev)
-        self._pending, self._tracks = [], []
+        for t in self._points:
+            ev = self._finish_points(t, enabled)
+            if ev:
+                out.append(ev)
+        self._pending, self._tracks, self._points = [], [], []
         return out
 
-    @staticmethod
-    def _finish_track(track: Dict[str, Any], enabled: set) -> Optional[Dict[str, Any]]:
+    def _finish_track(self, track: Dict[str, Any], enabled: set) -> Optional[Dict[str, Any]]:
         ev = track["event"]
+        if int(ev.get("frames", 1)) <= 1 and self._cloudy():
+            self.point_stats["streaks_rejected_cloudy_sky"] = self.point_stats.get("streaks_rejected_cloudy_sky", 0) + 1
+            return None
         if track["dashed"] or ev["peak_dn"] >= 60:
             ev["type"] = "plane"
         else:
@@ -240,6 +302,7 @@ class SkyEventDetector:
         w = gray.shape[1]
         min_len = max(12, int(self.min_length_frac * w))
         lines: List[Tuple[float, float, float, float]] = []
+        raw_binary = binary
         if nz >= min_len // 2:
             # Drop 1-2 px specks (noise, hot pixels) so they cannot line up by chance
             n, labels, stats, _ = cv2.connectedComponentsWithStats(binary, connectivity=8)
@@ -256,7 +319,7 @@ class SkyEventDetector:
         fat = cv2.dilate(binary, np.ones((3, 3), np.uint8))
         found: List[Dict[str, Any]] = []
         for ln in lines:
-            m = self._measure(ln, fat, diff, thr)
+            m = self._measure(ln, fat, diff, thr, prev)
             if m is None or m["length"] < min_len:
                 continue
             found.append({"line": ln, **m})
@@ -295,10 +358,10 @@ class SkyEventDetector:
             if f["dashed"]:
                 next_tracks.append({"line": ln, "event": ev, "dashed": True})
             else:
-                next_pending.append({"line": ln, "event": ev})
+                next_pending.append({"line": ln, "event": ev, "elong": f.get("elong", 99.0)})
 
         for i, p in enumerate(self._pending):
-            if i not in used_pending and "meteor" in enabled:
+            if i not in used_pending and "meteor" in enabled and self._meteor_ok(p):
                 events.append(p["event"])
         for i, t in enumerate(self._tracks):
             if i not in used_tracks:
@@ -306,9 +369,220 @@ class SkyEventDetector:
                 if ev:
                     events.append(ev)
         self._pending, self._tracks = next_pending, next_tracks
+        if {"plane", "satellite"} & enabled:
+            events += self._track_points(raw_binary, diff, thr, [f["line"] for f in found], ts, scale, small, enabled)
         return events
 
-    def _measure(self, ln: Tuple[float, ...], fat: np.ndarray, diff: np.ndarray, thr: float) -> Optional[Dict[str, Any]]:
+    # ------------------------------------------------------------------
+    # Moving dots: with exposures far shorter than the frame interval an aircraft is a dot per frame
+    # ------------------------------------------------------------------
+    POINT_MIN_POINTS = 4       # positions needed before a dot track counts
+    POINT_MAX_CANDIDATES = 40  # only the brightest specks are tracked
+    POINT_MAX_BLOBS = 3000     # more changed blobs than this: hopelessly noisy frame, skip it
+    # Aircraft dot vs drifting cloud (track medians at the 640 px work size; measured on real planes:
+    # sharpness 22-63, area 4-8 px, background texture 1.6-3 DN; cloud bits mostly fail one of these)
+    DOT_MIN_SHARPNESS = 15.0
+    DOT_MAX_AREA = 10.0
+    DOT_SHARP_ANY_SIZE = 30.0
+    DOT_FAINT_PEAK = 28        # brightest dot below this (DN above the sky) ...
+    DOT_FAINT_MIN_POINTS = 6   # ... needs at least this many positions
+    DOT_MAX_BG_TEXTURE = 5.0
+    POINT_MAX_TRACKS = 120
+
+    def _point_candidates(self, binary: np.ndarray, diff: np.ndarray, thr: float,
+                          lines: List[Tuple[float, ...]]) -> Optional[List[Tuple[float, float, int]]]:
+        """Small bright blobs (x, y, peak) in the brightening image, not on a streak; None if too many."""
+        n, labels, stats, cents = cv2.connectedComponentsWithStats(binary, connectivity=8)
+        if n <= 1:
+            return []
+        if n > self.POINT_MAX_BLOBS:
+            return None
+        h, w = binary.shape
+        max_area = max(12, int(binary.size * 3e-4))
+        min_peak = max(2.0 * thr, thr + 10.0)
+        out: List[Tuple[float, float, int, Tuple[float, int, float]]] = []
+        for i in range(1, n):
+            x, y, bw, bh, area = stats[i]
+            if area > max_area or max(bw, bh) > max(8, w // 40):
+                continue
+            peak = int(diff[y:y + bh, x:x + bw][labels[y:y + bh, x:x + bw] == i].max())
+            if peak < min_peak:
+                continue
+            cx, cy = float(cents[i][0]), float(cents[i][1])
+            if any(_perp_dist(cx, cy, ln) < 5 and min(_project((cx, cy, cx, cy), ln)) >= -5
+                   and max(_project((cx, cy, cx, cy), ln)) <= _line_geom(*ln)[1] + 5 for ln in lines):
+                continue  # part of a streak found above
+            out.append((cx, cy, peak, self._dot_shape(cx, cy, peak, diff, thr)))
+        if len(out) > self.POINT_MAX_CANDIDATES:
+            out = sorted(out, key=lambda c: -c[2])[:self.POINT_MAX_CANDIDATES]
+        return out
+
+    def _dot_shape(self, cx: float, cy: float, peak: int, diff: np.ndarray, thr: float) -> Tuple[float, int, float]:
+        """(sharpness, area, background texture) of a dot. An aircraft light is a sharp point (peak far above the
+        brightening around it, a few pixels) on smooth sky; the bright bits of a drifting cloud are soft, larger
+        and sit on lumpy background."""
+        h, w = diff.shape
+        xi, yi = int(round(cx)), int(round(cy))
+        win = diff[max(0, yi - 4):yi + 5, max(0, xi - 4):xi + 5].astype(np.float32)
+        ring = win.copy()
+        cy0, cx0 = yi - max(0, yi - 4), xi - max(0, xi - 4)
+        ring[max(0, cy0 - 1):cy0 + 2, max(0, cx0 - 1):cx0 + 2] = np.nan
+        sharp = float(peak) / max(1.0, float(np.nanmean(ring))) if np.isfinite(ring).any() else 0.0
+        area = int((win > thr).sum())
+        bgstd = 0.0
+        if self._prev is not None:
+            g = self._prev[max(0, yi - 8):yi + 9, max(0, xi - 8):xi + 9].astype(np.float32)
+            gy, gx = yi - max(0, yi - 8), xi - max(0, xi - 8)
+            g[max(0, gy - 3):gy + 4, max(0, gx - 3):gx + 4] = np.nan
+            if np.isfinite(g).any():
+                bgstd = float(np.nanstd(g))
+        return round(sharp, 2), area, round(bgstd, 2)
+
+    def _track_points(self, binary: np.ndarray, diff: np.ndarray, thr: float, lines: List[Tuple[float, ...]],
+                      ts: float, scale: float, small: np.ndarray, enabled: set) -> List[Dict[str, Any]]:
+        self._recent.append((ts, small))
+        cands = self._point_candidates(binary, diff, thr, lines)
+        n_specks = self.POINT_MAX_CANDIDATES if cands is None else len(cands)
+        self._speck_ema = 0.9 * self._speck_ema + 0.1 * n_specks
+        ps = self.point_stats
+        ps["frames"] += 1
+        ps["specks_per_frame"] = round(self._speck_ema, 1)
+        if cands is None:
+            ps["skipped"] += 1
+        else:
+            ps["candidates"] += len(cands)
+            ps["max_candidates"] = max(ps["max_candidates"], len(cands))
+        ps["last_thr"] = round(float(thr), 1)
+        w = binary.shape[1]
+        min_step, max_step = 2.5, w * 0.15
+        events: List[Dict[str, Any]] = []
+        used: set = set()
+        alive: List[Dict[str, Any]] = []
+        # Established tracks (2+ points) first: predict along the line at the same speed
+        for t in sorted(self._points, key=lambda t: -len(t["pts"])):
+            if len(t["pts"]) < 2:
+                continue
+            match = None
+            if cands is not None:
+                (x0, y0, t0), (x1, y1, t1) = t["pts"][-2][:3], t["pts"][-1][:3]
+                k = (ts - t1) / max(1e-3, t1 - t0)
+                px, py = x1 + (x1 - x0) * k, y1 + (y1 - y0) * k
+                r = max(4.0, 0.3 * math.hypot(px - x1, py - y1))
+                best = r
+                for j, (cx, cy, _, _) in enumerate(cands):
+                    d = math.hypot(cx - px, cy - py)
+                    if j not in used and d <= best:
+                        match, best = j, d
+            if match is not None:
+                used.add(match)
+                cx, cy, pk, shape = cands[match]
+                t["pts"].append((cx, cy, ts, pk, shape))
+                if t["misses"]:
+                    t["blinks"] += 1
+                t["misses"] = 0
+                if len(t["pts"]) >= self.POINT_MIN_POINTS:
+                    # Light trail: brightest value of every frame the dot was seen in (the dots themselves,
+                    # not markers drawn over them)
+                    if "stack" not in t:
+                        times = {p[2] for p in t["pts"]}
+                        t["stack"] = small.copy()
+                        for rts, rimg in self._recent:
+                            if rts in times and rimg.shape == small.shape:
+                                np.maximum(t["stack"], rimg, out=t["stack"])
+                    else:
+                        np.maximum(t["stack"], small, out=t["stack"])
+                    t["scale"] = scale
+                alive.append(t)
+                continue
+            t["misses"] += 1
+            if t["misses"] <= (2 if len(t["pts"]) >= self.POINT_MIN_POINTS else 1):
+                alive.append(t)
+            else:
+                ev = self._finish_points(t, enabled)
+                if ev:
+                    events.append(ev)
+        # Seeds from the previous frame pair up with any dot a plausible step away
+        if cands is not None:
+            for s in self._points:
+                if len(s["pts"]) != 1:
+                    continue
+                seed = s["pts"][0]
+                sx, sy = seed[0], seed[1]
+                for j, (cx, cy, pk, shape) in enumerate(cands):
+                    if j not in used and min_step <= math.hypot(cx - sx, cy - sy) <= max_step:
+                        alive.append({"pts": [seed, (cx, cy, ts, pk, shape)], "misses": 0, "blinks": 0})
+            for j, (cx, cy, pk, shape) in enumerate(cands):
+                if j not in used:
+                    alive.append({"pts": [(cx, cy, ts, pk, shape)], "misses": 0, "blinks": 0})
+        alive.sort(key=lambda t: -len(t["pts"]))
+        self._points = alive[:self.POINT_MAX_TRACKS]
+        return events
+
+    def _finish_points(self, t: Dict[str, Any], enabled: set) -> Optional[Dict[str, Any]]:
+        pts = t["pts"]
+        if len(pts) < self.POINT_MIN_POINTS or "stack" not in t:
+            return None
+        small, scale = t["stack"], t["scale"]
+        # A real aircraft travels: the dots must get somewhere, roughly in a line (a glinting lens smudge
+        # wobbles in place)
+        net = math.hypot(pts[-1][0] - pts[0][0], pts[-1][1] - pts[0][1])
+        path_len = sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(pts, pts[1:]))
+        if net < 12.0 or net < 0.6 * path_len:
+            self.point_stats["tracks_rejected_static"] += 1
+            return None
+        # Faint and short: with many specks about (cloud), four of them line up at a steady spacing by chance;
+        # a real faint aircraft keeps going (real planes peak at +31 DN or more, faint ones last 10+ frames)
+        if max(p[3] for p in pts) < self.DOT_FAINT_PEAK and len(pts) < self.DOT_FAINT_MIN_POINTS:
+            self.point_stats["tracks_rejected_faint"] = self.point_stats.get("tracks_rejected_faint", 0) + 1
+            return None
+        # Drifting cloud: its bright bits move like a slow dot but are soft, large and on lumpy sky
+        shapes = [p[4] for p in pts if len(p) > 4]
+        if shapes:
+            sharp = float(np.median([q[0] for q in shapes]))
+            area = float(np.median([q[1] for q in shapes]))
+            bgstd = float(np.median([q[2] for q in shapes]))
+            soft_blob = area > self.DOT_MAX_AREA and sharp < self.DOT_SHARP_ANY_SIZE  # a bright close plane is big but sharp
+            if sharp < self.DOT_MIN_SHARPNESS or soft_blob or bgstd > self.DOT_MAX_BG_TEXTURE:
+                self.point_stats["tracks_rejected_cloud"] = self.point_stats.get("tracks_rejected_cloud", 0) + 1
+                return None
+        peaks = [p[3] for p in pts]
+        blinking = t["blinks"] > 0 or max(peaks) > 2.5 * max(1, min(peaks))
+        etype = "plane" if blinking or max(peaks) >= 60 else "satellite"
+        if etype not in enabled:
+            return None
+        sh, sw = small.shape[:2]
+        poly = np.array([[round(p[0]), round(p[1])] for p in pts], np.int32)
+        xs, ys = poly[:, 0], poly[:, 1]
+        pad = 16
+        cx0, cx1 = max(0, int(xs.min()) - pad), min(sw, int(xs.max()) + pad)
+        cy0, cy1 = max(0, int(ys.min()) - pad), min(sh, int(ys.max()) + pad)
+        crop = small[cy0:cy1, cx0:cx1].copy()  # clean light trail, nothing drawn on it
+        overview = small.copy()
+        m = 10  # thin box around the path, clear of the dots
+        cv2.rectangle(overview, (int(xs.min()) - m, int(ys.min()) - m), (int(xs.max()) + m, int(ys.max()) + m),
+                      (0, 200, 255), 1, cv2.LINE_AA)
+        path = sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(pts, pts[1:]))
+        x1, y1, x2, y2 = pts[0][0], pts[0][1], pts[-1][0], pts[-1][1]
+        return {
+            "type": etype,
+            "ts": pts[-1][2],
+            "start_ts": pts[0][2],
+            "end_ts": pts[-1][2],
+            "frames": len(pts),
+            "length_px": round(path / scale, 1),
+            "peak_dn": int(max(peaks)),
+            "mean_dn": round(float(np.mean(peaks)), 1),
+            "dashes": int(t["blinks"]),
+            "moving_dot": True,
+            "speed_px_s": round(path / scale / max(1e-3, pts[-1][2] - pts[0][2]), 1),
+            "line": [round(v, 4) for v in (x1 / sw, y1 / sh, x2 / sw, y2 / sh)],
+            "bbox": [round(cx0 / scale), round(cy0 / scale), round((cx1 - cx0) / scale), round((cy1 - cy0) / scale)],
+            "_crop": crop,
+            "_overview": overview,
+        }
+
+    def _measure(self, ln: Tuple[float, ...], fat: np.ndarray, diff: np.ndarray, thr: float,
+                 prev: Optional[np.ndarray] = None) -> Optional[Dict[str, Any]]:
         """Sample along the line: fill fraction, dash count, thinness and brightness."""
         x1, y1, x2, y2 = ln
         _, length, ux, uy = _line_geom(x1, y1, x2, y2)
@@ -322,12 +596,14 @@ class SkyEventDetector:
         if fill < 0.15:
             return None
         # A streak is thin: 4 px either side of it should be mostly dark (cloud edges are not)
-        side, side_dn = 0.0, 0.0
+        side, side_dn, prev_side = 0.0, 0.0, []
         for off in (-4, 4):
             sx = np.clip(np.round(xs - off * uy).astype(int), 0, w - 1)
             sy = np.clip(np.round(ys + off * ux).astype(int), 0, h - 1)
             side = max(side, float((fat[sy, sx] > 0).mean()))
             side_dn = max(side_dn, float(diff[sy, sx].mean()))
+            if prev is not None:
+                prev_side.append(float(np.median(prev[sy, sx])))
         if side > 0.5 * fill:
             return None
         # Dashes: on-runs separated by gaps of 3+ samples (aircraft strobes); short gaps are noise
@@ -346,6 +622,29 @@ class SkyEventDetector:
         # Drifting cloud texture lines up by chance but barely clears the threshold: demand a clear edge
         if not vals.size or float(vals.mean()) - side_dn < 1.5 * thr:
             return None
+        # A meteor or aircraft appears on empty, smooth sky. Reject what was already there in the previous
+        # frame and just glinted brighter (lens smudge, raindrop track, wire): brighter than its surroundings,
+        # or lying on textured background whose two sides differ (smooth sky matches to ~1 DN at 4 px)
+        if prev_side:
+            prev_on = float(np.median(prev[ys, xs][on]))
+            limit = max(6.0, 0.4 * float(vals.mean()))
+            if prev_on - max(prev_side) > limit or abs(prev_side[0] - prev_side[1]) > limit:
+                return None
+            # Lying across cloud: the sky either side is lumpy (trimmed spread, so single stars do not count)
+            band = []
+            for off in (-8, -6, 6, 8):
+                bx = np.clip(np.round(xs - off * uy).astype(int), 0, w - 1)
+                by = np.clip(np.round(ys + off * ux).astype(int), 0, h - 1)
+                a = prev[by, bx].astype(np.float32)
+                k = min(31, len(a) | 1)
+                trend = np.convolve(np.pad(a, k // 2, mode="edge"), np.ones(k, np.float32) / k, mode="valid")
+                band.append(a - trend)  # without the slow sky gradient along the line
+            band = np.sort(np.concatenate(band))
+            cut = len(band) // 20  # trim 5% each end: the odd star, not broken cloud (many samples)
+            texture = float(band[cut:len(band) - cut].std()) if len(band) > 2 * cut + 2 else 0.0
+            if texture > self.DOT_MAX_BG_TEXTURE:
+                self.point_stats["streaks_rejected_cloud"] = self.point_stats.get("streaks_rejected_cloud", 0) + 1
+                return None
         return {
             "length": float(length),
             "fill": round(fill, 2),
@@ -353,7 +652,29 @@ class SkyEventDetector:
             "dashed": runs >= 4 and fill < 0.85,
             "peak_dn": int(vals.max()) if vals.size else 0,
             "mean_dn": round(float(vals.mean()), 1) if vals.size else 0.0,
+            "elong": self._elongation(ln, diff, thr),
         }
+
+    @staticmethod
+    def _elongation(ln: Tuple[float, ...], diff: np.ndarray, thr: float) -> float:
+        """Length / width of the brightened pixels around a streak (intensity-weighted moments). A meteor is a
+        sharp line (high); a glint on a lens smudge or raindrop is a fuzzy blob (low)."""
+        h, w = diff.shape
+        x0, x1 = max(0, int(min(ln[0], ln[2])) - 6), min(w, int(max(ln[0], ln[2])) + 7)
+        y0, y1 = max(0, int(min(ln[1], ln[3])) - 6), min(h, int(max(ln[1], ln[3])) + 7)
+        sub = diff[y0:y1, x0:x1]
+        ys, xs = np.nonzero(sub > thr)
+        if len(xs) < 5:
+            return 0.0
+        wt = sub[ys, xs].astype(np.float64)
+        wt /= wt.sum()
+        mx, my = float((xs * wt).sum()), float((ys * wt).sum())
+        cxx = float((((xs - mx) ** 2) * wt).sum())
+        cyy = float((((ys - my) ** 2) * wt).sum())
+        cxy = float(((xs - mx) * (ys - my) * wt).sum())
+        d = math.sqrt((cxx - cyy) ** 2 + 4 * cxy * cxy)
+        l1, l2 = (cxx + cyy + d) / 2, (cxx + cyy - d) / 2
+        return round(math.sqrt(l1 / max(l2, 0.25)), 2)
 
     @staticmethod
     def _new_event(f: Dict[str, Any], ts: float, scale: float, frame: np.ndarray, small: np.ndarray) -> Dict[str, Any]:

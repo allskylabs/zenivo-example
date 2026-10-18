@@ -70,6 +70,25 @@ def test_auto_exposure_goes_below_1ms_on_downscaled_live_frames():
     assert exp < 0.0005 and gain == 0.0
 
 
+def test_auto_exposure_no_sawtooth_at_dusk():
+    """Regression: at sunset a clipped glow fired the sunrise "fast recovery" on ms exposures (to 1.2 ms, 0 dB),
+    so /live went dark, dark, dark, light in a loop. The loop must settle instead."""
+    from datetime import datetime, timezone
+    from src.calibration.auto_exposure import DayNightAutoExposure
+
+    rad = np.random.default_rng(0).uniform(0.6, 1.4, (648, 1152)).astype(np.float32)
+    rad[:, :192] *= 6.0  # bright sunset glow
+    dusk = datetime(2026, 10, 18, 10, 33, tzinfo=timezone.utc)
+    ae = DayNightAutoExposure(21.0285, 105.8542, initial_exposure_s=0.0084, initial_gain_db=12.0)
+    means = []
+    for _ in range(40):
+        img = np.clip(rad * ae.exposure_s * 10 ** (ae.gain_db / 20) * 18000, 0, 255).astype(np.uint8)
+        means.append(float(img.mean()))
+        ae.process_frame_feedback(np.dstack([img] * 3), dusk, live_camera=True)
+    steps = [b / a for a, b in zip(means, means[1:]) if a > 0]
+    assert min(steps) > 0.5  # no single-step crash
+    assert max(means[-10:]) - min(means[-10:]) < 2.0  # settled
+
 def test_sky_analysis_throttled_and_recorded_day_and_night(monkeypatch):
     import src.api.service as svc_mod
     import src.calibration.auto_exposure as ae_mod

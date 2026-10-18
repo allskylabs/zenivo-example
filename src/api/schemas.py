@@ -24,6 +24,19 @@ class CameraModeRequest(BaseModel):
     auto: Optional[bool] = Field(None, description="Boolean flag: True for auto, False for manual")
 
 
+class AeLockRequest(BaseModel):
+    """Auto exposure with one knob held: lock 'exposure' or 'gain' (at value, default the current one), or 'none'."""
+    lock: str = Field(..., description="'none', 'exposure', 'gain' or 'both' (fixed exposure and gain)")
+    value: Optional[float] = Field(None, ge=0.0, le=90.0, description="Locked exposure (s) or gain (dB)")
+    exposure_s: Optional[float] = Field(None, ge=0.0, le=90.0, description="Exposure for lock 'both'")
+    gain_db: Optional[float] = Field(None, ge=0.0, le=90.0, description="Gain for lock 'both'")
+
+
+class TargetBrightnessRequest(BaseModel):
+    """Lock the auto-exposure target brightness (mean 0-255), or null to use the built-in day/night targets."""
+    value: Optional[float] = Field(None, ge=0.0, le=255.0)
+
+
 class MasterDarkRequest(BaseModel):
     """Request payload for generating a Master Dark calibration stack."""
     num_frames: int = Field(default=9, ge=3, le=50, description="Number of dark frames to stack")
@@ -70,6 +83,9 @@ class PerformanceSettingsRequest(BaseModel):
     )
     stream_max_width: Optional[int] = Field(None, ge=320, le=2592, description="Live stream JPEG width")
     stream_jpeg_quality: Optional[int] = Field(None, ge=40, le=95, description="Live stream JPEG quality")
+    background_capture_interval_s: Optional[float] = Field(
+        None, ge=0, le=3600, description="Capture with no viewer: 0 = back to back, N = every N seconds"
+    )
 
 
 class EventConfigRequest(BaseModel):
@@ -79,6 +95,13 @@ class EventConfigRequest(BaseModel):
     satellite: Optional[bool] = None
     clouds: Optional[bool] = None
     flash: Optional[bool] = None
+
+
+class AdsbConfigRequest(BaseModel):
+    """ADS-B receiver (SBS-1 / BaseStation feed, usually port 30003) used to name the flight behind aircraft events."""
+    host: Optional[str] = Field(default=None, max_length=253)
+    port: Optional[int] = Field(default=None, ge=1, le=65535)
+    enabled: Optional[bool] = None
 
 
 class CloudConfigRequest(BaseModel):

@@ -40,6 +40,7 @@ from src.api.histogram import compute_fast_histogram
 from src.pipeline.keogram import KeogramGenerator
 from src.pipeline.startrails import StartrailsAccumulator
 from src.pipeline.timelapse import compile_timelapse
+from src.pipeline.overlay import stamp_frame_info, frame_brightness
 from src.storage.retention import RetentionManager, merge_policy
 from src.activity import get_activity_log
 
@@ -104,6 +105,8 @@ class AllSkyService:
         "analysis_interval_s": 300.0,   # star/cloud sampling every 5 min (day and night); frames in between reuse it
         "stream_max_width": 960,        # live WebSocket JPEG width
         "stream_jpeg_quality": 75,      # live WebSocket JPEG quality
+        # Capture with nobody watching: 0 = back to back (meteor hunting), N = one frame every N seconds
+        "background_capture_interval_s": 0.0,
     }
     PERFORMANCE_LIMITS: Dict[str, Tuple[float, float]] = {
         "min_capture_interval_s": (0.4, 60.0),
@@ -112,6 +115,7 @@ class AllSkyService:
         "analysis_interval_s": (10.0, 3600.0),
         "stream_max_width": (320, 2592),
         "stream_jpeg_quality": (40, 95),
+        "background_capture_interval_s": (0.0, 3600.0),
     }
 
     def __init__(self, camera: Optional[CameraDriverInterface] = None):
@@ -154,6 +158,7 @@ class AllSkyService:
         self.last_webp: Optional[bytes] = None
         # Viewer copy of last_frame (star boost applied at night); analysis always reads last_frame
         self.display_frame: Optional[np.ndarray] = None
+        self.last_brightness: Optional[float] = None  # mean 0-255 of the latest frame (stamped on images)
         self._display_frame_ts: float = -1.0
         self._star_mask_cache: Tuple[Any, Optional[np.ndarray]] = (None, None)
         self._webp_frame_ts: float = -1.0
@@ -221,6 +226,7 @@ class AllSkyService:
         self._events_sun_ts = 0.0
         self._event_seq = 0
         self._cloud_state: Optional[str] = None
+        self.adsb = None  # ADS-B feed naming the flight behind aircraft events (start_adsb)
 
         # Observational products pipeline accumulators (Keogram, Startrails, Timelapse)
         self.keogram_gen = KeogramGenerator(slice_width=3, max_slices=2880)
@@ -254,6 +260,7 @@ class AllSkyService:
         self._retention_stop = threading.Event()
         if not os.environ.get("PYTEST_CURRENT_TEST"):
             threading.Thread(target=self._retention_worker, name="retention", daemon=True).start()
+            threading.Thread(target=self._background_capture_worker, name="bg-capture", daemon=True).start()
 
         # Initial capture to prime caches
         self._prime_cache()
@@ -549,6 +556,7 @@ class AllSkyService:
                     self.auto_exposure.exposure_s = float(getattr(self.camera, "current_exposure_s", self.auto_exposure.exposure_s))
                     self.auto_exposure.gain_db = float(getattr(self.camera, "current_gain_db", self.auto_exposure.gain_db))
                     self.auto_exposure.hw_min_exposure_s = getattr(self.camera, "min_exposure_s", None)
+                    self.auto_exposure.hw_max_exposure_s = camera_limits(self.camera).get("max_exposure_s")
                     new_exp, new_gain, ae_telem = self.auto_exposure.process_frame_feedback(
                         frame, live_camera=not is_pytest
                     )
@@ -567,7 +575,10 @@ class AllSkyService:
                     pass
 
             display = self._star_boost_frame(frame, meta.get("capture_path") == "raw10") if not self.focus.active else frame
-            self.display_frame, self._display_frame_ts = display, self.last_capture_time
+            # Viewers get time / exposure / gain / brightness written on the image; analysis keeps `display`
+            self.last_brightness = round(frame_brightness(frame), 1)
+            shown = display if self.focus.active else self._stamp(display, meta, brightness=self.last_brightness)
+            self.display_frame, self._display_frame_ts = shown, self.last_capture_time
 
             # Update cached snapshots after RAW10 subtraction + demosaic. A full-res WebP encode costs
             # ~250 ms of single-core CPU, so it is encoded lazily in get_snapshot_webp() and the
@@ -585,7 +596,7 @@ class AllSkyService:
                 # A native 5 MP encode per frame would halve the focus frame rate; snapshots encode lazily
                 self.last_jpeg = None
             else:
-                ret, jpeg = cv2.imencode(".jpg", display, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                ret, jpeg = cv2.imencode(".jpg", shown, [cv2.IMWRITE_JPEG_QUALITY, 85])
                 if ret:
                     self.last_jpeg = jpeg.tobytes()
 
@@ -599,7 +610,9 @@ class AllSkyService:
                 except Exception:
                     pass
                 try:
-                    self._detect_sky_events(frame, meta, now)
+                    # The star-boosted viewer frame: aircraft dots are several times brighter there than in
+                    # the raw frame (short exposures), and it is what people see
+                    self._detect_sky_events(display, meta, now)
                 except Exception:
                     pass
 
@@ -698,6 +711,7 @@ class AllSkyService:
             "uptime_s": uptime_s,
             "simulator_mode": is_sim,
             "mode": self.mode,
+            "ae_lock": self.get_ae_lock(),
             "hardware": {
                 "vid_pid": info.get("vid_pid", "0bda:5869"),
                 "sensor": info.get("sensor", "Sony Starvis IMX335"),
@@ -833,6 +847,7 @@ class AllSkyService:
             cached = dict(self.last_telemetry)
             cached["timestamp"] = datetime.now().astimezone().isoformat()
             cached["mode"] = self.mode
+            cached["ae_lock"] = self.get_ae_lock()
             cached["calibration"] = self.get_calibration_status()
             return cached
 
@@ -859,6 +874,7 @@ class AllSkyService:
             "temperature": meta.get("sensor_temp_c", 24.5),
             "cpu_load_pct": 14.8,
             "mode": self.mode,
+            "ae_lock": self.get_ae_lock(),
             "calibration": self.get_calibration_status(),
         }
         self.last_telemetry = telem
@@ -892,6 +908,9 @@ class AllSkyService:
     def set_mode(self, mode: str) -> Dict[str, Any]:
         """Toggle between Auto and Manual modes."""
         mode_clean = mode.lower().strip()
+        # Plain Auto/Manual drops any exposure or gain lock: Auto computes both knobs again
+        self.auto_exposure.lock_exposure_s = None
+        self.auto_exposure.lock_gain_db = None
         if mode_clean in ["auto", "automatic"]:
             self.mode = "auto"
             if not bool(os.environ.get("PYTEST_CURRENT_TEST")) and self.last_frame is not None:
@@ -899,6 +918,7 @@ class AllSkyService:
                     self.auto_exposure.exposure_s = float(getattr(self.camera, "current_exposure_s", self.auto_exposure.exposure_s))
                     self.auto_exposure.gain_db = float(getattr(self.camera, "current_gain_db", self.auto_exposure.gain_db))
                     self.auto_exposure.hw_min_exposure_s = getattr(self.camera, "min_exposure_s", None)
+                    self.auto_exposure.hw_max_exposure_s = camera_limits(self.camera).get("max_exposure_s")
                     new_exp, new_gain, _ = self.auto_exposure.process_frame_feedback(self.last_frame, live_camera=True)
                     self.camera.set_hardware_exposure(new_exp, new_gain)
                     self.last_capture_time = 0.0
@@ -910,6 +930,62 @@ class AllSkyService:
         self.activity.info("camera", f"Exposure mode set to {self.mode.upper()}")
         return {"success": True, "mode": self.mode}
 
+    def get_ae_lock(self) -> Dict[str, Any]:
+        """Which knobs are held: manual mode is both locked, auto may hold one of them."""
+        if self.mode == "manual":
+            return {"lock": "both", "exposure_s": float(self.camera.current_exposure_s),
+                    "gain_db": float(self.camera.current_gain_db),
+                    "target_brightness": self.auto_exposure.target_brightness, "brightness": self.last_brightness}
+        ae = self.auto_exposure
+        return {"lock": ae.lock_name(), "exposure_s": ae.lock_exposure_s, "gain_db": ae.lock_gain_db,
+                "target_brightness": ae.target_brightness, "brightness": self.last_brightness}
+
+    def set_target_brightness(self, value: Optional[float]) -> Dict[str, Any]:
+        """Lock the auto-exposure target for the frame's mean brightness (0-255), or None for the built-in targets."""
+        self.auto_exposure.target_brightness = None if value is None else max(5.0, min(250.0, float(value)))
+        self._persist_camera_settings()
+        t = self.auto_exposure.target_brightness
+        self.activity.info("camera", f"Target brightness locked at {t:.0f}/255" if t is not None
+                           else "Target brightness back to automatic day/night targets")
+        return {"success": True, "mode": self.mode, "ae_lock": self.get_ae_lock()}
+
+    def set_ae_lock(self, lock: str, value: Optional[float] = None,
+                    exposure_s: Optional[float] = None, gain_db: Optional[float] = None) -> Dict[str, Any]:
+        """Lock exposure, gain, both (= manual) or neither (= full auto); the loop adjusts what is unlocked."""
+        if lock not in ("none", "exposure", "gain", "both"):
+            raise ValueError("lock must be 'none', 'exposure', 'gain' or 'both'")
+        if lock == "both":
+            exp = exposure_s if exposure_s is not None else self.camera.current_exposure_s
+            gain = gain_db if gain_db is not None else self.camera.current_gain_db
+            self.set_mode("manual")
+            self.set_exposure(float(exp), float(gain))
+            return {"success": True, "mode": self.mode, "ae_lock": self.get_ae_lock()}
+        with self.lock:
+            ae = self.auto_exposure
+            ae.lock_exposure_s = ae.lock_gain_db = None
+            if lock == "exposure":
+                lim = camera_limits(self.camera)
+                v = float(value if value is not None else self.camera.current_exposure_s)
+                ae.lock_exposure_s = max(float(lim.get("min_exposure_s") or 1e-6), min(float(lim.get("max_exposure_s") or 15.0), v))
+            elif lock == "gain":
+                lim = camera_limits(self.camera)
+                v = float(value if value is not None else self.camera.current_gain_db)
+                ae.lock_gain_db = max(0.0, min(float(lim.get("max_gain_db") or 48.0), v))
+            self.mode = "auto"
+            if lock != "none":
+                self.camera.set_hardware_exposure(
+                    ae.lock_exposure_s if ae.lock_exposure_s is not None else self.camera.current_exposure_s,
+                    ae.lock_gain_db if ae.lock_gain_db is not None else self.camera.current_gain_db,
+                )
+            self.last_capture_time = 0.0
+            self._persist_camera_settings()
+        if lock == "none":
+            self.activity.info("camera", "Auto exposure: exposure and gain both automatic")
+        else:
+            held = f"{ae.lock_exposure_s:.4g}s" if lock == "exposure" else f"{ae.lock_gain_db:.1f} dB"
+            self.activity.info("camera", f"Auto exposure: {lock} locked at {held}, the other follows the sky")
+        return {"success": True, "mode": self.mode, "ae_lock": self.get_ae_lock()}
+
     def _persist_camera_settings(self) -> None:
         """Remember exposure mode and manual exposure/gain so they survive a server restart."""
         if os.environ.get("PYTEST_CURRENT_TEST"):
@@ -918,13 +994,19 @@ class AllSkyService:
             "mode": self.mode,
             "exposure_s": float(getattr(self.camera, "current_exposure_s", 0.2)),
             "gain_db": float(getattr(self.camera, "current_gain_db", 12.0)),
+            "lock_exposure_s": self.auto_exposure.lock_exposure_s,
+            "lock_gain_db": self.auto_exposure.lock_gain_db,
+            "target_brightness": self.auto_exposure.target_brightness,
         }
         self._save_station_config()
 
     def restore_camera_settings(self) -> Optional[Dict[str, Any]]:
         """Re-apply the last saved manual exposure/gain on startup (auto mode needs nothing restored)."""
         cs = self.station_config.get("camera_settings") or {}
+        self.auto_exposure.target_brightness = cs.get("target_brightness")
         if cs.get("mode") != "manual":
+            self.auto_exposure.lock_exposure_s = cs.get("lock_exposure_s")
+            self.auto_exposure.lock_gain_db = cs.get("lock_gain_db")
             return None
         try:
             self.camera.set_hardware_exposure(float(cs["exposure_s"]), float(cs["gain_db"]))
@@ -1302,6 +1384,26 @@ class AllSkyService:
     # ------------------------------------------------------------------
     # Disk retention
     # ------------------------------------------------------------------
+    def _background_capture_worker(self) -> None:
+        """Keep capturing with no viewer connected, so auto exposure, archiving and meteor/aircraft
+        detection never stop. Viewers share the same cached frames, so this adds no extra exposures."""
+        while not self._retention_stop.is_set():
+            interval = float(self.performance.get("background_capture_interval_s", 0.0))
+            started = time.time()
+            if not self.focus.active and self.calibration_status.get("state") != "running":
+                try:
+                    self.capture_frame()
+                except Exception:
+                    pass
+            if interval > 0:
+                wait = interval - (time.time() - started)
+            else:
+                # Back to back: wake when the frame cache expires (one exposure, or min_capture_interval_s)
+                ttl = max(self.performance["min_capture_interval_s"],
+                          float(getattr(self.camera, "current_exposure_s", 0.5)) * 0.9)
+                wait = ttl - (time.time() - self.last_capture_time)
+            self._retention_stop.wait(max(0.2, wait))
+
     def _retention_worker(self) -> None:
         """Run cleanup shortly after start, then hourly."""
         delay = 30.0
@@ -1568,7 +1670,9 @@ class AllSkyService:
         day_dir = self._get_today_frames_dir(today_str)
         fname = f"frame_{now_dt.strftime('%Y%m%d_%H%M%S_%f')[:19]}.jpg"
         fpath = os.path.join(day_dir, fname)
-        if not cv2.imwrite(fpath, arch_frame, [cv2.IMWRITE_JPEG_QUALITY, 88]):
+        # The saved JPEG carries the info stamp; keogram/startrails below use the clean frame
+        stamped = self._stamp(arch_frame, meta, now_dt, brightness=self.last_brightness)
+        if not cv2.imwrite(fpath, stamped, [cv2.IMWRITE_JPEG_QUALITY, 88]):
             self.activity.error("archive", f"Could not write archived frame {fpath} (disk full or read-only?)")
             return None
 
@@ -1861,6 +1965,7 @@ class AllSkyService:
             "enabled": cfg, "defaults": dict(self.EVENT_DEFAULTS), "night_sun_elev_deg": self.EVENT_NIGHT_SUN_ELEV,
             "night": self._events_night, "frames_seen": self.sky_events.frames_seen,
             "frames_compared": self.sky_events.frames_compared,
+            "dot_tracking": dict(self.sky_events.point_stats),
         }
 
     def set_event_config(self, **flags: Optional[bool]) -> Dict[str, Any]:
@@ -1914,15 +2019,152 @@ class AllSkyService:
             "cloud_cover_pct": round(cc, 1), "_overview": overview,
         })
 
+    # ------------------------------------------------------------------
+    # ADS-B: which flight was that aircraft (SBS-1 feed of a local receiver, e.g. dump1090 / FR24 feeder)
+    # ------------------------------------------------------------------
+    ADSB_DEFAULT_PORT = 30003
+
+    def get_adsb_config(self) -> Dict[str, Any]:
+        cfg = self.station_config.get("adsb") or {}
+        sol = self.station_config.get("bright_star_solution") or {}
+        return {
+            "enabled": int(bool(cfg.get("enabled", 1))) if cfg.get("host") else 0,
+            "host": cfg.get("host") or "",
+            "port": int(cfg.get("port") or self.ADSB_DEFAULT_PORT),
+            "pointing_solved": bool(sol.get("success")),
+            "status": self.adsb.status() if self.adsb is not None else None,
+        }
+
+    def set_adsb_config(self, host: Optional[str] = None, port: Optional[int] = None,
+                        enabled: Optional[bool] = None) -> Dict[str, Any]:
+        cfg = dict(self.station_config.get("adsb") or {})
+        if host is not None:
+            host = host.strip()
+            if host and not re.fullmatch(r"[A-Za-z0-9.\-:\[\]]{1,253}", host):
+                raise ValueError("host must be a hostname or IP address")
+            cfg["host"] = host
+        if port is not None:
+            if not 1 <= int(port) <= 65535:
+                raise ValueError("port must be 1..65535")
+            cfg["port"] = int(port)
+        if enabled is not None:
+            cfg["enabled"] = int(bool(enabled))
+        self.station_config["adsb"] = cfg
+        self._save_station_config()
+        self.start_adsb()
+        c = self.get_adsb_config()
+        self.activity.info("events", f"ADS-B flight matching: {c['host']}:{c['port']}" if c["enabled"] else "ADS-B flight matching off")
+        return {"success": True, **c}
+
+    def get_aircraft_now(self, limit: int = 30) -> Dict[str, Any]:
+        """Aircraft the ADS-B receiver hears right now: flight, altitude, speed, distance, direction, and
+        whether it is inside the camera's open sky (frame_xy in frame fractions)."""
+        from src.analytics.adsb import motion_fields, sky_position
+
+        if self.adsb is None:
+            return {"enabled": False, "connected": False, "aircraft": []}
+        self._adsb_view_ts = time.time()  # someone is looking: keep the feed on, day or night
+        sol = self.station_config.get("bright_star_solution") or {}
+        sol = sol if sol.get("success") else None
+        station = {"latitude_deg": self.auto_exposure.lat, "longitude_deg": self.auto_exposure.lon,
+                   "elevation_m": float(self.station_config.get("elevation_m") or 0.0)}
+        obstructions = [np.array(p, np.float32) for p in ((self.station_config.get("sky_mask") or {}).get("obstruction") or [])]
+        out = []
+        for a in self.adsb.current():
+            pos = sky_position(station, a["lat"], a["lon"], a["altitude_m"], sol)
+            xy = pos.get("frame_xy")
+            in_view = bool(xy) and not any(cv2.pointPolygonTest(p, (float(xy[0]), float(xy[1])), False) >= 0 for p in obstructions)
+            out.append({
+                "icao": a["icao"], "callsign": a["callsign"] or None,
+                "altitude_m": round(a["altitude_m"]), **motion_fields(a), **pos,
+                "in_view": in_view, "above_horizon": pos["alt_deg"] > 0, "age_s": round(a["age_s"], 1),
+            })
+        out.sort(key=lambda r: (not r["in_view"], not r["above_horizon"], r["distance_km"]))
+        st = self.adsb.status()
+        return {"enabled": True, "connected": st["connected"], "total": len(out),
+                "in_view": sum(1 for r in out if r["in_view"]), "aircraft": out[:limit]}
+
+    def _adsb_wanted(self) -> bool:
+        """Read the feed only while aircraft events can happen (night, plane detection on) or while the
+        Flights panel is open (polled in the last 2 minutes)."""
+        if time.time() - getattr(self, "_adsb_view_ts", 0.0) < 120.0:
+            return True
+        return self._events_night and bool(self.get_event_config()["enabled"].get("plane"))
+
+    def start_adsb(self) -> None:
+        """(Re)start the ADS-B reader from the station config; stops it when turned off."""
+        from src.analytics.adsb import AdsbFeed
+
+        cfg = self.get_adsb_config()
+        old = self.adsb
+        if old is not None and (not cfg["enabled"] or (old.host, old.port) != (cfg["host"], cfg["port"])):
+            old.stop()
+            self.adsb = old = None
+        if cfg["enabled"] and old is None:
+            self.adsb = AdsbFeed(cfg["host"], cfg["port"], wanted=self._adsb_wanted)
+            self.adsb.start()
+
+    def _match_flight(self, ev: Dict[str, Any]) -> None:
+        """Name the flight behind a streak / dot event; a 'meteor' or 'satellite' that matches an aircraft
+        becomes a plane."""
+        if self.adsb is None or ev.get("type") not in ("plane", "meteor", "satellite") or not ev.get("line"):
+            return
+        sol = self.station_config.get("bright_star_solution") or {}
+        if not sol.get("success"):
+            return
+        from src.analytics.adsb import frame_to_azalt, match_flight
+
+        if sol.get("projection", "rectilinear") == "rectilinear":
+            ln = ev["line"]
+            ev["sky_from"] = dict(zip(("az_deg", "alt_deg"), frame_to_azalt(ln[0], ln[1], sol)))
+            ev["sky_to"] = dict(zip(("az_deg", "alt_deg"), frame_to_azalt(ln[2], ln[3], sol)))
+        t0 = float(ev.get("start_ts", ev["ts"]))
+        t1 = float(ev.get("end_ts", t0))
+        station = {"latitude_deg": self.auto_exposure.lat, "longitude_deg": self.auto_exposure.lon,
+                   "elevation_m": float(self.station_config.get("elevation_m") or 0.0)}
+        tracks = self.adsb.tracks(t0, t1)
+        flight = match_flight(ev, tracks, station, sol, lag_s=self.ADSB_FRAME_LAG_S)
+        if flight is None:
+            # Diagnostics: the nearest aircraft anywhere in the frame and how far off it was
+            near = match_flight(ev, tracks, station, sol, lag_s=self.ADSB_FRAME_LAG_S, tol_px=5000.0, check_direction=False)
+            if near is not None:
+                ev["nearest_flight"] = {k: near.get(k) for k in ("callsign", "icao", "match_px", "match_angle_deg",
+                                                                 "altitude_m", "distance_km", "az_deg", "alt_deg")}
+            ev["adsb_aircraft"] = len(tracks)
+            return
+        if ev["type"] != "plane":
+            # Re-label only on a close match that also runs the aircraft's way
+            angle = flight.get("match_angle_deg")
+            if flight["match_px"] > 20.0 or angle is None or angle > 20.0:
+                return
+            ev["reclassified_from"] = ev["type"]
+            ev["type"] = "plane"
+        ev["flight"] = flight
+
+    ADSB_FRAME_LAG_S = 0.5  # frame timestamp (capture returned) minus mid-exposure, roughly
+
     def _record_sky_event(self, ev: Dict[str, Any]) -> Dict[str, Any]:
         """Save the event's images + a JSON line under events/<local day>/ and log it."""
         import json
 
+        try:
+            self._match_flight(ev)
+        except Exception:
+            pass  # flight naming is a bonus; never lose the event over it
         crop, overview = ev.pop("_crop", None), ev.pop("_overview", None)
         dt = datetime.fromtimestamp(float(ev.get("start_ts", ev["ts"]))).astimezone()
         day = dt.strftime("%Y-%m-%d")
         self._event_seq = (self._event_seq + 1) % 1000
         eid = f"{ev['type']}_{dt.strftime('%Y%m%d_%H%M%S')}_{self._event_seq:03d}"
+        # Daily cap: a false-alarm storm must not fill the disk (today's files escape the size rule)
+        count_day, count = getattr(self, "_events_saved", (None, 0))
+        count = count + 1 if count_day == day else 1
+        self._events_saved = (day, count)
+        cap = int(self.retention.policy.get("max_events_per_day", 1000))
+        if count > cap:
+            if count == cap + 1:
+                self.activity.warning("events", f"{cap} events saved today; further events are not saved until tomorrow")
+            return {"event_id": eid, "type": ev["type"], "dropped": True}
         day_dir = os.path.join(self.events_dir, day)
         os.makedirs(day_dir, exist_ok=True)
         rec = {"event_id": eid, "type": ev["type"], "timestamp": dt.isoformat(),
@@ -1945,6 +2187,10 @@ class AllSkyService:
         else:
             msg = (f"{ev['type'].capitalize()} detected: {ev.get('length_px', 0):.0f} px streak"
                    + (f" over {ev['frames']} frames" if ev.get("frames", 1) > 1 else ""))
+            fl = ev.get("flight")
+            if fl:
+                msg += (f" — flight {fl.get('callsign') or fl['icao']}, {fl['altitude_m']} m, {fl['distance_km']} km"
+                        + (f" (was {ev['reclassified_from']})" if ev.get("reclassified_from") else ""))
         self.activity.info("events", msg, event_id=eid)
         return rec
 
@@ -2777,6 +3023,12 @@ class AllSkyService:
     AUTO_SWEEP_INTERVAL_S = 12 * 3600.0  # full automatic sweep at most twice a day; tracking covers between
     AUTO_SWEEP_RETRY_S = 1800.0
 
+    def _focus_sky_mask(self, frame: np.ndarray) -> Optional[np.ndarray]:
+        """The station sky mask (Settings sky/obstruction polygons) at this frame's size, or None."""
+        from src.calibration.bright_star_solver import polygon_mask
+        m = self.station_config.get("sky_mask") or {}
+        return polygon_mask(frame.shape, m.get("sky"), m.get("obstruction"))
+
     def _maybe_auto_sweep(self, frame: np.ndarray, now: float, cfg: Dict[str, Any]) -> bool:
         """Auto lens mode runs a full sweep autofocus by itself when there is no valid sky focus (none saved,
         or one nearer than 1 m), right after Auto is switched on, and every AUTO_SWEEP_INTERVAL_S, but only
@@ -2795,7 +3047,7 @@ class AllSkyService:
         self._auto_sweep_retry_ts = now + self.AUTO_SWEEP_RETRY_S
         if -12.0 <= sun <= 3.0:
             return False  # twilight: stars too faint, daylight too low and changing
-        point = find_focus_point(frame)
+        point = find_focus_point(frame, sky_mask=self._focus_sky_mask(frame))
         if point is None or (sun < -12.0 and point["method"] == "contrast"):
             return False
 
@@ -3089,7 +3341,7 @@ class AllSkyService:
         frame = self.last_frame
         if frame is None:
             frame, _ = self.capture_frame()
-        point = find_focus_point(frame)
+        point = find_focus_point(frame, sky_mask=self._focus_sky_mask(frame))
         if point is None:
             state = self.get_focus_state()
             state.update({"found": False, "message": "nothing to focus on in the frame (blank sky, cloud or fog)"})
@@ -3116,6 +3368,20 @@ class AllSkyService:
         cy = (star["y"] + mh + 0.5) * scale / h
         state = self.configure_focus(cx=cx, cy=cy)
         return {"found": True, "source": star, **state}
+
+    def _stamp(self, frame: np.ndarray, meta: Dict[str, Any], when: Optional[datetime] = None,
+               brightness: Optional[float] = None) -> np.ndarray:
+        """Copy of frame with capture time, exposure, gain and mean brightness written on it."""
+        try:
+            return stamp_frame_info(
+                frame,
+                when or datetime.fromtimestamp(self.last_capture_time or time.time()).astimezone(),
+                float(meta.get("actual_exposure_s", getattr(self.camera, "current_exposure_s", 0.0))),
+                float(meta.get("gain_db", getattr(self.camera, "current_gain_db", 0.0))),
+                brightness if brightness is not None else frame_brightness(frame),
+            )
+        except Exception:
+            return frame
 
     def get_display_frame(self) -> Tuple[Optional[np.ndarray], float]:
         """(frame, capture timestamp) for viewers: the star-boosted copy when it belongs to the latest capture."""
@@ -3369,6 +3635,14 @@ class AllSkyService:
         threading.Thread(target=_job, name="plate-solve", daemon=True).start()
         return dict(self.plate_solve_status)
 
+    def _ps_progress(self, stage: str, message: str, eta_s: Optional[float] = None, **extra: Any) -> None:
+        """Publish plate-solve progress (stage, frame k/n, expected end) for the status poll."""
+        with self._plate_solve_lock:
+            if self.plate_solve_status.get("state") != "running":
+                return
+            self.plate_solve_status.update(stage=stage, message=message,
+                                           eta_ts=None if eta_s is None else time.time() + eta_s, **extra)
+
     def get_plate_solve_status(self) -> Dict[str, Any]:
         with self._plate_solve_lock:
             out = dict(self.plate_solve_status)
@@ -3430,6 +3704,7 @@ class AllSkyService:
         sits near target_level (of 255, gamma-encoded output) instead of saturating under city light. Frames are kept as grayscale
         to save memory; exposure mode and settings are restored afterwards.
         """
+        self._ps_progress("metering", "Measuring the sky brightness to pick the exposure")
         frame, meta = self.capture_frame(force_refresh=True)
         if os.environ.get("PYTEST_CURRENT_TEST") or getattr(self.camera, "simulator", False):
             return [frame], [time.time()]
@@ -3464,6 +3739,16 @@ class AllSkyService:
                 self.camera.set_hardware_exposure(exp, gain)
             interval = min_span_s / max(1, n_frames - 1)
             t0, adjustments = None, 0
+
+            def report(note: str = "") -> None:
+                done = len(frames)
+                left = (min_span_s + exp) if t0 is None else max(0.0, t0 + (n_frames - 1) * interval + exp - time.time())
+                self._ps_progress(
+                    "capturing", note or f"Capturing frame {done + 1}/{n_frames} ({exp:.1f} s at {gain:.1f} dB)",
+                    eta_s=left + 15.0, frame=done, frames_total=n_frames,
+                )
+
+            report()
             for _ in range(n_frames + 6):  # spares for frames still at old settings or re-exposed
                 if t0 is not None:
                     wait = t0 + len(frames) * interval - time.time()
@@ -3481,12 +3766,14 @@ class AllSkyService:
                     with self.lock:
                         self.camera.set_hardware_exposure(exp, gain)
                     frames, times, t0 = [], [], None
+                    report(f"Sky brighter/darker than expected: re-exposing at {exp:.1f} s, {gain:.1f} dB (series restarts)")
                     continue
                 frames.append(g)
                 times.append(time.time() - got / 2.0)
                 t0 = t0 or times[-1]
                 if len(frames) >= n_frames:
                     break
+                report()
         finally:
             with self.lock:
                 self.camera.set_hardware_exposure(old_exp, old_gain)
@@ -3502,9 +3789,31 @@ class AllSkyService:
                 cv2.imwrite(os.path.join(dbg, f"f{i}_{t:.1f}.png"), g)
         return frames, times
 
+    def _hot_pixel_exclusion(self, shape: Tuple[int, ...], exp_s: float, gain_db: float) -> Optional[np.ndarray]:
+        """Hot pixels of the closest dark profile, scaled to this frame and grown by 2 px (True = hot)."""
+        try:
+            profiles = [p for p in self.get_profiles_matrix() if p["ready"] or p.get("raw10_ready")]
+            masks = []
+            for p in sorted(profiles, key=lambda p: abs(p["exposure_s"] - exp_s) + abs(p["gain_db"] - gain_db) / 12.0):
+                path = os.path.join(self.calibration_dir, f"hot_pixels_exp{p['exposure_s']:.1f}s_gain{p['gain_db']:.0f}dB.npy")
+                if os.path.isfile(path):
+                    masks.append(np.load(path))
+                    break
+            if not masks or not np.any(masks[0]):
+                return None
+            hot = masks[0]
+            h, w = shape[:2]
+            ys, xs = np.nonzero(hot)
+            out = np.zeros((h, w), dtype=np.uint8)
+            out[np.minimum(h - 1, (ys * h / hot.shape[0]).astype(int)), np.minimum(w - 1, (xs * w / hot.shape[1]).astype(int))] = 1
+            return cv2.dilate(out, np.ones((5, 5), np.uint8)).astype(bool)
+        except Exception:
+            return None
+
     def _solve_bright_star_pattern(self, frame: np.ndarray, lat: float, lon: float,
                                    frames: Optional[List[np.ndarray]] = None,
-                                   times: Optional[List[float]] = None) -> Optional[Dict[str, Any]]:
+                                   times: Optional[List[float]] = None,
+                                   exclude: Optional[np.ndarray] = None) -> Optional[Dict[str, Any]]:
         """Match the brightest stars against the catalog; apply and return the result, or None if unsure.
 
         With a frame series, only points that persist and drift with the sky are used (hot pixels are
@@ -3523,6 +3832,8 @@ class AllSkyService:
         intr = self._lens_intrinsics(w)
         try:
             mask = bss.combined_sky_mask(frame, self.station_config.get("sky_mask"))
+            if exclude is not None and exclude.shape == frame.shape[:2]:
+                mask = (np.ones(exclude.shape, dtype=bool) if mask is None else mask) & ~exclude
             tracked, when = None, None
             if frames is not None and len(frames) >= 3:
                 hfov = float(optics0.get("fov_horizontal_deg") or 90.0)
@@ -3677,6 +3988,20 @@ class AllSkyService:
         """
         from src.calibration.station_solver import solve_station_parameters
 
+        lat = float(self.station_config.get("latitude_deg", 21.0285))
+        lon = float(self.station_config.get("longitude_deg", 105.8542))
+        # Lens already solved: one frame usually fixes the pointing (only the rotation is unknown). Hot pixels
+        # from the dark library are masked out; the 90 s tracking series runs only if this is not sure.
+        if self.last_frame is not None and self._lens_intrinsics(self.last_frame.shape[1]) is not None:
+            self._ps_progress("quick", "Lens already known: trying a single-frame solve", eta_s=15.0)
+            frame, meta = self.capture_frame()
+            exclude = self._hot_pixel_exclusion(frame.shape, float(meta.get("actual_exposure_s", 1.0)),
+                                                float(meta.get("gain_db", 0.0)))
+            quick = self._solve_bright_star_pattern(frame, lat, lon, exclude=exclude)
+            if quick is not None:
+                return quick
+            self.activity.info("station", "Single-frame solve not sure enough; capturing the 90 s tracking series")
+
         frames, times = self._capture_plate_solve_frames()
         frame = frames[-1]
         if (fov_hint or "auto") == "auto":
@@ -3684,11 +4009,11 @@ class AllSkyService:
             hfov = (self.station_config.get("optics") or {}).get("fov_horizontal_deg")
             if hfov and 1.0 <= float(hfov) <= 170.0:
                 fov_hint = str(int(round(float(hfov))))
-        lat = float(self.station_config.get("latitude_deg", 21.0285))
-        lon = float(self.station_config.get("longitude_deg", 105.8542))
         elev = float(self.station_config.get("elevation_m", 20.0))
 
         # 1. Local bright-star pattern solve: seconds, and works under city light pollution
+        self._ps_progress("matching", f"Matching the bright stars of {len(frames)} frame(s) against the catalog",
+                          eta_s=15.0, frame=len(frames), frames_total=len(frames))
         bright = self._solve_bright_star_pattern(frame, lat, lon, frames, times) if len(frames) >= 3 else \
             self._solve_bright_star_pattern(frame, lat, lon)
         if bright is not None:
@@ -3697,6 +4022,8 @@ class AllSkyService:
             frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
         # 2. Full blind solve on the hoan.uk plate solver (needs many stars, takes minutes)
+        self._ps_progress("online", "Bright-star match not sure enough: full blind solve on hoan.uk (up to 3 min)",
+                          eta_s=180.0)
         solved = solve_station_parameters(
             frame_bgr=frame,
             latitude_deg=lat,
@@ -3752,6 +4079,8 @@ class AllSkyService:
 
     def close(self) -> None:
         """Release camera hardware resources."""
+        if self.adsb is not None:
+            self.adsb.stop()
         for name in ("_retention_stop", "_camera_watchdog_stop"):
             stop = getattr(self, name, None)
             if stop is not None:

@@ -26,6 +26,7 @@ DEFAULT_POLICY: Dict[str, Any] = {
     "max_data_gb": 8.0,          # hard cap for the whole data directory
     "min_free_gb": 3.0,          # always leave this much free on the filesystem
     "archive_interval_s": 30.0,  # seconds between archived frames
+    "max_events_per_day": 1000,  # meteor/aircraft events saved per day; more (e.g. a false-alarm storm) are dropped
     "timelapse_refresh_s": 1800.0,  # seconds between live timelapse re-encodes (each costs tens of CPU-s)
     "extra_dirs": [],            # [{"path": "...", "keep_days": 3}]
 }

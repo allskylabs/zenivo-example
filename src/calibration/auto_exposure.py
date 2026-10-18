@@ -121,6 +121,13 @@ class DayNightAutoExposure:
         self.damping_factor = 0.25
         # Shortest exposure the live camera accepts (e.g. 26 us on a Pi IMX708); only ever lowers the 50 us floor
         self.hw_min_exposure_s: Optional[float] = None
+        # Optional user lock on one knob: the loop then puts the whole brightness step on the other one
+        self.lock_exposure_s: Optional[float] = None
+        self.lock_gain_db: Optional[float] = None
+        # Optional user target for the frame's mean brightness (0-255); None = built-in day/night targets
+        self.target_brightness: Optional[float] = None
+        # Longest exposure the live camera accepts; auto exposure runs up to 60 s within it
+        self.hw_max_exposure_s: Optional[float] = None
 
     def update_profile(self, solar_elevation_deg: float) -> str:
         """
@@ -208,6 +215,12 @@ class DayNightAutoExposure:
         Returns:
             tuple: (new_exposure_s, new_gain_db, telemetry_dict)
         """
+        if self.lock_exposure_s is not None:
+            self.exposure_s = float(self.lock_exposure_s)
+        if self.lock_gain_db is not None:
+            self.gain_db = float(self.lock_gain_db)
+        locked = self.lock_exposure_s is not None or self.lock_gain_db is not None
+
         # 1. Ephemeris feedforward loop
         solar_elev = calculate_solar_elevation(self.lat, self.lon, dt)
         profile = self.update_profile(solar_elev)
@@ -249,13 +262,20 @@ class DayNightAutoExposure:
             min_exp = 0.00005
             if isinstance(self.hw_min_exposure_s, (int, float)) and self.hw_min_exposure_s > 0:
                 min_exp = max(1e-6, min(min_exp, float(self.hw_min_exposure_s)))
-            max_exp = 15.0
+            max_exp = 60.0
+            if isinstance(self.hw_max_exposure_s, (int, float)) and self.hw_max_exposure_s > 0:
+                max_exp = min(max_exp, float(self.hw_max_exposure_s))
             min_gain = 0.0
             max_gain = 48.0
             target_y = 142.0 if solar_elev >= -2.0 else 85.0
             base_luma = 0.5 * p50 + 0.5 * mean_luma
             sky_luma = 0.50 * sky_p50 + 0.50 * sky_mean
             effective_luma = max(base_luma, sky_luma) if (solar_elev >= -6.0 or p95 > 180.0) else base_luma
+
+            if self.target_brightness is not None:
+                # User target: steer the plain frame mean (the brightness written on the image) to it
+                target_y = float(self.target_brightness)
+                effective_luma = mean_luma
 
             # Highlight clipping guard: only step down when a large fraction of the sky dome is saturating
             # (allow solar disk/corona up to 20% of sky ROI in daytime without forcing under-exposure of the rest of the sky)
@@ -271,9 +291,12 @@ class DayNightAutoExposure:
             # - Dark/night scene (already at >=1.0s exposure and >=24dB gain): hold steady when background >= 15
             low_band = 115.0 if solar_elev >= -2.0 else 65.0
             high_band = 185.0 if solar_elev >= -2.0 else 120.0
+            if self.target_brightness is not None:
+                low_band, high_band = target_y - max(4.0, 0.1 * target_y), target_y + max(4.0, 0.1 * target_y)
             in_normal_deadband = (low_band <= effective_luma <= high_band) and not highlights_clipped
             in_night_deadband = (
-                solar_elev < -6.0
+                self.target_brightness is None
+                and solar_elev < -6.0
                 and self.exposure_s >= 1.0
                 and self.gain_db >= 24.0
                 and 15.0 <= effective_luma <= 120.0
@@ -289,38 +312,70 @@ class DayNightAutoExposure:
                     "measured_mean": round(mean_luma, 1),
                     "recommended_exposure_s": round(self.exposure_s, 6),
                     "recommended_gain_db": round(self.gain_db, 1),
+                    "lock": self.lock_name(),
                 }
                 return self.exposure_s, self.gain_db, telemetry
 
+            if locked:
+                # One knob locked: same brightness step as below, all of it on the free knob
+                if effective_luma > high_band or highlights_clipped:
+                    over_luma = max(effective_luma, sky_p85 * 0.78)
+                    factor = max(0.55, min(0.86, (target_y / max(target_y + 10.0, over_luma)) ** 0.60))
+                else:
+                    factor = min(1.40, max(1.15, min(3.0, target_y / max(8.0, effective_luma)) ** 0.50))
+                    if solar_elev >= -2.0 and p90 * factor > 246.0:
+                        factor = 1.0
+                if self.lock_exposure_s is None:
+                    self.exposure_s *= factor
+                elif self.lock_gain_db is None:
+                    self.gain_db += 20.0 * math.log10(factor)
+
             min_step = 0.00002 if self.exposure_s < 0.001 else 0.00016
-            if effective_luma > high_band or highlights_clipped:
+            if locked:
+                pass
+            elif effective_luma > high_band or highlights_clipped:
                 # Scene or sky dome is too bright -> drop gain to 0 dB in daytime and step down exposure
                 over_luma = max(effective_luma, sky_p85 * 0.78)
-                if solar_elev >= -2.0 and (p90 > 248.0 or effective_luma > 215.0) and self.exposure_s > 0.005:
-                    # Fast sunrise/daylight recovery from long night exposures
+                if solar_elev >= -2.0 and (p90 > 248.0 or effective_luma > 215.0) and self.exposure_s > 0.1:
+                    # Fast sunrise/daylight recovery from long night exposures only: firing it on ms-range
+                    # dusk exposures slammed the frame ~28x darker and the slow re-ramp made /live pulse
                     self.gain_db = 0.0
                     self.exposure_s = max(min_exp, min(0.0012, self.exposure_s * 0.15))
                 else:
                     ratio = target_y / max(target_y + 10.0, over_luma)
                     step_factor = max(0.55, min(0.86, ratio ** 0.60))
                     if self.gain_db > 0.0 and (solar_elev >= -4.0 or self.exposure_s <= 0.1 or self.gain_db > 12.0):
-                        self.gain_db = max(min_gain, round(self.gain_db - 6.0, 1))
-                    next_exp = min(self.exposure_s - min_step, self.exposure_s * step_factor)
-                    self.exposure_s = max(min_exp, next_exp)
+                        # Take the step out of gain first; only the remainder once gain hits 0 dB goes to
+                        # exposure, so one step never darkens by more than step_factor (was -6 dB on top)
+                        step_db = -20.0 * math.log10(step_factor)
+                        used_db = min(self.gain_db - min_gain, step_db)
+                        self.gain_db = max(min_gain, round(self.gain_db - used_db, 1))
+                        step_factor = 10.0 ** (-(step_db - used_db) / 20.0)
+                    if step_factor < 0.99:
+                        next_exp = min(self.exposure_s - min_step, self.exposure_s * step_factor)
+                        self.exposure_s = max(min_exp, next_exp)
             else:
                 # Scene is too dark (effective_luma < low_band) -> step up smoothly
                 ratio = min(3.0, target_y / max(8.0, effective_luma))
                 step_factor = min(1.40, max(1.15, ratio ** 0.50))
                 next_exp = max(self.exposure_s + min_step, self.exposure_s * step_factor)
-                if solar_elev >= 0.0:
-                    # Daytime: keep gain at 0 dB unless exposure exceeds 15ms
-                    self.exposure_s = min(0.05, next_exp)
+                step_db = round(20.0 * math.log10(step_factor), 1)
+                if solar_elev >= -2.0 and p90 * step_factor > 246.0:
+                    # Stepping up would clip the bright part of the sky (sun, sunset glow) and force an
+                    # immediate step back down: hold rather than hunt between two levels
+                    pass
+                elif solar_elev >= 0.0:
+                    # Daytime: gain stays 0 dB until exposure reaches 15 ms; one knob per step
                     if self.exposure_s >= 0.015 and self.gain_db < 6.0:
-                        self.gain_db = min(6.0, round(self.gain_db + 1.5, 1))
+                        self.gain_db = min(6.0, round(self.gain_db + step_db, 1))
+                    else:
+                        self.exposure_s = min(0.05, next_exp)
                 elif self.exposure_s < 0.15:
-                    self.exposure_s = min(0.25, next_exp)
-                    if self.gain_db < 12.0:
-                        self.gain_db = min(18.0, round(self.gain_db + 2.0, 1))
+                    # Twilight: exposure first, gain once past 15 ms; raising both per step (~1.76x) overshot
+                    if self.exposure_s >= 0.015 and self.gain_db < 12.0:
+                        self.gain_db = min(12.0, round(self.gain_db + step_db, 1))
+                    else:
+                        self.exposure_s = min(0.25, next_exp)
                 else:
                     self.exposure_s = min(max_exp, next_exp)
                     if effective_luma < 45.0 and self.gain_db < max_gain:
@@ -347,6 +402,11 @@ class DayNightAutoExposure:
                 else:
                     self.exposure_s = new_exp
 
+        if self.lock_exposure_s is not None:
+            self.exposure_s = float(self.lock_exposure_s)
+        if self.lock_gain_db is not None:
+            self.gain_db = float(self.lock_gain_db)
+
         # Clamp to effective bounds
         self.exposure_s = max(min_exp, min(max_exp, round(self.exposure_s, 6)))
         self.gain_db = max(min_gain, min(max_gain, round(self.gain_db, 1)))
@@ -360,6 +420,14 @@ class DayNightAutoExposure:
             "measured_mean": round(mean_luma, 1),
             "recommended_exposure_s": round(self.exposure_s, 6),
             "recommended_gain_db": round(self.gain_db, 1),
+            "lock": self.lock_name(),
         }
 
         return self.exposure_s, self.gain_db, telemetry
+
+    def lock_name(self) -> Optional[str]:
+        if self.lock_exposure_s is not None:
+            return "exposure"
+        if self.lock_gain_db is not None:
+            return "gain"
+        return None

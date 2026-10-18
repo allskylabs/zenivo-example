@@ -12,11 +12,14 @@ from src.api.schemas import (
     ExposureControlRequest,
     GainControlRequest,
     CameraModeRequest,
+    AeLockRequest,
+    TargetBrightnessRequest,
     MasterDarkRequest,
     StationLocationRequest,
     ImageTransformRequest,
     OutputResolutionRequest,
     PerformanceSettingsRequest,
+    AdsbConfigRequest,
     EventConfigRequest,
     StarBoostRequest,
     WhiteBalanceRequest,
@@ -109,6 +112,27 @@ def set_camera_mode(
     """
     mode_target = "auto" if req.auto is True or (req.mode and req.mode.lower() == "auto") else "manual"
     return service.set_mode(mode_target)
+
+
+@router.get("/api/camera/ae-lock")
+def get_camera_ae_lock(service: AllSkyService = Depends(get_service)):
+    """Current exposure / gain / target-brightness locks and the latest frame brightness (cheap, polled)."""
+    return {"mode": service.mode, "ae_lock": service.get_ae_lock()}
+
+
+@router.post("/api/camera/ae-lock")
+def set_camera_ae_lock(req: AeLockRequest, service: AllSkyService = Depends(get_service)):
+    """Auto exposure with exposure or gain held fixed; the loop then adjusts only the other one."""
+    try:
+        return service.set_ae_lock(req.lock, req.value, req.exposure_s, req.gain_db)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/api/camera/target-brightness")
+def set_camera_target_brightness(req: TargetBrightnessRequest, service: AllSkyService = Depends(get_service)):
+    """Lock the brightness auto exposure aims for (frame mean 0-255); null returns to the day/night defaults."""
+    return service.set_target_brightness(req.value)
 
 
 @router.get("/api/camera/orientation")
@@ -568,6 +592,27 @@ def get_event_config(service: AllSkyService = Depends(get_service)):
 def set_event_config(req: EventConfigRequest, service: AllSkyService = Depends(get_service)):
     """Turn detection of sky event types on or off (persisted)."""
     return service.set_event_config(**req.model_dump(exclude_none=True))
+
+
+@router.get("/api/adsb")
+def get_adsb_config(service: AllSkyService = Depends(get_service)):
+    """ADS-B flight matching: receiver address and live feed status."""
+    return service.get_adsb_config()
+
+
+@router.get("/api/adsb/aircraft")
+def get_adsb_aircraft(limit: int = Query(default=30, ge=1, le=200), service: AllSkyService = Depends(get_service)):
+    """Aircraft heard right now: flight, altitude, speed, heading, distance, direction, in camera view."""
+    return service.get_aircraft_now(limit=limit)
+
+
+@router.post("/api/adsb")
+def set_adsb_config(req: AdsbConfigRequest, service: AllSkyService = Depends(get_service)):
+    """Set the ADS-B receiver (SBS-1 feed host/port) or turn flight matching on/off (persisted)."""
+    try:
+        return service.set_adsb_config(**req.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
 @router.get("/api/events/img/{day}/{name}")

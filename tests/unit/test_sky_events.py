@@ -73,6 +73,104 @@ def test_faint_solid_track_is_satellite_and_can_be_disabled():
     assert _run(frames, enabled={"meteor", "plane"}) == []
 
 
+def _dots(n_frames, path, value=220, radius=3, skip=()):
+    """Short exposures: an aircraft is one dot per frame along `path` (list of (x, y) per frame)."""
+    frames = [_sky(i, i * 0.5) for i in range(n_frames)]
+    for i, (x, y) in enumerate(path):
+        if i not in skip:
+            cv2.circle(frames[i + 1], (int(x), int(y)), radius, (value, value, value), -1)
+    return frames
+
+
+def test_moving_dot_is_plane():
+    path = [(200 + 70 * k, 800 - 40 * k) for k in range(7)]
+    events = _run(_dots(9, path))
+    assert [e["type"] for e in events] == ["plane"]
+    ev = events[0]
+    assert ev["frames"] == 7 and ev["moving_dot"]
+    assert 400 < ev["length_px"] < 600
+    assert ev["_crop"].size > 0 and ev["_overview"].shape[1] == 640
+
+
+def test_blinking_dot_is_plane_even_when_faint():
+    path = [(1000 - 50 * k, 150 + 45 * k) for k in range(8)]
+    assert [e["type"] for e in _run(_dots(10, path, value=90, skip=(3,)))] == ["plane"]
+
+
+def test_faint_steady_dot_is_satellite():
+    path = [(300 + 30 * k, 300 + 10 * k) for k in range(6)]
+    assert [e["type"] for e in _run(_dots(8, path, value=60, radius=2))] == ["satellite"]
+    assert _run(_dots(8, path, value=60, radius=2), enabled={"meteor", "plane"}) == []
+
+
+def test_dots_that_do_not_move_steadily_are_ignored():
+    rng = np.random.default_rng(7)
+    random_path = [(rng.uniform(100, 1200), rng.uniform(100, 900)) for _ in range(7)]
+    assert _run(_dots(9, random_path)) == []
+    assert _run(_dots(9, [(640, 480)] * 7)) == []  # twinkling / flickering in place
+    assert _run(_dots(5, [(200 + 70 * k, 800 - 40 * k) for k in range(3)])) == []  # too few positions
+
+
+def test_fuzzy_glint_is_not_a_meteor():
+    """A raindrop / smudge on the lens lighting up: a fuzzy blob, not a sharp line."""
+    frames = [_sky(i, i * 0.5) for i in range(4)]
+    blob = np.zeros((H, W), np.float32)
+    cv2.ellipse(blob, (700, 600), (34, 16), 20, 0, 360, 90.0, -1)
+    blob = cv2.GaussianBlur(blob, (0, 0), 6)
+    frames[2] = cv2.add(frames[2], cv2.cvtColor(np.clip(blob, 0, 255).astype(np.uint8), cv2.COLOR_GRAY2BGR))
+    assert [e["type"] for e in _run(frames)] == []
+
+
+def test_meteor_repeating_at_the_same_spot_is_a_glint():
+    det = SkyEventDetector()
+    out = []
+    for i in range(12):
+        f = _sky(i, i * 0.5)
+        if i in (2, 8):  # the same streak twice, 90 s apart
+            cv2.line(f, (300, 200), (520, 330), (230, 230, 230), 2, cv2.LINE_AA)
+        out += det.process(f, ALL, ts=1000.0 + 15 * i, exposure_s=10.0, gain_db=30.0)
+    assert [e["type"] for e in out] == ["meteor"]
+
+
+def test_drifting_cloud_is_not_a_plane():
+    """The bright core of a soft cloud drifting slowly across lumpy sky moves like a dot but is no aircraft."""
+    rng = np.random.default_rng(3)
+    lumps = cv2.GaussianBlur(rng.normal(0, 1, (H, W)).astype(np.float32), (0, 0), 9)
+    lumps = 40.0 * lumps / (np.abs(lumps).max() + 1e-6)
+    frames = []
+    for i in range(10):
+        f = _sky(i, i * 0.5).astype(np.float32)
+        cloud = np.zeros((H, W), np.float32)
+        cv2.ellipse(cloud, (300 + 12 * i, 500 + 4 * i), (60, 30), 15, 0, 360, 70.0, -1)
+        cloud = cv2.GaussianBlur(cloud, (0, 0), 10) + np.roll(lumps, 12 * i, axis=1) * (cloud > 5)
+        frames.append(np.clip(f + cloud[..., None], 0, 255).astype(np.uint8))
+    assert [e["type"] for e in _run(frames) if e["type"] == "plane"] == []
+
+
+def test_streak_across_lumpy_cloud_is_not_a_plane():
+    """Cloud bits brightening along a line read as a dashed streak; the lumpy sky around them gives them away."""
+    rng = np.random.default_rng(5)
+    lumps = cv2.GaussianBlur(rng.normal(0, 1, (H, W)).astype(np.float32), (0, 0), 6)
+    lumps = np.clip(160.0 * lumps / (np.abs(lumps).max() + 1e-6), 0, None)[..., None]  # real cloud: texture 13-40 DN
+    frames = [np.clip(_sky(i, i * 0.5).astype(np.float32) + lumps, 0, 255).astype(np.uint8) for i in range(4)]
+    for k in range(10):
+        cv2.circle(frames[2], (600 + k * 30, 700 - k * 12), 3, (240, 240, 240), -1)
+    assert _run(frames) == []
+
+
+def test_single_frame_streaks_skipped_under_broken_cloud():
+    """Many specks brightening every frame (drifting broken cloud): one-frame streaks are not trusted."""
+    rng = np.random.default_rng(11)
+    frames = []
+    for i in range(25):
+        f = _sky(i, i * 0.5)
+        for x, y in rng.uniform([50, 50], [W - 50, H - 50], (20, 2)):
+            cv2.circle(f, (int(x), int(y)), 3, (200, 200, 200), -1)  # cloud bits lighting up at random
+        frames.append(f)
+    cv2.line(frames[22], (300, 200), (520, 330), (230, 230, 230), 2, cv2.LINE_AA)
+    assert [e for e in _run(frames) if e["type"] == "meteor"] == []
+
+
 def test_meteor_disabled_reports_nothing():
     frames = [_sky(i, i * 0.5) for i in range(4)]
     cv2.line(frames[2], (300, 200), (520, 330), (230, 230, 230), 2)

@@ -248,6 +248,7 @@ def main():
         )
     if args.min_capture_interval is not None:
         service.set_performance(persist=False, min_capture_interval_s=args.min_capture_interval)
+    service.start_adsb()
     restored = service.restore_camera_settings()
     if restored:
         logger.info(
@@ -272,7 +273,8 @@ def main():
         import cv2
 
         def _sync_jpeg() -> bytes:
-            frame, _ = service.capture_frame()
+            service.capture_frame()
+            frame, _ = service.get_display_frame()  # what viewers see, including the info stamp
             if frame is None or frame.shape[1] <= args.sync_max_width:
                 return service.get_snapshot_jpeg()
             h, w = frame.shape[:2]

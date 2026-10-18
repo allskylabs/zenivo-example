@@ -289,3 +289,38 @@ def render_celestial_overlay(
                 cv2.circle(annotated, (cx_pos, cy_pos), 2, (180, 180, 180), -1, cv2.LINE_AA)
 
     return annotated
+
+
+def stamp_frame_info(
+    frame: np.ndarray,
+    timestamp: datetime,
+    exposure_s: float,
+    gain_db: float,
+    brightness: float,
+) -> np.ndarray:
+    """Copy of frame with capture time, exposure, gain and mean brightness in the top-left corner
+    (outside the fisheye sky circle, so star/cloud analysis of archived frames is unaffected)."""
+    out = frame.copy()
+    w = out.shape[1]
+    scale = max(0.4, w / 2000.0)
+    thick = max(1, int(round(scale * 1.6)))
+    exp_txt = f"{exposure_s * 1000:.2f} ms" if exposure_s < 0.1 else f"{exposure_s:.1f} s"
+    lines = [
+        timestamp.astimezone().strftime("%Y-%m-%d %H:%M:%S %z"),
+        f"Exp {exp_txt}  Gain {gain_db:.1f} dB",
+        f"Brightness {brightness:.0f}/255",
+    ]
+    step = int(30 * scale)
+    for i, text in enumerate(lines):
+        org = (int(10 * scale), int(28 * scale) + i * step)
+        cv2.putText(out, text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.8 * scale, (0, 0, 0), thick + 2, cv2.LINE_AA)
+        cv2.putText(out, text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.8 * scale, (255, 255, 255), thick, cv2.LINE_AA)
+    return out
+
+
+def frame_brightness(frame: np.ndarray) -> float:
+    """Mean luminance (0-255) of a BGR frame, from a 1/8 subsample."""
+    sub = frame[::8, ::8]
+    if sub.ndim == 3:
+        sub = cv2.cvtColor(np.ascontiguousarray(sub), cv2.COLOR_BGR2GRAY)
+    return float(sub.mean())

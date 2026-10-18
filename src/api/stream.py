@@ -93,7 +93,8 @@ async def mjpeg_frame_generator(
             break
         t_start = time.perf_counter()
         try:
-            frame, _ = await asyncio.to_thread(service.capture_frame)
+            await asyncio.to_thread(service.capture_frame)
+            frame, _ = service.get_display_frame()  # star-boosted, with the time/exposure/gain stamp
             if frame is not None and frame.size > 0:
                 h, w = frame.shape[:2]
                 if w > downscale_width:
@@ -254,8 +255,8 @@ async def sse_event_generator(service: AllSkyService, interval: float = 1.0):
 async def handle_live_websocket(websocket: WebSocket, service: AllSkyService):
     """
     Handles bidirectional WebSocket communication on /ws/live.
-    - When ?binary=1 is passed: 100% pure binary protocol (ASB1 server->client, ASC1 client->server),
-      zero JSON text messages sent over the wire.
+    - When ?binary=1 is passed: binary protocol (ASB1 server->client, ASC1 client->server); the only
+      text message is a small {"type": "ae_lock"} JSON sent when the lock state or frame brightness changes.
     - When ?binary=1 is omitted: legacy JSON mode for unit/E2E test compatibility.
     """
     await ws_manager.connect(websocket)
@@ -273,6 +274,19 @@ async def handle_live_websocket(websocket: WebSocket, service: AllSkyService):
                 "telemetry": telem_payload,
             })
 
+        # Lock state is not in ASB1: push it as text whenever it (or the frame brightness) changes
+        last_lock = None
+
+        async def push_lock_state():
+            nonlocal last_lock
+            payload = {"type": "ae_lock", "mode": service.mode, "ae_lock": service.get_ae_lock()}
+            if payload != last_lock:
+                last_lock = payload
+                await websocket.send_text(json.dumps(payload))
+
+        if binary_mode:
+            await push_lock_state()
+
         # Background streamer task
         async def live_streamer():
             while True:
@@ -282,6 +296,7 @@ async def handle_live_websocket(websocket: WebSocket, service: AllSkyService):
                 if binary_mode:
                     pkt = await _build_full_binary_packet(service, packet_type=1)
                     await websocket.send_bytes(pkt)
+                    await push_lock_state()
                 else:
                     telem = await asyncio.to_thread(service.get_telemetry)
                     status = await asyncio.to_thread(service.get_status)

@@ -126,6 +126,13 @@ class RTS5869CameraController(CameraDriverInterface):
             self.device_path = device_path
         if self.fd is not None:
             return True
+        if not device_path:
+            # USB re-enumeration (unplug/reset) moves the camera to a new /dev/videoN; re-resolve it
+            # on every (re)open instead of retrying the stale node forever.
+            node = find_rts5869_device_node()
+            if node and node != self.device_path:
+                logger.info("RTS5869 device node changed %s -> %s", self.device_path, node)
+                self.device_path = node
         try:
             self.fd = os.open(self.device_path, os.O_RDWR)
             self.xu = RTS5869XUController(self.fd)
