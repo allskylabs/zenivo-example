@@ -160,6 +160,17 @@
         showExpiry(s.expires_in_s);
         if (s.lens) applyLens(s.lens);
         emptyMsg.hidden = st.active && !!st.bitmap;
+        if (st.active && !st.bitmap) {
+            emptyMsg.innerHTML = "<span>Waiting for the first frame from the camera…</span>";
+            clearTimeout(st.waitTimer);
+            st.waitTimer = setTimeout(() => {
+                if (st.active && !st.bitmap) emptyMsg.innerHTML =
+                    "<span>The camera has not sent a frame for 15 s. It is re-opened automatically after a stall; " +
+                    "if this stays, check the Activity Log.</span>";
+            }, 15000);
+        } else if (!st.active) {
+            emptyMsg.innerHTML = "<span>Press <strong>Start focus mode</strong> to stream a native-resolution crop.</span>";
+        }
         placeRoiBox();
     }
 
