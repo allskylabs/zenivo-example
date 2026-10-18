@@ -58,6 +58,8 @@ class AdsbFeed:
     """SBS-1 reader. Connects only while wanted() is true (night with aircraft detection on)."""
 
     KEEP_S = 300.0       # seconds of positions kept per aircraft
+    TRAIL_KEEP_S = 900.0  # seconds of thinned path kept per aircraft for the 3D map
+    TRAIL_STEP_S = 4.0
     MAX_AIRCRAFT = 400
 
     def __init__(self, host: str, port: int = 30003, wanted: Optional[Callable[[], bool]] = None):
@@ -133,7 +135,8 @@ class AdsbFeed:
             if ac is None:
                 if len(self._ac) >= self.MAX_AIRCRAFT:
                     return
-                ac = self._ac[icao] = {"icao": icao, "callsign": "", "pos": deque(maxlen=400), "seen": now}
+                ac = self._ac[icao] = {"icao": icao, "callsign": "", "pos": deque(maxlen=400), "seen": now,
+                                       "trail": deque(maxlen=int(self.TRAIL_KEEP_S / self.TRAIL_STEP_S) + 8)}
             ac["seen"] = now
             if f[1] == "1":
                 if f[10].strip():
@@ -156,6 +159,8 @@ class AdsbFeed:
             except ValueError:
                 return
             ac["pos"].append((now, lat, lon, alt_ft * FT))
+            if not ac["trail"] or now - ac["trail"][-1][0] >= self.TRAIL_STEP_S:
+                ac["trail"].append((now, lat, lon, alt_ft * FT))
 
     def _prune(self, now: float) -> None:
         with self._lock:
@@ -164,6 +169,9 @@ class AdsbFeed:
             for a in self._ac.values():
                 q: Deque = a["pos"]
                 while q and now - q[0][0] > self.KEEP_S:
+                    q.popleft()
+                q = a["trail"]
+                while q and now - q[0][0] > self.TRAIL_KEEP_S:
                     q.popleft()
 
     # ------------------------------------------------------------------
@@ -186,9 +194,10 @@ class AdsbFeed:
                                 **{k: a[k] for k in ("speed_kt", "track_deg", "vrate_fpm") if k in a}})
         return out
 
-    def current(self, max_age_s: float = 60.0, trail_s: float = 0.0, trail_step_s: float = 5.0) -> List[Dict[str, Any]]:
+    def current(self, max_age_s: float = 60.0, trail_s: float = 0.0) -> List[Dict[str, Any]]:
         """Latest state of every aircraft with a position in the last max_age_s seconds; with trail_s, also
-        its recent path as [[lat, lon, alt_m], ...] (oldest first, one point per trail_step_s)."""
+        its recent path as [[lat, lon, alt_m, age_s], ...] (oldest first, one point per TRAIL_STEP_S, ending
+        at the latest fix)."""
         now = time.time()
         out = []
         with self._lock:
@@ -199,12 +208,9 @@ class AdsbFeed:
                            "altitude_m": alt, "age_s": now - t,
                            **{k: a[k] for k in ("speed_kt", "track_deg", "vrate_fpm") if k in a}}
                     if trail_s > 0:
-                        trail, last_t = [], -1e18
-                        for pt, plat, plon, palt in a["pos"]:
-                            if now - pt <= trail_s and pt - last_t >= trail_step_s:
-                                trail.append([round(plat, 5), round(plon, 5), round(palt)])
-                                last_t = pt
-                        trail.append([round(lat, 5), round(lon, 5), round(alt)])
+                        trail = [[round(plat, 5), round(plon, 5), round(palt), round(now - pt, 1)]
+                                 for pt, plat, plon, palt in a["trail"] if now - pt <= trail_s and pt < t]
+                        trail.append([round(lat, 5), round(lon, 5), round(alt), round(now - t, 1)])
                         rec["trail"] = trail
                     out.append(rec)
         return out

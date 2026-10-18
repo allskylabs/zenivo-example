@@ -602,11 +602,17 @@ def get_adsb_config(service: AllSkyService = Depends(get_service)):
 
 @router.get("/api/adsb/aircraft")
 def get_adsb_aircraft(limit: int = Query(default=30, ge=1, le=400),
-                      trail: float = Query(default=0.0, ge=0.0, le=300.0),
+                      trail: float = Query(default=0.0, ge=0.0, le=900.0),
                       service: AllSkyService = Depends(get_service)):
     """Aircraft heard right now: flight, altitude, speed, heading, distance, direction, in camera view.
     trail=<seconds> adds lat/lon and each aircraft's recent path (3D map)."""
     return service.get_aircraft_now(limit=limit, trail_s=trail)
+
+
+@router.get("/api/map/config")
+def get_map_config(service: AllSkyService = Depends(get_service)):
+    """Basemap settings for the 3D flights map (Google Maps key, if configured)."""
+    return service.get_map_config()
 
 
 @router.post("/api/adsb")

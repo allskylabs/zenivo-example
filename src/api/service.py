@@ -2081,7 +2081,8 @@ class AllSkyService:
                 "in_view": in_view, "above_horizon": pos["alt_deg"] > 0, "age_s": round(a["age_s"], 1),
             })
             if trail_s > 0:
-                out[-1].update(lat=round(a["lat"], 5), lon=round(a["lon"], 5), trail=a.get("trail") or [])
+                out[-1].update(lat=round(a["lat"], 5), lon=round(a["lon"], 5), trail=a.get("trail") or [],
+                               **self._aircraft_info().describe(a["icao"], a["callsign"] or None))
         out.sort(key=lambda r: (not r["in_view"], not r["above_horizon"], r["distance_km"]))
         st = self.adsb.status()
         res = {"enabled": True, "connected": st["connected"], "total": len(out),
@@ -2096,6 +2097,18 @@ class AllSkyService:
                                  "hfov_deg": round(2 * math.degrees(math.atan(cx / f)), 2),
                                  "vfov_deg": round(2 * math.degrees(math.atan(cy / f)), 2)}
         return res
+
+    def _aircraft_info(self):
+        """Type / airline / route lookups for the 3D map (created on first use)."""
+        if getattr(self, "aircraft_info", None) is None:
+            from src.analytics.aircraft_info import AircraftInfo
+            self.aircraft_info = AircraftInfo(os.path.join(self.output_dir, "cache"))
+        return self.aircraft_info
+
+    def get_map_config(self) -> Dict[str, Any]:
+        """Basemap settings for the 3D flights map. Only Google Maps (Map Tiles API, key in station config
+        "google_maps_key") is offered on top of the elevation-only terrain; no OpenStreetMap-based maps."""
+        return {"google_maps_key": str(self.station_config.get("google_maps_key") or "")}
 
     def _adsb_wanted(self) -> bool:
         """Read the feed only while aircraft events can happen (night, plane detection on) or while the
@@ -4094,6 +4107,8 @@ class AllSkyService:
         """Release camera hardware resources."""
         if self.adsb is not None:
             self.adsb.stop()
+        if getattr(self, "aircraft_info", None) is not None:
+            self.aircraft_info.stop()
         for name in ("_retention_stop", "_camera_watchdog_stop"):
             stop = getattr(self, name, None)
             if stop is not None:

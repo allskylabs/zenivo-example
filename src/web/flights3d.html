@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Flights 3D — AllSky Observatory</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
     <style>
         :root {
             --bg-primary: #070a13;
@@ -22,7 +22,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { height: 100%; }
         body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-sans); overflow: hidden; }
-        #map { position: absolute; inset: 0; }
+        #map { position: absolute; inset: 0; background: var(--bg-primary); }
         #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
         .ac-label {
             position: absolute; transform: translate(-50%, -100%); white-space: nowrap; pointer-events: auto; cursor: pointer;
@@ -32,6 +32,9 @@
         .ac-label small { display: block; font-weight: 400; color: var(--text-secondary); }
         .ac-label.in-view { color: var(--warning); }
         .ac-label.selected { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+        .place { font: 500 11px var(--font-sans); color: #8ea3c0; text-shadow: 0 1px 3px #000, 0 0 2px #000; white-space: nowrap; pointer-events: none; }
+        .place.airport { color: #c4b5fd; }
+        .place.ring { color: #38bdf8; opacity: 0.75; font-size: 10px; }
         .panel {
             position: absolute; background: color-mix(in srgb, var(--bg-card) 92%, transparent); border: 1px solid var(--border-color);
             border-radius: 10px; backdrop-filter: blur(6px); font-size: 13px;
@@ -48,22 +51,28 @@
         }
         button:hover { border-color: var(--accent); }
         button.on { border-color: var(--accent); color: var(--accent); }
-        #list { top: 12px; right: 12px; width: 250px; max-height: calc(100vh - 24px); display: flex; flex-direction: column; }
+        button[hidden] { display: none; }
+        #list { top: 12px; right: 12px; width: 270px; max-height: calc(100vh - 24px); display: flex; flex-direction: column; }
         #list h2 { font-size: 13px; font-weight: 600; padding: 9px 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; }
         #list ul { list-style: none; overflow-y: auto; }
         #list li { padding: 6px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-mono); font-size: 12px; }
         #list li:hover, #list li.selected { background: var(--bg-card-sub); }
         #list li.in-view .cs { color: var(--warning); }
         #list li .meta { color: var(--text-secondary); }
-        #info { left: 12px; bottom: 28px; padding: 10px 12px; min-width: 230px; display: none; }
+        #info { left: 12px; bottom: 28px; padding: 10px 12px; width: 260px; display: none; }
         #info.show { display: block; }
-        #info h3 { font: 600 15px var(--font-mono); margin-bottom: 4px; display: flex; justify-content: space-between; gap: 12px; }
+        #info h3 { font: 600 15px var(--font-mono); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+        #info-logo { display: block; max-width: 100%; max-height: 34px; margin: 2px 0 6px; background: #f8fafc; border-radius: 4px; padding: 3px 6px; }
+        #info-logo[hidden] { display: none; }
+        #info-model { display: block; width: 100%; height: 130px; margin: 0 0 6px; border-radius: 6px;
+            background: radial-gradient(ellipse at 50% 60%, #1b2a44 0%, #0b1220 75%); }
         #info dl { display: grid; grid-template-columns: auto auto; gap: 2px 14px; font-size: 12px; }
         #info dt { color: var(--text-secondary); }
         #info dd { font-family: var(--font-mono); text-align: right; }
-        #info .links { margin-top: 8px; display: flex; gap: 6px; }
+        #info .links { margin-top: 8px; display: flex; gap: 6px; align-items: center; }
         #info a { color: var(--accent); font-size: 12px; }
-        .legend { display: flex; gap: 12px; font-size: 11px; color: var(--text-secondary); }
+        .legend { display: flex; gap: 10px; font-size: 11px; color: var(--text-secondary); align-items: center; flex-wrap: wrap; }
+        .legend .ramp { width: 120px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #ffd166, #06d6a0, #38bdf8, #8b5cf6, #f472b6); }
         .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
         .station-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; box-shadow: 0 0 10px var(--accent); }
         #list-toggle { display: none; }
@@ -72,9 +81,15 @@
             #list { top: auto; bottom: 64px; right: 12px; left: 12px; width: auto; max-height: 40vh; }
             #list.collapsed ul { display: none; }
             #list-toggle { display: inline-block; }
-            #info { bottom: auto; top: 128px; right: 12px; }
+            #info { bottom: auto; top: 150px; right: 12px; width: auto; }
         }
     </style>
+    <script type="importmap">
+        { "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        } }
+    </script>
 </head>
 <body>
     <div id="map"></div>
@@ -87,16 +102,16 @@
             <span id="status">Loading…</span>
         </div>
         <div class="btns">
-            <button id="btn-sat" title="Satellite imagery">Satellite</button>
-            <button id="btn-terrain" class="on" title="3D terrain">Terrain</button>
-            <button id="btn-trails" class="on" title="Flight paths over the last 3 minutes">Trails</button>
+            <button id="btn-base-terrain" class="on" title="Dark 3D terrain">Terrain</button>
+            <button id="btn-base-google" hidden title="Google Maps, dark">Google</button>
+            <button id="btn-base-sat" hidden title="Google satellite imagery">Satellite</button>
+            <button id="btn-trails" class="on" title="Flight paths: click to change length">Trails 10 min</button>
             <button id="btn-labels" class="on" title="Callsign labels">Labels</button>
             <button id="btn-home" title="Back to the station">Station</button>
         </div>
         <div class="legend">
-            <span><i style="background:#e2e8f0"></i>Heard</span>
+            <span>Altitude</span><span>0</span><span class="ramp"></span><span>12 km</span>
             <span><i style="background:var(--warning)"></i>In camera view</span>
-            <span><i style="background:var(--accent)"></i>Camera</span>
         </div>
     </div>
 
@@ -107,6 +122,8 @@
 
     <div id="info" class="panel">
         <h3><span id="info-cs"></span><button id="info-close" title="Close">✕</button></h3>
+        <canvas id="info-model" title="Drag to turn"></canvas>
+        <img id="info-logo" alt="" hidden>
         <dl id="info-dl"></dl>
         <div class="links">
             <button id="btn-follow">Follow</button>
@@ -114,73 +131,163 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
     <script type="module">
-        import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+        import * as THREE from "three";
+        import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
+        // Basemap rule: no OpenStreetMap-derived data. The base is elevation only (no borders, no labels);
+        // Google Maps (Map Tiles API, region VN) is offered on top when a key is configured.
         const POLL_MS = 5000;
-        const TRAIL_S = 180;
+        const TRAIL_CHOICES = [600, 900, 0, 180];   // seconds; 0 = off
         const MAX_EXTRAP_S = 20;
-        const PLANE_PX = 42;          // on-screen plane length at any zoom (planes are drawn larger than life)
-        const PLANE_LEN_M = 40;       // model length in metres
+        const PLANE_PX = 46;          // on-screen length of a 40 m airliner at any zoom (planes are drawn larger than life)
         const DEM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
-        const SAT = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+        const LOGO_SQUARE = (iata) => `https://pics.avs.io/al_square/256/256/${iata}.png`;
+        const LOGO_WORD = (iata) => `https://pics.avs.io/400/100/${iata}.png`;
 
         const $ = (id) => document.getElementById(id);
         const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
         const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
         const compass = (az) => COMPASS[Math.round(((az % 360) + 360) % 360 / 45) % 8];
         const D2R = Math.PI / 180;
+        const nowS = () => performance.now() / 1000;
 
         let station = null, camera = null;
         let origin = null, mPerUnit = 1;    // scene origin (mercator) at the station; mercator units per metre there
         const aircraft = new Map();         // icao -> state
-        let selected = null, follow = false, centering = false;   // centering: bring the selected plane to mid-screen once
-        let showTrails = true, showLabels = true;
-        let lastFetch = 0;
+        let selected = null, follow = false, centering = false;
+        let trailIdx = 0, trailSpan = TRAIL_CHOICES[0], showLabels = true;
+        let lastFetch = 0, haveTrails = false;
 
-        // ---------------------------------------------------------------- map
+        // ---------------------------------------------------------------- map: dark 3D terrain from elevation only
+        const RELIEF = ["interpolate", ["linear"], ["elevation"],
+            -200, "#03060d", 0, "#060a14", 30, "#08101d", 150, "#0b1526", 400, "#101d33",
+            800, "#16263f", 1300, "#1d3150", 2000, "#283f60", 3000, "#3a5476"];
         const map = new maplibregl.Map({
             container: "map",
-            style: "https://tiles.openfreemap.org/styles/dark",
-            center: [105.9095, 21.0538], zoom: 9, pitch: 62, bearing: -20, maxPitch: 80,
+            style: {
+                version: 8,
+                sources: {
+                    dem: { type: "raster-dem", tiles: [DEM], encoding: "terrarium", tileSize: 256, maxzoom: 14,
+                        attribution: "Terrain: Mapzen / AWS Terrain Tiles" },
+                    "dem-shade": { type: "raster-dem", tiles: [DEM], encoding: "terrarium", tileSize: 256, maxzoom: 14 },
+                },
+                layers: [
+                    { id: "bg", type: "background", paint: { "background-color": "#060a14" } },
+                    { id: "relief", type: "color-relief", source: "dem-shade", paint: { "color-relief-color": RELIEF } },
+                    { id: "hillshade", type: "hillshade", source: "dem-shade",
+                        paint: { "hillshade-exaggeration": 0.75, "hillshade-shadow-color": "#000000",
+                            "hillshade-highlight-color": "#4d6a94", "hillshade-accent-color": "#0a1424" } },
+                ],
+                terrain: { source: "dem", exaggeration: 1 },
+                sky: { "sky-color": "#070a13", "horizon-color": "#16233d", "fog-color": "#070a13",
+                    "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.5, "fog-ground-blend": 0.35, "atmosphere-blend": 0 },
+            },
+            center: [105.9095, 21.0538], zoom: 9, pitch: 64, bearing: -20, maxPitch: 82,
             attributionControl: { compact: true },
         });
         map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
+        map.on("error", (e) => console.error("map:", e.error?.message || e));
 
-        function firstSymbolLayer() {
-            return (map.getStyle().layers || []).find((l) => l.type === "symbol")?.id;
+        // Places for orientation (the base has no labels of its own)
+        const PLACES = [
+            ["Hà Nội", 105.8542, 21.0285], ["Bắc Ninh", 106.0763, 21.1861], ["Thái Nguyên", 105.8442, 21.5928],
+            ["Vĩnh Yên", 105.5966, 21.3089], ["Tam Đảo", 105.6452, 21.4566], ["Ba Vì", 105.3702, 21.0773],
+            ["Hòa Bình", 105.3379, 20.8133], ["Hải Dương", 106.3146, 20.9373], ["Hưng Yên", 106.0511, 20.6464],
+            ["Hải Phòng", 106.6881, 20.8449], ["Hạ Long", 107.0843, 20.9517], ["Nam Định", 106.1621, 20.4388],
+            ["Ninh Bình", 105.9745, 20.2506], ["Phủ Lý", 105.9122, 20.5411], ["Bắc Giang", 106.1946, 21.2731],
+            ["Lạng Sơn", 106.7615, 21.8537], ["Tuyên Quang", 105.2146, 21.8236], ["Việt Trì", 105.4019, 21.3227],
+            ["Thanh Hóa", 105.7769, 19.8067], ["Sơn La", 103.9144, 21.3256], ["Lào Cai", 103.9707, 22.4856],
+            ["Cao Bằng", 106.2572, 22.6657], ["Hà Giang", 104.9784, 22.8233], ["Móng Cái", 107.9666, 21.5243],
+        ];
+        const AIRPORTS = [
+            ["✈ Nội Bài VVNB", 105.8072, 21.2212], ["✈ Cát Bi VVCI", 106.7250, 20.8194], ["✈ Vân Đồn VVVD", 107.4144, 21.1178],
+            ["✈ Thọ Xuân VVTX", 105.4778, 19.9017], ["✈ Điện Biên VVDB", 103.0076, 21.3975], ["✈ Gia Lâm", 105.8865, 21.0405],
+        ];
+        function addPlaces() {
+            for (const [name, lon, lat] of PLACES) addText(name, lon, lat, "place");
+            for (const [name, lon, lat] of AIRPORTS) addText(name, lon, lat, "place airport");
+        }
+        function addText(text, lon, lat, cls) {
+            const el = document.createElement("div");
+            el.className = cls;
+            el.textContent = text;
+            return new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(map);
         }
 
-        // Set up as soon as the style is parsed, not after every first tile ("load"), so planes show up quickly
-        map.once("style.load", () => {
-            const before = firstSymbolLayer();
-            map.addSource("sat", { type: "raster", tiles: [SAT], tileSize: 256, maxzoom: 18,
-                attribution: "Imagery © Esri, Maxar, Earthstar Geographics" });
-            map.addLayer({ id: "sat", type: "raster", source: "sat", layout: { visibility: "none" } }, before);
-            map.addSource("dem", { type: "raster-dem", tiles: [DEM], encoding: "terrarium", tileSize: 256, maxzoom: 14,
-                attribution: "Terrain: Mapzen / AWS Terrain Tiles" });
-            map.addSource("dem-shade", { type: "raster-dem", tiles: [DEM], encoding: "terrarium", tileSize: 256, maxzoom: 14 });
-            map.addLayer({ id: "hillshade", type: "hillshade", source: "dem-shade",
-                paint: { "hillshade-exaggeration": 0.45, "hillshade-shadow-color": "#000", "hillshade-highlight-color": "#3b4a66" } }, before);
-            map.setTerrain({ source: "dem", exaggeration: 1 });
-            map.setSky?.({ "sky-color": "#070a13", "horizon-color": "#15223b", "fog-color": "#070a13", "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.6, "fog-ground-blend": 0.4 });
-            if (!(map.getStyle().layers || []).some((l) => l.type === "fill-extrusion")) {
-                map.addLayer({
-                    id: "buildings-3d", type: "fill-extrusion", source: "openmaptiles", "source-layer": "building", minzoom: 13,
-                    paint: {
-                        "fill-extrusion-color": "#24324d",
-                        "fill-extrusion-height": ["coalesce", ["get", "render_height"], 8],
-                        "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
-                        "fill-extrusion-opacity": 0.85,
-                    },
-                }, before);
-            }
+        // Start as soon as the (inline) style is ready rather than on "load", which waits for every terrain tile
+        // (an inline style can finish loading inside the constructor, before a "style.load" listener exists)
+        let styleReady = false;
+        const styleQueue = [];
+        const whenStyle = (fn) => (styleReady ? fn() : styleQueue.push(fn));
+        const markStyleReady = () => {
+            if (styleReady || !map.style || !map.style._loaded) return;
+            styleReady = true;
+            styleQueue.splice(0).forEach((fn) => fn());
+        };
+        for (const ev of ["style.load", "styledata", "load", "idle"]) map.on(ev, markStyleReady);
+        setTimeout(markStyleReady, 0);
+        whenStyle(() => {
+            addPlaces();
             map.addLayer(planesLayer);
-            poll();
-            setInterval(() => { if (!document.hidden) poll(); }, POLL_MS);
-            document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastFetch > POLL_MS) poll(); });
         });
+        poll();
+        setInterval(() => { if (!document.hidden) poll(); }, POLL_MS);
+        document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastFetch > POLL_MS) poll(); });
+
+        // ---------------------------------------------------------------- Google Maps basemap (optional)
+        const GOOGLE_DARK = [
+            { elementType: "geometry", stylers: [{ color: "#0b1220" }] },
+            { elementType: "labels.text.fill", stylers: [{ color: "#8ea3c0" }] },
+            { elementType: "labels.text.stroke", stylers: [{ color: "#070a13" }] },
+            { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#0d1626" }] },
+            { featureType: "water", elementType: "geometry", stylers: [{ color: "#040914" }] },
+            { featureType: "road", elementType: "geometry", stylers: [{ color: "#1a2740" }] },
+            { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#24375a" }] },
+            { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+            { featureType: "poi", stylers: [{ visibility: "off" }] },
+            { featureType: "transit", stylers: [{ visibility: "off" }] },
+            { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#3a5a86" }] },
+        ];
+        let googleKey = "";
+        const googleSessions = {};
+        fetch("/api/map/config").then((r) => r.json()).then((c) => {
+            googleKey = c.google_maps_key || "";
+            $("btn-base-google").hidden = $("btn-base-sat").hidden = !googleKey;
+        }).catch(() => {});
+
+        async function googleSource(kind) {
+            if (googleSessions[kind]) return googleSessions[kind];
+            const body = kind === "sat"
+                ? { mapType: "satellite", language: "vi-VN", region: "VN" }
+                : { mapType: "roadmap", language: "vi-VN", region: "VN", styles: GOOGLE_DARK };
+            const r = await fetch(`https://tile.googleapis.com/v1/createSession?key=${encodeURIComponent(googleKey)}`, {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+            if (!r.ok) throw new Error(`Google Maps: ${r.status}`);
+            const s = await r.json();
+            googleSessions[kind] = s.session;
+            return s.session;
+        }
+
+        async function setBase(kind) {
+            for (const k of ["terrain", "google", "sat"]) $(`btn-base-${k}`).classList.toggle("on", k === kind);
+            for (const k of ["google", "sat"]) if (map.getLayer(`g-${k}`)) map.setLayoutProperty(`g-${k}`, "visibility", k === kind ? "visible" : "none");
+            map.setLayoutProperty("relief", "visibility", kind === "terrain" ? "visible" : "none");
+            map.setPaintProperty("hillshade", "hillshade-exaggeration", kind === "terrain" ? 0.75 : 0.35);
+            if (kind === "terrain" || map.getLayer(`g-${kind}`)) return;
+            try {
+                const session = await googleSource(kind);
+                map.addSource(`g-${kind}`, { type: "raster", tileSize: 256, maxzoom: 20,
+                    tiles: [`https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${session}&key=${encodeURIComponent(googleKey)}`],
+                    attribution: `Map data ©${new Date().getFullYear()} Google` });
+                map.addLayer({ id: `g-${kind}`, type: "raster", source: `g-${kind}`,
+                    paint: kind === "sat" ? { "raster-brightness-max": 0.75, "raster-saturation": -0.15 } : {} }, "hillshade");
+            } catch (err) {
+                $("status").textContent = err.message;
+                setBase("terrain");
+            }
+        }
 
         // ---------------------------------------------------------------- geometry helpers
         function merc(lon, lat, alt) {
@@ -205,81 +312,595 @@
 
         // ---------------------------------------------------------------- three.js scene
         const scene = new THREE.Scene();
-        scene.add(new THREE.AmbientLight(0xffffff, 1.4));
-        const sun = new THREE.DirectionalLight(0xffffff, 2.2);
-        sun.position.set(0.4, -0.6, 1);
+        scene.add(new THREE.HemisphereLight(0xc8d6ff, 0x20222a, 1.6));
+        const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+        sun.position.set(0.5, -0.7, 1);
         scene.add(sun);
+        const fill = new THREE.DirectionalLight(0x9fb4ff, 0.8);
+        fill.position.set(-0.6, 0.5, 0.3);
+        scene.add(fill);
         const cam3 = new THREE.Camera();
-        const world = new THREE.Group();       // per-frame matrix maps metres-ish scene units -> mercator offsets
+        const world = new THREE.Group();
         scene.add(world);
+        const DROP_MAT = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.3 });
 
-        const MAT = {
-            heard: new THREE.MeshLambertMaterial({ color: 0xe2e8f0 }),
-            inView: new THREE.MeshLambertMaterial({ color: 0xf59e0b, emissive: 0x4a2a00 }),
-            selected: new THREE.MeshLambertMaterial({ color: 0x38bdf8, emissive: 0x0b3a52 }),
+        // ================================================================ aircraft models
+        // Dimensions in metres (length, fuselage radius, span, wing chords/sweep, engines...), nose along +Y, up +Z.
+        const FAMILIES = {
+            narrow: { L: 38, R: 1.98, span: 34.5, cr: 6.6, ct: 1.6, sweep: 25, dih: 5.5, wingY: 0.5, wingZ: -0.62,
+                eng: [[5.9, 1.05, 4.6]], fin: [6.8, 6.4, 2.2, 38], stab: [12.6, 4.0, 1.4, 30], winglet: 2.4 },
+            wide: { L: 64, R: 2.95, span: 60, cr: 11, ct: 2.6, sweep: 30, dih: 6, wingY: 1.5, wingZ: -0.6,
+                eng: [[10, 1.6, 7]], fin: [9.5, 10.5, 3.4, 40], stab: [20, 6.5, 2.2, 33], winglet: 0 },
+            heavy: { L: 70, R: 3.15, span: 64.5, cr: 12.5, ct: 2.8, sweep: 31, dih: 6, wingY: 2.5, wingZ: -0.62,
+                eng: [[11.5, 1.95, 7.6]], fin: [10.5, 11.5, 3.6, 40], stab: [21.5, 7, 2.4, 33], winglet: 0 },
+            quad: { L: 70.6, R: 3.2, span: 64.4, cr: 13, ct: 3, sweep: 37, dih: 7, wingY: 2, wingZ: -0.6,
+                eng: [[11.6, 1.35, 6.2], [21, 1.35, 6.2]], fin: [11, 12, 3.6, 45], stab: [22, 7.5, 2.4, 35], winglet: 1.8, hump: true },
+            a380: { L: 72.7, R: 3.55, span: 79.8, cr: 17, ct: 3.6, sweep: 33, dih: 5.5, wingY: 3, wingZ: -0.7,
+                eng: [[15, 1.55, 7], [25.5, 1.55, 7]], fin: [13, 13.5, 4.2, 42], stab: [30, 9, 3, 33], winglet: 2, double: true },
+            regional: { L: 36.2, R: 1.5, span: 28.7, cr: 5, ct: 1.5, sweep: 24, dih: 5, wingY: 0, wingZ: -0.6,
+                eng: [[5.2, 0.9, 3.8]], fin: [6, 5.4, 2.4, 38], stab: [10, 3.2, 1.2, 28], winglet: 1.5 },
+            turboprop: { L: 27.2, R: 1.4, span: 27, cr: 2.6, ct: 1.5, sweep: 2, dih: 0, wingY: 1.2, wingZ: 0.95, high: true,
+                prop: [[4.05, 0.62, 5.4, 1.96, 6]], fin: [5.2, 4.6, 2.6, 30], stab: [7.3, 1.8, 1.1, 8], ttail: true },
+            ga: { L: 8.3, R: 0.6, span: 11, cr: 1.6, ct: 1.2, sweep: 0, dih: 1.5, wingY: 1.2, wingZ: 0.55, high: true,
+                nose: true, fin: [1.5, 1.4, 0.8, 30], stab: [3.4, 0.9, 0.7, 4] },
         };
-        const TRAIL_MAT = {
-            heard: new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.55 }),
-            inView: new THREE.LineBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.8 }),
-            selected: new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.95 }),
+        const TYPE_LEN = {
+            A318: 31.4, A319: 33.8, A19N: 33.8, A320: 37.6, A20N: 37.6, A321: 44.5, A21N: 44.5, BCS1: 35, BCS3: 38.7,
+            B736: 31.2, B737: 33.6, B738: 39.5, B739: 42.1, B37M: 35.6, B38M: 39.5, B39M: 42.2, B3XM: 43.8, B752: 47.3, B753: 54.4,
+            A332: 58.8, A333: 63.7, A338: 58.8, A339: 63.7, A359: 66.8, A35K: 73.8, A306: 54.1, A310: 46.7,
+            B762: 48.5, B763: 54.9, B764: 61.4, B788: 56.7, B789: 62.8, B78X: 68.3, B772: 63.7, B77L: 63.7, B773: 73.9, B77W: 73.9, B779: 76.7,
+            B744: 70.6, B748: 76.3, B74F: 70.6, A388: 72.7, A343: 63.7, A346: 75.4, MD11: 61.6,
+            E170: 29.9, E175: 31.7, E75L: 31.7, E190: 36.2, E195: 38.7, E290: 36.3, E295: 41.5, CRJ9: 36.2, SU95: 29.9, AT72: 27.2, AT76: 27.2,
+            AT75: 27.2, AT45: 22.7, DH8D: 32.8, C919: 38.9, ARJ2: 33.5,
         };
-        const DROP_MAT = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.35 });
+        function familyFor(type) {
+            const t = (type || "").toUpperCase();
+            if (!t) return "narrow";
+            if (t === "A388") return "a380";
+            if (/^(B74|A34|IL96|A124)/.test(t)) return "quad";
+            if (/^(B77|A35K|B78X)/.test(t)) return "heavy";
+            if (/^(A33|A35|A30|A31|B76|B78|MD11|A3ST)/.test(t)) return "wide";
+            if (/^(AT[4-7]|DH8|DHC|SF34|J41|C208|AN2|B190|D328|L410|PC12)/.test(t)) return "turboprop";
+            if (/^(E1|E2|E7|CRJ|SU9|ARJ|F70|F100|BCS)/.test(t)) return "regional";
+            if (/^(C1[5-9]|C2[0-9]|P28|PA|DA4|SR2|BE[0-9])/.test(t)) return "ga";
+            return "narrow";
+        }
 
-        // Airliner built from primitives, metres, nose along +Y, up +Z
-        const GEO = (() => {
-            const parts = [];
-            const add = (geo, x, y, z, rz = 0, rx = 0) => {
-                geo.rotateX(rx); geo.rotateZ(rz); geo.translate(x, y, z); parts.push(geo);
-            };
-            add(new THREE.CylinderGeometry(2, 2, 30, 12), 0, 0, 0);
-            add(new THREE.ConeGeometry(2, 6, 12), 0, 18, 0);
-            add(new THREE.ConeGeometry(2, 8, 12), 0, -19, 0.6, 0, Math.PI);
-            add(new THREE.BoxGeometry(17, 5, 0.6), 8.2, -1.5, -0.6, -0.32);
-            add(new THREE.BoxGeometry(17, 5, 0.6), -8.2, -1.5, -0.6, 0.32);
-            add(new THREE.BoxGeometry(6.5, 3, 0.4), 3.2, -18.5, 1.2, -0.35);
-            add(new THREE.BoxGeometry(6.5, 3, 0.4), -3.2, -18.5, 1.2, 0.35);
-            add(new THREE.BoxGeometry(0.5, 5, 7), 0, -18.5, 4.5);
-            add(new THREE.CylinderGeometry(1, 1, 4.5, 10), 6, 1.5, -1.6);
-            add(new THREE.CylinderGeometry(1, 1, 4.5, 10), -6, 1.5, -1.6);
-            return parts;
-        })();
+        const MODEL_CACHE = new Map();      // family|type -> {geos: {slot: geometry}, dims}
 
-        function makePlaneMesh() {
-            const g = new THREE.Group();
-            for (const geo of GEO) g.add(new THREE.Mesh(geo, MAT.heard));
-            g.matrixAutoUpdate = false;
+        function mergeSlot(list) {
+            return mergeGeometries(list.map((g) => {
+                const n = g.index ? g.toNonIndexed() : g;
+                for (const k of Object.keys(n.attributes)) if (!["position", "normal", "uv"].includes(k)) n.deleteAttribute(k);
+                if (!n.attributes.uv) n.setAttribute("uv", new THREE.Float32BufferAttribute(new Float32Array(n.attributes.position.count * 2), 2));
+                return n;
+            }), false);
+        }
+
+        // Planform (x span, y chord) extruded into a thin lifting surface
+        function surface(x0, x1, leRoot, cr, ct, sweepDeg, thick, side, opts = {}) {
+            const tanS = Math.tan(sweepDeg * D2R);
+            const leTip = leRoot - (x1 - x0) * tanS;
+            const pts = [[x0, leRoot], [x1, leTip], [x1, leTip - ct]];
+            if (opts.kink) {
+                const xk = x0 + (x1 - x0) * 0.33;
+                const teK = leRoot - (xk - x0) * tanS - Math.max(ct, cr * 0.55);
+                pts.push([xk, Math.min(teK, leRoot - cr + (xk - x0) * 0.05)]);
+            }
+            pts.push([x0, leRoot - cr]);
+            const shape = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x * side, y)));
+            const g = new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: true, bevelThickness: thick * 0.35,
+                bevelSize: Math.min(thick * 0.35, ct * 0.2), bevelSegments: 2, curveSegments: 1 });
+            g.translate(0, 0, -thick / 2);
             return g;
         }
-        function setPlaneMaterial(g, mat) { g.children.forEach((m) => { m.material = mat; }); }
 
-        let stationGroup = null;
+        function buildModel(fam, type) {
+            const key = `${fam}|${type || ""}`;
+            if (MODEL_CACHE.has(key)) return MODEL_CACHE.get(key);
+            const f = FAMILIES[fam];
+            const s = (TYPE_LEN[type] || f.L) / f.L;   // stretch the family to the type's real length
+            const L = f.L * s, R = f.R, half = L / 2;
+            const slots = { body: [], paint: [], brand: [], engine: [], dark: [], decalR: [], decalL: [] };
+
+            // --- fuselage: lathe around Y (nose +Y), upswept tail cone, livery UVs (u along length, v around)
+            const noseLen = (f.nose ? 1.6 : 2.4) * R, tailLen = (fam === "ga" ? 4.5 : 3.3) * R;
+            const prof = [new THREE.Vector2(0, -half)];
+            const N = 90;
+            for (let i = 0; i <= N; i++) {
+                const y = -half + (L * i) / N;
+                const yn = half - y, yt = y + half;
+                let r = R;
+                if (yn < noseLen) { const q = yn / noseLen; r = R * Math.pow(1 - Math.pow(1 - q, 2.3), 0.5); }
+                if (yt < tailLen) { const q = yt / tailLen; r = Math.min(r, R * (0.16 + 0.84 * Math.pow(q, 0.75))); }
+                prof.push(new THREE.Vector2(Math.max(r, 0.001), y));
+            }
+            const fus = new THREE.LatheGeometry(prof, 36);
+            const pos = fus.attributes.position, uv = fus.attributes.uv;
+            for (let i = 0; i < pos.count; i++) {
+                const x = pos.getX(i), y = pos.getY(i);
+                let z = pos.getZ(i);
+                const ang = (Math.atan2(x, z) / (2 * Math.PI) + 1) % 1;
+                uv.setXY(i, (y + half) / L, ang);
+                const yt = y + half, yn = half - y;
+                if (yt < tailLen) { const q = 1 - yt / tailLen; z += (R - z) * 0.42 * Math.pow(q, 1.5); }
+                if (f.double) z = z * 1.22 + R * 0.12;
+                if (f.hump && z > 0 && yn > 0.04 * L && yn < 0.36 * L) {
+                    const q = Math.sin(Math.PI * Math.min(1, (yn - 0.04 * L) / (0.32 * L)));
+                    z += 0.42 * R * Math.pow(q, 0.7) * (z / R);
+                }
+                pos.setXYZ(i, x, y, z);
+            }
+            fus.computeVertexNormals();
+            slots.body.push(fus);
+            const topZ = f.double ? R * 1.34 : R;
+
+            // --- wings, winglets
+            const thick = Math.max(0.18, R * 0.2);
+            const wz = f.wingZ * R;
+            const leRoot = f.wingY * s + f.cr * 0.55;
+            const x0 = R * 0.4, x1 = f.span / 2;
+            const tipZ = wz + (x1 - x0) * Math.tan(f.dih * D2R);
+            for (const side of [1, -1]) {
+                const w = surface(x0, x1, leRoot, f.cr, f.ct, f.sweep, thick, side, { kink: !f.high });
+                w.rotateY(-side * f.dih * D2R);
+                w.translate(0, 0, wz);
+                slots.paint.push(w);
+                if (f.winglet) {
+                    const tipLe = leRoot - (x1 - x0) * Math.tan(f.sweep * D2R);
+                    const sh = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(f.ct * 0.95, 0),
+                        new THREE.Vector2(f.ct * 0.25 - f.winglet * 0.6, f.winglet), new THREE.Vector2(-f.winglet * 0.6, f.winglet)]);
+                    const g = new THREE.ExtrudeGeometry(sh, { depth: 0.12, bevelEnabled: false });
+                    g.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1));
+                    g.rotateY(side * 0.18);
+                    g.translate(side * x1, tipLe - f.ct * 0.98, tipZ);
+                    slots.brand.push(g);
+                }
+            }
+
+            // --- engines under the wings (turbofans) with pylons and dark fan faces
+            for (const [ex, er, el] of f.eng || []) {
+                const prof2 = [[0, -0.62], [0.3, -0.6], [0.55, -0.5], [0.8, -0.28], [0.97, -0.02], [1, 0.22], [0.96, 0.44], [0.86, 0.5]]
+                    .map(([r, y]) => new THREE.Vector2(r * er, y * el));
+                for (const side of [1, -1]) {
+                    const x = side * ex;
+                    const le = leRoot - (ex - x0) * Math.tan(f.sweep * D2R);
+                    const zc = wz + (ex - x0) * Math.tan(f.dih * D2R) - er - thick * 0.6;
+                    const yc = le + el * 0.15;
+                    const n = new THREE.LatheGeometry(prof2, 24);
+                    n.translate(x, yc, zc);
+                    slots.engine.push(n);
+                    const fan = new THREE.CircleGeometry(er * 0.86, 24);
+                    fan.rotateX(-Math.PI / 2);
+                    fan.translate(x, yc + el * 0.44, zc);
+                    slots.dark.push(fan);
+                    const spin = new THREE.ConeGeometry(er * 0.22, er * 0.5, 12);
+                    spin.translate(x, yc + el * 0.46 + er * 0.2, zc);
+                    slots.paint.push(spin);
+                    const py = new THREE.BoxGeometry(er * 0.22, el * 0.75, er * 0.9);
+                    py.translate(x, yc - el * 0.05, zc + er * 0.85);
+                    slots.paint.push(py);
+                }
+            }
+
+            // --- vertical fin with logo decals on both sides
+            const [fh, fcr, fct, fsw] = f.fin;
+            const finTe = -half + Math.max(0.3, tailLen * 0.08);
+            const finLe = finTe + fcr;
+            const finTipLe = finLe - fh * Math.tan(fsw * D2R);
+            const finPts = [[finTe, 0], [finLe, 0], [finTipLe, fh], [finTipLe - fct, fh]];
+            const finBase = topZ * 0.82;
+            const finShape = new THREE.Shape(finPts.map(([a, b]) => new THREE.Vector2(a, b)));
+            const ft = Math.max(0.15, R * 0.12);
+            const fin = new THREE.ExtrudeGeometry(finShape, { depth: ft, bevelEnabled: true, bevelThickness: ft * 0.4, bevelSize: ft * 0.4, bevelSegments: 2 });
+            fin.translate(0, 0, -ft / 2);
+            fin.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, finBase, 0, 0, 0, 1));
+            slots.brand.push(fin);
+            // Square logo centred on the fin; edges clamp to the logo's background colour
+            const cx = (finTe + finLe + finTipLe + finTipLe - fct) / 4, cy = fh * 0.48;
+            const size = Math.min(fh, (fcr + fct) / 2) * 0.95;
+            for (const side of [1, -1]) {
+                const d = new THREE.ShapeGeometry(finShape);
+                const p = d.attributes.position, u = d.attributes.uv;
+                for (let i = 0; i < p.count; i++) {
+                    const uu = (p.getX(i) - cx) / size + 0.5, vv = (p.getY(i) - cy) / size + 0.5;
+                    u.setXY(i, side > 0 ? uu : 1 - uu, vv);
+                }
+                d.applyMatrix4(new THREE.Matrix4().set(0, 0, side, side * ft * 0.95, 1, 0, 0, 0, 0, 1, 0, finBase, 0, 0, 0, 1));
+                (side > 0 ? slots.decalR : slots.decalL).push(d);
+            }
+
+            // --- horizontal stabilisers (T-tail on turboprops)
+            const [ss, scr, sct, ssw] = f.stab;
+            const stLe = f.ttail ? finTipLe + 0.2 : finTe + scr * 1.05;
+            const stZ = f.ttail ? finBase + fh : topZ * 0.25;
+            for (const side of [1, -1]) {
+                const st = surface(f.ttail ? 0 : R * 0.2, ss / 2, stLe, scr, sct, ssw, Math.max(0.1, ft * 0.8), side);
+                st.rotateY(-side * (f.ttail ? 0 : 7) * D2R);
+                st.translate(0, 0, stZ);
+                slots.paint.push(st);
+            }
+
+            // --- turboprop / piston nacelles (props are added per aircraft so they can spin)
+            const props = [];
+            for (const [ex, er, el, pr, nb] of f.prop || []) {
+                for (const side of [1, -1]) {
+                    const x = side * ex;
+                    const n = new THREE.CapsuleGeometry(er, el - 2 * er, 6, 16);
+                    n.translate(x, leRoot - el * 0.25, wz - er * 0.2);
+                    slots.engine.push(n);
+                    props.push({ x, y: leRoot + el * 0.27 + 0.1, z: wz - er * 0.2, r: pr, n: nb });
+                }
+            }
+            if (f.nose) props.push({ x: 0, y: half + 0.05, z: 0, r: 0.95, n: 2 });
+
+            const geos = {};
+            for (const [k, list] of Object.entries(slots)) if (list.length) geos[k] = mergeSlot(list);
+            const tipLe = leRoot - (x1 - x0) * Math.tan(f.sweep * D2R);
+            const model = { geos, props, L, R, tailLen, noseLen, double: !!f.double, topZ, wingTip: x1, tipZ, tipY: tipLe - f.ct * 0.5 };
+            MODEL_CACHE.set(key, model);
+            return model;
+        }
+
+        // ---------------------------------------------------------------- liveries
+        // Colours come from the airline's square logo (its background is the tail colour); its wordmark is
+        // painted as fuselage titles. A few airlines' known details on top.
+        const LIVERY_EXTRA = {
+            VJC: { engine: "brand" }, HVN: { engine: "brand", belly: "#e6e9ee" }, BAV: { engine: "brand" },
+            CPA: { engine: "#d8dde3" }, KAL: { body: "#cfe3f3", belly: "#cfe3f3" }, ANA: { engine: "brand" },
+            EVA: { engine: "brand" }, SIA: { engine: "brand" },
+        };
+        const AIRLINE = new Map();   // IATA -> {square, word, brand, wordBox, ready}
+
+        function loadImg(url) {
+            return new Promise((res) => {
+                const im = new Image();
+                im.crossOrigin = "anonymous";
+                im.onload = () => res(im);
+                im.onerror = () => res(null);
+                im.src = url;
+            });
+        }
+        function airlineArt(iata) {
+            if (!iata) return null;
+            if (AIRLINE.has(iata)) return AIRLINE.get(iata);
+            const a = { square: null, word: null, brand: "#64748b", wordBox: null };
+            a.ready = Promise.all([loadImg(LOGO_SQUARE(iata)), loadImg(LOGO_WORD(iata))]).then(([sq, wd]) => {
+                const c = document.createElement("canvas"), ctx = c.getContext("2d", { willReadFrequently: true });
+                if (sq) {
+                    a.square = sq;
+                    c.width = sq.width; c.height = sq.height;
+                    ctx.drawImage(sq, 0, 0);
+                    try {
+                        const d = ctx.getImageData(3, 3, 1, 1).data;
+                        if (d[3] > 200) a.brand = `rgb(${d[0]},${d[1]},${d[2]})`;
+                    } catch (e) { /* tainted canvas: keep grey */ }
+                }
+                if (wd) {
+                    c.width = wd.width; c.height = wd.height;
+                    ctx.clearRect(0, 0, c.width, c.height);
+                    ctx.drawImage(wd, 0, 0);
+                    try {
+                        const d = ctx.getImageData(0, 0, c.width, c.height).data;
+                        let x0 = c.width, y0 = c.height, x1 = 0, y1 = 0;
+                        for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+                            if (d[(y * c.width + x) * 4 + 3] > 40) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+                        }
+                        if (x1 > x0) { a.word = wd; a.wordBox = [x0, y0, x1 - x0 + 1, y1 - y0 + 1]; }
+                    } catch (e) { /* no titles */ }
+                }
+                return a;
+            });
+            AIRLINE.set(iata, a);
+            return a;
+        }
+
+        const MAT_CACHE = new Map();     // livery key -> materials
+        const phong = (o) => new THREE.MeshPhongMaterial({ shininess: 70, specular: 0x666666, ...o });
+
+        // Fuselage texture: x along the length (tail -> nose), y around (top, right side, belly, left side)
+        function paintFuselage(tex, model, art, extra, icao3) {
+            const W = 2048, H = 512;
+            const c = tex.image;
+            c.width = W; c.height = H;
+            const g = c.getContext("2d");
+            const { L, R, tailLen, noseLen } = model;
+            const pxM = W / L, pyM = H / (2 * Math.PI * R * (model.double ? 1.15 : 1));
+            const brand = art ? art.brand : "#64748b";
+            const body = extra.body || "#f3f5f8";
+            g.fillStyle = body; g.fillRect(0, 0, W, H);
+            // belly
+            const belly = extra.belly || "#cfd4db";
+            const grad = g.createLinearGradient(0, H * 0.3, 0, H * 0.7);
+            grad.addColorStop(0, body); grad.addColorStop(0.12, belly); grad.addColorStop(0.88, belly); grad.addColorStop(1, body);
+            g.fillStyle = grad; g.fillRect(0, H * 0.3, W, H * 0.4);
+            // brand pinstripes along the lower sides, brand colour sweeping up the tail cone under the fin
+            g.fillStyle = brand;
+            const sx0 = tailLen * pxM * 0.5, sw = W - (tailLen * 0.5 + noseLen * 0.8) * pxM;
+            g.fillRect(sx0, H * 0.305, sw, H * 0.012);
+            g.fillRect(sx0, H * 0.683, sw, H * 0.012);
+            if (art) {
+                const tg = g.createLinearGradient(0, 0, tailLen * pxM * 1.6, 0);
+                tg.addColorStop(0, brand); tg.addColorStop(0.55, brand); tg.addColorStop(1, "rgba(0,0,0,0)");
+                g.fillStyle = tg;
+                g.beginPath(); g.moveTo(0, 0); g.lineTo(tailLen * pxM * 1.6, 0); g.lineTo(tailLen * pxM * 1.1, H * 0.13); g.lineTo(0, H * 0.2); g.fill();
+                g.beginPath(); g.moveTo(0, H); g.lineTo(tailLen * pxM * 1.6, H); g.lineTo(tailLen * pxM * 1.1, H * 0.87); g.lineTo(0, H * 0.8); g.fill();
+            }
+            // passenger windows (right side above the waterline at v~0.2, left at v~0.8) and doors
+            g.fillStyle = "#1b2433";
+            const ww = Math.max(2, 0.24 * pxM), wh = Math.max(3, 0.34 * pyM), pitch = 0.53 * pxM;
+            for (const dv of model.double ? [0.205, 0.13] : [0.205]) {
+                for (let x = (tailLen + 1.2) * pxM; x < W - (noseLen + 1.4) * pxM; x += pitch) {
+                    g.fillRect(x, dv * H - wh / 2, ww, wh);
+                    g.fillRect(x, (1 - dv) * H - wh / 2, ww, wh);
+                }
+            }
+            g.strokeStyle = "rgba(60,70,90,0.45)"; g.lineWidth = 2;
+            for (const dx of [W - (noseLen + 1.0) * pxM, (tailLen + 0.6) * pxM]) {
+                for (const v of [0.205, 0.795]) g.strokeRect(dx - 0.45 * pxM, v * H - 1.0 * pyM, 0.9 * pxM, 1.9 * pyM);
+            }
+            // cockpit windscreen
+            g.fillStyle = "#121a26";
+            const cx0 = W - noseLen * pxM * 0.78, cx1 = W - noseLen * pxM * 0.42;
+            for (const [a, b] of [[0.11, 0.2], [0.8, 0.89], [0.96, 1.0], [0, 0.04]]) {
+                g.beginPath(); g.moveTo(cx0, a * H); g.lineTo(cx1, a * H + 4); g.lineTo(cx1, b * H - 4); g.lineTo(cx0, b * H); g.fill();
+            }
+            // titles: the airline's wordmark above the windows, readable from both sides
+            if (art && art.word) {
+                const [sx, sy, swd, sh] = art.wordBox;
+                const thPx = Math.min(1.35 * pyM, H * 0.085);
+                const tw = Math.min(thPx * (swd / sh) * (pxM / pyM), W * 0.42);
+                const th = tw * (sh / swd) * (pyM / pxM);
+                const xc = W * 0.62;
+                g.drawImage(art.word, sx, sy, swd, sh, xc - tw / 2, 0.125 * H - th / 2, tw, th);
+                g.save(); g.translate(xc, 0.875 * H); g.rotate(Math.PI);
+                g.drawImage(art.word, sx, sy, swd, sh, -tw / 2, -th / 2, tw, th);
+                g.restore();
+            } else if (icao3) {
+                g.fillStyle = "#334155"; g.font = `bold ${Math.round(1.1 * pyM)}px sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
+                g.fillText(icao3, W * 0.62, 0.125 * H);
+                g.save(); g.translate(W * 0.62, 0.875 * H); g.rotate(Math.PI); g.fillText(icao3, 0, 0); g.restore();
+            }
+            tex.needsUpdate = true;
+        }
+
+        function liveryMaterials(model, modelKey, iata, icao3) {
+            const key = `${modelKey}|${iata || icao3 || "-"}`;
+            if (MAT_CACHE.has(key)) return MAT_CACHE.get(key);
+            const art = airlineArt(iata);
+            const extra = LIVERY_EXTRA[icao3] || {};
+            const bodyTex = new THREE.CanvasTexture(document.createElement("canvas"));
+            bodyTex.flipY = false; bodyTex.colorSpace = THREE.SRGBColorSpace; bodyTex.anisotropy = 4;
+            const logoTex = new THREE.Texture();
+            logoTex.colorSpace = THREE.SRGBColorSpace;
+            const decal = phong({ map: logoTex, transparent: true, opacity: 0, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide });
+            const mats = {
+                body: phong({ map: bodyTex }),
+                paint: phong({ color: 0xd9dee5 }),
+                brand: phong({ color: 0x8a96a8 }),
+                engine: phong({ color: 0xe6e9ee, side: THREE.DoubleSide }),
+                dark: new THREE.MeshBasicMaterial({ color: 0x0b0f17, side: THREE.DoubleSide }),
+                decalR: decal, decalL: decal,
+            };
+            paintFuselage(bodyTex, model, null, extra, icao3);
+            if (art) {
+                art.ready.then(() => {
+                    paintFuselage(bodyTex, model, art, extra, icao3);
+                    mats.brand.color.set(art.brand);
+                    if (extra.engine === "brand") mats.engine.color.set(art.brand);
+                    else if (extra.engine) mats.engine.color.set(extra.engine);
+                    if (art.square) {
+                        logoTex.image = art.square; logoTex.needsUpdate = true;
+                        decal.opacity = 1; decal.transparent = false; decal.needsUpdate = true;
+                    }
+                    map.triggerRepaint();
+                });
+            }
+            MAT_CACHE.set(key, mats);
+            return mats;
+        }
+
+        // ---------------------------------------------------------------- lights (nav, beacons, strobes) as glow sprites
+        function glowTexture() {
+            const c = document.createElement("canvas"); c.width = c.height = 64;
+            const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+            gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.2, "rgba(255,255,255,0.8)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+            g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+            return new THREE.CanvasTexture(c);
+        }
+        const GLOW = glowTexture();
+        const glowMat = (color, opacity = 1) => new THREE.SpriteMaterial({ map: GLOW, color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity });
+        const LIGHT_MAT = { red: glowMat(0xff3040), green: glowMat(0x30ff70), white: glowMat(0xffffff), beacon: glowMat(0xff2020) };
+        const HALO = { selected: glowMat(0x38bdf8, 0.45), inView: glowMat(0xf59e0b, 0.4) };
+
+        function makePlane(a, icao3) {
+            const fam = familyFor(a.type);
+            const model = buildModel(fam, a.type);
+            const mats = liveryMaterials(model, `${fam}|${a.type || ""}`, a.airline_iata, icao3);
+            const g = new THREE.Group();
+            g.matrixAutoUpdate = false;
+            for (const [k, geo] of Object.entries(model.geos)) g.add(new THREE.Mesh(geo, mats[k]));
+            // spinning props
+            g.userData.props = model.props.map((p) => {
+                const hub = new THREE.Group();
+                hub.position.set(p.x, p.y, p.z);
+                for (let i = 0; i < p.n; i++) {
+                    const b = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, p.r), mats.dark);
+                    b.position.z = p.r / 2;
+                    const arm = new THREE.Group(); arm.rotation.y = (i / p.n) * 2 * Math.PI; arm.add(b);
+                    hub.add(arm);
+                }
+                g.add(hub);
+                return hub;
+            });
+            // lights
+            const sz = Math.max(1.6, model.R * 0.9);
+            const add = (mat, x, y, z, k = 1) => { const sp = new THREE.Sprite(mat); sp.position.set(x, y, z); sp.scale.setScalar(sz * k); g.add(sp); return sp; };
+            const { wingTip: wx, tipY: wy, tipZ: wzz } = model;
+            add(LIGHT_MAT.green, wx, wy, wzz); add(LIGHT_MAT.red, -wx, wy, wzz);
+            g.userData.strobes = [add(LIGHT_MAT.white, wx, wy - 0.4, wzz, 1.7), add(LIGHT_MAT.white, -wx, wy - 0.4, wzz, 1.7),
+                add(LIGHT_MAT.white, 0, -model.L / 2 - 0.2, model.R * 0.2, 1.3)];
+            g.userData.beacons = [add(LIGHT_MAT.beacon, 0, 0, model.topZ + 0.25, 1.2), add(LIGHT_MAT.beacon, 0, 0, -model.R - 0.25, 1.2)];
+            g.userData.halo = add(HALO.selected, 0, 0, 0, (model.L * 1.4) / sz);
+            g.userData.halo.visible = false;
+            g.userData.phase = Math.random() * 2;
+            g.userData.L = model.L;
+            return g;
+        }
+
+        // ================================================================ trails: smooth ribbons, fading with age, coloured by altitude
+        const TRAIL_VS = `
+            attribute vec3 aPrev; attribute vec3 aNext; attribute float aSide; attribute float aTime; attribute float aAlt;
+            uniform vec2 uRes; uniform float uWidth; uniform float uNow; uniform float uSpan;
+            varying float vAge; varying float vSide; varying float vAlt;
+            vec2 px(vec4 c) { return c.xy / c.w * uRes * 0.5; }
+            void main() {
+                mat4 m = projectionMatrix * modelViewMatrix;
+                vec4 c = m * vec4(position, 1.0), p = m * vec4(aPrev, 1.0), n = m * vec4(aNext, 1.0);
+                vAge = clamp((uNow - aTime) / uSpan, 0.0, 1.0); vSide = aSide; vAlt = aAlt;
+                if (c.w <= 0.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+                vec2 sc = px(c);
+                vec2 d1 = p.w > 0.0 ? sc - px(p) : vec2(0.0), d2 = n.w > 0.0 ? px(n) - sc : vec2(0.0);
+                if (length(d1) < 1e-4) d1 = d2;
+                if (length(d2) < 1e-4) d2 = d1;
+                vec2 dir = normalize(normalize(d1 + 1e-6) + normalize(d2 + 1e-6) + 1e-6);
+                vec2 nrm = vec2(-dir.y, dir.x);
+                float w = uWidth * mix(1.0, 0.45, vAge);
+                c.xy += nrm * aSide * w / uRes * c.w;
+                gl_Position = c;
+            }`;
+        const TRAIL_FS = `
+            uniform float uBright; varying float vAge; varying float vSide; varying float vAlt;
+            vec3 ramp(float h) {
+                vec3 c0 = vec3(1.0, 0.82, 0.4), c1 = vec3(0.02, 0.84, 0.63), c2 = vec3(0.22, 0.74, 0.97), c3 = vec3(0.55, 0.36, 0.96), c4 = vec3(0.96, 0.45, 0.71);
+                float t = clamp(h / 3000.0, 0.0, 4.0);
+                return t < 1.0 ? mix(c0, c1, t) : t < 2.0 ? mix(c1, c2, t - 1.0) : t < 3.0 ? mix(c2, c3, t - 2.0) : mix(c3, c4, t - 3.0);
+            }
+            void main() {
+                float fade = pow(1.0 - vAge, 1.7);
+                float edge = 1.0 - abs(vSide);
+                float a = fade * smoothstep(0.0, 0.7, edge) * uBright;
+                if (a < 0.003) discard;
+                gl_FragColor = vec4(ramp(vAlt) * (0.75 + 0.5 * edge), a);
+            }`;
+        function trailMaterial(width, bright) {
+            return new THREE.ShaderMaterial({
+                vertexShader: TRAIL_VS, fragmentShader: TRAIL_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+                blending: THREE.AdditiveBlending,
+                uniforms: { uRes: { value: new THREE.Vector2(1, 1) }, uWidth: { value: width }, uNow: { value: 0 },
+                    uSpan: { value: 600 }, uBright: { value: bright } },
+            });
+        }
+        const TRAIL_MATS = { normal: trailMaterial(3.2, 0.85), selected: trailMaterial(6, 1.0) };
+
+        // Catmull-Rom through the fixes (several samples per segment), plus a head vertex that follows the plane
+        function buildTrail(s) {
+            if (s.trail) { world.remove(s.trail); s.trail.geometry.dispose(); s.trail = null; }
+            const now = nowS();
+            const pts = trailSpan ? s.pts.filter((p) => now - p.t <= trailSpan) : [];
+            if (pts.length < 2) return;
+            const P = pts.map((p) => new THREE.Vector3(...p.xyz));
+            const curve = new THREE.CatmullRomCurve3(P, false, "centripetal", 0.5);
+            const m = P.length;
+            const per = Math.max(1, Math.min(5, Math.floor(1200 / m)));
+            const n = (m - 1) * per + 1;
+            const total = n + 1;   // + head
+            const pos = new Float32Array(total * 6), time = new Float32Array(total * 2), alt = new Float32Array(total * 2), side = new Float32Array(total * 2);
+            const v = new THREE.Vector3();
+            for (let k = 0; k < n; k++) {
+                const t = k / (n - 1);
+                curve.getPoint(t, v);
+                const fi = t * (m - 1), i0 = Math.floor(fi), i1 = Math.min(m - 1, i0 + 1), fr = fi - i0;
+                const tm = pts[i0].t + (pts[i1].t - pts[i0].t) * fr, al = pts[i0].alt + (pts[i1].alt - pts[i0].alt) * fr;
+                for (let j = 0; j < 2; j++) {
+                    pos.set([v.x, v.y, v.z], (2 * k + j) * 3);
+                    time[2 * k + j] = tm; alt[2 * k + j] = al; side[2 * k + j] = j ? 1 : -1;
+                }
+            }
+            for (let j = 0; j < 2; j++) {   // head starts on the last sample; the render loop moves it to the plane
+                pos.copyWithin((2 * n + j) * 3, (2 * (n - 1)) * 3, (2 * (n - 1)) * 3 + 3);
+                time[2 * n + j] = time[2 * n - 1]; alt[2 * n + j] = alt[2 * n - 1]; side[2 * n + j] = j ? 1 : -1;
+            }
+            const prev = new Float32Array(pos.length), next = new Float32Array(pos.length);
+            for (let k = 0; k < total; k++) {
+                const kp = Math.max(0, k - 1), kn = Math.min(total - 1, k + 1);
+                for (let j = 0; j < 2; j++) {
+                    prev.set(pos.subarray((2 * kp) * 3, (2 * kp) * 3 + 3), (2 * k + j) * 3);
+                    next.set(pos.subarray((2 * kn) * 3, (2 * kn) * 3 + 3), (2 * k + j) * 3);
+                }
+            }
+            const idx = [];
+            for (let k = 0; k < total - 1; k++) { const a = 2 * k; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+            const g = new THREE.BufferGeometry();
+            g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+            g.setAttribute("aPrev", new THREE.BufferAttribute(prev, 3));
+            g.setAttribute("aNext", new THREE.BufferAttribute(next, 3));
+            g.setAttribute("aTime", new THREE.BufferAttribute(time, 1));
+            g.setAttribute("aAlt", new THREE.BufferAttribute(alt, 1));
+            g.setAttribute("aSide", new THREE.BufferAttribute(side, 1));
+            g.setIndex(idx);
+            const mesh = new THREE.Mesh(g, s.a.icao === selected ? TRAIL_MATS.selected : TRAIL_MATS.normal);
+            mesh.frustumCulled = false;
+            mesh.userData.n = n;
+            s.trail = mesh;
+            world.add(mesh);
+        }
+
+        function moveTrailHead(s, p, t) {
+            const g = s.trail.geometry, n = s.trail.userData.n;
+            const pos = g.attributes.position, next = g.attributes.aNext, time = g.attributes.aTime;
+            for (let j = 0; j < 2; j++) {
+                pos.setXYZ(2 * n + j, p[0], p[1], p[2]);
+                next.setXYZ(2 * n + j, p[0], p[1], p[2]);
+                next.setXYZ(2 * (n - 1) + j, p[0], p[1], p[2]);
+                time.setX(2 * n + j, t);
+            }
+            pos.needsUpdate = next.needsUpdate = time.needsUpdate = true;
+        }
+
+        // ---------------------------------------------------------------- station
         function buildStation() {
-            stationGroup = new THREE.Group();
+            const group = new THREE.Group();
             const s0 = merc(station.lon, station.lat, station.elevation_m || 0);
-            const pts = [];
             if (camera) {
-                // Camera view frustum out to 12 km
                 const R = pointingRotation(camera.az_deg, camera.alt_deg, camera.roll_deg || 0);
                 const th = Math.tan(camera.hfov_deg / 2 * D2R), tv = Math.tan(camera.vfov_deg / 2 * D2R);
                 const corners = [[-th, -tv], [th, -tv], [th, tv], [-th, tv]].map(([x, y]) => {
                     const v = [0, 1, 2].map((i) => R.right[i] * x + R.down[i] * y + R.axis[i]);
-                    const n = Math.hypot(...v);
-                    const d = 12000 / n;
+                    const d = 12000 / Math.hypot(...v);
                     const p = enuToScene(v[0] * d, v[1] * d, Math.max(v[2] * d, 0));   // rays below the horizon end on the ground
                     return new THREE.Vector3(s0[0] + p[0], s0[1] + p[1], s0[2] + p[2]);
                 });
                 const apex = new THREE.Vector3(...s0);
+                const pts = [];
                 for (const c of corners) pts.push(apex, c);
                 for (let i = 0; i < 4; i++) pts.push(corners[i], corners[(i + 1) % 4]);
-                const lines = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),
-                    new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.8 }));
-                stationGroup.add(lines);
+                group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),
+                    new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.7 })));
                 const face = new THREE.BufferGeometry().setFromPoints([corners[0], corners[1], corners[2], corners[0], corners[2], corners[3],
                     apex, corners[0], corners[1], apex, corners[1], corners[2], apex, corners[2], corners[3], apex, corners[3], corners[0]]);
-                stationGroup.add(new THREE.Mesh(face, new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.08,
+                group.add(new THREE.Mesh(face, new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.07,
                     side: THREE.DoubleSide, depthWrite: false })));
             }
-            world.add(stationGroup);
+            world.add(group);
+        }
+
+        function addStationOnMap() {
+            const el = document.createElement("div");
+            el.className = "station-dot";
+            el.title = "AllSky camera";
+            new maplibregl.Marker({ element: el }).setLngLat([station.lon, station.lat]).addTo(map);
+            const rings = [10, 25, 50, 100, 200].map((km) => {
+                const coords = [];
+                for (let i = 0; i <= 120; i++) {
+                    const b = i / 120 * 2 * Math.PI;
+                    coords.push([station.lon + km / 111.32 * Math.sin(b) / Math.cos(station.lat * D2R), station.lat + km / 110.57 * Math.cos(b)]);
+                }
+                addText(`${km} km`, station.lon, station.lat + km / 110.57, "place ring");
+                return { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } };
+            });
+            map.addSource("rings", { type: "geojson", data: { type: "FeatureCollection", features: rings } });
+            map.addLayer({ id: "rings", type: "line", source: "rings", paint: { "line-color": "#38bdf8", "line-opacity": 0.3, "line-width": 1, "line-dasharray": [3, 3] } }, "planes-3d");
         }
 
         // ---------------------------------------------------------------- state from the API
@@ -287,7 +908,8 @@
 
         function poll() {
             lastFetch = Date.now();
-            fetch(`/api/adsb/aircraft?limit=400&trail=${TRAIL_S}`).then((r) => r.json()).then(update).catch(() => {
+            const span = haveTrails ? 30 : Math.max(...TRAIL_CHOICES);
+            fetch(`/api/adsb/aircraft?limit=400&trail=${span}`).then((r) => r.json()).then((d) => { update(d); haveTrails = true; }).catch(() => {
                 $("status").textContent = "Receiver unavailable";
             });
         }
@@ -300,42 +922,49 @@
                 origin = maplibregl.MercatorCoordinate.fromLngLat([station.lon, station.lat], 0);
                 mPerUnit = origin.meterInMercatorCoordinateUnits();
                 map.jumpTo({ center: [station.lon, station.lat] });
-                addStationOnMap();
+                whenStyle(addStationOnMap);
                 buildStation();
             }
             if (!origin) return;
-            const now = performance.now();
+            const now = nowS();
             const seen = new Set();
             for (const a of d.aircraft || []) {
                 if (a.lat == null) continue;
                 seen.add(a.icao);
                 let s = aircraft.get(a.icao);
                 if (!s) {
-                    s = { mesh: makePlaneMesh(), label: document.createElement("div"), trail: null, drop: null, off: [0, 0, 0], disp: null };
+                    s = { mesh: null, label: document.createElement("div"), trail: null, drop: null, off: [0, 0, 0], disp: null, pts: [] };
                     s.label.className = "ac-label";
                     s.label.addEventListener("click", (ev) => { ev.stopPropagation(); select(a.icao, true); });
                     $("labels").appendChild(s.label);
-                    world.add(s.mesh);
                     aircraft.set(a.icao, s);
                 }
                 const prevDisp = s.disp;
                 s.a = a;
-                s.t0 = now - (a.age_s || 0) * 1000;
+                s.t0 = now - (a.age_s || 0);
                 s.base = merc(a.lon, a.lat, a.altitude_m);
-                // Hide the jump from dead reckoning to the new fix by easing the difference away
+                // (Re)build the model when its type or airline becomes known
+                const icao3 = /^[A-Z]{3}\d/.test(a.callsign || "") ? a.callsign.slice(0, 3) : "";
+                const key = `${familyFor(a.type)}|${a.type || ""}|${a.airline_iata || icao3}`;
+                if (!s.mesh || s.mesh.userData.key !== key) {
+                    if (s.mesh) world.remove(s.mesh);
+                    s.mesh = makePlane(a, icao3);
+                    s.mesh.userData.key = key;
+                    world.add(s.mesh);
+                }
                 if (prevDisp) {
                     const p = predict(s, now);
                     s.off = [prevDisp[0] - p[0], prevDisp[1] - p[1], prevDisp[2] - p[2]];
                     s.offT = now;
                 }
-                setTrail(s);
-                setPlaneMaterial(s.mesh, MAT[kind(a)]);
+                mergeTrail(s, a.trail || [], now);
+                buildTrail(s);
                 s.label.className = `ac-label${a.in_view ? " in-view" : ""}${a.icao === selected ? " selected" : ""}`;
-                s.label.innerHTML = `${esc(a.callsign || a.icao)}<small>${(a.altitude_m / 1000).toFixed(1)} km</small>`;
+                s.label.innerHTML = `${esc(a.callsign || a.icao)}${a.type ? ` <span style="opacity:.65">${esc(a.type)}</span>` : ""}<small>${(a.altitude_m / 1000).toFixed(1)} km</small>`;
             }
             for (const [icao, s] of aircraft) {
                 if (seen.has(icao)) continue;
-                world.remove(s.mesh);
+                if (s.mesh) world.remove(s.mesh);
                 if (s.trail) { world.remove(s.trail); s.trail.geometry.dispose(); }
                 if (s.drop) { world.remove(s.drop); s.drop.geometry.dispose(); }
                 s.label.remove();
@@ -347,19 +976,25 @@
             map.triggerRepaint();
         }
 
-        function setTrail(s) {
-            if (s.trail) { world.remove(s.trail); s.trail.geometry.dispose(); s.trail = null; }
-            const pts = (s.a.trail || []).map(([lat, lon, alt]) => new THREE.Vector3(...merc(lon, lat, alt)));
-            if (pts.length < 2) return;
-            s.trail = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), TRAIL_MAT[kind(s.a)]);
-            s.trail.visible = showTrails;
-            world.add(s.trail);
+        // Keep our own copy of each path: the first poll brings the long history, later ones only the newest fixes
+        function mergeTrail(s, trail, now) {
+            const lastT = s.pts.length ? s.pts[s.pts.length - 1].t : -1e9;
+            for (const [lat, lon, alt, age] of trail) {
+                const t = now - age;
+                if (t <= lastT + 0.5) continue;
+                const xyz = merc(lon, lat, alt);
+                const q = s.pts[s.pts.length - 1];
+                if (q && Math.hypot(xyz[0] - q.xyz[0], xyz[1] - q.xyz[1]) < 2 * mPerUnit) continue;   // under 2 m: nothing new
+                s.pts.push({ t, alt, xyz });
+            }
+            const keep = Math.max(...TRAIL_CHOICES);
+            while (s.pts.length > 2 && now - s.pts[0].t > keep) s.pts.shift();
         }
 
         // Position now: last fix moved along its ground track and climb rate (up to MAX_EXTRAP_S)
         function predict(s, now) {
             const a = s.a;
-            const dt = Math.min(Math.max((now - s.t0) / 1000, 0), MAX_EXTRAP_S);
+            const dt = Math.min(Math.max(now - s.t0, 0), MAX_EXTRAP_S);
             if (a.speed_kmh == null || a.heading_deg == null) return s.base.slice();
             const v = a.speed_kmh / 3.6, h = a.heading_deg * D2R;
             const p = enuToScene(Math.sin(h) * v * dt, Math.cos(h) * v * dt, (a.climb_m_min || 0) / 60 * dt);
@@ -373,25 +1008,29 @@
                 this.renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true });
                 this.renderer.autoClear = false;
             },
-            render(gl, matrix) {
+            render(gl, args) {
                 if (!origin) return;
-                const now = performance.now();
-                const zoom = map.getZoom();
-                const lat = map.getCenter().lat;
-                const mpp = 40075016.686 * Math.cos(lat * D2R) / (512 * Math.pow(2, zoom));
-                const k = Math.max(1, PLANE_PX * mpp / PLANE_LEN_M) * mPerUnit;   // metres -> mercator, enlarged
+                const matrix = args.defaultProjectionData?.mainMatrix || args;   // v5: mercator world -> clip
+                const now = nowS();
+                const mpp = 40075016.686 * Math.cos(map.getCenter().lat * D2R) / (512 * Math.pow(2, map.getZoom()));
+                const k = Math.max(1, PLANE_PX * mpp / 40) * mPerUnit;   // metres -> mercator, enlarged when far
 
-                const M = new THREE.Matrix4().fromArray(matrix)
-                    .multiply(new THREE.Matrix4().makeTranslation(origin.x, origin.y, 0));
+                const M = new THREE.Matrix4().fromArray(matrix).multiply(new THREE.Matrix4().makeTranslation(origin.x, origin.y, 0));
                 cam3.projectionMatrix = M;
-                const W = map.getCanvas().clientWidth, H = map.getCanvas().clientHeight;
+                const canvas = map.getCanvas();
+                const W = canvas.clientWidth, H = canvas.clientHeight;
+                for (const mt of Object.values(TRAIL_MATS)) {
+                    mt.uniforms.uRes.value.set(W, H); mt.uniforms.uNow.value = now; mt.uniforms.uSpan.value = trailSpan || 1;
+                }
                 const v4 = new THREE.Vector4();
                 const screen = [];
+                const tmp = new THREE.Matrix4();
 
                 for (const [icao, s] of aircraft) {
+                    if (!s.mesh) continue;
                     const p = predict(s, now);
                     if (s.offT) {
-                        const f = Math.max(0, 1 - (now - s.offT) / 1500);
+                        const f = Math.max(0, 1 - (now - s.offT) / 1.5);
                         p[0] += s.off[0] * f; p[1] += s.off[1] * f; p[2] += s.off[2] * f;
                         if (!f) s.offT = 0;
                     }
@@ -399,34 +1038,41 @@
                     const a = s.a;
                     const h = (a.heading_deg || 0) * D2R;
                     const pitch = a.speed_kmh ? Math.atan2((a.climb_m_min || 0) / 60, a.speed_kmh / 3.6) : 0;
-                    s.mesh.matrix.makeTranslation(p[0], p[1], p[2])
-                        .multiply(new THREE.Matrix4().makeScale(k, -k, k))
-                        .multiply(new THREE.Matrix4().makeRotationZ(-h))
-                        .multiply(new THREE.Matrix4().makeRotationX(pitch));
-                    s.mesh.matrixWorldNeedsUpdate = true;
+                    const mesh = s.mesh;
+                    mesh.matrix.makeTranslation(p[0], p[1], p[2])
+                        .multiply(tmp.makeScale(k, -k, k))
+                        .multiply(tmp.makeRotationZ(-h))
+                        .multiply(tmp.makeRotationX(pitch));
+                    mesh.matrixWorldNeedsUpdate = true;
+                    // lights: beacons 1 Hz, strobes double flash; props spin
+                    const ud = mesh.userData, ph = now + ud.phase;
+                    const bOn = (ph % 1.0) < 0.12, st = ph % 1.3, sOn = st < 0.05 || (st > 0.14 && st < 0.19);
+                    for (const b of ud.beacons) b.visible = bOn;
+                    for (const sp of ud.strobes) sp.visible = sOn;
+                    for (const pr of ud.props) pr.rotation.y = ph * 25;
+                    const kd = kind(a);
+                    ud.halo.visible = kd !== "heard";
+                    if (ud.halo.visible) ud.halo.material = HALO[kd];
 
-                    // Altitude stalk down to sea level
+                    if (s.trail) moveTrailHead(s, p, now);
                     if (!s.drop) {
                         s.drop = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), DROP_MAT);
+                        s.drop.frustumCulled = false;
                         world.add(s.drop);
                     }
-                    const pos = s.drop.geometry.attributes.position;
-                    pos.setXYZ(0, p[0], p[1], p[2]); pos.setXYZ(1, p[0], p[1], 0); pos.needsUpdate = true;
-                    s.drop.geometry.computeBoundingSphere();
+                    const dp = s.drop.geometry.attributes.position;
+                    dp.setXYZ(0, p[0], p[1], p[2]); dp.setXYZ(1, p[0], p[1], 0); dp.needsUpdate = true;
 
                     if (icao === selected) {
                         v4.set(p[0], p[1], p[2], 1).applyMatrix4(M);
                         this.sel = v4.w > 0 ? [(v4.x / v4.w + 1) / 2 * W, (1 - v4.y / v4.w) / 2 * H] : null;
                     }
-                    v4.set(p[0], p[1], p[2] + 9 * k, 1).applyMatrix4(M);
+                    v4.set(p[0], p[1], p[2] + (ud.L * 0.3 + 6) * k, 1).applyMatrix4(M);
                     if (v4.w > 0) {
                         const x = (v4.x / v4.w + 1) / 2 * W, y = (1 - v4.y / v4.w) / 2 * H;
                         const onScreen = x > -50 && x < W + 50 && y > -50 && y < H + 50;
                         s.label.style.display = showLabels && onScreen ? "" : "none";
-                        if (onScreen) {
-                            s.label.style.left = `${x}px`; s.label.style.top = `${y}px`;
-                            screen.push([icao, x, y]);
-                        }
+                        if (onScreen) { s.label.style.left = `${x}px`; s.label.style.top = `${y}px`; screen.push([icao, x, y]); }
                     } else {
                         s.label.style.display = "none";
                     }
@@ -446,34 +1092,65 @@
         };
 
         map.on("dragstart", () => { centering = false; });
-
-        // Click on the map near a plane selects it
         map.on("click", (e) => {
-            const hit = (planesLayer.screen || []).map(([icao, x, y]) => [icao, Math.hypot(x - e.point.x, y + 6 - e.point.y)])
+            const hit = (planesLayer.screen || []).map(([icao, x, y]) => [icao, Math.hypot(x - e.point.x, y + 8 - e.point.y)])
                 .sort((a, b) => a[1] - b[1])[0];
-            select(hit && hit[1] < 40 ? hit[0] : null);
+            select(hit && hit[1] < 45 ? hit[0] : null);
         });
 
-        function addStationOnMap() {
-            const el = document.createElement("div");
-            el.className = "station-dot";
-            el.title = "AllSky camera";
-            new maplibregl.Marker({ element: el }).setLngLat([station.lon, station.lat]).addTo(map);
-            // Distance rings 10 / 25 / 50 / 100 km
-            const rings = [10, 25, 50, 100].map((km) => {
-                const coords = [];
-                for (let i = 0; i <= 96; i++) {
-                    const b = i / 96 * 2 * Math.PI;
-                    coords.push([station.lon + km / 111.32 * Math.sin(b) / Math.cos(station.lat * D2R), station.lat + km / 110.57 * Math.cos(b)]);
-                }
-                return { type: "Feature", properties: { label: `${km} km` }, geometry: { type: "LineString", coordinates: coords } };
-            });
-            map.addSource("rings", { type: "geojson", data: { type: "FeatureCollection", features: rings } });
-            map.addLayer({ id: "rings", type: "line", source: "rings", paint: { "line-color": "#38bdf8", "line-opacity": 0.35, "line-width": 1, "line-dasharray": [3, 3] } }, "planes-3d");
-            map.addLayer({ id: "rings-label", type: "symbol", source: "rings",
-                layout: { "symbol-placement": "line", "text-field": ["get", "label"], "text-size": 11, "text-font": ["Noto Sans Regular"] },
-                paint: { "text-color": "#38bdf8", "text-opacity": 0.7, "text-halo-color": "#070a13", "text-halo-width": 1.5 } }, "planes-3d");
-        }
+        // ---------------------------------------------------------------- rotating model of the selected aircraft
+        const preview = (() => {
+            const canvas = $("info-model");
+            let renderer = null, plane = null, cam = null, sc = null, key = "", raf = 0, yaw = 0.9, drag = null;
+            function ensure() {
+                if (renderer) return;
+                renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+                renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+                sc = new THREE.Scene();
+                sc.add(new THREE.HemisphereLight(0xdde6ff, 0x30333c, 1.8));
+                const d = new THREE.DirectionalLight(0xffffff, 2.6); d.position.set(0.6, -0.8, 1); sc.add(d);
+                cam = new THREE.PerspectiveCamera(28, 2, 1, 5000);
+                cam.up.set(0, 0, 1);
+                canvas.addEventListener("pointerdown", (e) => { drag = e.clientX; canvas.setPointerCapture(e.pointerId); });
+                canvas.addEventListener("pointermove", (e) => { if (drag != null) { yaw += (e.clientX - drag) * 0.012; drag = e.clientX; } });
+                canvas.addEventListener("pointerup", () => { drag = null; });
+            }
+            function frame() {
+                raf = 0;
+                if (!plane || !$("info").classList.contains("show") || document.hidden) return;
+                const w = canvas.clientWidth, h = canvas.clientHeight;
+                if (canvas.width !== Math.round(w * renderer.getPixelRatio())) { renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+                if (drag == null) yaw += 0.006;
+                plane.matrix.makeRotationZ(yaw);
+                plane.matrixWorldNeedsUpdate = true;
+                const ud = plane.userData, ph = performance.now() / 1000 + ud.phase;
+                for (const b of ud.beacons) b.visible = (ph % 1.0) < 0.12;
+                const st = ph % 1.3;
+                for (const sp of ud.strobes) sp.visible = st < 0.05 || (st > 0.14 && st < 0.19);
+                for (const pr of ud.props) pr.rotation.y = ph * 25;
+                renderer.render(sc, cam);
+                raf = requestAnimationFrame(frame);
+            }
+            return {
+                show(a) {
+                    ensure();
+                    const icao3 = /^[A-Z]{3}\d/.test(a.callsign || "") ? a.callsign.slice(0, 3) : "";
+                    const k = `${familyFor(a.type)}|${a.type || ""}|${a.airline_iata || icao3}`;
+                    if (k !== key) {
+                        if (plane) sc.remove(plane);
+                        plane = makePlane(a, icao3);
+                        plane.userData.halo.visible = false;
+                        sc.add(plane);
+                        key = k;
+                        const L = plane.userData.L;
+                        cam.position.set(L * 1.25, -L * 1.05, L * 0.55);
+                        cam.lookAt(0, -L * 0.04, 0);
+                    }
+                    if (!raf) raf = requestAnimationFrame(frame);
+                },
+                resize(w, h) { canvas.style.width = `${w}px`; canvas.style.height = `${h}px`; },
+            };
+        })();
 
         // ---------------------------------------------------------------- list + info
         function sortedAircraft() {
@@ -487,7 +1164,7 @@
             $("ac-list").innerHTML = list.length ? list.map((a) =>
                 `<li data-icao="${esc(a.icao)}" class="${a.in_view ? "in-view" : ""}${a.icao === selected ? " selected" : ""}">
                     <span class="cs">${esc(a.callsign || a.icao)}</span>
-                    <span class="meta">${(a.altitude_m / 1000).toFixed(1)} km · ${a.distance_km} km ${compass(a.az_deg)}</span></li>`).join("")
+                    <span class="meta">${a.type ? esc(a.type) + " · " : ""}${(a.altitude_m / 1000).toFixed(1)} km · ${a.distance_km} km ${compass(a.az_deg)}</span></li>`).join("")
                 : `<li><span class="meta">No aircraft heard right now.</span></li>`;
         }
         $("ac-list").addEventListener("click", (e) => {
@@ -501,7 +1178,18 @@
             if (!s) return;
             const a = s.a;
             $("info-cs").textContent = a.callsign || a.icao;
+            preview.show(a);
+            const logo = $("info-logo");
+            if (a.airline_iata) {
+                const src = LOGO_WORD(a.airline_iata);
+                if (logo.getAttribute("src") !== src) { logo.hidden = true; logo.onload = () => { logo.hidden = false; }; logo.src = src; }
+            } else { logo.hidden = true; logo.removeAttribute("src"); }
+            const route = a.route ? a.route.split("-").join(" → ") : null;
             const rows = [
+                a.airline ? ["Airline", a.airline] : null,
+                route ? ["Route", route] : null,
+                ["Aircraft", a.model || a.type || "--"],
+                a.reg ? ["Registration", a.reg] : null,
                 ["ICAO", a.icao],
                 ["Altitude", `${Number(a.altitude_m).toLocaleString()} m`],
                 ["Speed", a.speed_kmh != null ? `${a.speed_kmh} km/h` : "--"],
@@ -510,7 +1198,7 @@
                 ["Distance", `${a.distance_km} km`],
                 ["From camera", a.above_horizon ? `${compass(a.az_deg)} ${a.az_deg}°, ${a.alt_deg}° up` : "below horizon"],
                 ["In camera view", a.in_view ? "yes" : "no"],
-            ];
+            ].filter(Boolean);
             $("info-dl").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
             $("info-link").href = `https://globe.adsbexchange.com/?icao=${encodeURIComponent(String(a.icao).toLowerCase())}`;
             $("btn-follow").classList.toggle("on", follow);
@@ -523,8 +1211,7 @@
             for (const id of [prev, icao]) {
                 const s = id && aircraft.get(id);
                 if (!s) continue;
-                setPlaneMaterial(s.mesh, MAT[kind(s.a)]);
-                if (s.trail) s.trail.material = TRAIL_MAT[kind(s.a)];
+                if (s.trail) s.trail.material = id === selected ? TRAIL_MATS.selected : TRAIL_MATS.normal;
                 s.label.classList.toggle("selected", id === selected);
             }
             planesLayer.sel = null;
@@ -539,26 +1226,24 @@
         $("info-close").onclick = () => select(null);
         $("btn-follow").onclick = () => { follow = !follow; renderInfo(); };
         $("list-toggle").onclick = () => $("list").classList.toggle("collapsed");
-        $("btn-sat").onclick = (e) => {
-            const on = e.target.classList.toggle("on");
-            map.setLayoutProperty("sat", "visibility", on ? "visible" : "none");
-        };
-        $("btn-terrain").onclick = (e) => {
-            const on = e.target.classList.toggle("on");
-            map.setTerrain(on ? { source: "dem", exaggeration: 1 } : null);
-            map.setLayoutProperty("hillshade", "visibility", on ? "visible" : "none");
-        };
+        $("btn-base-terrain").onclick = () => setBase("terrain");
+        $("btn-base-google").onclick = () => setBase("google");
+        $("btn-base-sat").onclick = () => setBase("sat");
         $("btn-trails").onclick = (e) => {
-            showTrails = e.target.classList.toggle("on");
-            for (const s of aircraft.values()) if (s.trail) s.trail.visible = showTrails;
+            trailIdx = (trailIdx + 1) % TRAIL_CHOICES.length;
+            trailSpan = TRAIL_CHOICES[trailIdx];
+            e.target.textContent = trailSpan ? `Trails ${trailSpan / 60} min` : "Trails off";
+            e.target.classList.toggle("on", !!trailSpan);
+            for (const s of aircraft.values()) buildTrail(s);
             map.triggerRepaint();
         };
         $("btn-labels").onclick = (e) => { showLabels = e.target.classList.toggle("on"); map.triggerRepaint(); };
         $("btn-home").onclick = () => {
             follow = false; renderInfo();
-            if (station) map.easeTo({ center: [station.lon, station.lat], zoom: 9, pitch: 62, bearing: -20, duration: 1200 });
+            if (station) map.easeTo({ center: [station.lon, station.lat], zoom: 9, pitch: 64, bearing: -20, duration: 1200 });
         };
         if (window.innerWidth <= 700) $("list").classList.add("collapsed");
+        window.flights3d = { map, aircraft, preview, layer: planesLayer };   // for inspection from the console
     </script>
 </body>
 </html>
