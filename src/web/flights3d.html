@@ -109,8 +109,8 @@
         </div>
         <div class="btns">
             <button id="btn-base-terrain" class="on" title="Dark 3D terrain">Terrain</button>
+            <button id="btn-base-sat" title="Satellite imagery (no labels or borders)">Satellite</button>
             <button id="btn-base-google" hidden title="Google Maps, dark">Google</button>
-            <button id="btn-base-sat" hidden title="Google satellite imagery">Satellite</button>
             <button id="btn-trails" class="on" title="Flight paths: click to change length">Trails 10 min</button>
             <button id="btn-labels" class="on" title="Callsign labels">Labels</button>
             <button id="btn-home" title="Back to the station">Station</button>
@@ -146,12 +146,14 @@
         import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
         // Basemap rule: no OpenStreetMap-derived data. The base is elevation only (no borders, no labels);
-        // Google Maps (Map Tiles API, region VN) is offered on top when a key is configured.
+        // airports and runways come from OurAirports (public domain); the satellite layer is imagery only
+        // (no labels, no borders); Google Maps (Map Tiles API, region VN) is offered when a key is configured.
         const POLL_MS = 5000;
         const TRAIL_CHOICES = [600, 900, 0, 180];   // seconds; 0 = off
         const MAX_EXTRAP_S = 20;
         const PLANE_PX = 46;          // on-screen length of a 40 m airliner at any zoom (planes are drawn larger than life)
         const DEM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
+        const SAT = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
         const LOGO_SQUARE = (iata) => `https://pics.avs.io/al_square/256/256/${iata}.png`;
         const LOGO_WORD = (iata) => `https://pics.avs.io/400/100/${iata}.png`;
 
@@ -211,13 +213,8 @@
             ["Thanh Hóa", 105.7769, 19.8067], ["Sơn La", 103.9144, 21.3256], ["Lào Cai", 103.9707, 22.4856],
             ["Cao Bằng", 106.2572, 22.6657], ["Hà Giang", 104.9784, 22.8233], ["Móng Cái", 107.9666, 21.5243],
         ];
-        const AIRPORTS = [
-            ["✈ Nội Bài VVNB", 105.8072, 21.2212], ["✈ Cát Bi VVCI", 106.7250, 20.8194], ["✈ Vân Đồn VVVD", 107.4144, 21.1178],
-            ["✈ Thọ Xuân VVTX", 105.4778, 19.9017], ["✈ Điện Biên VVDB", 103.0076, 21.3975], ["✈ Gia Lâm", 105.8865, 21.0405],
-        ];
         function addPlaces() {
             for (const [name, lon, lat] of PLACES) addText(name, lon, lat, "place");
-            for (const [name, lon, lat] of AIRPORTS) addText(name, lon, lat, "place airport");
         }
         function addText(text, lon, lat, cls) {
             const el = document.createElement("div");
@@ -241,7 +238,67 @@
         whenStyle(() => {
             addPlaces();
             map.addLayer(planesLayer);
+            loadAirports();
         });
+
+        // ---------------------------------------------------------------- airports: runways with their lights (OurAirports)
+        const VN_AIRPORT_NAMES = { VVNB: "Nội Bài", VVCI: "Cát Bi", VVVD: "Vân Đồn", VVTX: "Thọ Xuân", VVDB: "Điện Biên",
+            VVGL: "Gia Lâm", VVVH: "Vinh", VVDH: "Đồng Hới", VVKP: "Kép", VVNS: "Nà Sản", VVHN: "Hòa Lạc" };
+
+        function loadAirports(tries = 0) {
+            fetch("/api/map/airports").then((r) => r.json()).then((d) => {
+                if (!d.ready) { if (tries < 12) setTimeout(() => loadAirports(tries + 1), 10000); return; }
+                drawAirports(d);
+            }).catch(() => {});
+        }
+
+        function drawAirports(d) {
+            const byIdent = Object.fromEntries(d.airports.map((a) => [a.ident, a]));
+            const pavement = [], centre = [], edge = [], thresh = [], approach = [];
+            for (const r of d.runways) {
+                const [lat1, lon1] = r.le, [lat2, lon2] = r.he;
+                const kx = 111320 * Math.cos(lat1 * D2R), ky = 110574;          // metres per degree
+                const dx = (lon2 - lon1) * kx, dy = (lat2 - lat1) * ky, len = Math.hypot(dx, dy);
+                if (len < 200) continue;
+                const ux = dx / len, uy = dy / len, nx = -uy, ny = ux, hw = Math.max(r.width_m, 18) / 2;
+                const at = (along, across) => [lon1 + (ux * along + nx * across) / kx, lat1 + (uy * along + ny * across) / ky];
+                pavement.push({ type: "Feature", properties: {}, geometry: { type: "Polygon",
+                    coordinates: [[at(0, -hw), at(len, -hw), at(len, hw), at(0, hw), at(0, -hw)]] } });
+                centre.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [at(0, 0), at(len, 0)] } });
+                for (let a = 0; a <= len; a += 60) for (const s of [-1, 1]) edge.push(at(a, s * (hw + 1.5)));
+                for (const a of [0, len]) for (let c = -hw; c <= hw; c += 4) thresh.push(at(a, c));
+                if (r.lighted || byIdent[r.airport]?.type === "large") {
+                    for (let a = 30; a <= 900; a += 30) { approach.push(at(-a, 0)); approach.push(at(len + a, 0)); }
+                    for (const a of [-300, len + 300]) for (let c = -15; c <= 15; c += 3) approach.push(at(a, c));
+                }
+            }
+            const pts = (list) => ({ type: "FeatureCollection", features: list.map((c) => ({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: c } })) });
+            map.addSource("rwy", { type: "geojson", data: { type: "FeatureCollection", features: pavement } });
+            map.addSource("rwy-centre", { type: "geojson", data: { type: "FeatureCollection", features: centre } });
+            map.addSource("rwy-edge", { type: "geojson", data: pts(edge) });
+            map.addSource("rwy-thresh", { type: "geojson", data: pts(thresh) });
+            map.addSource("rwy-appr", { type: "geojson", data: pts(approach) });
+            const before = "planes-3d";
+            // far away: a glowing stroke per runway; close up: pavement, centreline and lights
+            map.addLayer({ id: "rwy-glow", type: "line", source: "rwy-centre", maxzoom: 12.5,
+                paint: { "line-color": "#c7d7ff", "line-opacity": 0.75, "line-blur": 1,
+                    "line-width": ["interpolate", ["linear"], ["zoom"], 6, 1.5, 10, 3, 12.5, 4] } }, before);
+            map.addLayer({ id: "rwy", type: "fill", source: "rwy", minzoom: 11,
+                paint: { "fill-color": "#2c3548", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0, 12, 0.95] } }, before);
+            map.addLayer({ id: "rwy-centre", type: "line", source: "rwy-centre", minzoom: 12.5,
+                paint: { "line-color": "#e2e8f0", "line-opacity": 0.55, "line-width": 1, "line-dasharray": [6, 5] } }, before);
+            const lights = (id, color, r0, r1, minzoom) => map.addLayer({ id, type: "circle", source: id, minzoom,
+                paint: { "circle-color": color, "circle-blur": 0.5, "circle-opacity": 0.95, "circle-pitch-alignment": "map",
+                    "circle-radius": ["interpolate", ["exponential", 1.6], ["zoom"], minzoom, r0, 17, r1] } }, before);
+            lights("rwy-edge", "#ffe9b0", 0.8, 5, 11);
+            lights("rwy-thresh", "#4ade80", 0.8, 4.5, 11);
+            lights("rwy-appr", "#fff7e0", 1, 6, 10);
+            for (const a of d.airports) {
+                if (a.type === "small" && !VN_AIRPORT_NAMES[a.ident]) continue;
+                const name = VN_AIRPORT_NAMES[a.ident] || a.name.replace(/\s*(International\s*)?(Airport|Air Base|Airfield)\s*$/i, "");
+                addText(`✈ ${name} ${a.iata || a.ident}`, a.lon, a.lat, "place airport");
+            }
+        }
         poll();
         setInterval(() => { if (!document.hidden) poll(); }, POLL_MS);
         document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastFetch > POLL_MS) poll(); });
@@ -264,14 +321,12 @@
         const googleSessions = {};
         fetch("/api/map/config").then((r) => r.json()).then((c) => {
             googleKey = c.google_maps_key || "";
-            $("btn-base-google").hidden = $("btn-base-sat").hidden = !googleKey;
+            $("btn-base-google").hidden = !googleKey;
         }).catch(() => {});
 
         async function googleSource(kind) {
             if (googleSessions[kind]) return googleSessions[kind];
-            const body = kind === "sat"
-                ? { mapType: "satellite", language: "vi-VN", region: "VN" }
-                : { mapType: "roadmap", language: "vi-VN", region: "VN", styles: GOOGLE_DARK };
+            const body = { mapType: "roadmap", language: "vi-VN", region: "VN", styles: GOOGLE_DARK };
             const r = await fetch(`https://tile.googleapis.com/v1/createSession?key=${encodeURIComponent(googleKey)}`, {
                 method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
             if (!r.ok) throw new Error(`Google Maps: ${r.status}`);
@@ -286,13 +341,19 @@
             map.setLayoutProperty("relief", "visibility", kind === "terrain" ? "visible" : "none");
             map.setPaintProperty("hillshade", "hillshade-exaggeration", kind === "terrain" ? 0.75 : 0.35);
             if (kind === "terrain" || map.getLayer(`g-${kind}`)) return;
+            if (kind === "sat") {   // imagery only, dimmed to keep the night look
+                map.addSource("g-sat", { type: "raster", tiles: [SAT], tileSize: 256, maxzoom: 19,
+                    attribution: "Imagery © Esri, Maxar, Earthstar Geographics" });
+                map.addLayer({ id: "g-sat", type: "raster", source: "g-sat",
+                    paint: { "raster-brightness-max": 0.62, "raster-saturation": -0.25, "raster-contrast": 0.1 } }, "hillshade");
+                return;
+            }
             try {
                 const session = await googleSource(kind);
                 map.addSource(`g-${kind}`, { type: "raster", tileSize: 256, maxzoom: 20,
                     tiles: [`https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${session}&key=${encodeURIComponent(googleKey)}`],
                     attribution: `Map data ©${new Date().getFullYear()} Google` });
-                map.addLayer({ id: `g-${kind}`, type: "raster", source: `g-${kind}`,
-                    paint: kind === "sat" ? { "raster-brightness-max": 0.75, "raster-saturation": -0.15 } : {} }, "hillshade");
+                map.addLayer({ id: `g-${kind}`, type: "raster", source: `g-${kind}` }, "hillshade");
             } catch (err) {
                 $("status").textContent = err.message;
                 setBase("terrain");

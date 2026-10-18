@@ -615,6 +615,12 @@ def get_map_config(service: AllSkyService = Depends(get_service)):
     return service.get_map_config()
 
 
+@router.get("/api/map/airports")
+def get_map_airports(service: AllSkyService = Depends(get_service)):
+    """Airports and runways around the station (OurAirports, public domain) for the 3D flights map."""
+    return service.get_airports()
+
+
 @router.post("/api/adsb")
 def set_adsb_config(req: AdsbConfigRequest, service: AllSkyService = Depends(get_service)):
     """Set the ADS-B receiver (SBS-1 feed host/port) or turn flight matching on/off (persisted)."""

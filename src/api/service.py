@@ -2105,6 +2105,13 @@ class AllSkyService:
             self.aircraft_info = AircraftInfo(os.path.join(self.output_dir, "cache"))
         return self.aircraft_info
 
+    def get_airports(self) -> Dict[str, Any]:
+        """Airports and runways around the station (OurAirports) for the 3D flights map."""
+        if getattr(self, "airports", None) is None:
+            from src.analytics.airports import Airports
+            self.airports = Airports(os.path.join(self.output_dir, "cache"))
+        return self.airports.get(self.auto_exposure.lat, self.auto_exposure.lon)
+
     def get_map_config(self) -> Dict[str, Any]:
         """Basemap settings for the 3D flights map. Only Google Maps (Map Tiles API, key in station config
         "google_maps_key") is offered on top of the elevation-only terrain; no OpenStreetMap-based maps."""
