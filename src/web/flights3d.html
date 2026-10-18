@@ -75,6 +75,11 @@
         .legend .ramp { width: 120px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #ffd166, #06d6a0, #38bdf8, #8b5cf6, #f472b6); }
         .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
         .station-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; box-shadow: 0 0 10px var(--accent); }
+        #cam-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 6px 8px 6px 12px; display: none;
+            align-items: center; gap: 10px; font-size: 12px; white-space: nowrap; }
+        #cam-badge.show { display: flex; }
+        #cam-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444; animation: blink 1.2s infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
         #list-toggle { display: none; }
         @media (max-width: 700px) {
             #top { right: 12px; }
@@ -82,6 +87,7 @@
             #list.collapsed ul { display: none; }
             #list-toggle { display: inline-block; }
             #info { bottom: auto; top: 150px; right: 12px; width: auto; }
+            #cam-badge { top: auto; bottom: 64px; }
         }
     </style>
     <script type="importmap">
@@ -120,13 +126,16 @@
         <ul id="ac-list"></ul>
     </div>
 
+    <div id="cam-badge" class="panel"><span class="dot"></span><span id="cam-text"></span><button id="cam-stop" title="Stop (Esc)">Stop</button></div>
+
     <div id="info" class="panel">
         <h3><span id="info-cs"></span><button id="info-close" title="Close">✕</button></h3>
         <canvas id="info-model" title="Drag to turn"></canvas>
         <img id="info-logo" alt="" hidden>
         <dl id="info-dl"></dl>
         <div class="links">
-            <button id="btn-follow">Follow</button>
+            <button id="btn-track" title="Keep the camera on this aircraft; rotate and zoom around it">Track</button>
+            <button id="btn-chase" title="Fly behind the aircraft, turning with it">Chase</button>
             <a id="info-link" target="_blank" rel="noopener">ADS-B Exchange ↗</a>
         </div>
     </div>
@@ -156,7 +165,8 @@
         let station = null, camera = null;
         let origin = null, mPerUnit = 1;    // scene origin (mercator) at the station; mercator units per metre there
         const aircraft = new Map();         // icao -> state
-        let selected = null, follow = false, centering = false;
+        let selected = null, centering = false;
+        let camMode = null, camZoom = null, camPitch = null, camPending = false;   // camera tracking the selected aircraft
         let trailIdx = 0, trailSpan = TRAIL_CHOICES[0], showLabels = true;
         let lastFetch = 0, haveTrails = false;
 
@@ -1064,6 +1074,8 @@
                     dp.setXYZ(0, p[0], p[1], p[2]); dp.setXYZ(1, p[0], p[1], 0); dp.needsUpdate = true;
 
                     if (icao === selected) {
+                        this.selPos = p;
+                        this.selHeading = a.heading_deg;
                         v4.set(p[0], p[1], p[2], 1).applyMatrix4(M);
                         this.sel = v4.w > 0 ? [(v4.x / v4.w + 1) / 2 * W, (1 - v4.y / v4.w) / 2 * H] : null;
                     }
@@ -1078,8 +1090,14 @@
                     }
                 }
                 this.screen = screen;
-                // Follow / center: pan so the plane itself (not the ground below it) sits mid-screen
-                if ((follow || centering) && selected && this.sel && !map.isMoving()) {
+                // Track / chase: the map centre sits on the aircraft itself, at its altitude
+                if (camMode && selected && this.selPos && !camPending) {
+                    camPending = true;
+                    const pos = this.selPos, hd = this.selHeading;
+                    requestAnimationFrame(() => { camPending = false; steerCamera(pos, hd); });
+                }
+                // After selecting: pan once so the plane (not the ground below it) sits mid-screen
+                if (!camMode && centering && selected && this.sel && !map.isMoving()) {
                     const dx = this.sel[0] - W / 2, dy = this.sel[1] - H / 2;
                     if (Math.hypot(dx, dy) < 6) centering = false;
                     else requestAnimationFrame(() => map.panBy([dx * 0.15, dy * 0.15], { duration: 0 }));
@@ -1091,7 +1109,68 @@
             },
         };
 
-        map.on("dragstart", () => { centering = false; });
+        // ---------------------------------------------------------------- camera tracking
+        function steerCamera(p, heading) {
+            if (!camMode) return;
+            const mc = new maplibregl.MercatorCoordinate(origin.x + p[0], origin.y + p[1], 0);
+            const o = { center: mc.toLngLat(), elevation: p[2] / mc.meterInMercatorCoordinateUnits() };
+            if (camZoom != null) {
+                const z = map.getZoom();
+                o.zoom = z + (camZoom - z) * 0.08;
+                if (Math.abs(camZoom - o.zoom) < 0.02) camZoom = null;
+            }
+            if (camPitch != null) {
+                const pt = map.getPitch();
+                o.pitch = pt + (camPitch - pt) * 0.08;
+                if (Math.abs(camPitch - o.pitch) < 0.2) camPitch = null;
+            }
+            if (camMode === "chase" && heading != null) {
+                const b = map.getBearing(), d = ((heading - b + 540) % 360) - 180;
+                o.bearing = b + d * 0.05;
+            }
+            map.jumpTo(o);
+        }
+
+        function setCamMode(mode) {
+            const s = selected && aircraft.get(selected);
+            if (!s || camMode === mode) { stopCamera(); return; }
+            camMode = mode;
+            centering = false;
+            map.setCenterClampedToGround(false);
+            camZoom = Math.max(map.getZoom(), mode === "chase" ? 13 : 12);
+            camPitch = mode === "chase" ? 74 : Math.max(map.getPitch(), 60);
+            showCamera();
+            map.triggerRepaint();
+        }
+
+        function stopCamera() {
+            if (!camMode) return;
+            camMode = camZoom = camPitch = null;
+            // Same viewpoint, but aimed at the ground under the screen centre, so the next pan doesn't jump
+            try {
+                const camLL = map.transform.getCameraLngLat(), camAlt = map.transform.getCameraAltitude();
+                const c = map.getCanvas();
+                const ground = map.unproject([c.clientWidth / 2, c.clientHeight / 2]);
+                const gAlt = map.queryTerrainElevation(ground) || 0;
+                map.setCenterClampedToGround(true);
+                map.jumpTo(map.calculateCameraOptionsFromTo(camLL, camAlt, ground, gAlt));
+            } catch (e) {
+                map.setCenterClampedToGround(true);
+            }
+            showCamera();
+        }
+
+        function showCamera() {
+            const a = selected && aircraft.get(selected)?.a;
+            $("cam-badge").classList.toggle("show", !!(camMode && a));
+            if (camMode && a) $("cam-text").textContent = `${camMode === "chase" ? "Chasing" : "Tracking"} ${a.callsign || a.icao} · Esc to stop`;
+            $("btn-track").classList.toggle("on", camMode === "track");
+            $("btn-chase").classList.toggle("on", camMode === "chase");
+        }
+
+        map.on("dragstart", () => { centering = false; stopCamera(); });   // panning away ends tracking
+        map.on("wheel", () => { camZoom = null; });
+        document.addEventListener("keydown", (e) => { if (e.key === "Escape") stopCamera(); });
         map.on("click", (e) => {
             const hit = (planesLayer.screen || []).map(([icao, x, y]) => [icao, Math.hypot(x - e.point.x, y + 8 - e.point.y)])
                 .sort((a, b) => a[1] - b[1])[0];
@@ -1201,13 +1280,13 @@
             ].filter(Boolean);
             $("info-dl").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
             $("info-link").href = `https://globe.adsbexchange.com/?icao=${encodeURIComponent(String(a.icao).toLowerCase())}`;
-            $("btn-follow").classList.toggle("on", follow);
+            showCamera();
         }
 
         function select(icao, fly = false) {
             const prev = selected;
             selected = icao;
-            if (!icao) follow = false;
+            if (icao !== prev) stopCamera();
             for (const id of [prev, icao]) {
                 const s = id && aircraft.get(id);
                 if (!s) continue;
@@ -1224,7 +1303,9 @@
 
         // ---------------------------------------------------------------- controls
         $("info-close").onclick = () => select(null);
-        $("btn-follow").onclick = () => { follow = !follow; renderInfo(); };
+        $("btn-track").onclick = () => setCamMode("track");
+        $("btn-chase").onclick = () => setCamMode("chase");
+        $("cam-stop").onclick = () => stopCamera();
         $("list-toggle").onclick = () => $("list").classList.toggle("collapsed");
         $("btn-base-terrain").onclick = () => setBase("terrain");
         $("btn-base-google").onclick = () => setBase("google");
@@ -1239,7 +1320,7 @@
         };
         $("btn-labels").onclick = (e) => { showLabels = e.target.classList.toggle("on"); map.triggerRepaint(); };
         $("btn-home").onclick = () => {
-            follow = false; renderInfo();
+            stopCamera();
             if (station) map.easeTo({ center: [station.lon, station.lat], zoom: 9, pitch: 64, bearing: -20, duration: 1200 });
         };
         if (window.innerWidth <= 700) $("list").classList.add("collapsed");
