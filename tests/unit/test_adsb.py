@@ -95,6 +95,19 @@ def test_sbs_parsing_keeps_positions_and_callsign():
     assert feed.tracks(0, 1e9) == []
 
 
+
+def test_current_trail_is_thinned_and_ends_at_the_latest_fix():
+    import time
+    feed = AdsbFeed("127.0.0.1", 30003)
+    now = time.time()
+    for i in range(40):  # one fix per second for the last 40 s, climbing
+        feed._parse(f"MSG,3,333,0,8880AB,100,,,,,,{10000 + i * 10},,,{21.0 + i * 0.001:.5f},105.9,,,0,0,0,0".encode(), now - 39 + i)
+    (a,) = feed.current(trail_s=30.0, trail_step_s=5.0)
+    trail = a["trail"]
+    assert len(trail) == 7  # 6 points 5 s apart inside 30 s, plus the latest fix
+    assert trail[-1] == [round(a["lat"], 5), 105.9, round(a["altitude_m"])]
+    assert all(p[0] < q[0] for p, q in zip(trail, trail[1:]))
+    assert "trail" not in feed.current()[0]
 # A real pass recorded 2026-10-18 20:43 (+07): moving-dot track of 34 frames and GTI8523's SBS positions
 # (seconds from the first dot, lat, lon, altitude ft). The station coordinates had been left at the Hanoi-centre
 # default, ~6.6 km from the camera; for an aircraft ~20-50 km away that put the projection 5-17 deg off.

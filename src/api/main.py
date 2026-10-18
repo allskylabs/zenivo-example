@@ -101,6 +101,11 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         def serve_section_page():
             return page_shell()
 
+        # 3D map of the aircraft the ADS-B receiver hears (standalone page; loads MapLibre + three.js)
+        @app.get("/flights3d")
+        def serve_flights3d():
+            return FileResponse(os.path.join(web_dir, "flights3d.html"), media_type="text/html", headers=no_cache)
+
         @app.get("/index.html")
         def serve_index_html():
             return page_shell()

@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flights 3D — AllSky Observatory</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+    <style>
+        :root {
+            --bg-primary: #070a13;
+            --bg-card: #0d1322;
+            --bg-card-sub: #131d31;
+            --border-color: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #38bdf8;
+            --warning: #f59e0b;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-sans); overflow: hidden; }
+        #map { position: absolute; inset: 0; }
+        #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+        .ac-label {
+            position: absolute; transform: translate(-50%, -100%); white-space: nowrap; pointer-events: auto; cursor: pointer;
+            font: 600 11px/1.25 var(--font-mono); color: var(--text-primary); text-shadow: 0 1px 3px #000, 0 0 2px #000;
+            padding: 1px 4px; border-radius: 4px; user-select: none;
+        }
+        .ac-label small { display: block; font-weight: 400; color: var(--text-secondary); }
+        .ac-label.in-view { color: var(--warning); }
+        .ac-label.selected { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+        .panel {
+            position: absolute; background: color-mix(in srgb, var(--bg-card) 92%, transparent); border: 1px solid var(--border-color);
+            border-radius: 10px; backdrop-filter: blur(6px); font-size: 13px;
+        }
+        #top { top: 12px; left: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; max-width: calc(100vw - 24px); }
+        #top .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        #top a.back { color: var(--accent); text-decoration: none; font-weight: 600; }
+        #top h1 { font-size: 15px; font-weight: 600; }
+        #status { color: var(--text-secondary); font-size: 12px; }
+        .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+        button {
+            background: var(--bg-card-sub); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px;
+            padding: 4px 9px; font: inherit; font-size: 12px; cursor: pointer;
+        }
+        button:hover { border-color: var(--accent); }
+        button.on { border-color: var(--accent); color: var(--accent); }
+        #list { top: 12px; right: 12px; width: 250px; max-height: calc(100vh - 24px); display: flex; flex-direction: column; }
+        #list h2 { font-size: 13px; font-weight: 600; padding: 9px 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; }
+        #list ul { list-style: none; overflow-y: auto; }
+        #list li { padding: 6px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-mono); font-size: 12px; }
+        #list li:hover, #list li.selected { background: var(--bg-card-sub); }
+        #list li.in-view .cs { color: var(--warning); }
+        #list li .meta { color: var(--text-secondary); }
+        #info { left: 12px; bottom: 28px; padding: 10px 12px; min-width: 230px; display: none; }
+        #info.show { display: block; }
+        #info h3 { font: 600 15px var(--font-mono); margin-bottom: 4px; display: flex; justify-content: space-between; gap: 12px; }
+        #info dl { display: grid; grid-template-columns: auto auto; gap: 2px 14px; font-size: 12px; }
+        #info dt { color: var(--text-secondary); }
+        #info dd { font-family: var(--font-mono); text-align: right; }
+        #info .links { margin-top: 8px; display: flex; gap: 6px; }
+        #info a { color: var(--accent); font-size: 12px; }
+        .legend { display: flex; gap: 12px; font-size: 11px; color: var(--text-secondary); }
+        .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+        .station-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; box-shadow: 0 0 10px var(--accent); }
+        #list-toggle { display: none; }
+        @media (max-width: 700px) {
+            #top { right: 12px; }
+            #list { top: auto; bottom: 64px; right: 12px; left: 12px; width: auto; max-height: 40vh; }
+            #list.collapsed ul { display: none; }
+            #list-toggle { display: inline-block; }
+            #info { bottom: auto; top: 128px; right: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="labels"></div>
+
+    <div id="top" class="panel">
+        <div class="row">
+            <a class="back" href="/live">← Live</a>
+            <h1>Flights 3D</h1>
+            <span id="status">Loading…</span>
+        </div>
+        <div class="btns">
+            <button id="btn-sat" title="Satellite imagery">Satellite</button>
+            <button id="btn-terrain" class="on" title="3D terrain">Terrain</button>
+            <button id="btn-trails" class="on" title="Flight paths over the last 3 minutes">Trails</button>
+            <button id="btn-labels" class="on" title="Callsign labels">Labels</button>
+            <button id="btn-home" title="Back to the station">Station</button>
+        </div>
+        <div class="legend">
+            <span><i style="background:#e2e8f0"></i>Heard</span>
+            <span><i style="background:var(--warning)"></i>In camera view</span>
+            <span><i style="background:var(--accent)"></i>Camera</span>
+        </div>
+    </div>
+
+    <div id="list" class="panel">
+        <h2><span>Aircraft</span><span><span id="count">--</span> <button id="list-toggle">▾</button></span></h2>
+        <ul id="ac-list"></ul>
+    </div>
+
+    <div id="info" class="panel">
+        <h3><span id="info-cs"></span><button id="info-close" title="Close">✕</button></h3>
+        <dl id="info-dl"></dl>
+        <div class="links">
+            <button id="btn-follow">Follow</button>
+            <a id="info-link" target="_blank" rel="noopener">ADS-B Exchange ↗</a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script type="module">
+        import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+
+        const POLL_MS = 5000;
+        const TRAIL_S = 180;
+        const MAX_EXTRAP_S = 20;
+        const PLANE_PX = 42;          // on-screen plane length at any zoom (planes are drawn larger than life)
+        const PLANE_LEN_M = 40;       // model length in metres
+        const DEM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
+        const SAT = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+
+        const $ = (id) => document.getElementById(id);
+        const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+        const compass = (az) => COMPASS[Math.round(((az % 360) + 360) % 360 / 45) % 8];
+        const D2R = Math.PI / 180;
+
+        let station = null, camera = null;
+        let origin = null, mPerUnit = 1;    // scene origin (mercator) at the station; mercator units per metre there
+        const aircraft = new Map();         // icao -> state
+        let selected = null, follow = false, centering = false;   // centering: bring the selected plane to mid-screen once
+        let showTrails = true, showLabels = true;
+        let lastFetch = 0;
+
+        // ---------------------------------------------------------------- map
+        const map = new maplibregl.Map({
+            container: "map",
+            style: "https://tiles.openfreemap.org/styles/dark",
+            center: [105.9095, 21.0538], zoom: 9, pitch: 62, bearing: -20, maxPitch: 80,
+            attributionControl: { compact: true },
+        });
+        map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
+
+        function firstSymbolLayer() {
+            return (map.getStyle().layers || []).find((l) => l.type === "symbol")?.id;
+        }
+
+        // Set up as soon as the style is parsed, not after every first tile ("load"), so planes show up quickly
+        map.once("style.load", () => {
+            const before = firstSymbolLayer();
+            map.addSource("sat", { type: "raster", tiles: [SAT], tileSize: 256, maxzoom: 18,
+                attribution: "Imagery © Esri, Maxar, Earthstar Geographics" });
+            map.addLayer({ id: "sat", type: "raster", source: "sat", layout: { visibility: "none" } }, before);
+            map.addSource("dem", { type: "raster-dem", tiles: [DEM], encoding: "terrarium", tileSize: 256, maxzoom: 14,
+                attribution: "Terrain: Mapzen / AWS Terrain Tiles" });
+            map.addSource("dem-shade", { type: "raster-dem", tiles: [DEM], encoding: "terrarium", tileSize: 256, maxzoom: 14 });
+            map.addLayer({ id: "hillshade", type: "hillshade", source: "dem-shade",
+                paint: { "hillshade-exaggeration": 0.45, "hillshade-shadow-color": "#000", "hillshade-highlight-color": "#3b4a66" } }, before);
+            map.setTerrain({ source: "dem", exaggeration: 1 });
+            map.setSky?.({ "sky-color": "#070a13", "horizon-color": "#15223b", "fog-color": "#070a13", "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.6, "fog-ground-blend": 0.4 });
+            if (!(map.getStyle().layers || []).some((l) => l.type === "fill-extrusion")) {
+                map.addLayer({
+                    id: "buildings-3d", type: "fill-extrusion", source: "openmaptiles", "source-layer": "building", minzoom: 13,
+                    paint: {
+                        "fill-extrusion-color": "#24324d",
+                        "fill-extrusion-height": ["coalesce", ["get", "render_height"], 8],
+                        "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
+                        "fill-extrusion-opacity": 0.85,
+                    },
+                }, before);
+            }
+            map.addLayer(planesLayer);
+            poll();
+            setInterval(() => { if (!document.hidden) poll(); }, POLL_MS);
+            document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastFetch > POLL_MS) poll(); });
+        });
+
+        // ---------------------------------------------------------------- geometry helpers
+        function merc(lon, lat, alt) {
+            const m = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], alt);
+            return [m.x - origin.x, m.y - origin.y, m.z];
+        }
+        function enuToScene(e, n, u) { return [e * mPerUnit, -n * mPerUnit, u * mPerUnit]; }
+
+        // Camera -> ENU rotation from the star-solved pointing (same as src/analytics/adsb.py pointing_rotation)
+        function pointingRotation(azDeg, altDeg, rollDeg) {
+            const alt = altDeg * D2R, az = azDeg * D2R, r = rollDeg * D2R;
+            const axis = [Math.cos(alt) * Math.sin(az), Math.cos(alt) * Math.cos(az), Math.sin(alt)];
+            const dot = axis[2];
+            let vert = [-axis[0] * dot, -axis[1] * dot, 1 - axis[2] * dot];
+            const vn = Math.hypot(...vert) || 1; vert = vert.map((v) => v / vn);
+            const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+            const ax = cross(axis, vert);
+            const up = vert.map((v, i) => Math.cos(r) * v + Math.sin(r) * ax[i]);
+            const y = up.map((v) => -v);
+            return { right: cross(y, axis), down: y, axis };
+        }
+
+        // ---------------------------------------------------------------- three.js scene
+        const scene = new THREE.Scene();
+        scene.add(new THREE.AmbientLight(0xffffff, 1.4));
+        const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+        sun.position.set(0.4, -0.6, 1);
+        scene.add(sun);
+        const cam3 = new THREE.Camera();
+        const world = new THREE.Group();       // per-frame matrix maps metres-ish scene units -> mercator offsets
+        scene.add(world);
+
+        const MAT = {
+            heard: new THREE.MeshLambertMaterial({ color: 0xe2e8f0 }),
+            inView: new THREE.MeshLambertMaterial({ color: 0xf59e0b, emissive: 0x4a2a00 }),
+            selected: new THREE.MeshLambertMaterial({ color: 0x38bdf8, emissive: 0x0b3a52 }),
+        };
+        const TRAIL_MAT = {
+            heard: new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.55 }),
+            inView: new THREE.LineBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.8 }),
+            selected: new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.95 }),
+        };
+        const DROP_MAT = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.35 });
+
+        // Airliner built from primitives, metres, nose along +Y, up +Z
+        const GEO = (() => {
+            const parts = [];
+            const add = (geo, x, y, z, rz = 0, rx = 0) => {
+                geo.rotateX(rx); geo.rotateZ(rz); geo.translate(x, y, z); parts.push(geo);
+            };
+            add(new THREE.CylinderGeometry(2, 2, 30, 12), 0, 0, 0);
+            add(new THREE.ConeGeometry(2, 6, 12), 0, 18, 0);
+            add(new THREE.ConeGeometry(2, 8, 12), 0, -19, 0.6, 0, Math.PI);
+            add(new THREE.BoxGeometry(17, 5, 0.6), 8.2, -1.5, -0.6, -0.32);
+            add(new THREE.BoxGeometry(17, 5, 0.6), -8.2, -1.5, -0.6, 0.32);
+            add(new THREE.BoxGeometry(6.5, 3, 0.4), 3.2, -18.5, 1.2, -0.35);
+            add(new THREE.BoxGeometry(6.5, 3, 0.4), -3.2, -18.5, 1.2, 0.35);
+            add(new THREE.BoxGeometry(0.5, 5, 7), 0, -18.5, 4.5);
+            add(new THREE.CylinderGeometry(1, 1, 4.5, 10), 6, 1.5, -1.6);
+            add(new THREE.CylinderGeometry(1, 1, 4.5, 10), -6, 1.5, -1.6);
+            return parts;
+        })();
+
+        function makePlaneMesh() {
+            const g = new THREE.Group();
+            for (const geo of GEO) g.add(new THREE.Mesh(geo, MAT.heard));
+            g.matrixAutoUpdate = false;
+            return g;
+        }
+        function setPlaneMaterial(g, mat) { g.children.forEach((m) => { m.material = mat; }); }
+
+        let stationGroup = null;
+        function buildStation() {
+            stationGroup = new THREE.Group();
+            const s0 = merc(station.lon, station.lat, station.elevation_m || 0);
+            const pts = [];
+            if (camera) {
+                // Camera view frustum out to 12 km
+                const R = pointingRotation(camera.az_deg, camera.alt_deg, camera.roll_deg || 0);
+                const th = Math.tan(camera.hfov_deg / 2 * D2R), tv = Math.tan(camera.vfov_deg / 2 * D2R);
+                const corners = [[-th, -tv], [th, -tv], [th, tv], [-th, tv]].map(([x, y]) => {
+                    const v = [0, 1, 2].map((i) => R.right[i] * x + R.down[i] * y + R.axis[i]);
+                    const n = Math.hypot(...v);
+                    const d = 12000 / n;
+                    const p = enuToScene(v[0] * d, v[1] * d, Math.max(v[2] * d, 0));   // rays below the horizon end on the ground
+                    return new THREE.Vector3(s0[0] + p[0], s0[1] + p[1], s0[2] + p[2]);
+                });
+                const apex = new THREE.Vector3(...s0);
+                for (const c of corners) pts.push(apex, c);
+                for (let i = 0; i < 4; i++) pts.push(corners[i], corners[(i + 1) % 4]);
+                const lines = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),
+                    new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.8 }));
+                stationGroup.add(lines);
+                const face = new THREE.BufferGeometry().setFromPoints([corners[0], corners[1], corners[2], corners[0], corners[2], corners[3],
+                    apex, corners[0], corners[1], apex, corners[1], corners[2], apex, corners[2], corners[3], apex, corners[3], corners[0]]);
+                stationGroup.add(new THREE.Mesh(face, new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.08,
+                    side: THREE.DoubleSide, depthWrite: false })));
+            }
+            world.add(stationGroup);
+        }
+
+        // ---------------------------------------------------------------- state from the API
+        function kind(a) { return a.icao === selected ? "selected" : a.in_view ? "inView" : "heard"; }
+
+        function poll() {
+            lastFetch = Date.now();
+            fetch(`/api/adsb/aircraft?limit=400&trail=${TRAIL_S}`).then((r) => r.json()).then(update).catch(() => {
+                $("status").textContent = "Receiver unavailable";
+            });
+        }
+
+        function update(d) {
+            if (!d.enabled) { $("status").textContent = "ADS-B is turned off (Settings)"; return; }
+            $("status").textContent = d.connected ? `${d.in_view || 0} in view · ${d.total || 0} heard` : "Receiver not connected";
+            if (d.station && !origin) {
+                station = d.station; camera = d.camera || null;
+                origin = maplibregl.MercatorCoordinate.fromLngLat([station.lon, station.lat], 0);
+                mPerUnit = origin.meterInMercatorCoordinateUnits();
+                map.jumpTo({ center: [station.lon, station.lat] });
+                addStationOnMap();
+                buildStation();
+            }
+            if (!origin) return;
+            const now = performance.now();
+            const seen = new Set();
+            for (const a of d.aircraft || []) {
+                if (a.lat == null) continue;
+                seen.add(a.icao);
+                let s = aircraft.get(a.icao);
+                if (!s) {
+                    s = { mesh: makePlaneMesh(), label: document.createElement("div"), trail: null, drop: null, off: [0, 0, 0], disp: null };
+                    s.label.className = "ac-label";
+                    s.label.addEventListener("click", (ev) => { ev.stopPropagation(); select(a.icao, true); });
+                    $("labels").appendChild(s.label);
+                    world.add(s.mesh);
+                    aircraft.set(a.icao, s);
+                }
+                const prevDisp = s.disp;
+                s.a = a;
+                s.t0 = now - (a.age_s || 0) * 1000;
+                s.base = merc(a.lon, a.lat, a.altitude_m);
+                // Hide the jump from dead reckoning to the new fix by easing the difference away
+                if (prevDisp) {
+                    const p = predict(s, now);
+                    s.off = [prevDisp[0] - p[0], prevDisp[1] - p[1], prevDisp[2] - p[2]];
+                    s.offT = now;
+                }
+                setTrail(s);
+                setPlaneMaterial(s.mesh, MAT[kind(a)]);
+                s.label.className = `ac-label${a.in_view ? " in-view" : ""}${a.icao === selected ? " selected" : ""}`;
+                s.label.innerHTML = `${esc(a.callsign || a.icao)}<small>${(a.altitude_m / 1000).toFixed(1)} km</small>`;
+            }
+            for (const [icao, s] of aircraft) {
+                if (seen.has(icao)) continue;
+                world.remove(s.mesh);
+                if (s.trail) { world.remove(s.trail); s.trail.geometry.dispose(); }
+                if (s.drop) { world.remove(s.drop); s.drop.geometry.dispose(); }
+                s.label.remove();
+                aircraft.delete(icao);
+                if (selected === icao) select(null);
+            }
+            renderList();
+            renderInfo();
+            map.triggerRepaint();
+        }
+
+        function setTrail(s) {
+            if (s.trail) { world.remove(s.trail); s.trail.geometry.dispose(); s.trail = null; }
+            const pts = (s.a.trail || []).map(([lat, lon, alt]) => new THREE.Vector3(...merc(lon, lat, alt)));
+            if (pts.length < 2) return;
+            s.trail = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), TRAIL_MAT[kind(s.a)]);
+            s.trail.visible = showTrails;
+            world.add(s.trail);
+        }
+
+        // Position now: last fix moved along its ground track and climb rate (up to MAX_EXTRAP_S)
+        function predict(s, now) {
+            const a = s.a;
+            const dt = Math.min(Math.max((now - s.t0) / 1000, 0), MAX_EXTRAP_S);
+            if (a.speed_kmh == null || a.heading_deg == null) return s.base.slice();
+            const v = a.speed_kmh / 3.6, h = a.heading_deg * D2R;
+            const p = enuToScene(Math.sin(h) * v * dt, Math.cos(h) * v * dt, (a.climb_m_min || 0) / 60 * dt);
+            return [s.base[0] + p[0], s.base[1] + p[1], s.base[2] + p[2]];
+        }
+
+        // ---------------------------------------------------------------- custom layer
+        const planesLayer = {
+            id: "planes-3d", type: "custom", renderingMode: "3d",
+            onAdd(m, gl) {
+                this.renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true });
+                this.renderer.autoClear = false;
+            },
+            render(gl, matrix) {
+                if (!origin) return;
+                const now = performance.now();
+                const zoom = map.getZoom();
+                const lat = map.getCenter().lat;
+                const mpp = 40075016.686 * Math.cos(lat * D2R) / (512 * Math.pow(2, zoom));
+                const k = Math.max(1, PLANE_PX * mpp / PLANE_LEN_M) * mPerUnit;   // metres -> mercator, enlarged
+
+                const M = new THREE.Matrix4().fromArray(matrix)
+                    .multiply(new THREE.Matrix4().makeTranslation(origin.x, origin.y, 0));
+                cam3.projectionMatrix = M;
+                const W = map.getCanvas().clientWidth, H = map.getCanvas().clientHeight;
+                const v4 = new THREE.Vector4();
+                const screen = [];
+
+                for (const [icao, s] of aircraft) {
+                    const p = predict(s, now);
+                    if (s.offT) {
+                        const f = Math.max(0, 1 - (now - s.offT) / 1500);
+                        p[0] += s.off[0] * f; p[1] += s.off[1] * f; p[2] += s.off[2] * f;
+                        if (!f) s.offT = 0;
+                    }
+                    s.disp = p;
+                    const a = s.a;
+                    const h = (a.heading_deg || 0) * D2R;
+                    const pitch = a.speed_kmh ? Math.atan2((a.climb_m_min || 0) / 60, a.speed_kmh / 3.6) : 0;
+                    s.mesh.matrix.makeTranslation(p[0], p[1], p[2])
+                        .multiply(new THREE.Matrix4().makeScale(k, -k, k))
+                        .multiply(new THREE.Matrix4().makeRotationZ(-h))
+                        .multiply(new THREE.Matrix4().makeRotationX(pitch));
+                    s.mesh.matrixWorldNeedsUpdate = true;
+
+                    // Altitude stalk down to sea level
+                    if (!s.drop) {
+                        s.drop = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), DROP_MAT);
+                        world.add(s.drop);
+                    }
+                    const pos = s.drop.geometry.attributes.position;
+                    pos.setXYZ(0, p[0], p[1], p[2]); pos.setXYZ(1, p[0], p[1], 0); pos.needsUpdate = true;
+                    s.drop.geometry.computeBoundingSphere();
+
+                    if (icao === selected) {
+                        v4.set(p[0], p[1], p[2], 1).applyMatrix4(M);
+                        this.sel = v4.w > 0 ? [(v4.x / v4.w + 1) / 2 * W, (1 - v4.y / v4.w) / 2 * H] : null;
+                    }
+                    v4.set(p[0], p[1], p[2] + 9 * k, 1).applyMatrix4(M);
+                    if (v4.w > 0) {
+                        const x = (v4.x / v4.w + 1) / 2 * W, y = (1 - v4.y / v4.w) / 2 * H;
+                        const onScreen = x > -50 && x < W + 50 && y > -50 && y < H + 50;
+                        s.label.style.display = showLabels && onScreen ? "" : "none";
+                        if (onScreen) {
+                            s.label.style.left = `${x}px`; s.label.style.top = `${y}px`;
+                            screen.push([icao, x, y]);
+                        }
+                    } else {
+                        s.label.style.display = "none";
+                    }
+                }
+                this.screen = screen;
+                // Follow / center: pan so the plane itself (not the ground below it) sits mid-screen
+                if ((follow || centering) && selected && this.sel && !map.isMoving()) {
+                    const dx = this.sel[0] - W / 2, dy = this.sel[1] - H / 2;
+                    if (Math.hypot(dx, dy) < 6) centering = false;
+                    else requestAnimationFrame(() => map.panBy([dx * 0.15, dy * 0.15], { duration: 0 }));
+                }
+
+                this.renderer.resetState();
+                this.renderer.render(scene, cam3);
+                if (aircraft.size && !document.hidden) map.triggerRepaint();
+            },
+        };
+
+        map.on("dragstart", () => { centering = false; });
+
+        // Click on the map near a plane selects it
+        map.on("click", (e) => {
+            const hit = (planesLayer.screen || []).map(([icao, x, y]) => [icao, Math.hypot(x - e.point.x, y + 6 - e.point.y)])
+                .sort((a, b) => a[1] - b[1])[0];
+            select(hit && hit[1] < 40 ? hit[0] : null);
+        });
+
+        function addStationOnMap() {
+            const el = document.createElement("div");
+            el.className = "station-dot";
+            el.title = "AllSky camera";
+            new maplibregl.Marker({ element: el }).setLngLat([station.lon, station.lat]).addTo(map);
+            // Distance rings 10 / 25 / 50 / 100 km
+            const rings = [10, 25, 50, 100].map((km) => {
+                const coords = [];
+                for (let i = 0; i <= 96; i++) {
+                    const b = i / 96 * 2 * Math.PI;
+                    coords.push([station.lon + km / 111.32 * Math.sin(b) / Math.cos(station.lat * D2R), station.lat + km / 110.57 * Math.cos(b)]);
+                }
+                return { type: "Feature", properties: { label: `${km} km` }, geometry: { type: "LineString", coordinates: coords } };
+            });
+            map.addSource("rings", { type: "geojson", data: { type: "FeatureCollection", features: rings } });
+            map.addLayer({ id: "rings", type: "line", source: "rings", paint: { "line-color": "#38bdf8", "line-opacity": 0.35, "line-width": 1, "line-dasharray": [3, 3] } }, "planes-3d");
+            map.addLayer({ id: "rings-label", type: "symbol", source: "rings",
+                layout: { "symbol-placement": "line", "text-field": ["get", "label"], "text-size": 11, "text-font": ["Noto Sans Regular"] },
+                paint: { "text-color": "#38bdf8", "text-opacity": 0.7, "text-halo-color": "#070a13", "text-halo-width": 1.5 } }, "planes-3d");
+        }
+
+        // ---------------------------------------------------------------- list + info
+        function sortedAircraft() {
+            return [...aircraft.values()].map((s) => s.a)
+                .sort((x, y) => (y.in_view - x.in_view) || (x.distance_km - y.distance_km));
+        }
+
+        function renderList() {
+            const list = sortedAircraft();
+            $("count").textContent = list.length;
+            $("ac-list").innerHTML = list.length ? list.map((a) =>
+                `<li data-icao="${esc(a.icao)}" class="${a.in_view ? "in-view" : ""}${a.icao === selected ? " selected" : ""}">
+                    <span class="cs">${esc(a.callsign || a.icao)}</span>
+                    <span class="meta">${(a.altitude_m / 1000).toFixed(1)} km · ${a.distance_km} km ${compass(a.az_deg)}</span></li>`).join("")
+                : `<li><span class="meta">No aircraft heard right now.</span></li>`;
+        }
+        $("ac-list").addEventListener("click", (e) => {
+            const li = e.target.closest("li[data-icao]");
+            if (li) select(li.dataset.icao, true);
+        });
+
+        function renderInfo() {
+            const s = selected && aircraft.get(selected);
+            $("info").classList.toggle("show", !!s);
+            if (!s) return;
+            const a = s.a;
+            $("info-cs").textContent = a.callsign || a.icao;
+            const rows = [
+                ["ICAO", a.icao],
+                ["Altitude", `${Number(a.altitude_m).toLocaleString()} m`],
+                ["Speed", a.speed_kmh != null ? `${a.speed_kmh} km/h` : "--"],
+                ["Heading", a.heading_deg != null ? `${a.heading_deg}° ${compass(a.heading_deg)}` : "--"],
+                ["Climb", a.climb_m_min != null ? `${a.climb_m_min} m/min` : "--"],
+                ["Distance", `${a.distance_km} km`],
+                ["From camera", a.above_horizon ? `${compass(a.az_deg)} ${a.az_deg}°, ${a.alt_deg}° up` : "below horizon"],
+                ["In camera view", a.in_view ? "yes" : "no"],
+            ];
+            $("info-dl").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
+            $("info-link").href = `https://globe.adsbexchange.com/?icao=${encodeURIComponent(String(a.icao).toLowerCase())}`;
+            $("btn-follow").classList.toggle("on", follow);
+        }
+
+        function select(icao, fly = false) {
+            const prev = selected;
+            selected = icao;
+            if (!icao) follow = false;
+            for (const id of [prev, icao]) {
+                const s = id && aircraft.get(id);
+                if (!s) continue;
+                setPlaneMaterial(s.mesh, MAT[kind(s.a)]);
+                if (s.trail) s.trail.material = TRAIL_MAT[kind(s.a)];
+                s.label.classList.toggle("selected", id === selected);
+            }
+            planesLayer.sel = null;
+            centering = !!(fly && icao && aircraft.get(icao));
+            if (centering && map.getZoom() < 10.5) map.easeTo({ zoom: 10.5, duration: 800 });
+            renderList();
+            renderInfo();
+            map.triggerRepaint();
+        }
+
+        // ---------------------------------------------------------------- controls
+        $("info-close").onclick = () => select(null);
+        $("btn-follow").onclick = () => { follow = !follow; renderInfo(); };
+        $("list-toggle").onclick = () => $("list").classList.toggle("collapsed");
+        $("btn-sat").onclick = (e) => {
+            const on = e.target.classList.toggle("on");
+            map.setLayoutProperty("sat", "visibility", on ? "visible" : "none");
+        };
+        $("btn-terrain").onclick = (e) => {
+            const on = e.target.classList.toggle("on");
+            map.setTerrain(on ? { source: "dem", exaggeration: 1 } : null);
+            map.setLayoutProperty("hillshade", "visibility", on ? "visible" : "none");
+        };
+        $("btn-trails").onclick = (e) => {
+            showTrails = e.target.classList.toggle("on");
+            for (const s of aircraft.values()) if (s.trail) s.trail.visible = showTrails;
+            map.triggerRepaint();
+        };
+        $("btn-labels").onclick = (e) => { showLabels = e.target.classList.toggle("on"); map.triggerRepaint(); };
+        $("btn-home").onclick = () => {
+            follow = false; renderInfo();
+            if (station) map.easeTo({ center: [station.lon, station.lat], zoom: 9, pitch: 62, bearing: -20, duration: 1200 });
+        };
+        if (window.innerWidth <= 700) $("list").classList.add("collapsed");
+    </script>
+</body>
+</html>

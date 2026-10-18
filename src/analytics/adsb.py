@@ -186,17 +186,27 @@ class AdsbFeed:
                                 **{k: a[k] for k in ("speed_kt", "track_deg", "vrate_fpm") if k in a}})
         return out
 
-    def current(self, max_age_s: float = 60.0) -> List[Dict[str, Any]]:
-        """Latest state of every aircraft with a position in the last max_age_s seconds."""
+    def current(self, max_age_s: float = 60.0, trail_s: float = 0.0, trail_step_s: float = 5.0) -> List[Dict[str, Any]]:
+        """Latest state of every aircraft with a position in the last max_age_s seconds; with trail_s, also
+        its recent path as [[lat, lon, alt_m], ...] (oldest first, one point per trail_step_s)."""
         now = time.time()
         out = []
         with self._lock:
             for a in self._ac.values():
                 if a["pos"] and now - a["pos"][-1][0] <= max_age_s:
                     t, lat, lon, alt = a["pos"][-1]
-                    out.append({"icao": a["icao"], "callsign": a["callsign"], "lat": lat, "lon": lon,
-                                "altitude_m": alt, "age_s": now - t,
-                                **{k: a[k] for k in ("speed_kt", "track_deg", "vrate_fpm") if k in a}})
+                    rec = {"icao": a["icao"], "callsign": a["callsign"], "lat": lat, "lon": lon,
+                           "altitude_m": alt, "age_s": now - t,
+                           **{k: a[k] for k in ("speed_kt", "track_deg", "vrate_fpm") if k in a}}
+                    if trail_s > 0:
+                        trail, last_t = [], -1e18
+                        for pt, plat, plon, palt in a["pos"]:
+                            if now - pt <= trail_s and pt - last_t >= trail_step_s:
+                                trail.append([round(plat, 5), round(plon, 5), round(palt)])
+                                last_t = pt
+                        trail.append([round(lat, 5), round(lon, 5), round(alt)])
+                        rec["trail"] = trail
+                    out.append(rec)
         return out
 
 

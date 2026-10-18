@@ -601,9 +601,12 @@ def get_adsb_config(service: AllSkyService = Depends(get_service)):
 
 
 @router.get("/api/adsb/aircraft")
-def get_adsb_aircraft(limit: int = Query(default=30, ge=1, le=200), service: AllSkyService = Depends(get_service)):
-    """Aircraft heard right now: flight, altitude, speed, heading, distance, direction, in camera view."""
-    return service.get_aircraft_now(limit=limit)
+def get_adsb_aircraft(limit: int = Query(default=30, ge=1, le=400),
+                      trail: float = Query(default=0.0, ge=0.0, le=300.0),
+                      service: AllSkyService = Depends(get_service)):
+    """Aircraft heard right now: flight, altitude, speed, heading, distance, direction, in camera view.
+    trail=<seconds> adds lat/lon and each aircraft's recent path (3D map)."""
+    return service.get_aircraft_now(limit=limit, trail_s=trail)
 
 
 @router.post("/api/adsb")

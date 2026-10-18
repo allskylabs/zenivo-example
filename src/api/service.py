@@ -2056,9 +2056,10 @@ class AllSkyService:
         self.activity.info("events", f"ADS-B flight matching: {c['host']}:{c['port']}" if c["enabled"] else "ADS-B flight matching off")
         return {"success": True, **c}
 
-    def get_aircraft_now(self, limit: int = 30) -> Dict[str, Any]:
+    def get_aircraft_now(self, limit: int = 30, trail_s: float = 0.0) -> Dict[str, Any]:
         """Aircraft the ADS-B receiver hears right now: flight, altitude, speed, distance, direction, and
-        whether it is inside the camera's open sky (frame_xy in frame fractions)."""
+        whether it is inside the camera's open sky (frame_xy in frame fractions). With trail_s (3D map),
+        also lat/lon, each aircraft's recent path, the station and the camera's pointing."""
         from src.analytics.adsb import motion_fields, sky_position
 
         if self.adsb is None:
@@ -2070,7 +2071,7 @@ class AllSkyService:
                    "elevation_m": float(self.station_config.get("elevation_m") or 0.0)}
         obstructions = [np.array(p, np.float32) for p in ((self.station_config.get("sky_mask") or {}).get("obstruction") or [])]
         out = []
-        for a in self.adsb.current():
+        for a in self.adsb.current(trail_s=trail_s):
             pos = sky_position(station, a["lat"], a["lon"], a["altitude_m"], sol)
             xy = pos.get("frame_xy")
             in_view = bool(xy) and not any(cv2.pointPolygonTest(p, (float(xy[0]), float(xy[1])), False) >= 0 for p in obstructions)
@@ -2079,10 +2080,22 @@ class AllSkyService:
                 "altitude_m": round(a["altitude_m"]), **motion_fields(a), **pos,
                 "in_view": in_view, "above_horizon": pos["alt_deg"] > 0, "age_s": round(a["age_s"], 1),
             })
+            if trail_s > 0:
+                out[-1].update(lat=round(a["lat"], 5), lon=round(a["lon"], 5), trail=a.get("trail") or [])
         out.sort(key=lambda r: (not r["in_view"], not r["above_horizon"], r["distance_km"]))
         st = self.adsb.status()
-        return {"enabled": True, "connected": st["connected"], "total": len(out),
-                "in_view": sum(1 for r in out if r["in_view"]), "aircraft": out[:limit]}
+        res = {"enabled": True, "connected": st["connected"], "total": len(out),
+               "in_view": sum(1 for r in out if r["in_view"]), "aircraft": out[:limit]}
+        if trail_s > 0:
+            res["station"] = {"lat": station["latitude_deg"], "lon": station["longitude_deg"], "elevation_m": station["elevation_m"]}
+            if sol:
+                cx, cy = sol["optical_center_px"]
+                f = float(sol["focal_px"])
+                res["camera"] = {"az_deg": sol["pointing_az_deg"], "alt_deg": sol["pointing_alt_deg"],
+                                 "roll_deg": sol.get("roll_deg", 0.0),
+                                 "hfov_deg": round(2 * math.degrees(math.atan(cx / f)), 2),
+                                 "vfov_deg": round(2 * math.degrees(math.atan(cy / f)), 2)}
+        return res
 
     def _adsb_wanted(self) -> bool:
         """Read the feed only while aircraft events can happen (night, plane detection on) or while the
