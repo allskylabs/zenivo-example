@@ -67,8 +67,16 @@ class _FakePicamera2:
     def set_controls(self, ctrls):
         self.controls.update(ctrls)
 
-    def capture_request(self):
+    stalled = False
+    flushed = 0
+
+    def capture_request(self, wait=None):
+        if self.stalled:
+            raise TimeoutError("timed out")
         return _FakeRequest(self)
+
+    def cancel_all_and_flush(self):
+        self.flushed += 1
 
 
 @pytest.fixture
@@ -96,6 +104,16 @@ def test_picamera_picks_binned_full_fov_mode_and_clamps_gain(fake_picamera2):
     assert meta["actual_exposure_s"] == pytest.approx(4.0)
     assert meta["sensor_temp_c"] == 31.0
     assert cam.get_info()["has_registers"] is False
+    cam.close()
+
+
+def test_picamera_capture_times_out_instead_of_hanging(fake_picamera2):
+    cam = PiCameraController()
+    cam.open()
+    cam.picam.stalled = True
+    with pytest.raises(TimeoutError):
+        cam.capture_frame()
+    assert cam.picam.flushed == 1
     cam.close()
 
 

@@ -229,8 +229,19 @@ class PiCameraController(CameraDriverInterface):
         # Frames queued before the last control change still carry the old exposure: skip them
         deadline = time.time() + max(10.0, self.current_exposure_s * 4 + 8.0)
         frame = md = None
+        # Never block forever: libcamera occasionally stops delivering frames, and a capture that hangs while
+        # holding the service's capture lock froze every page (focus, telemetry, snapshots). On timeout the
+        # pending camera jobs are cancelled and the error lets the service close and re-open the camera.
+        wait_s = max(5.0, self.current_exposure_s * 3 + 5.0)
         for attempt in range(6):
-            req = self.picam.capture_request()
+            try:
+                req = self.picam.capture_request(wait=wait_s)
+            except TimeoutError as exc:
+                try:
+                    self.picam.cancel_all_and_flush()
+                except Exception:
+                    pass
+                raise TimeoutError(f"Pi camera delivered no frame in {wait_s:.0f} s") from exc
             try:
                 md = req.get_metadata()
                 got_us = float(md.get("ExposureTime", want_us))
