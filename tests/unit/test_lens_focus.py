@@ -177,12 +177,13 @@ def test_finish_saves_and_record_can_be_reused(lens_client):
     out = client.post("/api/focus/finish").json()
     assert not out["active"] and out["record"]["lens_position"] == 0.41 and out["record"]["roi"]["size"] == 192
     assert client.get("/api/focus").json()["last_record"]["source"] == "manual"
-    # Next session starts from the saved zoom region and measure
+    # The next session places its zoom by itself; Use brings back the saved lens, zoom and measure
     st = client.post("/api/focus/start", json={}).json()
-    assert st["cx"] == 0.3 and st["roi_size"] == 192 and st["method"] == "stars"
-    client.post("/api/focus/lens", json={"position": 1.5})
+    assert st["active"] and "found" in st
+    client.post("/api/focus/lens", json={"position": 0.9})
     st = client.post("/api/focus/apply-record?index=-1").json()
     assert cam.lens_position_target == 0.41 and st["active"]
+    assert st["cx"] == 0.3 and st["roi_size"] == 192 and st["method"] == "stars"
 
 
 def test_near_object_af_is_rejected_and_lens_put_back(lens_client):
@@ -236,3 +237,48 @@ def test_flat_sweep_on_blank_sky_is_not_saved(lens_client):
     assert svc.focus.sweep["state"] == "failed" and "flat" in svc.focus.sweep["message"]
     assert cam.lens_position_target == 0.25 and svc.station_config["lens_focus"]["position"] == 0.25
     assert len(svc.lens_comp.samples) == n_samples and svc.station_config.get("focus_record") == rec_before
+
+
+def test_find_focus_point_day_detail_night_star_and_blank_sky():
+    from src.analytics.focus import find_focus_point
+    rng = np.random.default_rng(1)
+    day = np.full((480, 640, 3), 170, np.uint8)  # bright sky
+    patch = rng.integers(30, 220, (60, 80), dtype=np.uint8)
+    day[300:360, 420:500] = np.dstack([patch] * 3)  # a detailed rooftop
+    pt = find_focus_point(day)
+    assert pt["method"] == "contrast" and abs(pt["cx"] - 0.72) < 0.08 and abs(pt["cy"] - 0.69) < 0.1
+    night = _star_field(1.2)
+    assert find_focus_point(night)["method"] == "stars"
+    assert find_focus_point(np.full((480, 640, 3), 160, np.uint8)) is None
+
+
+def test_day_tracker_needs_a_clear_win():
+    tr = FocusTracker(delta=0.04, interval_s=0.0)
+    tr.reset(0.3)
+    vals = iter([10.0, 9.9, 10.1])  # within 4 %: no move
+    metric = lambda f: next(vals)
+    frame = np.zeros((10, 10, 3), np.uint8)
+    pos = 0.3
+    for t in range(3):
+        new = tr.step(t + 1.0, frame, pos, pos, (0, 12), is_night=False, day_metric=metric)
+        pos = new if new is not None else pos
+    assert pos == 0.3 and tr.log[-1]["kind"] == "day"
+    vals = iter([10.0, 9.0, 11.0])  # +0.04 D clearly sharper (lower score)
+    for t in range(3):
+        new = tr.step(t + 10.0, frame, pos, pos, (0, 12), is_night=False, day_metric=metric)
+        pos = new if new is not None else pos
+    assert pos > 0.3
+
+
+def test_near_records_are_not_last_or_reusable(lens_client):
+    client, svc, cam = lens_client
+    svc.station_config["focus_history"] = [
+        {"finished_at": "2026-10-17T20:00:00+07:00", "source": "sweep", "lens_position": 0.2, "roi": {"cx": 0.5, "cy": 0.5, "size": 256}},
+        {"finished_at": "2026-10-18T12:20:00+07:00", "source": "camera_af", "lens_position": 4.018, "roi": {"cx": 0.09, "cy": 0.87, "size": 256}},
+    ]
+    st = client.get("/api/focus").json()
+    assert st["last_record"]["lens_position"] == 0.2
+    assert client.post("/api/focus/apply-record?index=-1").status_code == 409
+    started = client.post("/api/focus/start", json={}).json()
+    assert started["active"] and "found" in started  # zoom placed by auto point, not the corner record
+    assert (started["cx"], started["cy"]) != (0.09, 0.87)

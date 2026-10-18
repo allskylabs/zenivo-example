@@ -432,6 +432,12 @@ def configure_focus(req: FocusConfigRequest, service: AllSkyService = Depends(ge
     return service.configure_focus(reset=req.reset, **cfg)
 
 
+@router.post("/api/focus/auto-point")
+def focus_auto_point(service: AllSkyService = Depends(get_service)):
+    """Move the zoom onto the best focus target: a star or light by night, the most detailed area by day."""
+    return service.focus_auto_point()
+
+
 @router.post("/api/focus/auto-roi")
 def focus_auto_roi(lights: bool = Query(False), service: AllSkyService = Depends(get_service)):
     """Move the focus ROI onto the best star (or bright light) in the current frame."""

@@ -33,7 +33,9 @@ from src.analytics.cloud_cover import CloudReference, analyze_cloud_cover
 from src.analytics.cloud_history import CloudHistory
 from src.analytics.sky_events import EVENT_TYPES, SkyEventDetector
 from src.analytics.focus_tracker import SKY_MAX_DIOPTRES, FocusTracker, TempCompensation
-from src.analytics.focus import FocusSession, LOWER_IS_BETTER, display_stretch, find_best_star, measure_focus
+from src.analytics.focus import (
+    FocusSession, LOWER_IS_BETTER, _contrast, display_stretch, find_best_star, find_focus_point, measure_focus,
+)
 from src.api.histogram import compute_fast_histogram
 from src.pipeline.keogram import KeogramGenerator
 from src.pipeline.startrails import StartrailsAccumulator
@@ -2266,7 +2268,9 @@ class AllSkyService:
         state["mode"] = self.mode
         state["limits"] = camera_limits(self.camera)
         state["lens"] = self.get_lens_state()
-        state["last_record"] = self.station_config.get("focus_record")
+        hist_all = self.station_config.get("focus_history") or []
+        good = [r for r in hist_all if not r.get("near") and not (r.get("lens_position") or 0) > SKY_MAX_DIOPTRES]
+        state["last_record"] = good[-1] if good else None
         state["history_records"] = (self.station_config.get("focus_history") or [])[-10:]
         if self.focus.active:
             state["expires_in_s"] = round(max(0.0, self.focus.last_action + self.FOCUS_MAX_UNATTENDED_S - time.time()), 1)
@@ -2278,14 +2282,7 @@ class AllSkyService:
     def start_focus(self, **config: Any) -> Dict[str, Any]:
         """Enter focus mode: native resolution, fastest capture rate, auto-exposure and archiving paused.
         Without explicit settings the zoom region and measure of the last saved focus are reused."""
-        if not config and not self.focus.active:
-            rec = self.station_config.get("focus_record") or {}
-            roi = rec.get("roi") or {}
-            if roi:
-                config = {"cx": roi.get("cx"), "cy": roi.get("cy"), "roi_size": roi.get("size")}
-                if rec.get("method"):
-                    config["method"] = rec["method"] if self.focus.method == "auto" else None
-                config = {k: v for k, v in config.items() if v is not None}
+        auto_point = not config and not self.focus.active
         with self._focus_lock:
             self.focus.configure(**config)
             self.focus.last_poll = self.focus.last_action = time.time()
@@ -2300,6 +2297,12 @@ class AllSkyService:
                 if not os.environ.get("PYTEST_CURRENT_TEST"):
                     self.activity.info("camera", "Focus mode started (native resolution, auto-exposure and archiving paused)")
                 threading.Thread(target=self._focus_watchdog, name="focus-watchdog", daemon=True).start()
+        if auto_point:
+            # Pick the focus point from the picture (stars / lights by night, the most detailed tile by day)
+            try:
+                return self.focus_auto_point()
+            except Exception:
+                pass
         return self.get_focus_state()
 
     def stop_focus(self, reason: str = "stopped") -> Dict[str, Any]:
@@ -2663,6 +2666,8 @@ class AllSkyService:
         if not hist:
             raise RuntimeError("No saved focus yet")
         rec = hist[index]
+        if rec.get("near") or (rec.get("lens_position") or 0) > SKY_MAX_DIOPTRES:
+            raise RuntimeError("That record focused on something nearer than 1 m, not the sky")
         if rec.get("lens_position") is not None and self._lens_supported():
             self.set_lens(position=float(rec["lens_position"]))
         roi = rec.get("roi") or {}
@@ -2707,6 +2712,8 @@ class AllSkyService:
             "exposure_s": float(getattr(self.camera, "current_exposure_s", 0.0)),
             "gain_db": float(getattr(self.camera, "current_gain_db", 0.0)),
             "note": note,
+            # Focused nearer than 1 m: kept in the history for reference, never offered as sky focus
+            "near": bool(lens_pos is not None and float(lens_pos) > SKY_MAX_DIOPTRES),
         }
         self.station_config["focus_record"] = rec
         hist = self.station_config.setdefault("focus_history", [])
@@ -2746,9 +2753,27 @@ class AllSkyService:
                 self.camera.set_lens_position(tgt)
                 return
         from src.calibration.auto_exposure import calculate_solar_elevation
-        is_night = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon) < -12.0
+        sun = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon)
+        is_night = sun < -12.0
+        day_metric = None
+        if sun > 3.0:
+            # By day probe edge contrast on the most detailed tile, chosen once per cycle so all three frames
+            # of a check measure the same buildings/rooftops (sky and drifting cloud are skipped)
+            if self.focus_tracker.phase is None and now >= self.focus_tracker.next_ts:
+                pt = find_focus_point(frame)
+                self._day_focus_tile = (pt["cx"], pt["cy"]) if pt and pt["method"] == "contrast" else None
+            tile = getattr(self, "_day_focus_tile", None)
+            if tile is not None:
+                def day_metric(f, tile=tile):
+                    fh, fw = f.shape[:2]
+                    side = max(64, min(fw, fh) // 6)
+                    x0 = int(min(max(0, tile[0] * fw - side / 2), fw - side))
+                    y0 = int(min(max(0, tile[1] * fh - side / 2), fh - side))
+                    c = _contrast(cv2.cvtColor(f[y0:y0 + side, x0:x0 + side], cv2.COLOR_BGR2GRAY))
+                    return 1000.0 / c if c > 1e-6 else None
         before = self.focus_tracker.phase
-        new = self.focus_tracker.step(now, frame, meta.get("lens_position"), cur, self.camera.lens_range, is_night, temp)
+        new = self.focus_tracker.step(now, frame, meta.get("lens_position"), cur, self.camera.lens_range, is_night, temp,
+                                      day_metric=day_metric)
         if new is None:
             return
         self.camera.set_lens_position(new)
@@ -2758,7 +2783,8 @@ class AllSkyService:
             self._save_lens(new, "tracking")
             if abs(float(entry.get("to", new)) - float(entry.get("from", new))) >= 0.001:
                 self.activity.info(
-                    "camera", f"Focus tracking: lens {entry.get('from')} -> {new} D at {temp} °C (HFR {entry.get('hfr')})"
+                    "camera", f"Focus tracking ({entry.get('kind')}): lens {entry.get('from')} -> {new} D at {temp} °C "
+                    f"({entry.get('hfr') or entry.get('score')})"
                 )
 
     def _roi_method(self, frame: np.ndarray) -> str:
@@ -2973,6 +2999,21 @@ class AllSkyService:
             self._lens_finish(None, "cancelled", f"cancelled, lens left at {pos_back}", "sweep")
         except Exception as exc:
             self._lens_finish(None, "failed", str(exc), "sweep")
+
+    def focus_auto_point(self) -> Dict[str, Any]:
+        """Move the zoom onto the best thing to focus on in the current frame (see find_focus_point)."""
+        frame = self.last_frame
+        if frame is None:
+            frame, _ = self.capture_frame()
+        point = find_focus_point(frame)
+        if point is None:
+            state = self.get_focus_state()
+            state.update({"found": False, "message": "nothing to focus on in the frame (blank sky, cloud or fog)"})
+            return state
+        state = self.configure_focus(cx=point["cx"], cy=point["cy"])
+        state.update({"found": True, "point": {k: point[k] for k in ("cx", "cy", "method")},
+                      "message": f"focus point on {'a star' if point['method'] == 'stars' else 'a bright light' if point['method'] == 'lights' else 'the most detailed area'}"})
+        return state
 
     def focus_auto_roi(self, lights: bool = False) -> Dict[str, Any]:
         """Centre the focus ROI on the best point source in the whole frame (stars, else bright lights)."""

@@ -9,7 +9,7 @@ position). It costs three star measurements per interval and never stops the nor
 """
 
 from collections import deque
-from typing import Any, Deque, Dict, Optional
+from typing import Any, Callable, Deque, Dict, Optional
 
 import numpy as np
 
@@ -43,6 +43,7 @@ class FocusTracker:
         self.noise_frac = noise_frac
         self.base: Optional[float] = None       # position found by the last sweep / manual focus
         self.phase: Optional[str] = None
+        self.kind: Optional[str] = None
         self.p0: Optional[float] = None
         self.scores: Dict[str, Optional[float]] = {}
         self.next_ts = 0.0
@@ -59,17 +60,25 @@ class FocusTracker:
             pos = min(self.base + self.max_offset, max(self.base - self.max_offset, pos))
         return round(min(hi, max(lo, pos)), 4)
 
+    DAY_NOISE_FRAC = 0.04  # daytime contrast moves with sun and drifting cloud: demand a clear win
+
     def step(self, now: float, frame: np.ndarray, reported: Optional[float], target: Optional[float],
-             lens_range, is_night: bool, temp_c: Optional[float] = None) -> Optional[float]:
-        """Feed one captured frame. Returns a lens position to move to, or None to leave the lens alone."""
+             lens_range, is_night: bool, temp_c: Optional[float] = None,
+             day_metric: Optional[Callable[[np.ndarray], Optional[float]]] = None) -> Optional[float]:
+        """Feed one captured frame. Returns a lens position to move to, or None to leave the lens alone.
+
+        At night the measure is the median star HFR of a central crop. By day, when day_metric is given
+        (lower = sharper, e.g. inverse contrast of a detailed tile), the same probe runs on that instead."""
         lo, hi = float(lens_range[0]), float(lens_range[1])
         if not self.enabled or self.base is None or target is None:
             return None
-        if not is_night:
-            if self.phase is not None:  # dawn mid-cycle: put the lens back
-                self.phase = None
-                return self.p0
+        kind = "stars" if is_night else ("day" if day_metric is not None else None)
+        if self.phase is not None and kind != self.kind:
+            self.phase = None  # dawn/dusk mid-cycle: put the lens back
+            return self.p0
+        if kind is None:
             return None
+        metric = star_hfr if kind == "stars" else day_metric
 
         def arrived(pos):
             return reported is None or abs(float(reported) - pos) < 0.006
@@ -77,18 +86,18 @@ class FocusTracker:
         if self.phase is None:
             if now < self.next_ts or not arrived(target):
                 return None
-            s0 = star_hfr(frame)
+            s0 = metric(frame)
             if s0 is None:
-                self.next_ts = now + 300.0  # cloudy or too few stars: try again in 5 min
+                self.next_ts = now + 300.0  # cloudy, too few stars or no detail: try again in 5 min
                 return None
-            self.p0, self.scores, self.phase = target, {"0": s0}, "plus"
+            self.p0, self.scores, self.phase, self.kind = target, {"0": s0}, "plus", kind
             return self._clamp(self.p0 + self.delta, lo, hi)
 
         if self.phase == "plus":
             want = self._clamp(self.p0 + self.delta, lo, hi)
             if not arrived(want):
                 return None
-            self.scores["+"] = star_hfr(frame)
+            self.scores["+"] = metric(frame)
             self.phase = "minus"
             return self._clamp(self.p0 - self.delta, lo, hi)
 
@@ -96,26 +105,28 @@ class FocusTracker:
         want = self._clamp(self.p0 - self.delta, lo, hi)
         if not arrived(want):
             return None
-        self.scores["-"] = star_hfr(frame)
+        self.scores["-"] = metric(frame)
         self.phase = None
         self.next_ts = now + self.interval_s
         s0, sp, sm = self.scores["0"], self.scores.get("+"), self.scores.get("-")
         new = self.p0
+        noise = self.noise_frac if kind == "stars" else self.DAY_NOISE_FRAC
         if sp is not None and sm is not None:
             d = self.delta
             curvature = sm - 2 * s0 + sp
             if curvature > 0:
-                offset = d * (sm - sp) / (2 * curvature)  # vertex of the parabola through the three HFRs
+                offset = d * (sm - sp) / (2 * curvature)  # vertex of the parabola through the three scores
             else:
                 offset = d if sp < sm else -d
             offset = float(np.clip(offset, -d, d))
             best_side = min(sp, sm)
-            # Move only when a probed side was really sharper, or the fitted vertex is clearly off-centre
-            if best_side < s0 * (1 - self.noise_frac) or (curvature > 0 and abs(offset) > d * 0.5):
+            # Move only when a probed side was really sharper (by day nothing else: drifting cloud and
+            # changing light would otherwise walk the lens), or at night the fitted vertex is clearly off-centre
+            if best_side < s0 * (1 - noise) or (kind == "stars" and curvature > 0 and abs(offset) > d * 0.5):
                 new = self._clamp(self.p0 + offset, lo, hi)
         self.log.append({
-            "t": round(now, 1), "temp_c": temp_c, "from": self.p0, "to": new,
-            "hfr": {k: (round(v, 3) if v is not None else None) for k, v in self.scores.items()},
+            "t": round(now, 1), "temp_c": temp_c, "from": self.p0, "to": new, "kind": kind,
+            "hfr" if kind == "stars" else "score": {k: (round(v, 4) if v is not None else None) for k, v in self.scores.items()},
         })
         return new
 

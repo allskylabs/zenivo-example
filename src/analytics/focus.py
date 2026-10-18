@@ -369,3 +369,38 @@ class FocusSession:
             "best_method": self.best_method,
             "history": list(self.history),
         }
+
+
+def find_focus_point(img: np.ndarray, grid_w: int = 12) -> Optional[Dict[str, Any]]:
+    """Pick where to focus, as fractions of the frame: by night the best star (else the brightest point
+    light), by day the tile with the most fine detail (buildings, rooftops, cloud edges), skipping blank
+    sky and the outermost tiles (frame edge, nearby walls). Runs on a ~768 px copy (a few ms)."""
+    gray = _to_gray(img)
+    h, w = gray.shape
+    scale = min(1.0, 768.0 / w)
+    small = cv2.resize(gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA) if scale < 1 else gray
+    sh, sw = small.shape
+    bright = float(np.percentile(small, 50))
+    if bright < 60:
+        star = find_best_star(small)
+        if star is not None:
+            kind = "lights" if star["saturated"] else "stars"
+            return {"cx": (star["x"] + 0.5) / sw, "cy": (star["y"] + 0.5) / sh, "method": kind, "detail": star}
+    tile = max(32, sw // grid_w)
+    best = None
+    scores = []
+    for ty in range(1, sh // tile - 1):
+        for tx in range(1, sw // tile - 1):
+            t = small[ty * tile:(ty + 1) * tile, tx * tile:(tx + 1) * tile]
+            c = _contrast(t)
+            scores.append(c)
+            if best is None or c > best[0]:
+                best = (c, tx, ty)
+    if best is None or not scores:
+        return None
+    med = float(np.median(scores))
+    if best[0] < max(med * 1.5, 1e-6):
+        return None  # nothing stands out: blank sky, fog, uniform cloud
+    c, tx, ty = best
+    return {"cx": (tx + 0.5) * tile / sw, "cy": (ty + 0.5) * tile / sh, "method": "contrast",
+            "detail": {"contrast": round(c, 4), "median_tile": round(med, 4)}}

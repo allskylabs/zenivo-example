@@ -1435,3 +1435,5 @@ html, .focus-side, .log-list {
     cursor: crosshair;
     touch-action: manipulation;
 }
+.focus-history tr.near td { color: var(--text-muted); text-decoration: line-through; }
+.focus-history tr.near td:last-child { text-decoration: none; }

@@ -28,14 +28,15 @@
         const rows = records.slice().reverse().map((r, i) => {
             const idx = records.length - 1 - i;
             const when = new Date(r.finished_at);
-            return `<tr class="${i === 0 ? "latest" : ""}">
+            const near = r.near || (r.lens_position || 0) > 1;
+            return `<tr class="${near ? "near" : i === 0 ? "latest" : ""}" title="${near ? "Focused nearer than 1 m: not the sky" : ""}">
                 <td>${when.toLocaleDateString()} ${when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
                 <td>${r.source}</td><td>${r.method || "—"}</td>
                 <td class="num">${fmtRecScore(r)}</td><td class="num">${fmtRecLens(r)}</td>
                 <td class="num">${r.sensor_temp_c ?? "—"}${r.sensor_temp_c != null ? " °C" : ""}</td>
                 <td class="num">${fmtExp(r.exposure_s)} · ${(r.gain_db ?? 0).toFixed(0)} dB</td>
                 <td class="num">${r.roi ? `${r.roi.size}px @ ${(r.roi.cx * 100).toFixed(0)},${(r.roi.cy * 100).toFixed(0)}%` : "—"}</td>
-                <td>${onUse ? `<button class="btn btn-sm btn-outline" data-use="${idx - records.length}" title="Reuse this lens position, zoom region, measure and exposure">Use</button>` : ""}</td>
+                <td>${near ? '<span class="text-warning">near</span>' : onUse ? `<button class="btn btn-sm btn-outline" data-use="${idx - records.length}" title="Reuse this lens position, zoom region, measure and exposure">Use</button>` : ""}</td>
             </tr>`;
         }).join("");
         el.innerHTML = `<table><thead><tr><th>When</th><th>How</th><th>Measure</th><th>Score</th><th>Lens</th><th>Temp</th><th>Exposure</th><th>Zoom</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -501,7 +502,9 @@
                 applyState(await api("/api/focus/stop", { method: "POST" }));
             } else {
                 st.history = [];
-                applyState(await api("/api/focus/start", { method: "POST", body: {} }));
+                const started = await api("/api/focus/start", { method: "POST", body: {} });
+                applyState(started);
+                if (started.message) $("focus-statline").textContent = started.message;
                 frameLoop();
             }
             startOverviewTimer();
@@ -518,7 +521,15 @@
         b.addEventListener("click", () => configure({ smooth: parseInt(b.dataset.smooth, 10) })));
     roiSizeSel.addEventListener("change", () => configure({ roi_size: parseInt(roiSizeSel.value, 10) }));
     $("focus-reset").addEventListener("click", () => configure({ reset: true }));
-    $("focus-center").addEventListener("click", () => configure({ cx: 0.5, cy: 0.5 }));
+    $("focus-auto-point").addEventListener("click", async () => {
+        try {
+            const r = await api("/api/focus/auto-point", { method: "POST" });
+            st.history = []; st.lastResult = null; updateStats(null); drawChart();
+            applyState(r);
+            $("focus-statline").textContent = r.message || "";
+            if (!r.found) alert(r.message);
+        } catch (e) { alert(`Auto point: ${e.message}`); }
+    });
     [markersChk, crossChk].forEach((c) => c.addEventListener("change", drawZoom));
     stretchChk.addEventListener("change", refreshOverview);
 
