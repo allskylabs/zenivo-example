@@ -2509,6 +2509,9 @@ class AllSkyService:
         """auto: follow temperature (learned model) and re-check focus on stars every night;
         manual: hold the lens exactly where it was put."""
         cfg = self._lens_cfg()
+        if mode == "auto" and cfg.get("mode") != "auto":
+            cfg["next_auto_sweep"] = 0.0  # find focus by itself as soon as there is something to focus on
+            self._auto_sweep_retry_ts = 0.0
         cfg["mode"] = "auto" if mode == "auto" else "manual"
         cfg["tracking"] = cfg["mode"] == "auto"
         self.focus_tracker.enabled = cfg["mode"] == "auto"
@@ -2544,6 +2547,8 @@ class AllSkyService:
             "samples": self.lens_comp.samples[-20:],
         }
         info["tracking"] = self.focus_tracker.state()
+        nxt = cfg.get("next_auto_sweep")
+        info["next_auto_sweep_in_s"] = round(max(0.0, float(nxt) - time.time())) if nxt is not None else 0
         if self.focus_tracker.next_ts:
             info["tracking"]["next_in_s"] = round(max(0.0, self.focus_tracker.next_ts - time.time()))
         info["sweep"] = dict(self.focus.sweep) if self.focus.sweep else None
@@ -2593,7 +2598,7 @@ class AllSkyService:
             fy = 1.0 - fy - hh
         return fx, fy, ww, hh
 
-    def start_lens_autofocus(self, mode: str = "sweep") -> Dict[str, Any]:
+    def start_lens_autofocus(self, mode: str = "sweep", auto: bool = False) -> Dict[str, Any]:
         """Autofocus the motorised lens on the focus ROI and keep the result.
 
         mode "camera": libcamera's own scan (phase-detect + contrast). Fast and fine in daylight, but it
@@ -2608,7 +2613,7 @@ class AllSkyService:
         self.focus.last_action = time.time()
         self.focus.sweep_cancel = False
         self.focus.sweep = {"state": "running", "mode": mode, "phase": "start", "progress": 0.0, "points": [],
-                            "started_at": time.time()}
+                            "started_at": time.time(), "auto": bool(auto)}
         target = self._lens_camera_af if mode == "camera" else self._lens_sweep
         threading.Thread(target=target, name=f"lens-af-{mode}", daemon=True).start()
         return self.get_focus_state()
@@ -2632,6 +2637,8 @@ class AllSkyService:
             with self._focus_lock:
                 self.focus.reset_stats()
             self.activity.warning("camera", f"Lens autofocus ({sw.get('mode')}): {msg}")
+            if sw.get("auto") and self.focus.active:
+                self.stop_focus("automatic autofocus rejected")
             return
         if position is not None:
             position = self.camera.set_lens_position(position)
@@ -2651,13 +2658,17 @@ class AllSkyService:
             except Exception:
                 pass
             sw["final_score"] = score
-            self.finish_focus(source, method=method, score=score, note=message)
+            if sw.get("auto"):
+                self._lens_cfg()["next_auto_sweep"] = time.time() + self.AUTO_SWEEP_INTERVAL_S
+            self.finish_focus("auto_sweep" if sw.get("auto") else source, method=method, score=score, note=message)
             sw.update({"state": state, "message": message + " · saved, focus mode off", "progress": 1.0,
                        "finished_at": time.time()})
             return
         sw.update({"state": state, "message": message, "progress": 1.0, "finished_at": time.time()})
         if not os.environ.get("PYTEST_CURRENT_TEST"):
             self.activity.log("warning", "camera", f"Lens autofocus ({sw.get('mode')}): {message}")
+        if sw.get("auto") and self.focus.active:
+            self.stop_focus(f"automatic autofocus {state}")
 
     def apply_focus_record(self, index: int = -1, exposure: bool = True) -> Dict[str, Any]:
         """Reuse a saved focus: lens position (held, saved), zoom region and measure, and optionally its
@@ -2733,12 +2744,55 @@ class AllSkyService:
         self.stop_focus("focus finished and saved")
         return {"record": rec, **self.get_focus_state()}
 
+    AUTO_SWEEP_INTERVAL_S = 12 * 3600.0  # full automatic sweep at most twice a day; tracking covers between
+    AUTO_SWEEP_RETRY_S = 1800.0
+
+    def _maybe_auto_sweep(self, frame: np.ndarray, now: float, cfg: Dict[str, Any]) -> bool:
+        """Auto lens mode runs a full sweep autofocus by itself when there is no valid sky focus (none saved,
+        or one nearer than 1 m), right after Auto is switched on, and every AUTO_SWEEP_INTERVAL_S, but only
+        when the frame has something to focus on (stars/lights by night, detail by day; never at twilight).
+        It enters focus mode on the chosen point and leaves it again when done. True when one was started."""
+        if self.focus.active or (self.focus.sweep and self.focus.sweep.get("state") == "running"):
+            return False
+        pos = cfg.get("position")
+        valid = pos is not None and float(pos) <= SKY_MAX_DIOPTRES
+        if valid and now < float(cfg.get("next_auto_sweep") or 0):
+            return False
+        if now < float(getattr(self, "_auto_sweep_retry_ts", 0.0)):
+            return False
+        from src.calibration.auto_exposure import calculate_solar_elevation
+        sun = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon)
+        self._auto_sweep_retry_ts = now + self.AUTO_SWEEP_RETRY_S
+        if -12.0 <= sun <= 3.0:
+            return False  # twilight: stars too faint, daylight too low and changing
+        point = find_focus_point(frame)
+        if point is None or (sun < -12.0 and point["method"] == "contrast"):
+            return False
+
+        def _run():
+            try:
+                # Measure what the point was chosen for (a lone star would read as 'contrast' in auto)
+                self.start_focus(cx=point["cx"], cy=point["cy"], method=point["method"])
+                self.focus.last_action = time.time()
+                self.activity.info("camera", f"Auto lens mode: automatic sweep autofocus on {point['method']} "
+                                   f"at ({point['cx']:.2f}, {point['cy']:.2f})")
+                self.start_lens_autofocus("sweep", auto=True)
+            except Exception as exc:
+                self.activity.warning("camera", f"Automatic autofocus did not start: {exc}")
+                if self.focus.active:
+                    self.stop_focus("automatic autofocus did not start")
+
+        threading.Thread(target=_run, name="auto-sweep", daemon=True).start()
+        return True
+
     def _track_focus(self, frame: np.ndarray, meta: Dict[str, Any], now: float) -> None:
         """Auto lens mode on ordinary captures: follow temperature with the learned model (any time of day),
         and at night re-check focus on stars every 20 min (FocusTracker). Needs a saved focus position."""
         if not self._lens_supported():
             return
         cfg = self._lens_cfg()
+        if cfg["mode"] == "auto" and self._maybe_auto_sweep(frame, now, cfg):
+            return
         if cfg["mode"] != "auto" or cfg.get("position") is None or self.focus_tracker.base is None:
             return
         temp = meta.get("sensor_temp_c")

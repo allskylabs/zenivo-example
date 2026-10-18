@@ -151,6 +151,7 @@ def test_temperature_model_learns_slope_and_clamps():
 def test_auto_mode_follows_temperature_manual_holds(lens_client):
     client, svc, cam = lens_client
     client.post("/api/focus/lens", json={"mode": "auto"})
+    svc._lens_cfg()["next_auto_sweep"] = time.time() + 86400  # this test is about compensation only
     svc.last_metadata["sensor_temp_c"] = 20.0
     client.post("/api/focus/lens", json={"position": 0.30})  # manual set in auto mode = verified sample
     svc.lens_comp.add(30.0, 0.35, "tracking", 2)
@@ -282,3 +283,37 @@ def test_near_records_are_not_last_or_reusable(lens_client):
     started = client.post("/api/focus/start", json={}).json()
     assert started["active"] and "found" in started  # zoom placed by auto point, not the corner record
     assert (started["cx"], started["cy"]) != (0.09, 0.87)
+
+
+def test_auto_mode_runs_sweep_by_itself(lens_client, monkeypatch):
+    import src.calibration.auto_exposure as ae
+    client, svc, cam = lens_client
+    monkeypatch.setattr(ae, "calculate_solar_elevation", lambda *a, **k: -30.0)  # dark night
+    client.post("/api/focus/lens", json={"mode": "manual"})
+    client.post("/api/focus/lens", json={"position": 1.5})  # near: not a valid sky focus
+    client.post("/api/focus/lens", json={"mode": "auto"})
+    frame = _star_field(1.0)
+    svc._track_focus(frame, {"lens_position": cam.lens_position}, time.time())
+    deadline = time.time() + 90
+    while time.time() < deadline and (svc.focus.sweep is None or svc.focus.sweep.get("state") == "running"):
+        time.sleep(0.2)
+    sw = svc.focus.sweep
+    assert sw and sw["auto"] and sw["state"] == "done", sw
+    assert abs(cam.lens_position_target - TRUE_FOCUS) <= 0.03
+    assert not svc.focus.active
+    assert svc.station_config["focus_record"]["source"] == "auto_sweep"
+    assert svc.station_config["lens_focus"]["next_auto_sweep"] > time.time() + 3600
+    # Done for now: the next capture does not start another sweep
+    svc._track_focus(frame, {"lens_position": cam.lens_position}, time.time())
+    assert not svc.focus.active
+
+
+def test_auto_sweep_skips_twilight_and_blank_sky(lens_client, monkeypatch):
+    import src.calibration.auto_exposure as ae
+    client, svc, cam = lens_client
+    client.post("/api/focus/lens", json={"mode": "auto"})
+    monkeypatch.setattr(ae, "calculate_solar_elevation", lambda *a, **k: -5.0)
+    assert svc._maybe_auto_sweep(_star_field(1.0), time.time(), svc._lens_cfg()) is False
+    monkeypatch.setattr(ae, "calculate_solar_elevation", lambda *a, **k: 40.0)
+    svc._auto_sweep_retry_ts = 0.0
+    assert svc._maybe_auto_sweep(np.full((480, 640, 3), 170, np.uint8), time.time(), svc._lens_cfg()) is False

@@ -645,7 +645,8 @@
         if (!L.available) return;
         // The commanded position updates at once; the position frames report lags a frame or two behind
         const pos = L.held ?? L.position;
-        const lag = L.held != null && L.position != null && Math.abs(L.held - L.position) > 0.003;
+        // Outside focus mode frames are seconds apart, so the reported position is simply stale
+        const lag = st.active && L.held != null && L.position != null && Math.abs(L.held - L.position) > 0.003;
         $("focus-lens-pos").textContent = pos === null || pos === undefined ? "—" : `${pos.toFixed(3)} D`;
         $("focus-lens-dist").textContent = fmtDist(pos) + (lag ? ` · moving (at ${L.position.toFixed(3)})` : "");
         $("focus-lens-dist").classList.toggle("text-warning", pos > 1);
@@ -663,7 +664,7 @@
         document.querySelectorAll("#focus-lens-mode button").forEach((b) => b.classList.toggle("active", b.dataset.lensMode === L.mode));
         const cp = L.compensation || {};
         $("focus-lens-comp").textContent = !auto
-            ? "Manual: the lens stays exactly where you put it."
+            ? "Manual: the lens stays exactly where you put it. Auto finds and keeps focus by itself."
             : cp.n_rejected && !cp.learned && cp.rms_d
                 ? `Temperature model ignored: checks disagree (±${cp.rms_d} D); ${cp.n_rejected} outlier(s) dropped`
             : cp.learned
@@ -677,7 +678,8 @@
             ? "Run a sweep first: tracking follows the swept position."
             : `around ${tr.base.toFixed(3)} D ±${tr.max_offset} · ` +
               (last ? `last ${new Date(last.t * 1000).toLocaleTimeString()}: ${last.from} → ${last.to} D${last.temp_c != null ? ` at ${last.temp_c} °C` : ""}` : "no check yet") +
-              (tr.next_in_s != null ? ` · next star check in ${Math.round(tr.next_in_s / 60)} min (night only)` : "");
+              (tr.next_in_s != null ? ` · next check in ${Math.round(tr.next_in_s / 60)} min` : "") +
+              ` · automatic sweep ${L.next_auto_sweep_in_s > 60 ? `in ${(L.next_auto_sweep_in_s / 3600).toFixed(1)} h` : "as soon as there is something to focus on"}`;
 
         const sw = L.sweep;
         const running = !!sw && sw.state === "running";
