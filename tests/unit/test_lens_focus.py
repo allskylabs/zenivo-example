@@ -150,10 +150,11 @@ def test_temperature_model_learns_slope_and_clamps():
 
 def test_auto_mode_follows_temperature_manual_holds(lens_client):
     client, svc, cam = lens_client
+    svc.last_metadata["sensor_temp_c"] = 20.0
+    client.post("/api/focus/lens", json={"position": 0.30})
     client.post("/api/focus/lens", json={"mode": "auto"})
     svc._lens_cfg()["next_auto_sweep"] = time.time() + 86400  # this test is about compensation only
-    svc.last_metadata["sensor_temp_c"] = 20.0
-    client.post("/api/focus/lens", json={"position": 0.30})  # manual set in auto mode = verified sample
+    svc.lens_comp.add(20.0, 0.30, "sweep", 1)
     svc.lens_comp.add(30.0, 0.35, "tracking", 2)
     svc.lens_comp.add(25.0, 0.325, "tracking", 3)
     frame = _star_field(1.0)
@@ -317,3 +318,28 @@ def test_auto_sweep_skips_twilight_and_blank_sky(lens_client, monkeypatch):
     monkeypatch.setattr(ae, "calculate_solar_elevation", lambda *a, **k: 40.0)
     svc._auto_sweep_retry_ts = 0.0
     assert svc._maybe_auto_sweep(np.full((480, 640, 3), 170, np.uint8), time.time(), svc._lens_cfg()) is False
+
+
+def test_start_with_autofocus_sweeps_saves_and_ends(lens_client):
+    client, svc, cam = lens_client
+    client.post("/api/focus/lens", json={"mode": "manual"})
+    client.post("/api/focus/lens", json={"position": 1.4})
+    st = client.post("/api/focus/start", json={"autofocus": True}).json()
+    assert st["active"] and st["lens"]["sweep"]["state"] == "running"
+    deadline = time.time() + 90
+    while svc.focus.sweep.get("state") == "running" and time.time() < deadline:
+        time.sleep(0.2)
+    assert svc.focus.sweep["state"] == "done", svc.focus.sweep
+    assert abs(cam.lens_position_target - TRUE_FOCUS) <= 0.03 and not svc.focus.active
+
+
+def test_af_mf_modes(lens_client):
+    client, svc, cam = lens_client
+    client.post("/api/focus/lens", json={"mode": "manual"})
+    st = client.post("/api/focus/start", json={}).json()  # MF: streams only
+    assert st["active"] and not (svc.focus.sweep and svc.focus.sweep.get("state") == "running")
+    st = client.post("/api/focus/lens", json={"mode": "auto"}).json()  # AF while focusing: sweep now
+    assert st["lens"]["mode"] == "auto" and svc.focus.sweep["state"] == "running"
+    client.post("/api/focus/lens", json={"position": 0.8})  # touching the slider = MF, AF run cancelled
+    assert svc._lens_cfg()["mode"] == "manual" and cam.lens_position_target == 0.8
+    assert svc.focus.sweep["state"] in ("cancelled", "done", "failed")

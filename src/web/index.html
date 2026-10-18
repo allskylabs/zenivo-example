@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllSky Observatory — Edge Dashboard</title>
-    <link rel="stylesheet" href="/style.css?v=20261018fg">
+    <link rel="stylesheet" href="/style.css?v=20261018fk">
 </head>
 <body class="dark-mode">
     <!-- Top Navigation Header -->
@@ -867,8 +867,11 @@
                     </div>
                     <div class="card" id="focus-lens-card" hidden>
                         <div class="card-header">
-                            <h2>Lens (motorised)</h2>
-                            <span class="text-muted focus-hint" id="focus-lens-af">—</span>
+                            <h2>Lens</h2>
+                            <div class="focus-seg focus-afmf" id="focus-lens-mode">
+                                <button data-lens-mode="auto" title="AF: the app finds focus by itself (sweep on stars, lights or detail) and keeps it (temperature, periodic checks). Click again to refocus now.">AF</button>
+                                <button data-lens-mode="manual" title="MF: you set the focus with the slider; the lens stays exactly there">MF</button>
+                            </div>
                         </div>
                         <div class="focus-lens-pos"><b id="focus-lens-pos">—</b> <span class="text-muted" id="focus-lens-dist"></span></div>
                         <div class="focus-hint text-muted" id="focus-lens-saved">&nbsp;</div>
@@ -881,21 +884,9 @@
                             <button class="btn btn-sm btn-outline" data-lens-delta="0.02">+0.02</button>
                             <button class="btn btn-sm btn-outline" data-lens-delta="0.1">+0.1</button>
                         </div>
-                        <div class="btn-group focus-btns">
-                            <button class="btn btn-sm btn-primary" id="focus-lens-sweep" title="Step the lens through its range and keep the position with the best score in the zoom region (works on stars, lights and daytime scenes)">Sweep autofocus</button>
-                            <button class="btn btn-sm btn-outline" id="focus-lens-camaf" title="libcamera's own phase-detect autofocus on the zoom region: fast, daylight only">Camera AF</button>
-                            <button class="btn btn-sm btn-outline" id="focus-lens-cancel" hidden>Cancel</button>
-                        </div>
                         <div class="focus-meter" id="focus-lens-progress-wrap" hidden><div class="focus-meter-fill good" id="focus-lens-progress"></div></div>
-                        <div class="focus-hint" id="focus-lens-msg">&nbsp;</div>
+                        <div class="focus-hint focus-lens-status"><span id="focus-lens-msg">&nbsp;</span> <button class="btn btn-sm btn-outline" id="focus-lens-cancel" hidden>Cancel</button></div>
                         <canvas id="focus-lens-chart" class="focus-lens-chart" hidden></canvas>
-                        <div class="focus-field focus-lens-mode">
-                            <span class="focus-field-label">Lens focus</span>
-                            <div class="focus-seg" id="focus-lens-mode">
-                                <button data-lens-mode="auto" title="Follow temperature with the learned model, re-check on stars every 20 min at night">Auto</button>
-                                <button data-lens-mode="manual" title="Hold the lens exactly where it is put">Manual</button>
-                            </div>
-                        </div>
                         <div class="focus-hint text-muted" id="focus-lens-comp"></div>
                         <div class="focus-hint text-muted" id="focus-lens-track-msg"></div>
                         <button class="btn btn-sm btn-outline" id="focus-lens-reset-learning" title="Forget the focus-vs-temperature samples, e.g. after moving or refitting the camera">Reset temperature learning</button>
@@ -969,6 +960,6 @@
     <script src="/static/sky_catalog.js"></script>
     <script src="/app.js?v=20261018ev2"></script>
     <script src="/static/activity.js?v=20261016h"></script>
-    <script src="/static/focus.js?v=20261018fi"></script>
+    <script src="/static/focus.js?v=20261018fk"></script>
 </body>
 </html>

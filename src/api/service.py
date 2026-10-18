@@ -2279,10 +2279,14 @@ class AllSkyService:
             state["frame_width"], state["frame_height"] = int(frame.shape[1]), int(frame.shape[0])
         return state
 
-    def start_focus(self, **config: Any) -> Dict[str, Any]:
+    def start_focus(self, autofocus: Optional[bool] = None, **config: Any) -> Dict[str, Any]:
         """Enter focus mode: native resolution, fastest capture rate, auto-exposure and archiving paused.
-        Without explicit settings the zoom region and measure of the last saved focus are reused."""
+        Without explicit settings the focus point is picked from the picture. With autofocus (and a motorised
+        lens) a sweep autofocus starts right away on that point; it saves the result and ends focus mode."""
         auto_point = not config and not self.focus.active
+        if autofocus is None:
+            # AF lens mode: starting focus mode means 'find focus'; MF: just stream for adjusting by hand
+            autofocus = self._lens_supported() and self._lens_cfg().get("mode") == "auto"
         with self._focus_lock:
             self.focus.configure(**config)
             self.focus.last_poll = self.focus.last_action = time.time()
@@ -2297,13 +2301,29 @@ class AllSkyService:
                 if not os.environ.get("PYTEST_CURRENT_TEST"):
                     self.activity.info("camera", "Focus mode started (native resolution, auto-exposure and archiving paused)")
                 threading.Thread(target=self._focus_watchdog, name="focus-watchdog", daemon=True).start()
+        state = None
         if auto_point:
             # Pick the focus point from the picture (stars / lights by night, the most detailed tile by day)
             try:
-                return self.focus_auto_point()
+                state = self.focus_auto_point()
             except Exception:
-                pass
-        return self.get_focus_state()
+                state = None
+        if autofocus and self._lens_supported():
+            if state is not None and not state.get("found", True):
+                state["message"] = (state.get("message") or "") + " — autofocus not started"
+                return state
+            try:
+                if state is not None and state.get("point", {}).get("method") in ("stars", "lights", "contrast"):
+                    self.configure_focus(method=state["point"]["method"])
+                af = self.start_lens_autofocus("sweep")
+                af.update({k: state[k] for k in ("found", "point") if state and k in state})
+                af["message"] = (state or {}).get("message", "") + " · sweep autofocus started"
+                return af
+            except RuntimeError as exc:
+                state = state or self.get_focus_state()
+                state["message"] = f"autofocus not started: {exc}"
+                return state
+        return state if state is not None else self.get_focus_state()
 
     def stop_focus(self, reason: str = "stopped") -> Dict[str, Any]:
         with self._focus_lock:
@@ -2509,8 +2529,9 @@ class AllSkyService:
         """auto: follow temperature (learned model) and re-check focus on stars every night;
         manual: hold the lens exactly where it was put."""
         cfg = self._lens_cfg()
-        if mode == "auto" and cfg.get("mode") != "auto":
-            cfg["next_auto_sweep"] = 0.0  # find focus by itself as soon as there is something to focus on
+        if mode == "auto":
+            # AF: find focus now (in focus mode) or as soon as there is something to focus on
+            cfg["next_auto_sweep"] = 0.0
             self._auto_sweep_retry_ts = 0.0
         cfg["mode"] = "auto" if mode == "auto" else "manual"
         cfg["tracking"] = cfg["mode"] == "auto"
@@ -2523,6 +2544,12 @@ class AllSkyService:
             self.focus_tracker.phase = None
         if not os.environ.get("PYTEST_CURRENT_TEST"):
             self._save_station_config()
+        if (cfg["mode"] == "auto" and self.focus.active and self._lens_supported()
+                and not (self.focus.sweep and self.focus.sweep.get("state") == "running")):
+            try:
+                return self.start_lens_autofocus("sweep")
+            except RuntimeError:
+                pass
         return self.get_focus_state()
 
     def get_lens_state(self) -> Dict[str, Any]:
@@ -2565,6 +2592,9 @@ class AllSkyService:
             self.set_lens_mode(mode or self._lens_cfg()["mode"], reset_learning)
             if position is None and delta is None:
                 return self.get_focus_state()
+        if self._lens_cfg().get("mode") == "auto":
+            # Moving the lens by hand means manual focus (MF): AF must not move it back
+            self.set_lens_mode("manual")
         if self.focus.sweep and self.focus.sweep.get("state") == "running":
             # Moving the lens by hand wins over a running autofocus: stop it rather than refuse
             self.focus.sweep_cancel = True
@@ -2609,7 +2639,7 @@ class AllSkyService:
         if not self.focus.active:
             raise RuntimeError("Start focus mode first")
         if self.focus.sweep and self.focus.sweep.get("state") == "running":
-            raise RuntimeError("Autofocus is already running")
+            return self.get_focus_state()  # already finding focus: nothing more to start
         self.focus.last_action = time.time()
         self.focus.sweep_cancel = False
         self.focus.sweep = {"state": "running", "mode": mode, "phase": "start", "progress": 0.0, "points": [],
@@ -2772,7 +2802,7 @@ class AllSkyService:
         def _run():
             try:
                 # Measure what the point was chosen for (a lone star would read as 'contrast' in auto)
-                self.start_focus(cx=point["cx"], cy=point["cy"], method=point["method"])
+                self.start_focus(autofocus=False, cx=point["cx"], cy=point["cy"], method=point["method"])
                 self.focus.last_action = time.time()
                 self.activity.info("camera", f"Auto lens mode: automatic sweep autofocus on {point['method']} "
                                    f"at ({point['cx']:.2f}, {point['cy']:.2f})")

@@ -1437,3 +1437,9 @@ html, .focus-side, .log-list {
 }
 .focus-history tr.near td { color: var(--text-muted); text-decoration: line-through; }
 .focus-history tr.near td:last-child { text-decoration: none; }
+.focus-af-start { display: flex; margin-top: 0.4rem; }
+.focus-af-start[hidden] { display: none; }
+.focus-afmf button { min-width: 3.2rem; font-weight: 700; }
+#focus-lens-card.lens-af #focus-lens-slider { opacity: 0.55; }
+#focus-lens-card.lens-af .focus-lens-nudge { opacity: 0.45; }
+.focus-lens-status { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }

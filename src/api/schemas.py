@@ -107,6 +107,7 @@ class FocusConfigRequest(BaseModel):
     method: Optional[str] = Field(None, pattern="^(auto|stars|lights|contrast)$", description="Focus measure")
     smooth: Optional[int] = Field(None, ge=1, le=30, description="Frames in the robust running average of the score")
     reset: bool = Field(False, description="Forget the score history and best score")
+    autofocus: Optional[bool] = Field(None, description="start only: sweep autofocus right away; default: lens mode is AF")
 
 
 class LensRequest(BaseModel):

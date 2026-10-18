@@ -399,8 +399,8 @@ def get_focus_state(service: AllSkyService = Depends(get_service)):
 @router.post("/api/focus/start")
 def start_focus(req: Optional[FocusConfigRequest] = None, service: AllSkyService = Depends(get_service)):
     """Enter focus mode (native resolution, fastest frame rate, auto-exposure and archiving paused)."""
-    cfg = req.model_dump(exclude_none=True, exclude={"reset"}) if req else {}
-    return service.start_focus(**cfg)
+    cfg = req.model_dump(exclude_none=True, exclude={"reset", "autofocus"}) if req else {}
+    return service.start_focus(autofocus=req.autofocus if req else None, **cfg)
 
 
 @router.post("/api/focus/stop")
@@ -428,7 +428,7 @@ def apply_focus_record(index: int = Query(-1, ge=-20, le=19), exposure: bool = Q
 
 @router.post("/api/focus/config")
 def configure_focus(req: FocusConfigRequest, service: AllSkyService = Depends(get_service)):
-    cfg = req.model_dump(exclude_none=True, exclude={"reset"})
+    cfg = req.model_dump(exclude_none=True, exclude={"reset", "autofocus"})
     return service.configure_focus(reset=req.reset, **cfg)
 
 

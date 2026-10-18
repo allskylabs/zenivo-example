@@ -513,6 +513,7 @@
                 applyState(await api("/api/focus/stop", { method: "POST" }));
             } else {
                 st.history = [];
+                // In AF the server sweeps right away; in MF it only streams for adjusting by hand
                 const started = await api("/api/focus/start", { method: "POST", body: {} });
                 applyState(started);
                 if (started.message) $("focus-statline").textContent = started.message;
@@ -653,8 +654,10 @@
         lensSlider.max = Math.min(L.max, 3);
         lensSlider.min = L.min;
         if (document.activeElement !== lensSlider && pos !== null && pos !== undefined) lensSlider.value = pos;
-        const AF = { 0: "AF idle", 1: "AF scanning", 2: "AF focused", 3: "AF failed" };
-        $("focus-lens-af").textContent = L.af_state !== null && L.af_state !== undefined ? AF[L.af_state] || "" : "";
+        // MF: slider and nudges set the lens. AF: they only show where the app put it (moving one = MF)
+        const mf = L.mode !== "auto";
+        lensCard.classList.toggle("lens-af", !mf);
+        lensSlider.title = mf ? "Drag to focus" : "AF moves the lens; drag to switch to MF";
         const sv = L.saved;
         $("focus-lens-saved").textContent = sv
             ? `saved ${sv.position.toFixed(3)} D by ${sv.source}${sv.sensor_temp_c != null ? ` at ${sv.sensor_temp_c} °C` : ""} · ${new Date(sv.updated_at).toLocaleString()}`
@@ -664,7 +667,7 @@
         document.querySelectorAll("#focus-lens-mode button").forEach((b) => b.classList.toggle("active", b.dataset.lensMode === L.mode));
         const cp = L.compensation || {};
         $("focus-lens-comp").textContent = !auto
-            ? "Manual: the lens stays exactly where you put it. Auto finds and keeps focus by itself."
+            ? "MF: drag the slider or use the nudges; the lens stays exactly there."
             : cp.n_rejected && !cp.learned && cp.rms_d
                 ? `Temperature model ignored: checks disagree (±${cp.rms_d} D); ${cp.n_rejected} outlier(s) dropped`
             : cp.learned
@@ -684,8 +687,6 @@
         const sw = L.sweep;
         const running = !!sw && sw.state === "running";
         $("focus-lens-cancel").hidden = !running;
-        $("focus-lens-sweep").disabled = running;
-        $("focus-lens-camaf").disabled = running;
         $("focus-lens-progress-wrap").hidden = !running;
         if (sw) {
             $("focus-lens-progress").style.width = Math.round((sw.progress || 0) * 100) + "%";
@@ -754,19 +755,12 @@
     document.querySelectorAll("[data-lens-delta]").forEach((b) =>
         b.addEventListener("click", () => lensCmd("/api/focus/lens", { delta: parseFloat(b.dataset.lensDelta) })));
     lensSlider.addEventListener("change", () => lensCmd("/api/focus/lens", { position: parseFloat(lensSlider.value) }));
-    $("focus-lens-sweep").addEventListener("click", () => {
-        if (!st.active) { alert("Start focus mode first, and put the zoom on stars, a light or a detailed distant object."); return; }
-        lensCmd("/api/focus/lens/autofocus", { mode: "sweep" });
-        setLensPoll(700);
-    });
-    $("focus-lens-camaf").addEventListener("click", () => {
-        if (!st.active) { alert("Start focus mode first."); return; }
-        lensCmd("/api/focus/lens/autofocus", { mode: "camera" });
-        setLensPoll(700);
-    });
     $("focus-lens-cancel").addEventListener("click", () => lensCmd("/api/focus/lens/cancel"));
     document.querySelectorAll("#focus-lens-mode button").forEach((b) =>
-        b.addEventListener("click", () => lensCmd("/api/focus/lens", { mode: b.dataset.lensMode })));
+        b.addEventListener("click", () => {
+            lensCmd("/api/focus/lens", { mode: b.dataset.lensMode });
+            if (b.dataset.lensMode === "auto") setLensPoll(700);  // AF starts (or schedules) a sweep
+        }));
     $("focus-lens-reset-learning").addEventListener("click", () => {
         if (confirm("Forget all focus-vs-temperature samples?")) lensCmd("/api/focus/lens", { reset_learning: true });
     });
