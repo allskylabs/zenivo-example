@@ -8,7 +8,9 @@ into az/alt from the station and projected into the frame with the star-solved c
 aircraft that lands on the event's streak / dot track names the flight.
 """
 
+import json
 import math
+import os
 import socket
 import threading
 import time
@@ -82,6 +84,39 @@ class AdsbFeed:
 
     def stop(self) -> None:
         self._stop.set()
+
+    def save_trails(self, path: str) -> None:
+        """Write the recent paths (e.g. on shutdown) so the 3D map has history again right after a restart."""
+        with self._lock:
+            data = {icao: {"callsign": a["callsign"], "trail": [[round(t, 1), lat, lon, round(alt)] for t, lat, lon, alt in a["trail"]]}
+                    for icao, a in self._ac.items() if a["trail"]}
+        try:
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump({"ts": round(time.time(), 1), "aircraft": data}, f, separators=(",", ":"))
+            os.replace(tmp, path)
+        except OSError:
+            pass
+
+    def load_trails(self, path: str) -> int:
+        """Restore paths saved by save_trails that are still within TRAIL_KEEP_S; returns how many aircraft."""
+        try:
+            with open(path, encoding="utf-8") as f:
+                d = json.load(f)
+        except (OSError, ValueError):
+            return 0
+        now = time.time()
+        n = 0
+        with self._lock:
+            for icao, a in (d.get("aircraft") or {}).items():
+                pts = [tuple(p) for p in a.get("trail") or [] if now - p[0] <= self.TRAIL_KEEP_S]
+                if not pts or icao in self._ac:
+                    continue
+                trail = deque(pts, maxlen=int(self.TRAIL_KEEP_S / self.TRAIL_STEP_S) + 8)
+                self._ac[icao] = {"icao": icao, "callsign": a.get("callsign") or "", "pos": deque(maxlen=400),
+                                  "seen": pts[-1][0], "trail": trail}
+                n += 1
+        return n
 
     # ------------------------------------------------------------------
     def _run(self) -> None:

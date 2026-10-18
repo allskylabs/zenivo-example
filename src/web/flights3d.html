@@ -338,14 +338,19 @@
         async function setBase(kind) {
             for (const k of ["terrain", "google", "sat"]) $(`btn-base-${k}`).classList.toggle("on", k === kind);
             for (const k of ["google", "sat"]) if (map.getLayer(`g-${k}`)) map.setLayoutProperty(`g-${k}`, "visibility", k === kind ? "visible" : "none");
+            if (map.getLayer("sat-night")) map.setLayoutProperty("sat-night", "visibility", kind === "sat" ? "visible" : "none");
             map.setLayoutProperty("relief", "visibility", kind === "terrain" ? "visible" : "none");
             map.setPaintProperty("hillshade", "hillshade-exaggeration", kind === "terrain" ? 0.75 : 0.35);
             if (kind === "terrain" || map.getLayer(`g-${kind}`)) return;
-            if (kind === "sat") {   // imagery only, dimmed to keep the night look
+            if (kind === "sat") {   // imagery only, in a night look: dark, desaturated, tinted blue
                 map.addSource("g-sat", { type: "raster", tiles: [SAT], tileSize: 256, maxzoom: 19,
                     attribution: "Imagery © Esri, Maxar, Earthstar Geographics" });
                 map.addLayer({ id: "g-sat", type: "raster", source: "g-sat",
-                    paint: { "raster-brightness-max": 0.62, "raster-saturation": -0.25, "raster-contrast": 0.1 } }, "hillshade");
+                    paint: { "raster-brightness-max": 0.5, "raster-saturation": -0.6, "raster-contrast": 0.2 } }, "hillshade");
+                map.addSource("sat-night", { type: "geojson", data: { type: "Feature", properties: {},
+                    geometry: { type: "Polygon", coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]]] } } });
+                map.addLayer({ id: "sat-night", type: "fill", source: "sat-night",
+                    paint: { "fill-color": "#0a1838", "fill-opacity": 0.45 } }, "hillshade");
                 return;
             }
             try {

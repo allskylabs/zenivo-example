@@ -2118,8 +2118,11 @@ class AllSkyService:
         return {"google_maps_key": str(self.station_config.get("google_maps_key") or "")}
 
     def _adsb_wanted(self) -> bool:
-        """Read the feed only while aircraft events can happen (night, plane detection on) or while the
-        Flights panel is open (polled in the last 2 minutes)."""
+        """Read the feed all the time by default ("record": the 3D map then has every aircraft's last 15
+        minutes the moment it opens); with recording off, only while aircraft events can happen (night,
+        plane detection on) or while the Flights panel is open (polled in the last 2 minutes)."""
+        if (self.station_config.get("adsb") or {}).get("record", 1):
+            return True
         if time.time() - getattr(self, "_adsb_view_ts", 0.0) < 120.0:
             return True
         return self._events_night and bool(self.get_event_config()["enabled"].get("plane"))
@@ -2135,7 +2138,11 @@ class AllSkyService:
             self.adsb = old = None
         if cfg["enabled"] and old is None:
             self.adsb = AdsbFeed(cfg["host"], cfg["port"], wanted=self._adsb_wanted)
+            self.adsb.load_trails(self._adsb_trails_path())
             self.adsb.start()
+
+    def _adsb_trails_path(self) -> str:
+        return os.path.join(self.output_dir, "cache", "adsb_trails.json")
 
     def _match_flight(self, ev: Dict[str, Any]) -> None:
         """Name the flight behind a streak / dot event; a 'meteor' or 'satellite' that matches an aircraft
@@ -4114,6 +4121,8 @@ class AllSkyService:
         """Release camera hardware resources."""
         if self.adsb is not None:
             self.adsb.stop()
+            os.makedirs(os.path.dirname(self._adsb_trails_path()), exist_ok=True)
+            self.adsb.save_trails(self._adsb_trails_path())
         if getattr(self, "aircraft_info", None) is not None:
             self.aircraft_info.stop()
         for name in ("_retention_stop", "_camera_watchdog_stop"):

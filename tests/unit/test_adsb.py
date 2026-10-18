@@ -131,3 +131,22 @@ def test_recorded_pass_matches_only_from_the_true_station_location():
     m = match_flight(GTI8523_EVENT, tracks, fitted, SOLUTION, lag_s=0.5)
     assert m is not None and m["callsign"] == "GTI8523" and m["match_px"] < 25 and m["match_angle_deg"] < 5
     assert match_flight(GTI8523_EVENT, tracks, STATION, SOLUTION, lag_s=0.5) is None
+
+
+def test_trails_survive_a_restart(tmp_path):
+    import time
+    feed = AdsbFeed("127.0.0.1", 30003)
+    now = time.time()
+    for i in range(10):
+        feed._parse(f"MSG,3,333,0,8880AB,100,,,,,,{10000 + i * 10},,,{21.0 + i * 0.01:.5f},105.9,,,0,0,0,0".encode(), now - 90 + i * 10)
+    path = str(tmp_path / "trails.json")
+    feed.save_trails(path)
+
+    fresh = AdsbFeed("127.0.0.1", 30003)
+    assert fresh.load_trails(path) == 1
+    feed_trail = [p[1:] for p in feed._ac["8880AB"]["trail"]]
+    assert [tuple(p[1:]) for p in fresh._ac["8880AB"]["trail"]] == [(lat, lon, round(alt)) for lat, lon, alt in feed_trail]
+    # the next fix extends the restored path
+    fresh._parse(b"MSG,3,333,0,8880AB,100,,,,,,10100,,,21.10000,105.9,,,0,0,0,0", now)
+    (a,) = fresh.current(trail_s=900)
+    assert len(a["trail"]) == len(feed_trail) + 1
