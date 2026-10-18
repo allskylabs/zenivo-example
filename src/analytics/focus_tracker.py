@@ -15,6 +15,10 @@ import numpy as np
 
 from src.analytics.focus import measure_focus
 
+# An all-sky camera looks at things metres to kilometres away: a focus nearer than 1 m (1 dioptre) is a
+# window frame, a railing or dust on the dome, never the sky. Such results are not kept as sky focus.
+SKY_MAX_DIOPTRES = 1.0
+
 
 def star_hfr(frame: np.ndarray, crop: int = 1024, min_stars: int = 8) -> Optional[float]:
     """Median HFR of stars in a central native-resolution crop, or None with too few stars (cloud, dawn)."""
@@ -141,30 +145,35 @@ class TempCompensation:
     MIN_SAMPLES = 3
     MIN_SPAN_C = 3.0
     MAX_SLOPE = 0.02  # D per degree C; anything steeper is noise or a disturbed mount
+    MAX_RMS_D = 0.05  # a fit worse than this explains nothing: keep the lens where it was verified
+    OUTLIER_D = 0.15  # samples this far from the median position belong to another focus (re-mount, near object)
 
     def __init__(self, samples=None):
-        self.samples = [dict(s) for s in (samples or []) if s.get("temp_c") is not None]
+        self.samples = [dict(s) for s in (samples or [])
+                        if s.get("temp_c") is not None and s.get("pos") is not None and s["pos"] <= SKY_MAX_DIOPTRES]
 
     def add(self, temp_c: Optional[float], pos: float, source: str, t: float) -> None:
-        if temp_c is None:
+        if temp_c is None or pos > SKY_MAX_DIOPTRES:
             return
         self.samples.append({"t": round(t, 1), "temp_c": round(float(temp_c), 2), "pos": round(float(pos), 4),
                              "source": source})
         self.samples = self.samples[-self.MAX_SAMPLES:]
 
     def fit(self) -> Dict[str, Any]:
-        temps = np.array([s["temp_c"] for s in self.samples], np.float64)
-        pos = np.array([s["pos"] for s in self.samples], np.float64)
+        pos_all = np.array([s["pos"] for s in self.samples], np.float64)
+        keep = [s for s in self.samples
+                if len(pos_all) and abs(s["pos"] - float(np.median(pos_all))) <= self.OUTLIER_D]
+        temps = np.array([s["temp_c"] for s in keep], np.float64)
+        pos = np.array([s["pos"] for s in keep], np.float64)
         span = float(temps.max() - temps.min()) if len(temps) else 0.0
-        out = {"n": len(temps), "span_c": round(span, 2), "slope": 0.0, "learned": False}
+        out = {"n": len(temps), "n_rejected": len(self.samples) - len(keep), "span_c": round(span, 2),
+               "slope": 0.0, "learned": False}
         if len(temps) >= self.MIN_SAMPLES and span >= self.MIN_SPAN_C:
-            slope, _ = np.polyfit(temps, pos, 1)
-            resid = pos - np.polyval(np.polyfit(temps, pos, 1), temps)
-            out.update({
-                "slope": round(float(np.clip(slope, -self.MAX_SLOPE, self.MAX_SLOPE)), 5),
-                "learned": True,
-                "rms_d": round(float(np.sqrt(np.mean(resid ** 2))), 4),
-            })
+            coef = np.polyfit(temps, pos, 1)
+            rms = float(np.sqrt(np.mean((pos - np.polyval(coef, temps)) ** 2)))
+            out["rms_d"] = round(rms, 4)
+            if rms <= self.MAX_RMS_D:
+                out.update({"slope": round(float(np.clip(coef[0], -self.MAX_SLOPE, self.MAX_SLOPE)), 5), "learned": True})
         return out
 
     def target(self, anchor_pos: float, anchor_temp: Optional[float], temp_c: Optional[float]) -> float:

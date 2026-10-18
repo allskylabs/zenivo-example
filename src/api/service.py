@@ -32,7 +32,7 @@ from src.calibration.dark import DarkCalibrationEngine
 from src.analytics.cloud_cover import CloudReference, analyze_cloud_cover
 from src.analytics.cloud_history import CloudHistory
 from src.analytics.sky_events import EVENT_TYPES, SkyEventDetector
-from src.analytics.focus_tracker import FocusTracker, TempCompensation
+from src.analytics.focus_tracker import SKY_MAX_DIOPTRES, FocusTracker, TempCompensation
 from src.analytics.focus import FocusSession, LOWER_IS_BETTER, display_stretch, find_best_star, measure_focus
 from src.api.histogram import compute_fast_histogram
 from src.pipeline.keogram import KeogramGenerator
@@ -2558,7 +2558,11 @@ class AllSkyService:
             if position is None and delta is None:
                 return self.get_focus_state()
         if self.focus.sweep and self.focus.sweep.get("state") == "running":
-            raise RuntimeError("A focus sweep is running")
+            # Moving the lens by hand wins over a running autofocus: stop it rather than refuse
+            self.focus.sweep_cancel = True
+            deadline = time.time() + 5.0
+            while self.focus.sweep.get("state") == "running" and time.time() < deadline:
+                time.sleep(0.05)
         cur = getattr(self.camera, "lens_position_target", None)
         if cur is None:
             cur = getattr(self.camera, "lens_position", None)
@@ -2612,10 +2616,25 @@ class AllSkyService:
 
     def _lens_finish(self, position: Optional[float], state: str, message: str, source: str) -> None:
         sw = self.focus.sweep
+        if state == "done" and position is not None and float(position) > SKY_MAX_DIOPTRES:
+            # Focused on something nearer than 1 m (window frame, railing, dome dust): not the sky
+            back = (self.station_config.get("lens_focus") or {}).get("base_position")
+            if back is None or float(back) > SKY_MAX_DIOPTRES:
+                back = self.camera.lens_range[0]
+            self.camera.set_lens_position(float(back))
+            msg = (f"focused on a near object ({1 / float(position):.2f} m, {float(position):.3f} D), not the sky: "
+                   f"not saved, lens put back to {float(back):.3f} D. Move the zoom onto distant detail or stars.")
+            sw.update({"state": "rejected", "message": msg, "progress": 1.0, "finished_at": time.time(),
+                       "rejected_position": round(float(position), 4)})
+            with self._focus_lock:
+                self.focus.reset_stats()
+            self.activity.warning("camera", f"Lens autofocus ({sw.get('mode')}): {msg}")
+            return
         if position is not None:
             position = self.camera.set_lens_position(position)
-            self._save_lens(position, source)
-            sw["best_position"] = position
+            if state == "done":  # a failed/cancelled run only puts the lens back; it verifies nothing
+                self._save_lens(position, source)
+                sw["best_position"] = position
         with self._focus_lock:
             self.focus.reset_stats()
         if state == "done" and self.focus.active:
@@ -2742,32 +2761,73 @@ class AllSkyService:
                     "camera", f"Focus tracking: lens {entry.get('from')} -> {new} D at {temp} °C (HFR {entry.get('hfr')})"
                 )
 
+    def _roi_method(self, frame: np.ndarray) -> str:
+        fh, fw = frame.shape[:2]
+        x0, y0, rw, rh = self.focus.roi_rect(fw, fh)
+        if self.focus.method != "auto":
+            return self.focus.method
+        return measure_focus(frame[y0:y0 + rh, x0:x0 + rw], "auto")["method"]
+
     def _lens_camera_af(self) -> None:
+        """libcamera's own AF scan, then checked with this app's score: the result is kept only if it is
+        really sharper than where the lens started (blank sky or cloud by day has nothing to lock on)."""
         sw = self.focus.sweep
+        start_pos = getattr(self.camera, "lens_position_target", None)
+        if start_pos is None:
+            start_pos = getattr(self.camera, "lens_position", None)
         try:
+            frame, _, since = self._focus_new_frame(self.last_capture_time, timeout_s=15.0)
+            method = self._roi_method(frame)
+            sw["method"] = method
+            lower = LOWER_IS_BETTER[method]
+            before = None
+            if start_pos is not None:
+                before, since = self._lens_score(float(start_pos), method, 0, 3, since)
             if not self.camera.start_autofocus(self._focus_sensor_window()):
                 raise RuntimeError("camera refused autofocus")
             sw["phase"] = "camera scan"
             deadline = time.time() + 15.0
-            since = self.last_capture_time
             while time.time() < deadline and not self.focus.sweep_cancel:
                 _, meta, since = self._focus_new_frame(since, timeout_s=5.0)
                 st = self.camera.af_status()
-                sw["progress"] = min(0.95, (time.time() - sw["started_at"]) / 6.0)
+                sw["progress"] = min(0.9, (time.time() - sw["started_at"]) / 6.0)
                 if st.get("lens_position") is not None:
                     sw["points"].append({"pos": st["lens_position"], "score": None})
-                if not st.get("scanning"):
-                    ok = st.get("af_state") == 2
-                    pos = st.get("lens_position")
-                    self._lens_finish(pos, "done" if ok else "failed",
-                                      f"{'focused' if ok else 'no lock, lens held'} at {pos:.3f} D" if pos is not None
-                                      else "no lens position reported", "camera_af")
+                if st.get("scanning"):
+                    continue
+                pos = st.get("lens_position")
+                if st.get("af_state") != 2 or pos is None:
+                    self._lens_restore(start_pos)
+                    self._lens_finish(None, "failed", "camera AF found nothing to lock on (blank sky or cloud?); "
+                                      f"lens put back to {start_pos} D", "camera_af")
                     return
-            pos = getattr(self.camera, "lens_position", None)
-            self._lens_finish(pos, "cancelled" if self.focus.sweep_cancel else "failed",
+                sw["phase"] = "checking"
+                after, since = self._lens_score(float(pos), method, 1, 3, since)
+                sw["score_before"], sw["score_after"] = before, after
+                better = (before is None and after is not None) or (
+                    after is not None and before is not None and (after < before * 0.97 if lower else after > before * 1.03))
+                if not better:
+                    self._lens_restore(start_pos)
+                    self._lens_finish(None, "rejected",
+                                      f"camera AF moved to {pos:.3f} D but the zoom region got no sharper "
+                                      f"({before} → {after} {method}); lens put back to {start_pos} D", "camera_af")
+                    return
+                self._lens_finish(pos, "done", f"focused at {pos:.3f} D ({before:.3g} → {after:.3g} {method})"
+                                  if before is not None else f"focused at {pos:.3f} D", "camera_af")
+                return
+            self._lens_restore(start_pos)
+            self._lens_finish(None, "cancelled" if self.focus.sweep_cancel else "failed",
                               "cancelled" if self.focus.sweep_cancel else "timed out", "camera_af")
         except Exception as exc:
+            self._lens_restore(start_pos)
             self._lens_finish(None, "failed", str(exc), "camera_af")
+
+    def _lens_restore(self, pos: Optional[float]) -> None:
+        if pos is not None:
+            try:
+                self.camera.set_lens_position(float(pos))
+            except Exception:
+                pass
 
     def _lens_score(self, pos: float, method: str, settle: int, frames: int, since: float):
         """Move the lens, drop frames exposed while it moved, then the median ROI score of the next ones."""
@@ -2846,6 +2906,17 @@ class AllSkyService:
             if best_pos is None or not np.isfinite(best_q):
                 pos_back = start_pos if start_pos is not None else lo
                 self._lens_finish(pos_back, "failed", f"nothing measurable in the zoom region ({method}); lens put back", "sweep")
+                return
+            # Nothing to focus on (blank sky, uniform cloud, fog): the score hardly changes across the range
+            finite = [q for _, q in coarse_pts if np.isfinite(q)]
+            spread = (max(finite) - min(finite)) / max(abs(max(finite)), 1e-9) if len(finite) >= 3 else 0.0
+            sw["coarse_spread"] = round(float(spread), 4)
+            if spread < 0.05:
+                pos_back = start_pos if start_pos is not None else lo
+                self._lens_finish(pos_back if pos_back is not None else None, "failed",
+                                  f"score is flat across the lens range ({spread * 100:.1f} %): nothing in the zoom "
+                                  "region to focus on (blank sky or cloud?). Lens put back; zoom onto distant buildings, "
+                                  "the horizon or stars.", "sweep")
                 return
             # One spoiled frame must not pick the peak: 3-point median of the coarse curve, then the centre
             # of the plateau within 3 % of its best (a short lens has a deep depth of field near infinity,

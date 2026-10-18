@@ -144,7 +144,7 @@ def test_temperature_model_learns_slope_and_clamps():
     fit = comp.fit()
     assert fit["learned"] and abs(fit["slope"] - 0.005) < 0.001
     assert abs(comp.target(0.33, 26.0, 30.0) - 0.35) < 0.005
-    steep = TempCompensation([{"temp_c": 0, "pos": 0}, {"temp_c": 5, "pos": 1}, {"temp_c": 10, "pos": 2}])
+    steep = TempCompensation([{"temp_c": 0, "pos": 0.12}, {"temp_c": 5, "pos": 0.25}, {"temp_c": 10, "pos": 0.38}])
     assert steep.fit()["slope"] == TempCompensation.MAX_SLOPE
 
 
@@ -183,3 +183,56 @@ def test_finish_saves_and_record_can_be_reused(lens_client):
     client.post("/api/focus/lens", json={"position": 1.5})
     st = client.post("/api/focus/apply-record?index=-1").json()
     assert cam.lens_position_target == 0.41 and st["active"]
+
+
+def test_near_object_af_is_rejected_and_lens_put_back(lens_client):
+    client, svc, cam = lens_client
+    client.post("/api/focus/lens", json={"position": 0.2})  # verified sky focus
+    client.post("/api/focus/start", json={})
+    svc.focus.sweep = {"state": "running", "mode": "camera", "points": [], "started_at": time.time()}
+    svc._lens_finish(4.02, "done", "focused at 4.02 D", "camera_af")
+    assert svc.focus.sweep["state"] == "rejected"
+    assert cam.lens_position_target == 0.2 and svc.focus.active  # not saved, focus mode stays on
+    assert svc.station_config["lens_focus"]["position"] == 0.2
+
+
+def test_temperature_fit_drops_near_and_outlier_samples():
+    from src.analytics.focus_tracker import TempCompensation
+    comp = TempCompensation([
+        {"temp_c": 47, "pos": 0.2}, {"temp_c": 46, "pos": 0.16}, {"temp_c": 70, "pos": 0.22},
+        {"temp_c": 73, "pos": 4.023},  # near object: never a sample
+    ])
+    assert len(comp.samples) == 3
+    comp.add(71.0, 2.8, "camera_af", 1)
+    assert len(comp.samples) == 3
+    comp.add(60.0, 0.6, "manual", 2)  # far from the others: outlier
+    fit = comp.fit()
+    assert fit["n"] == 3 and fit["n_rejected"] == 1 and abs(fit["slope"]) < 0.005
+
+
+def test_manual_move_cancels_running_autofocus(lens_client):
+    client, svc, cam = lens_client
+    client.post("/api/focus/start", json={"method": "stars", "roi_size": 384})
+    client.post("/api/focus/lens/autofocus", json={"mode": "sweep"})
+    time.sleep(0.5)
+    r = client.post("/api/focus/lens", json={"position": 0.9})
+    assert r.status_code == 200
+    assert svc.focus.sweep["state"] == "cancelled"
+    assert cam.lens_position_target == 0.9
+
+
+def test_flat_sweep_on_blank_sky_is_not_saved(lens_client):
+    client, svc, cam = lens_client
+    client.post("/api/focus/lens", json={"position": 0.25})
+    cam.capture_frame = lambda: (np.full((480, 640, 3), 180, np.uint8), {"lens_position": cam.lens_position,
+                                                                       "actual_exposure_s": 0.01, "gain_db": 0.0})
+    client.post("/api/focus/start", json={"method": "contrast", "roi_size": 256})
+    n_samples = len(svc.lens_comp.samples)
+    rec_before = svc.station_config.get("focus_record")
+    client.post("/api/focus/lens/autofocus", json={"mode": "sweep"})
+    deadline = time.time() + 60
+    while svc.focus.sweep["state"] == "running" and time.time() < deadline:
+        time.sleep(0.2)
+    assert svc.focus.sweep["state"] == "failed" and "flat" in svc.focus.sweep["message"]
+    assert cam.lens_position_target == 0.25 and svc.station_config["lens_focus"]["position"] == 0.25
+    assert len(svc.lens_comp.samples) == n_samples and svc.station_config.get("focus_record") == rec_before

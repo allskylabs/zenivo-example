@@ -130,7 +130,11 @@
             init.body = JSON.stringify(opts.body);
         }
         const r = await fetch(path, init);
-        if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
+        if (!r.ok) {
+            let detail = "";
+            try { detail = (await r.json()).detail || ""; } catch (e) { /* not JSON */ }
+            throw new Error(detail ? `${detail} (HTTP ${r.status})` : `${path}: HTTP ${r.status}`);
+        }
         return r.json();
     }
 
@@ -610,15 +614,19 @@
 
     function fmtDist(d) {
         if (d === null || d === undefined) return "";
-        return d < 0.02 ? "(nominal ∞)" : `(≈ ${(1 / d).toFixed(d > 1 ? 2 : 1)} m)`;
+        if (d < 0.02) return "(nominal ∞)";
+        return d > 1 ? `(≈ ${(1 / d).toFixed(2)} m — near focus, not the sky)` : `(≈ ${(1 / d).toFixed(1)} m)`;
     }
 
     function applyLens(L) {
         lensCard.hidden = !L.available;
         if (!L.available) return;
-        const pos = L.position ?? L.held;
+        // The commanded position updates at once; the position frames report lags a frame or two behind
+        const pos = L.held ?? L.position;
+        const lag = L.held != null && L.position != null && Math.abs(L.held - L.position) > 0.003;
         $("focus-lens-pos").textContent = pos === null || pos === undefined ? "—" : `${pos.toFixed(3)} D`;
-        $("focus-lens-dist").textContent = fmtDist(pos);
+        $("focus-lens-dist").textContent = fmtDist(pos) + (lag ? ` · moving (at ${L.position.toFixed(3)})` : "");
+        $("focus-lens-dist").classList.toggle("text-warning", pos > 1);
         lensSlider.max = Math.min(L.max, 3);
         lensSlider.min = L.min;
         if (document.activeElement !== lensSlider && pos !== null && pos !== undefined) lensSlider.value = pos;
@@ -634,6 +642,8 @@
         const cp = L.compensation || {};
         $("focus-lens-comp").textContent = !auto
             ? "Manual: the lens stays exactly where you put it."
+            : cp.n_rejected && !cp.learned && cp.rms_d
+                ? `Temperature model ignored: checks disagree (±${cp.rms_d} D); ${cp.n_rejected} outlier(s) dropped`
             : cp.learned
                 ? `Temperature compensation: ${(cp.slope * 1000).toFixed(1)} mD/°C from ${cp.n} checks over ${cp.span_c} °C` +
                   ` (fit ±${cp.rms_d} D) · now ${cp.temp_c ?? "?"} °C → ${cp.target?.toFixed(3)} D`
@@ -658,6 +668,7 @@
             $("focus-lens-msg").textContent = running
                 ? `${sw.mode === "camera" ? "Camera AF" : "Sweep"} · ${sw.phase}${sw.method ? " · " + sw.method : ""} · ${(sw.points || []).length} steps`
                 : `${sw.mode === "camera" ? "Camera AF" : "Sweep"} ${sw.state}: ${sw.message || ""}`;
+            $("focus-lens-msg").classList.toggle("text-warning", sw.state === "rejected" || sw.state === "failed");
             drawLensChart(sw);
         }
         if (running !== lensSweepRunning) {
