@@ -3113,9 +3113,9 @@ class AllSkyService:
         if -12.0 <= sun <= 3.0:
             return False  # twilight: stars too faint, daylight too low and changing
         point = find_focus_point(frame, sky_mask=self._focus_sky_mask(frame))
-        if point is not None and point["method"] == "contrast":
+        if sun > 3.0 and (point is None or point["method"] == "contrast"):
             cands = self._day_focus_candidates(frame, k=1)  # static detail, not sky/cloud or a known wall
-            point = {**point, "cx": cands[0]["cx"], "cy": cands[0]["cy"]} if cands else None
+            point = {"cx": cands[0]["cx"], "cy": cands[0]["cy"], "method": "contrast"} if cands else None
         if point is None or (sun < -12.0 and point["method"] == "contrast"):
             return False
 
@@ -3164,8 +3164,10 @@ class AllSkyService:
             # By day probe edge contrast on the most detailed tile, chosen once per cycle so all three frames
             # of a check measure the same buildings/rooftops (sky and drifting cloud are skipped)
             if self.focus_tracker.phase is None and now >= self.focus_tracker.next_ts:
-                pt = find_focus_point(frame)
-                self._day_focus_tile = (pt["cx"], pt["cy"]) if pt and pt["method"] == "contrast" else None
+                # Only a remembered target a day sweep verified as distant static detail; none = no day probe
+                # (probing cloud or sky lets noise walk the lens around)
+                targets = self._lens_cfg().get("day_targets") or []
+                self._day_focus_tile = (targets[0]["cx"], targets[0]["cy"]) if targets else None
             tile = getattr(self, "_day_focus_tile", None)
             if tile is not None:
                 def day_metric(f, tile=tile):
@@ -3512,7 +3514,8 @@ class AllSkyService:
         def ok(t):
             x0 = int(min(max(0, t["cx"] * w - side / 2), w - side))
             y0 = int(min(max(0, t["cy"] * h - side / 2), h - side))
-            if mask is not None and float(mask[y0:y0 + side, x0:x0 + side].mean()) > 0.3:
+            q = side // 4  # judge the central half: a building corner is still a building
+            if mask is not None and float(mask[y0 + q:y0 + side - q, x0 + q:x0 + side - q].mean()) > 0.3:
                 return False  # sky / cloud
             if self._near_any(t, near):
                 return False  # a known nearby object
@@ -3553,9 +3556,10 @@ class AllSkyService:
         if frame is None:
             frame, _ = self.capture_frame()
         point = find_focus_point(frame, sky_mask=self._focus_sky_mask(frame))
-        if point is not None and point["method"] == "contrast":
+        if point is None or point["method"] == "contrast":
+            # By day (or no star/light found): static detail outside the sky, not a known wall
             cands = self._day_focus_candidates(frame, k=1)
-            point = {**point, "cx": cands[0]["cx"], "cy": cands[0]["cy"]} if cands else None
+            point = {"cx": cands[0]["cx"], "cy": cands[0]["cy"], "method": "contrast"} if cands else None
         if point is None:
             state = self.get_focus_state()
             state.update({"found": False, "message": "nothing to focus on in the frame (blank sky, cloud or fog)"})
