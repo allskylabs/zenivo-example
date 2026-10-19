@@ -233,3 +233,84 @@ def test_picamera_copies_only_the_kept_frame_read_only(fake_picamera2):
     assert maps == [False]
     assert frame.shape == (cam.height, cam.width, 3) and int(frame[0, 0, 0]) == 7
     cam.close()
+
+
+def test_picamera_learns_sensor_exposure_floor(fake_picamera2):
+    """A steady exposure above the request is the sensor mode's floor and becomes the new minimum."""
+    cam = PiCameraController()
+    cam.open()
+    real_md = _FakeRequest.get_metadata
+    _FakeRequest.get_metadata = lambda self: {**real_md(self), "ExposureTime": 53}
+    try:
+        cam.set_hardware_exposure(0.00003, 0.0)
+        cam.capture_frame()
+    finally:
+        _FakeRequest.get_metadata = real_md
+    assert cam.min_exposure_s == pytest.approx(53e-6)
+    cam.close()
+
+
+def test_picamera_stale_frames_do_not_raise_exposure_floor(fake_picamera2):
+    """Frames still carrying an older, longer exposure must not ratchet the minimum up (saturated days)."""
+    cam = PiCameraController()
+    cam.open()
+    floor = cam.min_exposure_s
+    real_md = _FakeRequest.get_metadata
+    # ramping down / never applied in time / one stale frame inside the 150 us slack (the 587 us incident)
+    for want, reported in ((0.0003, [587, 587, 520, 450, 400, 380]), (0.0003, [587] * 6), (0.00044, [587, 440])):
+        stale = iter(reported)
+        _FakeRequest.get_metadata = lambda self: {**real_md(self), "ExposureTime": next(stale)}
+        try:
+            cam.set_hardware_exposure(want, 0.0)
+            _, meta = cam.capture_frame()
+        finally:
+            _FakeRequest.get_metadata = real_md
+        assert cam.min_exposure_s == floor
+        assert cam.current_exposure_s == pytest.approx(want)
+    cam.close()
+
+
+def test_picamera_darkens_below_sensor_floor_with_isp_brightness(fake_picamera2):
+    """At the floor the mode minimum is requested (no IPA digital gain); below it ISP Brightness takes over."""
+    cam = PiCameraController()
+    cam.open()
+    cam.picam.camera_controls["Brightness"] = (-1.0, 1.0, 0.0)
+    cam._has_brightness = True
+    real_md = _FakeRequest.get_metadata
+    _FakeRequest.get_metadata = lambda self: {**real_md(self), "ExposureTime": 53}
+    try:
+        cam.set_hardware_exposure(0.00003, 0.0)
+        cam.capture_frame()
+        assert cam.sensor_floor_s == pytest.approx(53e-6)
+        assert cam.min_exposure_s == pytest.approx(53e-6 / 4)
+        assert cam.picam.controls["ExposureTime"] == 26  # the mode minimum, not 53
+        assert cam.picam.controls["Brightness"] == pytest.approx(-0.1 * math.log2(53 / 30), abs=1e-3)
+
+        cam.set_hardware_exposure(53e-6, 0.0)
+        assert cam.picam.controls["ExposureTime"] == 26
+        assert cam.picam.controls["Brightness"] == 0.0
+        _, meta = cam.capture_frame()
+        assert meta["actual_exposure_s"] == pytest.approx(53e-6)
+        assert "isp_brightness" not in meta
+
+        cam.set_hardware_exposure(26.5e-6, 0.0)
+        assert cam.picam.controls["Brightness"] == pytest.approx(-0.1)
+        _, meta = cam.capture_frame()
+        assert meta["actual_exposure_s"] == pytest.approx(26.5e-6, abs=1e-6)  # equivalent exposure
+        assert meta["sensor_exposure_s"] == pytest.approx(53e-6)
+        assert meta["isp_brightness"] == pytest.approx(-0.1)
+
+        cam.set_hardware_exposure(1e-6, 0.0)  # clamped to two stops below the floor
+        assert cam.current_exposure_s == pytest.approx(53e-6 / 4)
+        assert cam.picam.controls["Brightness"] == pytest.approx(-0.2)
+
+        _FakeRequest.get_metadata = real_md
+        cam.set_hardware_exposure(0.002, 0.0)  # above the floor: plain exposure, brightness back to neutral
+        assert cam.picam.controls["ExposureTime"] == 2000
+        assert cam.picam.controls["Brightness"] == 0.0
+        _, meta = cam.capture_frame()
+        assert meta["actual_exposure_s"] == pytest.approx(0.002)
+        assert cam.sensor_floor_s == pytest.approx(53e-6)
+    finally:
+        _FakeRequest.get_metadata = real_md
+    cam.close()

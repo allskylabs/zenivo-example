@@ -279,8 +279,10 @@ class DayNightAutoExposure:
 
             # Highlight clipping guard: only step down when a large fraction of the sky dome is saturating
             # (allow solar disk/corona up to 20% of sky ROI in daytime without forcing under-exposure of the rest of the sky)
+            # By day the sun and the raw-saturated sky around it keep p90 at 255 whatever the exposure: that
+            # alone only darkens while the sky is still above target (it pinned day frames at the darkest setting)
             highlights_clipped = (
-                (sky_p50 > 200.0) or (p90 > 246.0)
+                (sky_p50 > 200.0) or (p90 > 246.0 and effective_luma > target_y)
                 if solar_elev >= -2.0
                 else ((sky_p85 > 238.0) or (p90 > 244.0) or (p95 > 251.0))
             )
@@ -323,14 +325,15 @@ class DayNightAutoExposure:
                     factor = max(0.55, min(0.86, (target_y / max(target_y + 10.0, over_luma)) ** 0.60))
                 else:
                     factor = min(1.40, max(1.15, min(3.0, target_y / max(8.0, effective_luma)) ** 0.50))
-                    if solar_elev >= -2.0 and p90 * factor > 246.0:
+                    if solar_elev >= -2.0 and p90 < 246.0 and p90 * factor > 246.0:
                         factor = 1.0
                 if self.lock_exposure_s is None:
                     self.exposure_s *= factor
                 elif self.lock_gain_db is None:
                     self.gain_db += 20.0 * math.log10(factor)
 
-            min_step = 0.00002 if self.exposure_s < 0.001 else 0.00016
+            # Below 100 us (sensor floor + ISP darkening) a fixed 20 us step was up to 2.5x per step
+            min_step = 0.000004 if self.exposure_s < 0.0001 else 0.00002 if self.exposure_s < 0.001 else 0.00016
             if locked:
                 pass
             elif effective_luma > high_band or highlights_clipped:
@@ -360,9 +363,9 @@ class DayNightAutoExposure:
                 step_factor = min(1.40, max(1.15, ratio ** 0.50))
                 next_exp = max(self.exposure_s + min_step, self.exposure_s * step_factor)
                 step_db = round(20.0 * math.log10(step_factor), 1)
-                if solar_elev >= -2.0 and p90 * step_factor > 246.0:
-                    # Stepping up would clip the bright part of the sky (sun, sunset glow) and force an
-                    # immediate step back down: hold rather than hunt between two levels
+                if solar_elev >= -2.0 and p90 < 246.0 and p90 * step_factor > 246.0:
+                    # Stepping up would clip the bright part of the sky (sunset glow) and force an immediate
+                    # step back down: hold rather than hunt. Already clipped (the sun) = no reason to stay dark
                     pass
                 elif solar_elev >= 0.0:
                     # Daytime: gain stays 0 dB until exposure reaches 15 ms; one knob per step

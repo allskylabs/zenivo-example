@@ -62,6 +62,12 @@ class PiCameraController(CameraDriverInterface):
     simulator = False
     backend = "picamera"
     MAX_FPS = 5.0
+    # Largest exposure floor capture_frame() may learn from the sensor (IMX708 binned mode: 53 us)
+    FLOOR_CAP_S = 0.0002
+    # Below the sensor floor the ISP Brightness control darkens further (a "virtual ND"): 0.1 per stop,
+    # up to ISP_ND_STOPS. At 53 us the IMX708 NoIR daytime sky still came out at 200-255 DN.
+    ISP_ND_STOPS = 2.0
+    ISP_BRIGHTNESS_PER_STOP = 0.1
 
     def __init__(
         self,
@@ -82,6 +88,12 @@ class PiCameraController(CameraDriverInterface):
         self.current_gain_db = 0.0
         self.min_exposure_s = 0.0001
         self.max_exposure_s = 60.0
+        # Shortest exposure the sensor mode really reaches (learned from frames), and what to request for it
+        self.sensor_floor_s: Optional[float] = None
+        self._floor_request_us = 1
+        self._want_us = self.current_exposure_s * 1e6
+        self._has_brightness = False
+        self.isp_brightness = 0.0
         self.min_gain_db = 0.0
         self.max_gain_db = 24.0
         self.pixel_array_size: Tuple[int, int] = (0, 0)
@@ -140,6 +152,11 @@ class PiCameraController(CameraDriverInterface):
         g_min, g_max, _ = ctrl_info.get("AnalogueGain", (1.0, 16.0, None))
         self.min_exposure_s = max(1e-5, float(exp_min) / 1e6)
         self.max_exposure_s = float(exp_max) / 1e6
+        # Request at the floor: the mode's own minimum. Asking for the floor itself (53 us) made the IPA round
+        # it down to whole lines and add up to 1.5x digital gain on top (DigitalGain 1.32 at 53 us, 1.0 at 13 us)
+        mode_min = (mode.get("exposure_limits") or (None,))[0] if mode else None
+        self._floor_request_us = max(1, int(mode_min if mode_min else exp_min))
+        self._has_brightness = "Brightness" in ctrl_info
         self.min_gain_db = 0.0
         self.max_gain_db = round(20.0 * math.log10(max(1.0, float(g_max))), 2)
 
@@ -187,9 +204,18 @@ class PiCameraController(CameraDriverInterface):
         gain = max(self.min_gain_db, min(self.max_gain_db, float(gain_db)))
         self.current_exposure_s = exp
         self.current_gain_db = gain
+        floor = self.sensor_floor_s
+        exp_us = int(round(exp * 1e6))
+        self._want_us = exp_us
+        brightness = 0.0
+        if floor is not None and exp <= floor * 1.001:
+            exp_us = self._floor_request_us
+            self._want_us = floor * 1e6
+            if self._has_brightness and exp < floor:
+                brightness = -self.ISP_BRIGHTNESS_PER_STOP * min(self.ISP_ND_STOPS, math.log2(floor / exp))
+        self.isp_brightness = round(brightness, 3)
         if self.picam is not None:
-            exp_us = int(round(exp * 1e6))
-            self.picam.set_controls({
+            ctrls = {
                 "AeEnable": False,
                 "ExposureTime": exp_us,
                 "AnalogueGain": float(10.0 ** (gain / 20.0)),
@@ -200,7 +226,10 @@ class PiCameraController(CameraDriverInterface):
                     max(int(1e6 / self.max_fps), exp_us + 1000),
                     max(int(1e6 / self.max_fps), exp_us + 1000),
                 ),
-            })
+            }
+            if self._has_brightness:
+                ctrls["Brightness"] = self.isp_brightness
+            self.picam.set_controls(ctrls)
         return {
             "requested_exposure_s": exposure_s,
             "actual_exposure_s": round(exp, 6),
@@ -224,11 +253,12 @@ class PiCameraController(CameraDriverInterface):
     def capture_frame(self) -> Tuple[np.ndarray, Dict[str, Any]]:
         if not self.is_open:
             self.open()
-        want_us = self.current_exposure_s * 1e6
+        want_us = self._want_us
         want_gain = 10.0 ** (self.current_gain_db / 20.0)
         # Frames queued before the last control change still carry the old exposure: skip them
         deadline = time.time() + max(10.0, self.current_exposure_s * 4 + 8.0)
         frame = md = None
+        seen_us = []  # ExposureTime of every frame looked at, to tell a sensor floor from stale frames
         # Never block forever: libcamera occasionally stops delivering frames, and a capture that hangs while
         # holding the service's capture lock froze every page (focus, telemetry, snapshots). On timeout the
         # pending camera jobs are cancelled and the error lets the service close and re-open the camera.
@@ -246,7 +276,12 @@ class PiCameraController(CameraDriverInterface):
                 md = req.get_metadata()
                 got_us = float(md.get("ExposureTime", want_us))
                 got_gain = float(md.get("AnalogueGain", want_gain))
+                seen_us.append(got_us)
                 exp_ok = abs(got_us - want_us) <= max(0.05 * want_us, 150.0)
+                if exp_ok and got_us > want_us * 1.1:
+                    # Within the slack but clearly longer: a sensor floor or a frame still on the previous
+                    # exposure. Only a value repeated over three frames is trusted as the floor below.
+                    exp_ok = len(seen_us) >= 3 and all(abs(u - got_us) <= 2.0 for u in seen_us[-3:])
                 gain_ok = abs(got_gain - want_gain) <= max(0.08 * want_gain, 0.1)
                 done = (exp_ok and gain_ok) or time.time() > deadline or attempt == 5
                 if done:
@@ -264,11 +299,21 @@ class PiCameraController(CameraDriverInterface):
         frame_dur_us = float(md.get("FrameDuration", md.get("ExposureTime", want_us)))
         self._last_ts = now
         exp_s = float(md.get("ExposureTime", want_us)) / 1e6
-        if exp_s < 0.001 and exp_s > self.current_exposure_s * 1.1:
+        floor_us = seen_us[-1]
+        steady = len(seen_us) >= 3 and all(abs(u - floor_us) <= 2.0 for u in seen_us[-3:])
+        if exp_s < self.FLOOR_CAP_S and exp_s > want_us * 1.1e-6 and steady:
             # libcamera's ExposureTime minimum is below what the sensor mode can do (IMX708 2304x1296: 26 vs 53 us);
-            # asking for less makes the ISP add digital gain, so the floor actually reached becomes the limit
-            self.min_exposure_s = exp_s
-            self.current_exposure_s = exp_s
+            # asking for less makes the ISP add digital gain, so the floor actually reached becomes the limit.
+            # Only a steady, small value counts: frames still carrying the previous (longer) exposure once
+            # ratcheted the floor to 587 us and left daytime frames saturated with no way to darken them.
+            self.sensor_floor_s = exp_s
+            self.min_exposure_s = exp_s / (2.0 ** self.ISP_ND_STOPS if self._has_brightness else 1.0)
+            # Re-request at the floor (mode minimum, no digital gain), or below it through ISP Brightness
+            self.set_hardware_exposure(max(self.current_exposure_s, self.min_exposure_s), self.current_gain_db)
+        elif self.isp_brightness and abs(exp_s * 1e6 - want_us) <= 2.0:
+            # Sensor at its floor, ISP darkening the rest: report the equivalent exposure so brightness keeps
+            # tracking exposure for the auto exposure loop, cloud radiance and sky-event frame matching
+            exp_s = self.current_exposure_s
         gain_db = 20.0 * math.log10(max(1.0, float(md.get("AnalogueGain", want_gain))))
         meta: Dict[str, Any] = {
             "hw_frame_delta": round(frame_dur_us / 1000.0, 2),
@@ -282,6 +327,9 @@ class PiCameraController(CameraDriverInterface):
             "simulator": False,
             "camera_backend": self.backend,
         }
+        if self.isp_brightness:
+            meta["isp_brightness"] = self.isp_brightness
+            meta["sensor_exposure_s"] = round(float(md.get("ExposureTime", want_us)) / 1e6, 6)
         if md.get("LensPosition") is not None:
             self.lens_position = round(float(md["LensPosition"]), 4)
             meta["lens_position"] = self.lens_position
