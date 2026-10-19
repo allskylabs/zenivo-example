@@ -743,12 +743,16 @@
             const xv = x0 + ((x1 - x0) * k) / ticks;
             c.fillText(`${xv.toFixed(2)} D`, Math.min(X(xv) - 14, w - 52), h - 3);
         }
+        // Outward pass as a line, the return pass over the peak as orange dots
+        const out = pts.filter((p) => p.phase !== "refine"), back = pts.filter((p) => p.phase === "refine");
         c.strokeStyle = "rgba(56,189,248,0.5)"; c.lineWidth = 1.5;
         c.beginPath();
-        pts.forEach((p, i) => { if (i === 0) c.moveTo(X(p.pos), Y(p.score)); else c.lineTo(X(p.pos), Y(p.score)); });
+        out.forEach((p, i) => { if (i === 0) c.moveTo(X(p.pos), Y(p.score)); else c.lineTo(X(p.pos), Y(p.score)); });
         c.stroke();
         c.fillStyle = "#38bdf8";
-        pts.forEach((p) => { c.beginPath(); c.arc(X(p.pos), Y(p.score), 3, 0, Math.PI * 2); c.fill(); });
+        out.forEach((p) => { c.beginPath(); c.arc(X(p.pos), Y(p.score), 3, 0, Math.PI * 2); c.fill(); });
+        c.fillStyle = "#f59e0b";
+        back.forEach((p) => { c.beginPath(); c.arc(X(p.pos), Y(p.score), 3.5, 0, Math.PI * 2); c.fill(); });
         // Fitted parabola around the peak (quality q = a(x-x0)^2 + b(x-x0) + c; score = -q for HFR)
         const f = sw.fit;
         if (f) {

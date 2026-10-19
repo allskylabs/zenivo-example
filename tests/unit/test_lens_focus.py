@@ -357,8 +357,10 @@ def test_sweep_is_one_pass_with_parabola_and_rejects_near_object(lens_client):
     while svc.focus.sweep["state"] == "running" and time.time() < deadline:
         time.sleep(0.2)
     sw = svc.focus.sweep
-    pos = [p["pos"] for p in sw["points"]]
-    assert pos == sorted(pos), "lens must move one way only"
+    out = [p["pos"] for p in sw["points"] if p["phase"] == "sweep"]
+    back = [p["pos"] for p in sw["points"] if p["phase"] == "refine"]
+    assert out == sorted(out) and back == sorted(back, reverse=True), "one way out, one way back"
+    assert back and max(back) - min(back) <= 0.17 and abs(cam.lens_position_target - TRUE_FOCUS) <= 0.02
     assert sw["state"] == "done" and sw["fit"] and abs(sw["fit"]["vertex"] - TRUE_FOCUS) <= 0.03
     # Zoom on something 0.6 m away: sharpening all the way to the end of the sky range
     cam.true_focus = 1.6
@@ -438,4 +440,34 @@ def test_day_sweep_with_only_a_nearby_wall_runs_on_until_its_peak():
         sw = svc.focus.sweep
         assert sw["state"] == "rejected" and abs(sw["best_position"] - 2.4) <= 0.15, sw.get("message")
         assert cam.lens_position_target == 0.3  # near focus is reported, not kept
+    AllSkyService.reset_instance()
+
+
+def test_sweep_stops_soon_after_the_peak_even_with_flat_regions():
+    class WallAndCloud(SceneLensCamera):
+        """Only a nearby wall peaks (2.4 D); a soft drifting 'cloud' tile never peaks."""
+        def capture_frame(self):
+            f, meta = SceneLensCamera.capture_frame(self)
+            f[150:310, 60:240] = 175
+            rng = np.random.default_rng(self.frames)
+            self.frames += 1
+            cloud = cv2.GaussianBlur(rng.integers(120, 220, (60, 60), dtype=np.uint8), (0, 0), 3)
+            f[60:120, 300:360] = np.dstack([cloud] * 3)
+            return f, meta
+
+    AllSkyService.reset_instance()
+    cam = WallAndCloud(width=640, height=480, seed=42)
+    cam.open()
+    svc = AllSkyService.get_instance(camera=cam)
+    svc.station_config["image_transform"] = {}
+    with TestClient(create_app(camera=cam)) as client:
+        client.post("/api/focus/lens", json={"mode": "manual"})
+        client.post("/api/focus/lens", json={"position": 0.3})
+        client.post("/api/focus/start", json={"cx": 470 / 640, "cy": 230 / 480, "roi_size": 64, "method": "contrast"})
+        client.post("/api/focus/lens/autofocus", json={"mode": "sweep"})
+        deadline = time.time() + 180
+        while svc.focus.sweep["state"] == "running" and time.time() < deadline:
+            time.sleep(0.2)
+        last = max(p["pos"] for p in svc.focus.sweep["points"])
+        assert last <= 4.0, last  # wall peak 2.4 D: stop well before the 12 D end of the lens
     AllSkyService.reset_instance()

@@ -3342,19 +3342,19 @@ class AllSkyService:
                         worse_run[r] = worse_run[r] + 1 if worse else 0
                 sw["progress"] = 0.95 * (i + 1) / len(positions)
 
-                sky_peak = any(worse_run[r] >= 3 and best_at[r] is not None and best_at[r] <= SKY_MAX_DIOPTRES
-                               for r in range(n_roi))
+                # Once any region is past its peak, the others need not hold the sweep: a region that is
+                # flat (blank sky, cloud) or has not improved for 0.6 D since its best is not going to peak
+                any_peak = any(worse_run[r] >= 3 for r in range(n_roi))
 
                 def finished(r):
                     if worse_run[r] >= 3:
                         return True  # clearly past its peak
+                    if not any_peak:
+                        return False  # nothing has peaked yet: keep going to find a peak
                     vals = [quality(v) for v in curves[r] if v is not None]
-                    # A region still flat past the sky range is blank sky/cloud, but only give up on it once
-                    # another region has its peak in the sky range: otherwise keep going to find any peak
-                    if sky_peak and pos >= 1.2 - 1e-9 and (
-                            len(vals) < 3 or (max(vals) - min(vals)) / max(abs(max(vals)), 1e-9) < 0.05):
+                    if len(vals) < 3 or (max(vals) - min(vals)) / max(abs(max(vals)), 1e-9) < 0.05:
                         return True
-                    return False
+                    return best_at[r] is not None and pos - best_at[r] >= 0.6 - 1e-9
                 past = [finished(r) for r in range(n_roi)]
                 if all(past) and i >= 4:
                     break
@@ -3397,9 +3397,40 @@ class AllSkyService:
             sw["fit"] = win.get("fit")
             final = round(min(hi, max(lo, win["vertex"])), 4)
             best_score = win.get("peak_score")
+            how = "parabola peak" if win.get("fit") else "best step"
+
+            # Come back over the peak: one pass downwards from 2 coarse steps above to 2 below in quarter
+            # steps, on the winning region only (the zoom now shows it), and fit the parabola on those
+            coarse = 0.04 if final < 1.2 else 0.1 if final < 3.0 else 0.25
+            fine = max(0.01, coarse / 4)
+            top, bottom = min(positions[-1], final + 2 * coarse), max(lo, final - 2 * coarse)
+            back = [round(top - k * fine, 4) for k in range(int(round((top - bottom) / fine)) + 1)]
+            sw["phase"] = "refine"
+            refine: List[Tuple[float, Optional[float]]] = []
+            for k, pos in enumerate(back):
+                if self.focus.sweep_cancel:
+                    raise InterruptedError
+                scores, since = self._lens_score_multi(pos, method, settle, frames, since, [])
+                refine.append((pos, scores[0]))
+                sw["points"].append({"pos": pos, "score": scores[0], "phase": "refine"})
+                sw["progress"] = 0.95 + 0.05 * (k + 1) / len(back)
+            fx = np.array([p for p, v in refine if v is not None])
+            fy = np.array([quality(v) for p, v in refine if v is not None])
+            if len(fx) >= 5:
+                a2, a1, a0 = np.polyfit(fx - final, fy, 2)
+                if a2 < 0:
+                    v = final - a1 / (2 * a2)
+                    if fx.min() <= v <= fx.max():
+                        sw["coarse_vertex"] = final
+                        final = round(float(v), 4)
+                        how = "fine parabola peak"
+                        sw["fit"] = {"a": float(a2), "b": float(a1), "c": float(a0), "x0": float(sw["coarse_vertex"]),
+                                     "from": float(fx.min()), "to": float(fx.max()), "vertex": final,
+                                     "lower_is_better": bool(lower)}
+                        best_score = max((v2 for p2, v2 in refine if v2 is not None),
+                                         key=lambda v2: quality(v2))
             unit = "px HFR" if lower else "contrast"
             dist = f"{1 / final:.1f} m" if final > 0.05 else "infinity"
-            how = "parabola peak" if win.get("fit") else "best step"
             others = f"; {len(near)} near region(s) skipped" if near else ""
             where = "" if win["roi"] == 0 else f" (detail region {win['roi']} of {n_roi})"
             self._lens_finish(final, "done", f"{how} at {final:.3f} D ({dist}){where}, "
