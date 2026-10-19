@@ -3507,7 +3507,9 @@ class AllSkyService:
         frames (drifting cloud), and places already found to be nearer than 1 m (walls next to the camera)."""
         cfg = self._lens_cfg()
         h, w = frame.shape[:2]
-        side = side or min(self.focus.roi_size, w, h)
+        # The ROI size is in native pixels; frames outside focus mode may be downscaled
+        native_w = int(getattr(self.camera, "width", 0) or w)
+        side = side or max(16, int(min(self.focus.roi_size * w / max(native_w, w), w, h)))
         mask = self._focus_sky_mask(frame)
         near = cfg.get("near_targets") or []
 
