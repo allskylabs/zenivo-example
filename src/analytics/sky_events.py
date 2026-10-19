@@ -13,6 +13,11 @@ transform on the few changed pixels, then classified across frames:
 - flash: the whole sky brightens at an unchanged exposure (lightning, headlights on the dome)
 
 Frames whose exposure or gain changed, or where too much of the sky changed (moving clouds), are skipped.
+
+Broken cloud lit by the city drifts across as many bright bits that look like slow aircraft dots. Wind
+moves them all the same way at the same speed, while aircraft each fly their own way: a dot track whose
+velocity matches two or more other tracks of the last minutes is cloud, and while such a drift is under
+way single-frame streaks (cloud edges lighting up) are not called meteors.
 """
 
 import math
@@ -123,6 +128,7 @@ class SkyEventDetector:
         self.max_gap_s = max_gap_s
         self.flash_ratio = flash_ratio
         self._meteor_spots: Deque[Tuple[float, float, float]] = deque(maxlen=500)  # survives reset()
+        self._track_id = 0
         self.frames_seen = 0      # frames given to process() since the last reset
         self.frames_compared = 0  # of those, compared with the previous frame
         self.reset()
@@ -131,17 +137,56 @@ class SkyEventDetector:
     CLOUDY_SPECKS = 8.0          # running mean of brightening specks per frame above which the sky counts as cloudy
     REPEAT_RADIUS_FRAC = 0.03   # ~20 px at 640: a "meteor" again within this of an earlier one is a glint
     REPEAT_WINDOW_S = 3 * 3600.0
+    # Common drift (wind-blown cloud): velocities of dot tracks within this window, compared pairwise
+    DRIFT_WINDOW_S = 600.0
+    DRIFT_MAX_ANGLE = 25.0      # degrees between the two directions
+    DRIFT_MAX_SPEED_DIFF = 0.4  # relative to the faster one
+    DRIFT_MIN_OTHERS = 2        # this many other tracks moving alike => cloud
+    DRIFT_ACTIVE_S = 300.0      # a drift seen this recently makes the sky count as cloudy
 
-    def _cloudy(self) -> bool:
-        """Broken cloud drifting over: many specks brighten every frame (clear sky: ~1 per frame, cloud: 25).
-        Single-frame streaks are then mostly cloud edges lighting up, and a meteor would be hidden anyway."""
-        return self._speck_ema >= self.CLOUDY_SPECKS
+    def _cloudy(self, ts: Optional[float] = None) -> bool:
+        """Broken cloud drifting over: many specks brighten every frame (clear sky: ~1 per frame, cloud: 25),
+        or several dot tracks just moved alike. Single-frame streaks are then mostly cloud edges lighting up,
+        and a meteor would be hidden anyway."""
+        if self._speck_ema >= self.CLOUDY_SPECKS:
+            return True
+        if ts is None or not self._drift:
+            return False
+        recent = [d for d in self._drift if ts - d[0] <= self.DRIFT_ACTIVE_S]
+        return any(self._drift_matches(d[1], d[2], ts, d[3], recent) >= self.DRIFT_MIN_OTHERS for d in recent)
+
+    @staticmethod
+    def _velocity(pts: List[Tuple[Any, ...]]) -> Tuple[float, float]:
+        dt = max(1e-3, pts[-1][2] - pts[0][2])
+        return (pts[-1][0] - pts[0][0]) / dt, (pts[-1][1] - pts[0][1]) / dt
+
+    def _drift_matches(self, vx: float, vy: float, ts: float, tid: int,
+                       entries: Optional[List[Tuple[float, float, float, int]]] = None) -> int:
+        """How many other tracks of the drift window moved like (vx, vy) (work px/s)."""
+        s1 = math.hypot(vx, vy)
+        if s1 < 1e-6:
+            return 0
+        others = set()
+        for t0, ux, uy, other in (self._drift if entries is None else entries):
+            if other == tid or other in others or abs(ts - t0) > self.DRIFT_WINDOW_S:
+                continue
+            s2 = math.hypot(ux, uy)
+            if s2 < 1e-6 or abs(s1 - s2) > self.DRIFT_MAX_SPEED_DIFF * max(s1, s2):
+                continue
+            cos = (vx * ux + vy * uy) / (s1 * s2)
+            if math.degrees(math.acos(max(-1.0, min(1.0, cos)))) <= self.DRIFT_MAX_ANGLE:
+                others.add(other)
+        return len(others)
+
+    def _new_dot_track(self, pts: List[Tuple[Any, ...]]) -> Dict[str, Any]:
+        self._track_id += 1
+        return {"pts": pts, "misses": 0, "blinks": 0, "id": self._track_id}
 
     def _meteor_ok(self, p: Dict[str, Any]) -> bool:
         """Final checks before a single-frame streak is called a meteor: a sharp line, and not at a spot
         where single-frame streaks already appeared (lens smudges and raindrops glint again and again)."""
         ev = p["event"]
-        if self._cloudy():
+        if self._cloudy(float(ev["ts"])):
             self.point_stats["meteors_rejected_cloudy_sky"] = self.point_stats.get("meteors_rejected_cloudy_sky", 0) + 1
             return False
         ln = p["line"]
@@ -180,6 +225,7 @@ class SkyEventDetector:
         self._points: List[Dict[str, Any]] = []   # moving dots (short exposures): seeds and tracks
         self._recent: Deque[Tuple[float, np.ndarray]] = deque(maxlen=self.POINT_MIN_POINTS)  # work-size frames
         self._speck_ema = 0.0
+        self._drift: Deque[Tuple[float, float, float, int]] = deque(maxlen=400)  # (ts, vx, vy, track id)
         self._mask_key: Any = None
         self._mask: Optional[np.ndarray] = None
 
@@ -234,7 +280,7 @@ class SkyEventDetector:
 
     def _finish_track(self, track: Dict[str, Any], enabled: set) -> Optional[Dict[str, Any]]:
         ev = track["event"]
-        if int(ev.get("frames", 1)) <= 1 and self._cloudy():
+        if int(ev.get("frames", 1)) <= 1 and self._cloudy(float(ev["ts"])):
             self.point_stats["streaks_rejected_cloudy_sky"] = self.point_stats.get("streaks_rejected_cloudy_sky", 0) + 1
             return None
         if track["dashed"] or ev["peak_dn"] >= 60:
@@ -480,6 +526,9 @@ class SkyEventDetector:
                 if t["misses"]:
                     t["blinks"] += 1
                 t["misses"] = 0
+                if len(t["pts"]) == 3:
+                    # Every track that gets going (cloud bits too, even if rejected later) maps the drift
+                    self._drift.append((ts, *self._velocity(t["pts"]), t["id"]))
                 if len(t["pts"]) >= self.POINT_MIN_POINTS:
                     # Light trail: brightest value of every frame the dot was seen in (the dots themselves,
                     # not markers drawn over them)
@@ -510,10 +559,10 @@ class SkyEventDetector:
                 sx, sy = seed[0], seed[1]
                 for j, (cx, cy, pk, shape) in enumerate(cands):
                     if j not in used and min_step <= math.hypot(cx - sx, cy - sy) <= max_step:
-                        alive.append({"pts": [seed, (cx, cy, ts, pk, shape)], "misses": 0, "blinks": 0})
+                        alive.append(self._new_dot_track([seed, (cx, cy, ts, pk, shape)]))
             for j, (cx, cy, pk, shape) in enumerate(cands):
                 if j not in used:
-                    alive.append({"pts": [(cx, cy, ts, pk, shape)], "misses": 0, "blinks": 0})
+                    alive.append(self._new_dot_track([(cx, cy, ts, pk, shape)]))
         alive.sort(key=lambda t: -len(t["pts"]))
         self._points = alive[:self.POINT_MAX_TRACKS]
         return events
@@ -529,6 +578,11 @@ class SkyEventDetector:
         path_len = sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(pts, pts[1:]))
         if net < 12.0 or net < 0.6 * path_len:
             self.point_stats["tracks_rejected_static"] += 1
+            return None
+        # Moving with the wind alongside other tracks: drifting cloud
+        vx, vy = self._velocity(pts)
+        if self._drift_matches(vx, vy, pts[-1][2], t.get("id", -1)) >= self.DRIFT_MIN_OTHERS:
+            self.point_stats["tracks_rejected_drift"] = self.point_stats.get("tracks_rejected_drift", 0) + 1
             return None
         # Faint and short: with many specks about (cloud), four of them line up at a steady spacing by chance;
         # a real faint aircraft keeps going (real planes peak at +31 DN or more, faint ones last 10+ frames)

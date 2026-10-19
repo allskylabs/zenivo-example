@@ -1,19 +1,26 @@
 """
-Cloud cover from single allsky frames, day and night, plus a small learned clear-sky reference.
+Cloud cover from single allsky frames, day and night, with a small learned clear-sky template.
 
-Structure (day and night): the IMX708 NoIR sees clouds brighter than the sky gaps between them
-(sunlit by day, lit by city lights at night), while its colours are too washed out for the classic
-red/blue ratio. The luminance is detrended with a quadratic surface (removes vignetting, sun glow
-and the horizon gradient) and split with Otsu; when the two classes are clearly apart the bright
-class is cloud. A frame without that contrast is uniform: all clear or all overcast.
+Clouds differ from clear sky the same way day and night: they are less blue (white or grey cloud
+against blue sky by day; city-lit, orange-grey cloud against the teal night sky). The colour cue is
+log(B/R) per pixel of a ~160 px wide copy; at night clouds are also brighter than the sky between
+them, so log luminance is a second cue.
 
-Uniform frames are decided by:
-- night (sun below -6°): stars per cell of a coarse grid against the best counts seen in each cell
-  recently (a slowly decaying maximum), so it adapts to the lens, light pollution and buildings;
-- day: exposure-normalised sky brightness against the clear-sky level learned from mixed skies.
+The camera adds smooth patterns that would otherwise look like cloud: lens colour shading, light
+pollution glow, vignetting, the horizon. They are removed in two steps:
+- a learned per-pixel template (the static part: lens shading, glow, walls the mask misses), learned
+  on dark, mostly clear nights as a running quantile of the residuals, so passing clouds average out;
+- a quadratic surface per frame fitted to the clear side only (the bluest / darkest pixels), so it
+  follows the sky between the clouds instead of splitting the frame in two.
+A pixel is cloud when it is less blue (or, at night, brighter) than that surface by more than a fixed
+margin or a few noise sigmas, whichever is larger.
 
-Everything runs on downscaled frames (~3 ms by day, ~100 ms by night on a Pi 4) and is sampled
-every few minutes, never per frame.
+Only the sky counts (station sky polygons and sky ROI, minus the info stamp corner), so buildings and
+street lights do not. Stars are counted for display only: in a city sky most "stars" are windows and
+lamps. The camera's auto white balance hides the absolute sky colour, so a uniformly overcast sky has
+no structure to measure; such frames report little cloud with low confidence.
+
+Runs in ~10 ms on a Pi 4 (plus star counting at night) and is sampled every few minutes, never per frame.
 """
 
 import json
@@ -21,20 +28,27 @@ import math
 import os
 import tempfile
 import threading
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 import cv2
 import numpy as np
 
 from src.analytics.stars_clouds import detect_stars_blob
+from src.pipeline.star_boost import sky_polygon_mask
 
-STRUCT_WIDTH = 240         # clouds are large; more pixels add nothing to the structure analysis
-MIN_SEPARATION = 0.09      # Otsu class means this far apart (fraction of sky level) => clouds visible
-OVERCAST_RATIO = 2.5       # uniform day sky this many times brighter than learned clear sky => overcast
-GRID_COLS, GRID_ROWS = 8, 4
-NIGHT_REF_DECAY = 0.9993   # per night sample (~5 min): reference half-life ~1 week of nights
-MIN_NIGHT_SAMPLES = 24     # before this the per-cell star reference is not trusted
-DEFAULT_CLEAR_STARS = 150  # total stars on a clear night until the reference has been learned
+WORK_WIDTH = 160                  # clouds are large; more pixels add noise and CPU, not information
+STAMP_BOX = (0.0, 0.0, 0.2, 0.1)  # info stamp in the top-left corner of archived / viewer frames
+COLOUR_MARGIN_NIGHT = 0.04        # log(B/R) drop below the clear-sky surface that counts as cloud
+COLOUR_MARGIN_DAY = 0.03
+LUM_MARGIN_NIGHT = math.log(1.2)  # night: this much brighter than the clear-sky surface is cloud
+NOISE_SIGMAS = 3.0                # ... or this many (smoothed) pixel-noise sigmas, whichever is larger
+SMOOTH_SIGMA = 1.5                # Gaussian smoothing of the feature maps, in work pixels
+TEMPLATE_RATE = 0.001             # per dark-night sample: relearns a re-aimed camera in a night or two
+LEARN_MAX_CLOUD = 0.35            # only mostly clear frames teach the template (long overcast must not)
+TEMPLATE_Q_COLOUR = 0.7           # clear sky is the bluer side of the colour residuals ...
+TEMPLATE_Q_LUM = 0.3              # ... and the darker side of the luminance residuals
+MIN_TEMPLATE_SAMPLES = 24         # before this the template is used but trusted less
+MIN_SKY_LEVEL = 20.0              # median sky DN below this: black / failed frame
 
 
 def _status(cc: Optional[float]) -> str:
@@ -49,47 +63,87 @@ def _log_radiance(level_dn: float, exposure_s: float, gain_db: float) -> float:
     return math.log(lin / max(1e-9, exposure_s * 10.0 ** (gain_db / 20.0)))
 
 
-def _crop_roi(img: np.ndarray, roi: Sequence[float]) -> np.ndarray:
-    x0, y0, x1, y1 = (min(1.0, max(0.0, float(v))) for v in roi)
-    if x1 - x0 < 0.05 or y1 - y0 < 0.05:
-        return img
-    h, w = img.shape[:2]
-    return img[int(y0 * h):max(int(y0 * h) + 1, round(y1 * h)), int(x0 * w):max(int(x0 * w) + 1, round(x1 * w))]
+def _basis(h: int, w: int) -> np.ndarray:
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    xx = xx / max(1, w - 1) * 2.0 - 1.0
+    yy = yy / max(1, h - 1) * 2.0 - 1.0
+    return np.stack([np.ones_like(xx), xx, yy, xx * xx, xx * yy, yy * yy], axis=-1)
+
+
+def _envelope_fit(v: np.ndarray, valid: np.ndarray, basis: np.ndarray, upper: bool, iters: int = 5) -> np.ndarray:
+    """Quadratic surface through the clear side of v: refitted to the pixels at most one robust sigma
+    below it (upper=True) or above it (upper=False), so clouds on the other side do not pull it."""
+    sel = valid
+    fit = np.zeros_like(v)
+    for _ in range(iters):
+        coef, *_ = np.linalg.lstsq(basis[sel], v[sel], rcond=None)
+        fit = basis @ coef
+        r = v - fit
+        rs = r[sel]
+        s = 1.4826 * float(np.median(np.abs(rs - np.median(rs)))) + 1e-4
+        new = valid & ((r > -s) if upper else (r < s))
+        if new.sum() < 30:
+            break
+        sel = new
+    return fit
+
+
+def _pixel_noise(v: np.ndarray, valid: np.ndarray) -> float:
+    """Robust per-pixel noise sigma from neighbour differences (cloud edges are rare outliers)."""
+    ok = valid[:, 1:] & valid[:, :-1]
+    d = (v[:, 1:] - v[:, :-1])[ok]
+    if d.size < 10:
+        return 0.0
+    return 1.4826 * float(np.median(np.abs(d - np.median(d)))) / math.sqrt(2.0)
 
 
 class CloudReference:
-    """Learned clear-sky references, persisted as a tiny JSON file (written at most once per sample)."""
+    """Learned clear-sky template (colour and luminance residual maps at the work size) and its sample
+    count, persisted as <path> (JSON) and <path without .json>_template.npy (~60 KB)."""
+
+    SAVE_EVERY = 3  # template samples between writes
 
     def __init__(self, path: Optional[str] = None):
         self.path = path
         self.lock = threading.Lock()
         self.reset(save=False)
-        if path and os.path.exists(path):
-            try:
+        if not path:
+            return
+        try:
+            if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as fp:
                     d = json.load(fp)
-                if len(d.get("night_cells") or []) == GRID_COLS * GRID_ROWS:
-                    self.night_cells = [float(c) for c in d["night_cells"]]
-                self.night_samples = int(d.get("night_samples", 0))
-                self.day_clear = d.get("day_clear")
-                self.day_samples = int(d.get("day_samples", 0))
-            except Exception:
-                pass
+                if int(d.get("version", 1)) >= 2:  # version 1 held star counts, nothing reusable
+                    self.night_samples = int(d.get("night_samples", 0))
+            if self.night_samples and os.path.exists(self._template_path()):
+                t = np.load(self._template_path())
+                if t.ndim == 3 and t.shape[0] == 2:
+                    self.template = t.astype(np.float32)
+            if self.template is None:
+                self.night_samples = 0
+        except Exception:
+            self.reset(save=False)
+
+    def _template_path(self) -> str:
+        base = self.path[:-5] if self.path and self.path.endswith(".json") else (self.path or "")
+        return base + "_template.npy"
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "night_cells": [round(c, 2) for c in self.night_cells],
-            "night_samples": self.night_samples,
-            "day_clear": self.day_clear,
-            "day_samples": self.day_samples,
-        }
+        return {"version": 2, "night_samples": self.night_samples,
+                "learned": self.night_samples >= MIN_TEMPLATE_SAMPLES}
 
     def save(self) -> None:
         if not self.path:
             return
         try:
-            os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
-            fd, tmp = tempfile.mkstemp(dir=os.path.dirname(self.path) or ".", suffix=".tmp")
+            d = os.path.dirname(self.path) or "."
+            os.makedirs(d, exist_ok=True)
+            if self.template is not None:
+                fd, tmp = tempfile.mkstemp(dir=d, suffix=".npy")
+                with os.fdopen(fd, "wb") as fp:
+                    np.save(fp, self.template.astype(np.float16))
+                os.replace(tmp, self._template_path())
+            fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
             with os.fdopen(fd, "w", encoding="utf-8") as fp:
                 json.dump(self.to_dict(), fp)
             os.replace(tmp, self.path)
@@ -98,97 +152,112 @@ class CloudReference:
 
     def reset(self, save: bool = True) -> None:
         """Forget everything learned (e.g. after moving or re-aiming the camera)."""
-        self.night_cells: List[float] = [0.0] * (GRID_COLS * GRID_ROWS)
+        self.template: Optional[np.ndarray] = None  # (2, h, w): clear-sky colour and luminance residuals
         self.night_samples = 0
-        self.day_clear: Optional[float] = None  # log radiance / sin(sun elevation) of clear day sky
-        self.day_samples = 0
         if save:
+            try:
+                os.remove(self._template_path())
+            except OSError:
+                pass
+            self.save()
+
+    def learn(self, res_c: np.ndarray, res_l: np.ndarray, valid: np.ndarray) -> None:
+        """One dark-night sample: move the template a small step towards the clear-sky quantile of the
+        residuals (bluer side for colour, darker side for luminance)."""
+        if self.template is None or self.template.shape[1:] != res_c.shape:
+            self.template = np.zeros((2,) + res_c.shape, np.float32)
+            self.night_samples = 0
+        tc, tl = self.template[0], self.template[1]
+        tc += TEMPLATE_RATE * valid * np.where(res_c < tc, TEMPLATE_Q_COLOUR - 1.0, TEMPLATE_Q_COLOUR)
+        tl += TEMPLATE_RATE * valid * np.where(res_l < tl, TEMPLATE_Q_LUM - 1.0, TEMPLATE_Q_LUM)
+        self.night_samples += 1
+        if self.night_samples % self.SAVE_EVERY == 0:
             self.save()
 
 
-def analyze_structure(frame: np.ndarray) -> Dict[str, Any]:
-    """Bright-cloud vs. dark-gap segmentation of a (cropped) frame.
+_mask_cache: Dict[Any, np.ndarray] = {}
 
-    Returns valid_frac, saturated_frac, bimodal, separation, cloud_frac (bright class among valid
-    pixels), clear_level / sky_level (DN of the dark class / all valid sky).
+
+def sky_work_mask(shape: Tuple[int, int], sky_polygons: Optional[dict], roi: Sequence[float]) -> np.ndarray:
+    """Boolean sky mask at the work size: sky polygons inside the ROI, minus the info stamp corner,
+    eroded by a pixel so walls and roof edges do not bleed in."""
+    key = (tuple(shape), repr(sky_polygons), tuple(round(float(v), 4) for v in roi))
+    m = _mask_cache.get(key)
+    if m is not None:
+        return m
+    h, w = shape
+    poly = sky_polygon_mask((h, w), sky_polygons)
+    m = np.ones((h, w), np.uint8) if poly is None else poly.astype(np.uint8)
+    x0, y0, x1, y1 = (min(1.0, max(0.0, float(v))) for v in roi)
+    if x1 - x0 >= 0.05 and y1 - y0 >= 0.05:
+        r = np.zeros_like(m)
+        r[int(y0 * h):max(int(y0 * h) + 1, round(y1 * h)), int(x0 * w):max(int(x0 * w) + 1, round(x1 * w))] = 1
+        m &= r
+    sx0, sy0, sx1, sy1 = STAMP_BOX
+    m[int(sy0 * h):math.ceil(sy1 * h), int(sx0 * w):math.ceil(sx1 * w)] = 0
+    m = cv2.erode(m, np.ones((3, 3), np.uint8)) > 0
+    if len(_mask_cache) > 8:
+        _mask_cache.clear()
+    _mask_cache[key] = m
+    return m
+
+
+def cloud_map(
+    frame: np.ndarray,
+    night: bool,
+    sky_polygons: Optional[dict] = None,
+    roi: Sequence[float] = (0.0, 0.0, 1.0, 1.0),
+    template: Optional[np.ndarray] = None,
+    want_residuals: bool = False,
+) -> Dict[str, Any]:
+    """Per-pixel cloud mask of one frame at the work size.
+
+    Returns cloud (bool map, None when the frame cannot be judged), valid (judged sky pixels), sky_frac
+    (valid share of the sky mask), saturated_frac, sky_level (median DN of the sky) and, with
+    want_residuals, res_c / res_l: the residuals without the template, which the template learns from.
     """
     h, w = frame.shape[:2]
-    sw = min(STRUCT_WIDTH, w)
-    small = cv2.resize(frame, (sw, max(8, round(h * sw / w))), interpolation=cv2.INTER_AREA)
-    gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY) if small.ndim == 3 else small
-    # Median removes stars and other point sources: only cloud-sized structure should split the sky
-    lum = cv2.medianBlur(gray, 5).astype(np.float32)
-    peak = cv2.medianBlur(small.max(axis=2) if small.ndim == 3 else small, 5)
-    saturated = peak >= 250
-    valid = ~saturated & (lum > 4)
-    out = {"valid_frac": float(valid.mean()), "saturated_frac": float(saturated.mean()), "bimodal": False,
-           "separation": 0.0, "cloud_frac": None, "clear_level": None, "sky_level": None}
-    if valid.sum() < 50:
+    ww = min(WORK_WIDTH, w)
+    wh = max(8, round(h * ww / w))
+    small = cv2.resize(frame, (ww, wh), interpolation=cv2.INTER_AREA).astype(np.float32)
+    if small.ndim == 2:
+        small = np.repeat(small[:, :, None], 3, axis=2)
+    sky = sky_work_mask((wh, ww), sky_polygons, roi)
+    out: Dict[str, Any] = {"cloud": None, "valid": None, "sky_frac": 0.0, "saturated_frac": 0.0,
+                           "sky_level": 0.0, "res_c": None, "res_l": None}
+    if not sky.any():
+        return out
+    sat = small.max(axis=2) >= 248
+    out["saturated_frac"] = float(sat[sky].mean())
+    b, g, r = cv2.split(small + 1.0)
+    lum = (b + g + r) / 3.0
+    out["sky_level"] = float(np.median(lum[sky])) - 1.0
+    valid = sky & ~cv2.dilate(sat.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool) & (lum > 6.0)
+    out["valid"] = valid
+    out["sky_frac"] = float(valid.sum()) / float(sky.sum())
+    if valid.sum() < 50 or out["sky_frac"] < 0.3 or out["sky_level"] < MIN_SKY_LEVEL:
         return out
 
-    # Remove smooth gradients (vignetting, sun glow, horizon) that would otherwise split the sky in two
-    hh, ww = lum.shape
-    yy, xx = np.mgrid[0:hh, 0:ww].astype(np.float32)
-    xx = xx / max(1, ww - 1) * 2.0 - 1.0
-    yy = yy / max(1, hh - 1) * 2.0 - 1.0
-    basis = np.stack([np.ones_like(xx), xx, yy, xx * xx, xx * yy, yy * yy], axis=-1)[valid]
-    vals = lum[valid]
-    coef, *_ = np.linalg.lstsq(basis, vals, rcond=None)
-    sky_level = max(4.0, float(np.median(vals)))
-    z = (vals - basis @ coef) / sky_level
+    c_raw, l_raw = np.log(b / r), np.log(lum)
+    nc, nl = _pixel_noise(c_raw, valid), _pixel_noise(l_raw, valid)
+    c = cv2.GaussianBlur(c_raw, (0, 0), SMOOTH_SIGMA)
+    l = cv2.GaussianBlur(l_raw, (0, 0), SMOOTH_SIGMA)
+    basis = _basis(wh, ww)
+    smooth_gain = 1.0 / (math.sqrt(4.0 * math.pi) * SMOOTH_SIGMA)  # pixel noise left after the smoothing
+    if want_residuals:
+        out["res_c"] = c - _envelope_fit(c, valid, basis, upper=True)
+        out["res_l"] = l - _envelope_fit(l, valid, basis, upper=False)
+    if template is not None and template.shape[1:] == c.shape:
+        c = c - template[0]
+        l = l - template[1]
 
-    lo, hi = np.percentile(z, [1, 99])
-    q = np.clip((z - lo) / max(1e-6, hi - lo) * 255.0, 0, 255).astype(np.uint8).reshape(-1, 1)
-    t, _ = cv2.threshold(q, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    bright = q.ravel() > t
-    if bright.all() or not bright.any():
-        return {**out, "sky_level": sky_level, "clear_level": sky_level}
-    sep = float(z[bright].mean() - z[~bright].mean())
-    out.update({
-        "bimodal": sep >= MIN_SEPARATION,
-        "separation": round(sep, 3),
-        "cloud_frac": float(bright.mean()),
-        "clear_level": float(np.median(vals[~bright])),
-        "sky_level": sky_level,
-    })
+    margin_c = max(COLOUR_MARGIN_NIGHT if night else COLOUR_MARGIN_DAY, NOISE_SIGMAS * nc * smooth_gain)
+    score = (_envelope_fit(c, valid, basis, upper=True) - c) / margin_c
+    if night:
+        margin_l = max(LUM_MARGIN_NIGHT, NOISE_SIGMAS * nl * smooth_gain)
+        score = np.maximum(score, (l - _envelope_fit(l, valid, basis, upper=False)) / margin_l)
+    out["cloud"] = (score > 1.0) & valid
     return out
-
-
-def _night_stars(gray: np.ndarray, reference: Optional[CloudReference], learn: bool) -> Dict[str, Any]:
-    """Star-based cloud fraction from per-cell counts against the learned clear-sky counts."""
-    h, w = gray.shape[:2]
-    n_stars, _, stars = detect_stars_blob(gray)
-    counts = np.zeros(GRID_COLS * GRID_ROWS, np.float32)
-    for s in stars:
-        c = min(GRID_COLS - 1, int(s["x"] * GRID_COLS / w))
-        r = min(GRID_ROWS - 1, int(s["y"] * GRID_ROWS / h))
-        counts[r * GRID_COLS + c] += 1
-
-    learned = False
-    cells = np.full_like(counts, DEFAULT_CLEAR_STARS / counts.size)
-    if reference is not None:
-        with reference.lock:
-            ref = np.array(reference.night_cells, np.float32)
-            if learn:
-                # Slowly decaying maximum: rises quickly on clear nights, forgets a re-aimed camera in ~a week
-                ref = np.where(counts > ref, ref + 0.25 * (counts - ref), ref * NIGHT_REF_DECAY)
-                reference.night_cells = ref.tolist()
-                reference.night_samples += 1
-                reference.save()
-            learned = reference.night_samples >= MIN_NIGHT_SAMPLES
-        if learned:
-            cells = ref
-    # Cells that never show stars (buildings, street lights, lens corners) carry no information
-    informative = cells >= 1.5
-    if not informative.any():
-        return {"star_count": int(n_stars), "star_cloud": None, "learned": learned, "coverage": 0.0}
-    clear = np.minimum(1.0, counts[informative] / cells[informative])
-    return {
-        "star_count": int(n_stars),
-        "star_cloud": 1.0 - float(np.average(clear, weights=cells[informative])),
-        "learned": learned,
-        "coverage": float(informative.mean()),
-    }
 
 
 def analyze_cloud_cover(
@@ -198,75 +267,70 @@ def analyze_cloud_cover(
     sun_elev: float,
     roi: Sequence[float] = (0.0, 0.0, 1.0, 1.0),
     reference: Optional[CloudReference] = None,
+    sky_polygons: Optional[dict] = None,
+    count_stars: bool = True,
 ) -> Dict[str, Any]:
     """
     Estimate cloud cover of one frame.
 
     Args:
-        frame: BGR or grayscale frame; star detection runs at the size given, so downscale first.
-        exposure_s, gain_db: capture settings, used to normalise sky brightness.
-        sun_elev: solar elevation in degrees; above -6° the day rules apply.
+        frame: BGR frame (grayscale works, without the colour cue); stars are counted at the size given.
+        exposure_s, gain_db: capture settings, used for the reported sky brightness.
+        sun_elev: solar elevation in degrees; at or below -6° the night rules apply.
         roi: sky region as fractions (left, top, right, bottom) of the frame.
-        reference: learned clear-sky reference, updated in place (None: fixed defaults, no learning).
+        reference: learned clear-sky template, updated in place on dark nights (None: no template).
+        sky_polygons: station sky mask ({"sky": [...], "obstruction": [...]} in frame fractions).
+        count_stars: at night also count the stars in the sky (reported only).
 
     Returns:
         dict with cloud_cover_pct (None when the frame cannot be judged), status, method
-        ("day" | "night"), confidence (0..1), star_count, separation and sky_brightness.
+        ("day" | "night"), confidence (0..1), star_count, sky_fraction and sky_brightness.
     """
     if frame is None or frame.size == 0:
         raise ValueError("Cannot analyse cloud cover on an empty frame")
     exposure_s = max(1e-6, float(exposure_s or 0.0))
     gain_db = float(gain_db or 0.0)
     night = sun_elev <= -6.0
-    sky = _crop_roi(frame, roi)
-    st = analyze_structure(sky)
+    learn = reference is not None and sun_elev < -12.0
+    template, learned = None, False
+    if reference is not None:
+        with reference.lock:
+            if reference.template is not None:
+                template = reference.template.copy()
+            learned = reference.night_samples >= MIN_TEMPLATE_SAMPLES
+    cm = cloud_map(frame, night, sky_polygons, roi, template, want_residuals=learn)
     result: Dict[str, Any] = {"method": "night" if night else "day", "star_count": 0,
-                              "separation": st["separation"], "sky_brightness": None}
-    if st["valid_frac"] < 0.4:
-        # Sun glare / overexposed (or black) frame: nothing trustworthy to measure
-        status = "overexposed" if st["saturated_frac"] > 0.3 else "unknown"
+                              "sky_fraction": round(cm["sky_frac"], 3), "sky_brightness": None}
+    if cm["sky_level"] > 0:
+        result["sky_brightness"] = round(_log_radiance(cm["sky_level"], exposure_s, gain_db), 3)
+    if cm["cloud"] is None:
+        # Sun glare / overexposed, black or fully masked frame: nothing trustworthy to measure
+        status = "overexposed" if cm["saturated_frac"] > 0.3 else "unknown"
         return {**result, "cloud_cover_pct": None, "status": status, "confidence": 0.0}
-    log_rad = _log_radiance(st["clear_level"] or st["sky_level"], exposure_s, gain_db)
-    result["sky_brightness"] = round(log_rad, 3)
-    struct_cc = st["cloud_frac"] if st["bimodal"] else None
 
-    cc: Optional[float] = None
-    confidence = 0.0
-    if night:
-        gray = cv2.cvtColor(sky, cv2.COLOR_BGR2GRAY) if sky.ndim == 3 else sky
-        stars = _night_stars(np.ascontiguousarray(gray), reference, learn=sun_elev < -12.0)
-        result["star_count"] = stars["star_count"]
-        star_cc = stars["star_cloud"]
-        if struct_cc is not None and star_cc is not None and stars["learned"]:
-            cc, confidence = 0.5 * struct_cc + 0.5 * star_cc, 0.85
-        elif struct_cc is not None:
-            cc, confidence = struct_cc, 0.7
-        elif star_cc is not None:
-            cc, confidence = star_cc, (0.75 if stars["learned"] else 0.4) * stars["coverage"] ** 0.5
-        if sun_elev > -12.0:
-            confidence *= 0.6  # nautical twilight hides faint stars and brightens the sky
-    else:
-        norm = log_rad - math.log(max(0.1, math.sin(math.radians(max(sun_elev, 1.0)))))
-        day_clear = None
-        if reference is not None:
-            with reference.lock:
-                if st["bimodal"] and 0.1 <= st["cloud_frac"] <= 0.9 and sun_elev > 10.0:
-                    # Mixed sky: the dark class is genuinely clear sky, so it calibrates the clear level
-                    reference.day_clear = norm if reference.day_clear is None else reference.day_clear + 0.1 * (norm - reference.day_clear)
-                    reference.day_samples += 1
-                    reference.save()
-                if reference.day_samples >= 3:
-                    day_clear = reference.day_clear
-        if struct_cc is not None:
-            cc, confidence = struct_cc, 0.75
-        elif day_clear is not None:
-            # Uniform sky: overcast if much brighter than the learned clear sky
-            cc = min(1.0, max(0.0, (norm - day_clear - math.log(1.4)) / math.log(OVERCAST_RATIO / 1.4)))
-            confidence = 0.6
-        if sun_elev < 5.0:
-            confidence *= 0.6
-    if cc is None:
-        return {**result, "cloud_cover_pct": None, "status": "unknown", "confidence": 0.0}
-    confidence *= min(1.0, st["valid_frac"] / 0.8)
+    valid = cm["valid"]
+    cc = float(cm["cloud"][valid].mean())
+    if learn and cc < LEARN_MAX_CLOUD:
+        with reference.lock:
+            reference.learn(cm["res_c"], cm["res_l"], valid)
+
+    if night and count_stars:
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) if frame.ndim == 3 else frame
+        _, _, stars = detect_stars_blob(np.ascontiguousarray(gray))
+        fh, fw = gray.shape[:2]
+        mh, mw = valid.shape
+        result["star_count"] = sum(
+            1 for s in stars if valid[min(mh - 1, int(s["y"] * mh / fh)), min(mw - 1, int(s["x"] * mw / fw))])
+
+    confidence = 0.85 if night else 0.75
+    if not learned:
+        confidence *= 0.75
+    if -12.0 < sun_elev < 5.0:
+        confidence *= 0.6  # twilight: the sky colour changes across the frame by the minute
+    if cc < 0.05:
+        confidence *= 0.7  # clear, or a uniform overcast with no structure to see
+    confidence *= min(1.0, cm["sky_frac"] / 0.8)
+    if cm["saturated_frac"] > 0.05:
+        confidence *= 0.5  # sun glare / overexposure washes the cloud colour out around it
     cc_pct = round(100.0 * cc, 1)
     return {**result, "cloud_cover_pct": cc_pct, "status": _status(cc_pct), "confidence": round(confidence, 2)}

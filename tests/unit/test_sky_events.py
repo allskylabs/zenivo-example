@@ -158,6 +158,32 @@ def test_streak_across_lumpy_cloud_is_not_a_plane():
     assert _run(frames) == []
 
 
+def _drifting_bits(n_frames, starts=((200, 300), (300, 650), (750, 420)), step=(40, 10)):
+    """City-lit cloud bits blown by the wind: sharp dots that all move the same way at the same speed."""
+    frames = [_sky(i, i * 0.5) for i in range(n_frames)]
+    for i in range(1, n_frames - 1):
+        for x, y in starts:
+            cv2.circle(frames[i], (int(x + step[0] * i), int(y + step[1] * i)), 3, (220, 220, 220), -1)
+    return frames
+
+
+def test_dots_drifting_together_are_cloud():
+    assert [e for e in _run(_drifting_bits(9)) if e["type"] in ("plane", "satellite")] == []
+
+
+def test_aircraft_crossing_the_drift_is_kept():
+    frames = _drifting_bits(9)
+    for k in range(7):  # an aircraft flying its own way across the drifting bits
+        cv2.circle(frames[k + 1], (1100 - 60 * k, 150 + 70 * k), 3, (220, 220, 220), -1)
+    assert [e["type"] for e in _run(frames)] == ["plane"]
+
+
+def test_no_meteor_while_cloud_drifts():
+    frames = _drifting_bits(9)
+    cv2.line(frames[7], (900, 700), (1150, 820), (230, 230, 230), 2, cv2.LINE_AA)
+    assert [e for e in _run(frames) if e["type"] == "meteor"] == []
+
+
 def test_single_frame_streaks_skipped_under_broken_cloud():
     """Many specks brightening every frame (drifting broken cloud): one-frame streaks are not trusted."""
     rng = np.random.default_rng(11)

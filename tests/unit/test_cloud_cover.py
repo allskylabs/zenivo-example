@@ -1,92 +1,100 @@
-"""Cloud cover analysis (structure / stars / learned reference), history storage and API."""
+"""Cloud cover analysis (colour / brightness structure, learned template), history storage and API."""
 
 import numpy as np
 import cv2
 
-from src.analytics.cloud_cover import CloudReference, analyze_cloud_cover, analyze_structure, MIN_NIGHT_SAMPLES
+from src.analytics.cloud_cover import MIN_TEMPLATE_SAMPLES, CloudReference, analyze_cloud_cover
 from src.analytics.cloud_history import CloudHistory
 
+H, W = 270, 480
 
-def _sky(cloud_frac: float, seed: int = 1, base: int = 70, gradient: bool = True) -> np.ndarray:
-    """Dark sky with a smooth gradient and bright soft-edged blobs covering ~cloud_frac of it."""
+
+def _sky(cloud_frac: float, seed: int = 1, night: bool = True, glow: float = 40.0, bump: float = 0.0) -> np.ndarray:
+    """Teal sky with lens colour shading (bluer centre) and a light-pollution glow at the bottom, plus
+    grey clouds (B = R) covering ~cloud_frac of it; at night the clouds are also brighter."""
     rng = np.random.default_rng(seed)
-    h, w = 270, 480
-    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
-    sky = np.full((h, w), float(base), np.float32) + (25.0 * xx / w if gradient else 0.0)
-    noise = cv2.GaussianBlur(rng.random((h, w)).astype(np.float32), (0, 0), 25)
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    r2 = ((xx - W / 2) / (W / 2)) ** 2 + ((yy - H / 2) / (H / 2)) ** 2
+    base = (60.0 if night else 150.0) + glow * (yy / H) ** 2
+    if bump:
+        # A small static glow (street lamp behind a roof): not a quadratic, the template must learn it
+        base = base + bump * np.exp(-(((xx - 0.75 * W) / 18) ** 2 + ((yy - 0.3 * H) / 18) ** 2))
+    blue = 1.25 - 0.15 * r2   # B/R of clear sky, falling towards the corners (lens shading)
+    b, g, r = base * blue, base * 1.05, base.copy()
     if cloud_frac > 0:
-        thr = np.quantile(noise, 1.0 - cloud_frac)
-        sky += 110.0 * cv2.GaussianBlur((noise > thr).astype(np.float32), (5, 5), 0)
-    img = np.clip(sky + rng.normal(0, 2, (h, w)), 0, 255).astype(np.uint8)
-    return cv2.merge([img, img, img])
+        noise = cv2.GaussianBlur(rng.random((H, W)).astype(np.float32), (0, 0), 20)
+        k = cv2.GaussianBlur((noise > np.quantile(noise, 1.0 - cloud_frac)).astype(np.float32), (5, 5), 0)
+        grey = base * (1.6 if night else 1.1)
+        b, g, r = b + k * (grey - b), g + k * (grey - g), r + k * (grey - r)
+    img = np.stack([b, g, r], axis=-1) + rng.normal(0, 1.5, (H, W, 3))
+    return np.clip(img, 0, 255).astype(np.uint8)
 
 
-def test_structure_measures_broken_cloud():
-    for frac in (0.3, 0.6):
-        st = analyze_structure(_sky(frac))
-        assert st["bimodal"]
-        assert abs(st["cloud_frac"] - frac) < 0.12
+def test_broken_cloud_is_measured_day_and_night():
+    for night, sun in ((True, -40.0), (False, 40.0)):
+        for frac in (0.3, 0.6):
+            r = analyze_cloud_cover(_sky(frac, night=night), 1.0, 10.0, sun)
+            assert r["method"] == ("night" if night else "day")
+            assert abs(r["cloud_cover_pct"] - 100 * frac) < 12, (night, frac, r)
 
 
-def test_uniform_sky_is_not_bimodal_and_day_needs_reference():
-    st = analyze_structure(_sky(0.0))
-    assert not st["bimodal"]
-    res = analyze_cloud_cover(_sky(0.0), 0.001, 0.0, 40.0)
-    assert res["cloud_cover_pct"] is None and res["status"] == "unknown"
+def test_clear_sky_with_glow_and_shading_is_clear():
+    for night, sun in ((True, -40.0), (False, 40.0)):
+        r = analyze_cloud_cover(_sky(0.0, night=night, glow=60.0), 1.0, 10.0, sun)
+        assert r["cloud_cover_pct"] < 5 and r["status"] == "clear"
 
 
-def test_overexposed_frame_is_skipped():
+def test_sky_mask_excludes_buildings():
+    img = _sky(0.0)
+    img[:, 400:] = (90, 140, 200)  # a lit wall on the right: bright and orange
+    walls = analyze_cloud_cover(img, 1.0, 10.0, -40.0)
+    mask = {"sky": [[[0, 0], [0.8, 0], [0.8, 1], [0, 1]]], "obstruction": []}
+    masked = analyze_cloud_cover(img, 1.0, 10.0, -40.0, sky_polygons=mask)
+    assert walls["cloud_cover_pct"] > 10 and masked["cloud_cover_pct"] < 5
+
+
+def test_overexposed_and_black_frames_are_skipped():
     white = np.full((200, 300, 3), 255, np.uint8)
     res = analyze_cloud_cover(white, 0.001, 0.0, 40.0)
     assert res["cloud_cover_pct"] is None and res["status"] == "overexposed"
+    black = np.full((200, 300, 3), 8, np.uint8)
+    res = analyze_cloud_cover(black, 10.0, 30.0, -40.0)
+    assert res["cloud_cover_pct"] is None and res["status"] == "unknown"
 
 
-def test_day_reference_learned_from_mixed_sky_flags_uniform_overcast():
+def test_template_learns_static_glow(monkeypatch):
+    from src.analytics import cloud_cover
+
+    monkeypatch.setattr(cloud_cover, "TEMPLATE_RATE", 0.02)  # learn in 80 samples instead of a few nights
+    before = analyze_cloud_cover(_sky(0.0, bump=60.0), 1.0, 10.0, -40.0)["cloud_cover_pct"]
+    assert before > 0.5  # the lamp glow looks like a small cloud at first
     ref = CloudReference(None)
-    for seed in range(4):
-        r = analyze_cloud_cover(_sky(0.4, seed=seed), 0.001, 0.0, 45.0, reference=ref)
-        assert r["method"] == "day" and 20 < r["cloud_cover_pct"] < 60
-    assert ref.day_samples >= 3
-    # Same exposure, uniform and much brighter sky => overcast; uniform at the clear level => clear
-    assert analyze_cloud_cover(_sky(0.0, base=190, gradient=False), 0.001, 0.0, 45.0, reference=ref)["cloud_cover_pct"] > 80
-    assert analyze_cloud_cover(_sky(0.0, base=70), 0.001, 0.0, 45.0, reference=ref)["cloud_cover_pct"] < 20
-
-
-def _stars(n: int, seed: int = 3) -> np.ndarray:
-    rng = np.random.default_rng(seed)
-    img = np.full((540, 960), 20, np.uint8)
-    for x, y in zip(rng.integers(10, 950, n), rng.integers(10, 530, n)):
-        cv2.circle(img, (int(x), int(y)), 2, 200, -1)
-    return cv2.merge([img, img, img])
-
-
-def test_night_star_reference_adapts_to_camera():
-    ref = CloudReference(None)
-    for _ in range(MIN_NIGHT_SAMPLES):
-        analyze_cloud_cover(_stars(60), 10.0, 30.0, -40.0, reference=ref)
-    clear = analyze_cloud_cover(_stars(60), 10.0, 30.0, -40.0, reference=ref)
-    half_frame = _stars(60)
-    half_frame[:, 480:] = 20  # clouds hide the right half
-    half = analyze_cloud_cover(half_frame, 10.0, 30.0, -40.0, reference=ref)
-    assert clear["cloud_cover_pct"] < 15 and clear["confidence"] >= 0.5
-    assert 30 < half["cloud_cover_pct"] < 75
-
-
-def test_roi_excludes_ground():
-    img = _sky(0.0)
-    img[150:] = np.random.default_rng(0).integers(0, 255, img[150:].shape, dtype=np.uint8)  # textured ground
-    st_full = analyze_structure(img)
-    st_roi = analyze_structure(img[:140])
-    assert not st_roi["bimodal"] and st_full["separation"] > st_roi["separation"]
+    for seed in range(80):
+        analyze_cloud_cover(_sky(0.15, seed=seed, bump=60.0), 1.0, 10.0, -40.0, reference=ref, count_stars=False)
+    assert ref.night_samples >= MIN_TEMPLATE_SAMPLES
+    after = analyze_cloud_cover(_sky(0.0, bump=60.0), 1.0, 10.0, -40.0, reference=ref)
+    assert after["cloud_cover_pct"] < before / 4
+    # Twilight does not teach the template
+    n = ref.night_samples
+    analyze_cloud_cover(_sky(0.0), 1.0, 10.0, -8.0, reference=ref)
+    assert ref.night_samples == n
 
 
 def test_reference_persists(tmp_path):
     p = tmp_path / "ref.json"
     ref = CloudReference(str(p))
-    analyze_cloud_cover(_stars(40), 10.0, 30.0, -40.0, reference=ref)
+    for seed in range(CloudReference.SAVE_EVERY):
+        analyze_cloud_cover(_sky(0.0, seed=seed), 1.0, 10.0, -40.0, reference=ref, count_stars=False)
     again = CloudReference(str(p))
-    assert again.night_samples == 1 and max(again.night_cells) > 0
+    assert again.night_samples == CloudReference.SAVE_EVERY and again.template is not None
+    assert np.allclose(again.template, ref.template, atol=1e-3)
     again.reset()
+    assert CloudReference(str(p)).night_samples == 0 and CloudReference(str(p)).template is None
+
+
+def test_old_star_reference_is_ignored(tmp_path):
+    p = tmp_path / "ref.json"
+    p.write_text('{"night_cells": [1.0], "night_samples": 300, "day_clear": 8.8, "day_samples": 88}')
     assert CloudReference(str(p)).night_samples == 0
 
 
@@ -102,6 +110,8 @@ def test_history_query_and_bucketing(tmp_path):
     with open(h.path, "a") as fp:
         fp.write('{"t": 99')  # torn line
     assert len(h.query(0, 1e9)) == 101
+    assert h.remove_range(1000, 1000 + 50 * 60) == 50
+    assert len(h.query(0, 1e9)) == 51 and h.query(0, 1e9)[0]["t"] == 1000 + 50 * 60
 
 
 def test_cloud_api_roundtrip(monkeypatch):

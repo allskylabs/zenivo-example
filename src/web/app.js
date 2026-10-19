@@ -3036,7 +3036,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         if (cloudRefNote && cfg.reference) {
             const r = cfg.reference;
-            cloudRefNote.textContent = `Learned so far: ${r.night_samples} night samples, ${r.day_samples} mixed-sky day samples.`;
+            cloudRefNote.textContent = `Clear-sky template learned from ${r.night_samples} dark-night samples${r.learned ? "" : " (still learning)"}.`;
         }
     }
 

@@ -760,7 +760,8 @@ class AllSkyService:
             aw = int(self.performance["analysis_max_width"])
             analysis_frame = cv2.resize(frame, (aw, max(1, round(h * aw / w))), interpolation=cv2.INTER_AREA) if w > aw else frame
             stats = analyze_cloud_cover(
-                analysis_frame, exposure_s, gain_db, sun_elev, roi=self.sky_roi, reference=self.cloud_reference
+                analysis_frame, exposure_s, gain_db, sun_elev, roi=self.sky_roi, reference=self.cloud_reference,
+                sky_polygons=self.station_config.get("sky_mask"),
             )
         except Exception:
             stats = {"star_count": 0, "cloud_cover_pct": None, "status": "unknown", "method": "", "confidence": 0.0}

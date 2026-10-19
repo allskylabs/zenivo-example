@@ -32,14 +32,26 @@ class CloudHistory:
             except OSError:
                 pass
 
-    def _trim(self, min_t: float) -> None:
-        recs = [r for r in self._read_all() if r.get("t", 0) >= min_t]
+    def remove_range(self, start_t: float, end_t: float) -> int:
+        """Drop the samples in [start_t, end_t) (to recompute them); returns how many were dropped."""
+        with self.lock:
+            recs = self._read_all()
+            keep = [r for r in recs if not start_t <= r.get("t", 0) < end_t]
+            if len(keep) == len(recs):
+                return 0
+            self._write(keep)
+            return len(recs) - len(keep)
+
+    def _write(self, recs: List[Dict[str, Any]]) -> None:
         tmp = self.path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as fp:
             for r in recs:
                 fp.write(json.dumps(r, separators=(",", ":")) + "\n")
         os.replace(tmp, self.path)
         self._cache_key = None
+
+    def _trim(self, min_t: float) -> None:
+        self._write([r for r in self._read_all() if r.get("t", 0) >= min_t])
 
     def _read_all(self) -> List[Dict[str, Any]]:
         try:
