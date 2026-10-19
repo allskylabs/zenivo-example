@@ -34,6 +34,7 @@ from src.analytics.cloud_history import CloudHistory
 from src.analytics.sky_events import EVENT_TYPES, SkyEventDetector
 from src.analytics.focus_tracker import SKY_MAX_DIOPTRES, FocusTracker, TempCompensation
 from src.analytics.focus import (
+    analyse_sweep, find_focus_tiles,
     FocusSession, LOWER_IS_BETTER, _contrast, display_stretch, find_best_star, find_focus_point, measure_focus,
 )
 from src.api.histogram import compute_fast_histogram
@@ -3234,6 +3235,13 @@ class AllSkyService:
 
     def _lens_score(self, pos: float, method: str, settle: int, frames: int, since: float):
         """Move the lens, drop frames exposed while it moved, then the median ROI score of the next ones."""
+        scores, since = self._lens_score_multi(pos, method, settle, frames, since, [])
+        return scores[0], since
+
+    def _lens_score_multi(self, pos: float, method: str, settle: int, frames: int, since: float,
+                          tiles: List[Dict[str, float]]):
+        """Like _lens_score, for the focus ROI and extra tiles (frame fractions, same ROI size) measured
+        on the same frames. Returns ([roi score, tile scores...], since); a score is None if unmeasurable."""
         pos = self.camera.set_lens_position(pos)
         wait = 10.0 + 3 * float(getattr(self.camera, "current_exposure_s", 0.0))
         # Controls reach the sensor a few frames late: wait until frames report the new position
@@ -3245,19 +3253,32 @@ class AllSkyService:
                 break
         for _ in range(settle):
             _, _, since = self._focus_new_frame(since, timeout_s=wait)
-        scores = []
+        per = [[] for _ in range(1 + len(tiles))]
         for _ in range(frames):
             frame, _, since = self._focus_new_frame(since, timeout_s=wait)
             self.focus.last_poll = time.time()
             fh, fw = frame.shape[:2]
-            x0, y0, rw, rh = self.focus.roi_rect(fw, fh)
-            res = measure_focus(frame[y0:y0 + rh, x0:x0 + rw], method)
-            if res.get("score") is not None:
-                scores.append(float(res["score"]))
-        return (float(np.median(scores)) if scores else None), since
+            rects = [self.focus.roi_rect(fw, fh)]
+            side = rects[0][2]
+            for t in tiles:
+                tx = int(min(max(0, t["cx"] * fw - side / 2), fw - side))
+                ty = int(min(max(0, t["cy"] * fh - side / 2), fh - side))
+                rects.append((tx, ty, side, side))
+            for i, (x0, y0, rw, rh) in enumerate(rects):
+                res = measure_focus(frame[y0:y0 + rh, x0:x0 + rw], method)
+                if res.get("score") is not None:
+                    per[i].append(float(res["score"]))
+        return [float(np.median(v)) if v else None for v in per], since
 
-    SWEEP_STEP_D = 0.04   # dioptres between sweep positions
-    SWEEP_RANGE_D = 1.2   # sweep 0 .. 1.2 D: the sky range (focus nearer than 1 m is never kept) plus margin
+    @staticmethod
+    def _sweep_positions(lo: float, hi: float) -> List[float]:
+        """0.04 D steps to 1.2 D (where sky focus lies), 0.1 D to 3 D, then 0.25 D to the end of the lens."""
+        out, p = [], float(lo)
+        while p <= hi + 1e-9:
+            out.append(round(p, 4))
+            p += 0.04 if p < 1.2 - 1e-9 else 0.1 if p < 3.0 - 1e-9 else 0.25
+        return out
+
 
     def _lens_sweep(self) -> None:
         sw = self.focus.sweep
@@ -3285,80 +3306,105 @@ class AllSkyService:
                 sw["points"].append({"pos": round(pos, 4), "score": score, "phase": phase})
                 return score
 
-            # One monotonic pass from infinity (0 D) outwards over the sky range only (results nearer than
-            # 1 m are never kept), stopping once clearly past the peak; then a least-squares parabola
-            # through the points around the peak gives the focus between the steps.
-            step = self.SWEEP_STEP_D
-            positions = [float(p) for p in np.arange(lo, min(hi, lo + self.SWEEP_RANGE_D) + 1e-9, step)]
-            best_q, worse_run = float("-inf"), 0
+            # By day measure several detailed tiles besides the zoom on the same frames: in a scene of sky,
+            # cloud and a nearby wall, the wall must not be the only thing the sweep can see
+            tiles: List[Dict[str, float]] = []
+            if method == "contrast":
+                for t in find_focus_tiles(frame, k=8):
+                    if abs(t["cx"] - self.focus.cx) * fw > rw or abs(t["cy"] - self.focus.cy) * fh > rh:
+                        tiles.append({"cx": t["cx"], "cy": t["cy"]})
+            sw["tiles"] = [{"cx": round(t["cx"], 4), "cy": round(t["cy"], 4)} for t in tiles]
+
+            # One pass from infinity (0 D) outwards, continuing over the whole lens range until every
+            # measured region is clearly past its peak (30 % worse, or gone, for 3 steps)
+            positions = self._sweep_positions(lo, hi)
+            n_roi = 1 + len(tiles)
+            curves: List[List[Optional[float]]] = [[] for _ in range(n_roi)]
+            best = [float("-inf")] * n_roi
+            best_at = [None] * n_roi
+            worse_run = [0] * n_roi
+            done_pos: List[float] = []
             sw["phase"] = "sweep"
-            pts: List[Tuple[float, float, Optional[float]]] = []  # (pos, quality, raw score)
             for i, pos in enumerate(positions):
                 if self.focus.sweep_cancel:
                     raise InterruptedError
-                score = measure(pos, "sweep")
-                q = quality(score)
-                pts.append((pos, q, score))
+                scores, since = self._lens_score_multi(pos, method, settle, frames, since, tiles)
+                done_pos.append(pos)
+                sw["points"].append({"pos": round(pos, 4), "score": scores[0], "phase": "sweep"})
+                sw["tile_scores"] = sw.get("tile_scores", []) + [[None if v is None else round(v, 4) for v in scores[1:]]]
+                for r, v in enumerate(scores):
+                    curves[r].append(v)
+                    q = quality(v)
+                    if q > best[r]:
+                        best[r], best_at[r], worse_run[r] = q, pos, 0
+                    elif np.isfinite(best[r]):
+                        worse = (not np.isfinite(q)) or (abs(q) > abs(best[r]) * 1.3 if lower else q < best[r] * 0.7)
+                        worse_run[r] = worse_run[r] + 1 if worse else 0
                 sw["progress"] = 0.95 * (i + 1) / len(positions)
-                if q > best_q:
-                    best_q, worse_run = q, 0
-                elif np.isfinite(best_q):
-                    # Clearly past the peak (30 % worse, or the sources vanished) for 3 steps in a row
-                    worse = (not np.isfinite(q)) or (abs(q) > abs(best_q) * 1.3 if lower else q < best_q * 0.7)
-                    worse_run = worse_run + 1 if worse else 0
-                    if worse_run >= 3:
-                        break
-            if not np.isfinite(best_q):
-                pos_back = start_pos if start_pos is not None else lo
-                self._lens_finish(pos_back, "failed", f"nothing measurable in the zoom region ({method}); lens put back", "sweep")
-                return
-            # Nothing to focus on (blank sky, uniform cloud, fog): the score hardly changes across the range
-            finite = [q for _, q, _ in pts if np.isfinite(q)]
-            spread = (max(finite) - min(finite)) / max(abs(max(finite)), 1e-9) if len(finite) >= 3 else 0.0
-            sw["spread"] = round(float(spread), 4)
-            if spread < 0.05:
-                pos_back = start_pos if start_pos is not None else lo
-                self._lens_finish(pos_back, "failed",
-                                  f"score is flat across the lens range ({spread * 100:.1f} %): nothing in the zoom "
-                                  "region to focus on (blank sky or cloud?). Lens put back; zoom onto distant buildings, "
-                                  "the horizon or stars.", "sweep")
-                return
-            # Peak on a 3-point median (one spoiled frame must not choose it)
-            qs = [q for _, q, _ in pts]
-            med = [float(np.median([v for v in qs[max(0, i - 1):i + 2] if np.isfinite(v)] or [float("-inf")]))
-                   for i in range(len(qs))]
-            ib = int(np.argmax(med))
-            if ib == len(pts) - 1 and pts[-1][0] >= positions[-1] - 1e-9:
-                # Still getting sharper at the near end of the sky range: the zoom shows something close
+
+                sky_peak = any(worse_run[r] >= 3 and best_at[r] is not None and best_at[r] <= SKY_MAX_DIOPTRES
+                               for r in range(n_roi))
+
+                def finished(r):
+                    if worse_run[r] >= 3:
+                        return True  # clearly past its peak
+                    vals = [quality(v) for v in curves[r] if v is not None]
+                    # A region still flat past the sky range is blank sky/cloud, but only give up on it once
+                    # another region has its peak in the sky range: otherwise keep going to find any peak
+                    if sky_peak and pos >= 1.2 - 1e-9 and (
+                            len(vals) < 3 or (max(vals) - min(vals)) / max(abs(max(vals)), 1e-9) < 0.05):
+                        return True
+                    return False
+                past = [finished(r) for r in range(n_roi)]
+                if all(past) and i >= 4:
+                    break
+
+            # Judge every region's curve; sky focus = the most decisive peak within 1 m (1 D) or farther
+            results = []
+            for r in range(n_roi):
+                res = analyse_sweep(done_pos, curves[r], lower)
+                res["roi"] = 0 if r == 0 else r
+                results.append(res)
+            sky = [x for x in results if x["ok"] and x["vertex"] <= SKY_MAX_DIOPTRES]
+            near = [x for x in results if x["ok"] and x["vertex"] > SKY_MAX_DIOPTRES]
+            sw["regions"] = [{k: x.get(k) for k in ("roi", "ok", "reason", "vertex", "spread")} for x in results]
+            if not sky:
                 pos_back = start_pos if start_pos is not None and start_pos <= SKY_MAX_DIOPTRES else lo
                 self.camera.set_lens_position(float(pos_back))
-                sw["fit"] = None
-                self._lens_finish(None, "rejected",
-                                  f"still sharpening at {pts[-1][0]:.2f} D (~{1 / max(pts[-1][0], 0.01):.1f} m), the near end "
-                                  f"of the sky range: the zoom region is on a nearby object. Lens put back to {float(pos_back):.3f} D; "
-                                  "zoom onto distant detail or stars.", "sweep")
+                sw["fit"] = results[0].get("fit")
+                if near:
+                    nb = max(near, key=lambda x: x["spread"])
+                    msg = (f"sweep complete: the sharpest focus found is {nb['vertex']:.2f} D (~{1 / nb['vertex']:.2f} m), "
+                           f"a nearby object; nothing in focus beyond 1 m (blank sky/cloud elsewhere). Not saved; lens back "
+                           f"to {float(pos_back):.3f} D. Zoom onto distant buildings or stars, or set it by hand (MF).")
+                    sw["best_position"] = nb["vertex"]
+                    sw["fit"] = nb.get("fit") if nb["roi"] == 0 else sw["fit"]
+                    self._lens_finish(None, "rejected", msg, "sweep")
+                else:
+                    reasons = sorted({x.get("reason") for x in results})
+                    self._lens_finish(None, "failed",
+                                      f"sweep complete, no focus peak in {n_roi} region(s) ({', '.join(reasons)}): nothing "
+                                      "with detail to focus on (blank sky or cloud?). Lens put back; zoom onto distant "
+                                      "buildings, the horizon or stars.", "sweep")
                 return
-            # Least-squares parabola q = a(x - v)^2 + c through the finite points within 3 steps of the peak
-            w0, w1 = max(0, ib - 3), min(len(pts), ib + 4)
-            fx = np.array([p for p, q, _ in pts[w0:w1] if np.isfinite(q)])
-            fy = np.array([q for p, q, _ in pts[w0:w1] if np.isfinite(q)])
-            final = pts[ib][0]
-            sw["fit"] = None
-            if len(fx) >= 4:
-                a2, a1, a0 = np.polyfit(fx - pts[ib][0], fy, 2)
-                if a2 < 0:
-                    vertex = pts[ib][0] - a1 / (2 * a2)
-                    if fx.min() - 1e-9 <= vertex <= fx.max() + 1e-9:
-                        final = float(vertex)
-                    sw["fit"] = {"a": float(a2), "b": float(a1), "c": float(a0), "x0": pts[ib][0],
-                                 "from": float(fx.min()), "to": float(fx.max()), "vertex": round(final, 4),
-                                 "lower_is_better": bool(lower)}
-            final = round(min(positions[-1], max(lo, final)), 4)
-            best_score = pts[ib][2] if pts[ib][2] is not None else (-best_q if lower else best_q)
+            win = max(sky, key=lambda x: x["spread"])
+            if win["roi"] != 0:
+                # Show the region that decided the focus, and its curve
+                t = tiles[win["roi"] - 1]
+                with self._focus_lock:
+                    self.focus.cx, self.focus.cy = t["cx"], t["cy"]
+                sw["points"] = [{"pos": round(p, 4), "score": v, "phase": "sweep"} for p, v in zip(done_pos, curves[win["roi"]])]
+            sw["fit"] = win.get("fit")
+            final = round(min(hi, max(lo, win["vertex"])), 4)
+            best_score = win.get("peak_score")
             unit = "px HFR" if lower else "contrast"
             dist = f"{1 / final:.1f} m" if final > 0.05 else "infinity"
-            how = "parabola peak" if sw["fit"] else "best step"
-            self._lens_finish(final, "done", f"{how} at {final:.3f} D ({dist}), {best_score:.3g} {unit}", "sweep")
+            how = "parabola peak" if win.get("fit") else "best step"
+            others = f"; {len(near)} near region(s) skipped" if near else ""
+            where = "" if win["roi"] == 0 else f" (detail region {win['roi']} of {n_roi})"
+            self._lens_finish(final, "done", f"{how} at {final:.3f} D ({dist}){where}, "
+                              f"{best_score:.3g} {unit}{others}" if best_score is not None else
+                              f"{how} at {final:.3f} D ({dist}){where}{others}", "sweep")
         except InterruptedError:
             pos_back = getattr(self.camera, "lens_position_target", None)
             self._lens_finish(None, "cancelled", f"cancelled, lens left at {pos_back}", "sweep")

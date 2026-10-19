@@ -414,3 +414,66 @@ def find_focus_point(img: np.ndarray, grid_w: int = 12, sky_mask: Optional[np.nd
     c, tx, ty = best
     return {"cx": (tx + 0.5) * tile / sw, "cy": (ty + 0.5) * tile / sh, "method": "contrast",
             "detail": {"contrast": round(c, 4), "median_tile": round(med, 4)}}
+
+
+def find_focus_tiles(img: np.ndarray, k: int = 8, grid_w: int = 12) -> List[Dict[str, Any]]:
+    """The k most detailed tiles (as frame fractions), at least one tile apart, skipping the outermost
+    tiles and anything not clearly above the frame's median detail. A daytime sweep measures them all at
+    once, so a nearby wall among them cannot decide the focus."""
+    gray = _to_gray(img)
+    h, w = gray.shape
+    scale = min(1.0, 768.0 / w)
+    small = cv2.resize(gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA) if scale < 1 else gray
+    sh, sw = small.shape
+    tile = max(32, sw // grid_w)
+    cells = []
+    for ty in range(1, sh // tile - 1):
+        for tx in range(1, sw // tile - 1):
+            cells.append((_contrast(small[ty * tile:(ty + 1) * tile, tx * tile:(tx + 1) * tile]), tx, ty))
+    if not cells:
+        return []
+    med = float(np.median([c for c, _, _ in cells]))
+    picked: List[Tuple[float, int, int]] = []
+    for c, tx, ty in sorted(cells, reverse=True):
+        if c < max(med * 1.2, 1e-6) or len(picked) >= k:
+            break
+        if any(max(abs(tx - px), abs(ty - py)) < 2 for _, px, py in picked):
+            continue
+        picked.append((c, tx, ty))
+    return [{"cx": (tx + 0.5) * tile / sw, "cy": (ty + 0.5) * tile / sh, "contrast": round(c, 4)} for c, tx, ty in picked]
+
+
+def analyse_sweep(positions: List[float], scores: List[Optional[float]], lower: bool) -> Dict[str, Any]:
+    """Judge one focus-vs-lens-position curve from a one-way sweep (positions ascending, in dioptres).
+
+    ok=False with reason 'nothing' (no measurement), 'flat' (< 5 % change: blank sky, cloud, fog) or 'near'
+    (still sharpening at the near end: a nearby object). Otherwise vertex is the peak of a least-squares
+    parabola through the points within 3 steps of the 3-point-median peak, and spread the curve's relative
+    range (how decisive it is)."""
+    q = [float("-inf") if s is None else (-float(s) if lower else float(s)) for s in scores]
+    finite = [v for v in q if np.isfinite(v)]
+    if len(finite) < 3:
+        return {"ok": False, "reason": "nothing"}
+    spread = (max(finite) - min(finite)) / max(abs(max(finite)), 1e-9)
+    if spread < 0.05:
+        return {"ok": False, "reason": "flat", "spread": round(spread, 4)}
+    med = [float(np.median([v for v in q[max(0, i - 1):i + 2] if np.isfinite(v)] or [float("-inf")]))
+           for i in range(len(q))]
+    ib = int(np.argmax(med))
+    if ib == len(q) - 1:
+        return {"ok": False, "reason": "near", "spread": round(spread, 4), "peak_index": ib}
+    w0, w1 = max(0, ib - 3), min(len(q), ib + 4)
+    fx = np.array([positions[i] for i in range(w0, w1) if np.isfinite(q[i])])
+    fy = np.array([q[i] for i in range(w0, w1) if np.isfinite(q[i])])
+    vertex, fit = float(positions[ib]), None
+    if len(fx) >= 4:
+        x0 = float(positions[ib])
+        a2, a1, a0 = np.polyfit(fx - x0, fy, 2)
+        if a2 < 0:
+            v = x0 - a1 / (2 * a2)
+            if fx.min() - 1e-9 <= v <= fx.max() + 1e-9:
+                vertex = float(v)
+            fit = {"a": float(a2), "b": float(a1), "c": float(a0), "x0": x0, "from": float(fx.min()),
+                   "to": float(fx.max()), "vertex": round(vertex, 4), "lower_is_better": bool(lower)}
+    return {"ok": True, "vertex": round(vertex, 4), "fit": fit, "spread": round(spread, 4), "peak_index": ib,
+            "peak_score": scores[ib]}

@@ -2,6 +2,7 @@
 
 import time
 
+import cv2
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
@@ -369,3 +370,72 @@ def test_sweep_is_one_pass_with_parabola_and_rejects_near_object(lens_client):
         time.sleep(0.2)
     assert svc.focus.sweep["state"] == "rejected" and "nearby object" in svc.focus.sweep["message"]
     assert cam.lens_position_target == 0.2
+
+
+class SceneLensCamera(LensSimCamera):
+    """Day scene: a distant rooftop (sharpest at 0.30 D) on the left, a nearby wall (sharpest at 2.4 D) right."""
+
+    def capture_frame(self):
+        _, meta = SimulatedIMX335Controller.capture_frame(self)
+        h, w = self.height, self.width
+        rng = np.random.default_rng(5)
+        img = np.full((h, w), 175, np.uint8)  # bright sky
+        far = rng.integers(40, 220, (60, 60), dtype=np.uint8)
+        near = rng.integers(30, 200, (60, 60), dtype=np.uint8)
+
+        def blurred(patch, focus):
+            sig = 0.4 + 6.0 * abs(self.lens_position - focus)
+            return cv2.GaussianBlur(patch, (0, 0), sig)
+
+        img[200:260, 120:180] = blurred(far, 0.30)
+        img[200:260, 440:500] = blurred(near, 2.4)
+        meta["lens_position"] = self.lens_position
+        return np.dstack([img] * 3), meta
+
+
+def test_day_sweep_uses_distant_detail_not_the_nearby_wall():
+    AllSkyService.reset_instance()
+    cam = SceneLensCamera(width=640, height=480, seed=42)
+    cam.open()
+    svc = AllSkyService.get_instance(camera=cam)
+    svc.station_config["image_transform"] = {}  # the scene's left/right must stay where they are drawn
+    with TestClient(create_app(camera=cam)) as client:
+        client.post("/api/focus/lens", json={"mode": "manual"})
+        client.post("/api/focus/lens", json={"position": 0.6})
+        client.post("/api/focus/start", json={"cx": 470 / 640, "cy": 230 / 480, "roi_size": 64, "method": "contrast"})
+        client.post("/api/focus/lens/autofocus", json={"mode": "sweep"})
+        deadline = time.time() + 120
+        while svc.focus.sweep["state"] == "running" and time.time() < deadline:
+            time.sleep(0.2)
+        sw = svc.focus.sweep
+        assert sw["state"] == "done", sw.get("message")
+        assert abs(cam.lens_position_target - 0.30) <= 0.04, sw.get("message")
+        assert svc.focus.cx < 0.5  # the zoom moved to the distant rooftop that decided it
+        assert max(p["pos"] for p in sw["points"]) < 2.0  # no need to walk the whole lens once the sky peak is known
+    AllSkyService.reset_instance()
+
+
+def test_day_sweep_with_only_a_nearby_wall_runs_on_until_its_peak():
+    class WallOnly(SceneLensCamera):
+        def capture_frame(self):
+            f, meta = SceneLensCamera.capture_frame(self)
+            f[150:310, 60:240] = 175  # no distant rooftop: sky and the wall only
+            return f, meta
+
+    AllSkyService.reset_instance()
+    cam = WallOnly(width=640, height=480, seed=42)
+    cam.open()
+    svc = AllSkyService.get_instance(camera=cam)
+    svc.station_config["image_transform"] = {}
+    with TestClient(create_app(camera=cam)) as client:
+        client.post("/api/focus/lens", json={"mode": "manual"})
+        client.post("/api/focus/lens", json={"position": 0.3})
+        client.post("/api/focus/start", json={"cx": 470 / 640, "cy": 230 / 480, "roi_size": 64, "method": "contrast"})
+        client.post("/api/focus/lens/autofocus", json={"mode": "sweep"})
+        deadline = time.time() + 180
+        while svc.focus.sweep["state"] == "running" and time.time() < deadline:
+            time.sleep(0.2)
+        sw = svc.focus.sweep
+        assert sw["state"] == "rejected" and abs(sw["best_position"] - 2.4) <= 0.15, sw.get("message")
+        assert cam.lens_position_target == 0.3  # near focus is reported, not kept
+    AllSkyService.reset_instance()
