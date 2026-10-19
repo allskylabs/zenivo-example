@@ -3365,6 +3365,15 @@ class AllSkyService:
                 res = analyse_sweep(done_pos, curves[r], lower)
                 res["roi"] = 0 if r == 0 else r
                 results.append(res)
+            if not lower:
+                # A relative change means nothing on an almost featureless tile (contrast near 0: noise
+                # alone looks like a big swing). Only regions with real detail - a peak at least 25 % of
+                # the strongest region's peak - may decide the focus.
+                peaks = [abs(float(x["peak_score"])) for x in results if x["ok"] and x.get("peak_score") is not None]
+                floor = 0.25 * max(peaks) if peaks else 0.0
+                for x in results:
+                    if x["ok"] and abs(float(x.get("peak_score") or 0.0)) < floor:
+                        x.update({"ok": False, "reason": "weak"})
             sky = [x for x in results if x["ok"] and x["vertex"] <= SKY_MAX_DIOPTRES]
             near = [x for x in results if x["ok"] and x["vertex"] > SKY_MAX_DIOPTRES]
             sw["regions"] = [{k: x.get(k) for k in ("roi", "ok", "reason", "vertex", "spread")} for x in results]

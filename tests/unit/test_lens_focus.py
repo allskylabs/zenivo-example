@@ -471,3 +471,11 @@ def test_sweep_stops_soon_after_the_peak_even_with_flat_regions():
         last = max(p["pos"] for p in svc.focus.sweep["points"])
         assert last <= 4.0, last  # wall peak 2.4 D: stop well before the 12 D end of the lens
     AllSkyService.reset_instance()
+
+
+def test_weak_featureless_region_cannot_decide():
+    from src.analytics.focus import analyse_sweep
+    pos = [round(0.04 * i, 2) for i in range(20)]
+    sky_noise = [0.005 if i == 0 else 0.002 for i in range(20)]  # big relative swing, no detail
+    res = analyse_sweep(pos, sky_noise, lower=False)
+    assert res["ok"] and res["spread"] > 0.5  # alone it looks decisive, hence the 25 % floor in the sweep
