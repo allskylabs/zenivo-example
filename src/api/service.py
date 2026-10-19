@@ -3256,6 +3256,9 @@ class AllSkyService:
                 scores.append(float(res["score"]))
         return (float(np.median(scores)) if scores else None), since
 
+    SWEEP_STEP_D = 0.04   # dioptres between sweep positions
+    SWEEP_RANGE_D = 1.2   # sweep 0 .. 1.2 D: the sky range (focus nearer than 1 m is never kept) plus margin
+
     def _lens_sweep(self) -> None:
         sw = self.focus.sweep
         try:
@@ -3282,95 +3285,80 @@ class AllSkyService:
                 sw["points"].append({"pos": round(pos, 4), "score": score, "phase": phase})
                 return score
 
-            # Coarse: from infinity outwards (the sky is at 0 D) until well past the peak
-            coarse_hi = min(hi, lo + 2.5)
-            step = 0.1
-            positions = list(np.arange(lo, coarse_hi + 1e-9, step))
-            best_q, best_pos, worse_run = float("-inf"), None, 0
-            sw["phase"] = "coarse"
-            coarse_pts = []
+            # One monotonic pass from infinity (0 D) outwards over the sky range only (results nearer than
+            # 1 m are never kept), stopping once clearly past the peak; then a least-squares parabola
+            # through the points around the peak gives the focus between the steps.
+            step = self.SWEEP_STEP_D
+            positions = [float(p) for p in np.arange(lo, min(hi, lo + self.SWEEP_RANGE_D) + 1e-9, step)]
+            best_q, worse_run = float("-inf"), 0
+            sw["phase"] = "sweep"
+            pts: List[Tuple[float, float, Optional[float]]] = []  # (pos, quality, raw score)
             for i, pos in enumerate(positions):
                 if self.focus.sweep_cancel:
                     raise InterruptedError
-                q = quality(measure(float(pos), "coarse"))
-                coarse_pts.append((float(pos), q))
-                sw["progress"] = 0.7 * (i + 1) / len(positions)
+                score = measure(pos, "sweep")
+                q = quality(score)
+                pts.append((pos, q, score))
+                sw["progress"] = 0.95 * (i + 1) / len(positions)
                 if q > best_q:
-                    best_q, best_pos, worse_run = q, float(pos), 0
-                elif best_pos is not None and np.isfinite(best_q):
+                    best_q, worse_run = q, 0
+                elif np.isfinite(best_q):
                     # Clearly past the peak (30 % worse, or the sources vanished) for 3 steps in a row
-                    if lower:
-                        worse = (not np.isfinite(q)) or abs(q) > abs(best_q) * 1.3
-                    else:
-                        worse = q < best_q * 0.7
+                    worse = (not np.isfinite(q)) or (abs(q) > abs(best_q) * 1.3 if lower else q < best_q * 0.7)
                     worse_run = worse_run + 1 if worse else 0
                     if worse_run >= 3:
                         break
-            if best_pos is None or not np.isfinite(best_q):
+            if not np.isfinite(best_q):
                 pos_back = start_pos if start_pos is not None else lo
                 self._lens_finish(pos_back, "failed", f"nothing measurable in the zoom region ({method}); lens put back", "sweep")
                 return
             # Nothing to focus on (blank sky, uniform cloud, fog): the score hardly changes across the range
-            finite = [q for _, q in coarse_pts if np.isfinite(q)]
+            finite = [q for _, q, _ in pts if np.isfinite(q)]
             spread = (max(finite) - min(finite)) / max(abs(max(finite)), 1e-9) if len(finite) >= 3 else 0.0
-            sw["coarse_spread"] = round(float(spread), 4)
+            sw["spread"] = round(float(spread), 4)
             if spread < 0.05:
                 pos_back = start_pos if start_pos is not None else lo
-                self._lens_finish(pos_back if pos_back is not None else None, "failed",
+                self._lens_finish(pos_back, "failed",
                                   f"score is flat across the lens range ({spread * 100:.1f} %): nothing in the zoom "
                                   "region to focus on (blank sky or cloud?). Lens put back; zoom onto distant buildings, "
                                   "the horizon or stars.", "sweep")
                 return
-            # One spoiled frame must not pick the peak: 3-point median of the coarse curve, then the centre
-            # of the plateau within 3 % of its best (a short lens has a deep depth of field near infinity,
-            # and the middle of that flat top is the safest position)
-            cq = [q for _, q in coarse_pts]
-            med = [float(np.median([v for v in cq[max(0, i - 1):i + 2] if np.isfinite(v)] or [float("-inf")]))
-                   for i in range(len(cq))]
+            # Peak on a 3-point median (one spoiled frame must not choose it)
+            qs = [q for _, q, _ in pts]
+            med = [float(np.median([v for v in qs[max(0, i - 1):i + 2] if np.isfinite(v)] or [float("-inf")]))
+                   for i in range(len(qs))]
             ib = int(np.argmax(med))
-            tol = abs(med[ib]) * 0.03
-            j0 = j1 = ib
-            while j0 > 0 and np.isfinite(med[j0 - 1]) and med[j0 - 1] >= med[ib] - tol:
-                j0 -= 1
-            while j1 < len(med) - 1 and np.isfinite(med[j1 + 1]) and med[j1 + 1] >= med[ib] - tol:
-                j1 += 1
-            best_pos = round((coarse_pts[j0][0] + coarse_pts[j1][0]) / 2.0, 4)
-            plateau = (coarse_pts[j0][0], coarse_pts[j1][0])
-            sw["coarse_plateau"] = [round(plateau[0], 3), round(plateau[1], 3)]
-
-            # Fine: +-1 coarse step around the peak in 0.02 D steps, walked up and then back down. The scene
-            # drifts while sweeping (dusk, AE-free exposure, lights), and averaging the two directions cancels
-            # a linear drift that would otherwise favour whichever end was measured first.
-            sw["phase"] = "fine"
-            fine = [float(p) for p in np.arange(best_pos - step, best_pos + step + 1e-9, 0.02) if lo - 1e-9 <= p <= hi + 1e-9]
-            order = fine + fine[::-1]
-            samples: Dict[float, List[float]] = {p: [] for p in fine}
-            for i, pos in enumerate(order):
-                if self.focus.sweep_cancel:
-                    raise InterruptedError
-                samples[pos].append(quality(measure(pos, "fine")))
-                sw["progress"] = 0.7 + 0.28 * (i + 1) / len(order)
-            fine_pts = [(p, float(np.mean(v)) if all(np.isfinite(v)) else float("-inf")) for p, v in samples.items()]
-            k = int(np.argmax([q for _, q in fine_pts]))
-            final = best_pos  # plateau centre unless the fine pass shows a clear peak
-            # Least-squares parabola through all finite fine points; trusted only when its peak stands
-            # clearly (3 %) above the ends of the fine range, otherwise the fine pass is just noise
-            fx = np.array([p for p, q in fine_pts if np.isfinite(q)])
-            fy = np.array([q for p, q in fine_pts if np.isfinite(q)])
-            if len(fx) >= 5:
-                a2, a1, a0 = np.polyfit(fx - best_pos, fy, 2)
+            if ib == len(pts) - 1 and pts[-1][0] >= positions[-1] - 1e-9:
+                # Still getting sharper at the near end of the sky range: the zoom shows something close
+                pos_back = start_pos if start_pos is not None and start_pos <= SKY_MAX_DIOPTRES else lo
+                self.camera.set_lens_position(float(pos_back))
+                sw["fit"] = None
+                self._lens_finish(None, "rejected",
+                                  f"still sharpening at {pts[-1][0]:.2f} D (~{1 / max(pts[-1][0], 0.01):.1f} m), the near end "
+                                  f"of the sky range: the zoom region is on a nearby object. Lens put back to {float(pos_back):.3f} D; "
+                                  "zoom onto distant detail or stars.", "sweep")
+                return
+            # Least-squares parabola q = a(x - v)^2 + c through the finite points within 3 steps of the peak
+            w0, w1 = max(0, ib - 3), min(len(pts), ib + 4)
+            fx = np.array([p for p, q, _ in pts[w0:w1] if np.isfinite(q)])
+            fy = np.array([q for p, q, _ in pts[w0:w1] if np.isfinite(q)])
+            final = pts[ib][0]
+            sw["fit"] = None
+            if len(fx) >= 4:
+                a2, a1, a0 = np.polyfit(fx - pts[ib][0], fy, 2)
                 if a2 < 0:
-                    vertex = -a1 / (2 * a2)
-                    peak = a0 - a1 * a1 / (4 * a2)
-                    edge = max(np.polyval([a2, a1, a0], fx.min() - best_pos), np.polyval([a2, a1, a0], fx.max() - best_pos))
-                    if fx.min() <= vertex + best_pos <= fx.max() and peak - edge > abs(peak) * 0.03:
-                        final = float(vertex + best_pos)
-            sw["fine_mean"] = [{"pos": round(p, 4), "q": (round(q, 4) if np.isfinite(q) else None)} for p, q in fine_pts]
-            best_score = -fine_pts[k][1] if lower else fine_pts[k][1]
+                    vertex = pts[ib][0] - a1 / (2 * a2)
+                    if fx.min() - 1e-9 <= vertex <= fx.max() + 1e-9:
+                        final = float(vertex)
+                    sw["fit"] = {"a": float(a2), "b": float(a1), "c": float(a0), "x0": pts[ib][0],
+                                 "from": float(fx.min()), "to": float(fx.max()), "vertex": round(final, 4),
+                                 "lower_is_better": bool(lower)}
+            final = round(min(positions[-1], max(lo, final)), 4)
+            best_score = pts[ib][2] if pts[ib][2] is not None else (-best_q if lower else best_q)
             unit = "px HFR" if lower else "contrast"
             dist = f"{1 / final:.1f} m" if final > 0.05 else "infinity"
-            flat = f", flat {plateau[0]:.2f}-{plateau[1]:.2f} D" if plateau[1] - plateau[0] > 0.05 else ""
-            self._lens_finish(final, "done", f"best at {final:.3f} D ({dist}), {best_score:.3g} {unit}{flat}", "sweep")
+            how = "parabola peak" if sw["fit"] else "best step"
+            self._lens_finish(final, "done", f"{how} at {final:.3f} D ({dist}), {best_score:.3g} {unit}", "sweep")
         except InterruptedError:
             pos_back = getattr(self.camera, "lens_position_target", None)
             self._lens_finish(None, "cancelled", f"cancelled, lens left at {pos_back}", "sweep")

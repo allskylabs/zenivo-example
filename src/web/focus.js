@@ -726,9 +726,25 @@
         c.fillText(`${x1.toFixed(2)} D`, w - 46, h - 3);
         c.fillText("sharp", 0, 12);
         pts.forEach((p) => {
-            c.fillStyle = p.phase === "fine" ? "#10b981" : "#38bdf8";
+            c.fillStyle = "#38bdf8";
             c.beginPath(); c.arc(X(p.pos), Y(p.score), 2.5, 0, Math.PI * 2); c.fill();
         });
+        // Fitted parabola around the peak (quality q = a(x-x0)^2 + b(x-x0) + c; score = -q for HFR)
+        const f = sw.fit;
+        if (f) {
+            c.strokeStyle = "#10b981";
+            c.lineWidth = 2;
+            c.beginPath();
+            for (let k = 0; k <= 40; k++) {
+                const xv = f.from + ((f.to - f.from) * k) / 40, d = xv - f.x0;
+                const q = f.a * d * d + f.b * d + f.c;
+                const sc = f.lower_is_better ? -q : q;
+                if (k === 0) c.moveTo(X(xv), Y(sc)); else c.lineTo(X(xv), Y(sc));
+            }
+            c.stroke();
+            c.fillStyle = "#10b981";
+            c.fillText(`peak ${f.vertex.toFixed(3)} D`, Math.min(X(f.vertex) + 4, w - 90), 22);
+        }
         if (sw.best_position !== undefined && sw.best_position !== null) {
             c.strokeStyle = "#f1f5f9";
             c.setLineDash([3, 3]);

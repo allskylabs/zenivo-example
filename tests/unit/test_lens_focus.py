@@ -35,6 +35,7 @@ class LensSimCamera(SimulatedIMX335Controller):
         self.lens_position_target = None
         self.lens_position = 1.0
         self.moves = []
+        self.true_focus = TRUE_FOCUS
         self.drift_per_frame = 0.0  # seeing / dusk: the whole scene softens steadily while sweeping
         self.frames = 0
 
@@ -54,7 +55,7 @@ class LensSimCamera(SimulatedIMX335Controller):
     def capture_frame(self):
         _, meta = super().capture_frame()
         self.frames += 1
-        sigma = 0.9 + 9.0 * abs(self.lens_position - TRUE_FOCUS) + self.drift_per_frame * self.frames
+        sigma = 0.9 + 9.0 * abs(self.lens_position - self.true_focus) + self.drift_per_frame * self.frames
         meta["lens_position"] = self.lens_position
         return _star_field(sigma, self.width, self.height), meta
 
@@ -343,3 +344,28 @@ def test_af_mf_modes(lens_client):
     client.post("/api/focus/lens", json={"position": 0.8})  # touching the slider = MF, AF run cancelled
     assert svc._lens_cfg()["mode"] == "manual" and cam.lens_position_target == 0.8
     assert svc.focus.sweep["state"] in ("cancelled", "done", "failed")
+
+
+def test_sweep_is_one_pass_with_parabola_and_rejects_near_object(lens_client):
+    client, svc, cam = lens_client
+    client.post("/api/focus/lens", json={"mode": "manual"})
+    client.post("/api/focus/lens", json={"position": 0.2})
+    client.post("/api/focus/start", json={"method": "stars", "roi_size": 384})
+    client.post("/api/focus/lens/autofocus", json={"mode": "sweep"})
+    deadline = time.time() + 90
+    while svc.focus.sweep["state"] == "running" and time.time() < deadline:
+        time.sleep(0.2)
+    sw = svc.focus.sweep
+    pos = [p["pos"] for p in sw["points"]]
+    assert pos == sorted(pos), "lens must move one way only"
+    assert sw["state"] == "done" and sw["fit"] and abs(sw["fit"]["vertex"] - TRUE_FOCUS) <= 0.03
+    # Zoom on something 0.6 m away: sharpening all the way to the end of the sky range
+    cam.true_focus = 1.6
+    client.post("/api/focus/lens", json={"position": 0.2})
+    client.post("/api/focus/start", json={"method": "stars", "roi_size": 384})
+    client.post("/api/focus/lens/autofocus", json={"mode": "sweep"})
+    deadline = time.time() + 90
+    while svc.focus.sweep["state"] == "running" and time.time() < deadline:
+        time.sleep(0.2)
+    assert svc.focus.sweep["state"] == "rejected" and "nearby object" in svc.focus.sweep["message"]
+    assert cam.lens_position_target == 0.2
