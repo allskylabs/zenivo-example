@@ -3604,12 +3604,14 @@ class AllSkyService:
             return frame
 
     def get_display_frame(self) -> Tuple[Optional[np.ndarray], float]:
-        """(frame, capture timestamp) for viewers: the star-boosted copy when it belongs to the latest capture."""
-        frame, ts = self.last_frame, self.last_capture_time
+        """(frame, capture timestamp) for viewers: the latest stamped / star-boosted frame.
+
+        last_frame is published before AE, star boost and the stamp run, so in that window it is a raw,
+        unstamped frame; serving it made /live flash a different-looking frame every few seconds."""
         display = self.display_frame
-        if display is not None and self._display_frame_ts == ts:
-            return display, ts
-        return frame, ts
+        if display is not None:
+            return display, self._display_frame_ts
+        return self.last_frame, self.last_capture_time
 
     def _star_boost_frame(self, frame: np.ndarray, raw10: bool = True) -> np.ndarray:
         """Sum-bin stars for viewers at night (sun below -6 deg), limited to the station sky mask."""
