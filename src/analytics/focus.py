@@ -416,7 +416,7 @@ def find_focus_point(img: np.ndarray, grid_w: int = 12, sky_mask: Optional[np.nd
             "detail": {"contrast": round(c, 4), "median_tile": round(med, 4)}}
 
 
-def find_focus_tiles(img: np.ndarray, k: int = 8, grid_w: int = 12) -> List[Dict[str, Any]]:
+def find_focus_tiles(img: np.ndarray, k: int = 8, grid_w: int = 12, border: bool = False) -> List[Dict[str, Any]]:
     """The k most detailed tiles (as frame fractions), at least one tile apart, skipping the outermost
     tiles and anything not clearly above the frame's median detail. A daytime sweep measures them all at
     once, so a nearby wall among them cannot decide the focus."""
@@ -427,8 +427,9 @@ def find_focus_tiles(img: np.ndarray, k: int = 8, grid_w: int = 12) -> List[Dict
     sh, sw = small.shape
     tile = max(32, sw // grid_w)
     cells = []
-    for ty in range(1, sh // tile - 1):
-        for tx in range(1, sw // tile - 1):
+    e = 0 if border else 1  # with border=True the outermost tiles count too (buildings often sit at the edge)
+    for ty in range(e, sh // tile - e):
+        for tx in range(e, sw // tile - e):
             cells.append((_contrast(small[ty * tile:(ty + 1) * tile, tx * tile:(tx + 1) * tile]), tx, ty))
     if not cells:
         return []

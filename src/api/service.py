@@ -3529,7 +3529,8 @@ class AllSkyService:
         for t in (cfg.get("day_targets") or []):
             if ok(t) and not self._near_any(t, out):
                 out.append({"cx": t["cx"], "cy": t["cy"], "saved": True})
-        for t in find_focus_tiles(frame, k=k * 2):
+        # Frame edges allowed: walls there are caught by the near list after one sweep
+        for t in find_focus_tiles(frame, k=k * 2, border=True):
             if len(out) >= k:
                 break
             if ok(t) and not self._near_any(t, out):
