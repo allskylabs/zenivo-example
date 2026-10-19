@@ -64,10 +64,12 @@ class PiCameraController(CameraDriverInterface):
     MAX_FPS = 5.0
     # Largest exposure floor capture_frame() may learn from the sensor (IMX708 binned mode: 53 us)
     FLOOR_CAP_S = 0.0002
-    # Below the sensor floor the ISP Brightness control darkens further (a "virtual ND"): 0.1 per stop,
-    # up to ISP_ND_STOPS. At 53 us the IMX708 NoIR daytime sky still came out at 200-255 DN.
-    ISP_ND_STOPS = 2.0
+    # Below the sensor floor the ISP Brightness and Contrast controls darken further (a "virtual ND"), up to
+    # ISP_ND_STOPS. At 53 us the IMX708 NoIR morning sky still came out at mean 193 DN; measured on the Pi:
+    # Brightness -0.2 / Contrast 0.7 -> 138, -0.3 / 0.6..0.7 -> ~112 (only the sun's flare disc stays clipped)
+    ISP_ND_STOPS = 3.0
     ISP_BRIGHTNESS_PER_STOP = 0.1
+    ISP_CONTRAST_PER_STOP = 0.4 / 3.0
 
     def __init__(
         self,
@@ -94,6 +96,7 @@ class PiCameraController(CameraDriverInterface):
         self._want_us = self.current_exposure_s * 1e6
         self._has_brightness = False
         self.isp_brightness = 0.0
+        self.isp_contrast = 1.0
         self.min_gain_db = 0.0
         self.max_gain_db = 24.0
         self.pixel_array_size: Tuple[int, int] = (0, 0)
@@ -156,7 +159,7 @@ class PiCameraController(CameraDriverInterface):
         # it down to whole lines and add up to 1.5x digital gain on top (DigitalGain 1.32 at 53 us, 1.0 at 13 us)
         mode_min = (mode.get("exposure_limits") or (None,))[0] if mode else None
         self._floor_request_us = max(1, int(mode_min if mode_min else exp_min))
-        self._has_brightness = "Brightness" in ctrl_info
+        self._has_brightness = "Brightness" in ctrl_info and "Contrast" in ctrl_info
         self.min_gain_db = 0.0
         self.max_gain_db = round(20.0 * math.log10(max(1.0, float(g_max))), 2)
 
@@ -207,13 +210,14 @@ class PiCameraController(CameraDriverInterface):
         floor = self.sensor_floor_s
         exp_us = int(round(exp * 1e6))
         self._want_us = exp_us
-        brightness = 0.0
+        stops = 0.0
         if floor is not None and exp <= floor * 1.001:
             exp_us = self._floor_request_us
             self._want_us = floor * 1e6
             if self._has_brightness and exp < floor:
-                brightness = -self.ISP_BRIGHTNESS_PER_STOP * min(self.ISP_ND_STOPS, math.log2(floor / exp))
-        self.isp_brightness = round(brightness, 3)
+                stops = min(self.ISP_ND_STOPS, math.log2(floor / exp))
+        self.isp_brightness = round(-self.ISP_BRIGHTNESS_PER_STOP * stops, 3)
+        self.isp_contrast = round(1.0 - self.ISP_CONTRAST_PER_STOP * stops, 3)
         if self.picam is not None:
             ctrls = {
                 "AeEnable": False,
@@ -229,6 +233,7 @@ class PiCameraController(CameraDriverInterface):
             }
             if self._has_brightness:
                 ctrls["Brightness"] = self.isp_brightness
+                ctrls["Contrast"] = self.isp_contrast
             self.picam.set_controls(ctrls)
         return {
             "requested_exposure_s": exposure_s,
@@ -329,6 +334,7 @@ class PiCameraController(CameraDriverInterface):
         }
         if self.isp_brightness:
             meta["isp_brightness"] = self.isp_brightness
+            meta["isp_contrast"] = self.isp_contrast
             meta["sensor_exposure_s"] = round(float(md.get("ExposureTime", want_us)) / 1e6, 6)
         if md.get("LensPosition") is not None:
             self.lens_position = round(float(md["LensPosition"]), 4)

@@ -275,6 +275,7 @@ def test_picamera_darkens_below_sensor_floor_with_isp_brightness(fake_picamera2)
     cam = PiCameraController()
     cam.open()
     cam.picam.camera_controls["Brightness"] = (-1.0, 1.0, 0.0)
+    cam.picam.camera_controls["Contrast"] = (0.0, 32.0, 1.0)
     cam._has_brightness = True
     real_md = _FakeRequest.get_metadata
     _FakeRequest.get_metadata = lambda self: {**real_md(self), "ExposureTime": 53}
@@ -282,7 +283,7 @@ def test_picamera_darkens_below_sensor_floor_with_isp_brightness(fake_picamera2)
         cam.set_hardware_exposure(0.00003, 0.0)
         cam.capture_frame()
         assert cam.sensor_floor_s == pytest.approx(53e-6)
-        assert cam.min_exposure_s == pytest.approx(53e-6 / 4)
+        assert cam.min_exposure_s == pytest.approx(53e-6 / 8)
         assert cam.picam.controls["ExposureTime"] == 26  # the mode minimum, not 53
         assert cam.picam.controls["Brightness"] == pytest.approx(-0.1 * math.log2(53 / 30), abs=1e-3)
 
@@ -299,15 +300,18 @@ def test_picamera_darkens_below_sensor_floor_with_isp_brightness(fake_picamera2)
         assert meta["actual_exposure_s"] == pytest.approx(26.5e-6, abs=1e-6)  # equivalent exposure
         assert meta["sensor_exposure_s"] == pytest.approx(53e-6)
         assert meta["isp_brightness"] == pytest.approx(-0.1)
+        assert meta["isp_contrast"] == pytest.approx(1.0 - 0.4 / 3, abs=1e-3)
 
-        cam.set_hardware_exposure(1e-6, 0.0)  # clamped to two stops below the floor
-        assert cam.current_exposure_s == pytest.approx(53e-6 / 4)
-        assert cam.picam.controls["Brightness"] == pytest.approx(-0.2)
+        cam.set_hardware_exposure(1e-6, 0.0)  # clamped to three stops below the floor
+        assert cam.current_exposure_s == pytest.approx(53e-6 / 8)
+        assert cam.picam.controls["Brightness"] == pytest.approx(-0.3)
+        assert cam.picam.controls["Contrast"] == pytest.approx(0.6)
 
         _FakeRequest.get_metadata = real_md
         cam.set_hardware_exposure(0.002, 0.0)  # above the floor: plain exposure, brightness back to neutral
         assert cam.picam.controls["ExposureTime"] == 2000
         assert cam.picam.controls["Brightness"] == 0.0
+        assert cam.picam.controls["Contrast"] == 1.0
         _, meta = cam.capture_frame()
         assert meta["actual_exposure_s"] == pytest.approx(0.002)
         assert cam.sensor_floor_s == pytest.approx(53e-6)
