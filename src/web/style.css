@@ -1743,3 +1743,5 @@ body.no-scroll { overflow: hidden; }
 .fl-where { margin-left: auto; font-size: 0.72rem; color: var(--text-secondary); white-space: nowrap; }
 .fl-inview { color: var(--accent); font-weight: 600; }
 .fl-meta { display: flex; gap: 0.9rem; font-size: 0.74rem; color: var(--text-secondary); font-family: var(--font-mono); margin-top: 0.1rem; }
+.focus-stats-card { justify-content: center; margin-top: 0.5rem; }
+.focus-score .focus-statline { margin-top: 0.4rem; font-size: 0.7rem; text-align: center; }

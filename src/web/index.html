@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllSky Observatory — Edge Dashboard</title>
-    <link rel="stylesheet" href="/style.css?v=20261018lk1">
+    <link rel="stylesheet" href="/style.css?v=20261019fc">
 </head>
 <body class="dark-mode">
     <!-- Top Navigation Header -->
@@ -851,20 +851,10 @@
                                 <img id="focus-overview" alt="Whole frame">
                                 <div class="focus-roi-box" id="focus-roi-box"></div>
                             </div>
-                            <div class="focus-saved-box" id="focus-saved-box"></div>
                         </aside>
                     </div>
-                    <div class="focus-statline" id="focus-statline">—</div>
                     <div class="focus-chart-head">
-                        <strong>Focus curve</strong>
-                        <div class="focus-stats">
-                            <span>Now <b id="focus-stat-now">—</b></span>
-                            <span class="good">Best <b id="focus-stat-best">—</b></span>
-                            <span>Min <b id="focus-stat-min">—</b></span>
-                            <span>Max <b id="focus-stat-max">—</b></span>
-                            <span title="Frame-to-frame score noise; changes smaller than this mean nothing">Noise <b id="focus-stat-noise">—</b></span>
-                            <span>Frames <b id="focus-stat-n">0</b></span>
-                        </div>
+                        <strong id="focus-chart-title">Focus curve</strong>
                         <button class="btn btn-sm btn-outline" id="focus-reset" title="Forget the curve and best score (R)">Reset (R)</button>
                     </div>
                     <canvas id="focus-chart" class="focus-chart"></canvas>
@@ -886,6 +876,13 @@
                             <div class="focus-score-sub" id="focus-score-sub">&nbsp;</div>
                             <div class="focus-meter" title="Bar spans 80–100 % of the best score"><div class="focus-meter-fill" id="focus-meter-fill"></div></div>
                             <div class="focus-score-sub"><span id="focus-quality">—</span> of best <span id="focus-best">—</span> <span class="focus-trend" id="focus-trend"></span></div>
+                            <div class="focus-stats focus-stats-card">
+                                <span>Min <b id="focus-stat-min">—</b></span>
+                                <span>Max <b id="focus-stat-max">—</b></span>
+                                <span title="Frame-to-frame score noise; changes smaller than this mean nothing">Noise <b id="focus-stat-noise">—</b></span>
+                                <span>Frames <b id="focus-stat-n">0</b></span>
+                            </div>
+                            <div class="focus-statline" id="focus-statline">—</div>
                         </div>
                         <div class="focus-field">
                             <span class="focus-field-label">Measure</span>
@@ -944,7 +941,6 @@
                         </div>
                         <div class="focus-meter" id="focus-lens-progress-wrap" hidden><div class="focus-meter-fill good" id="focus-lens-progress"></div></div>
                         <div class="focus-hint focus-lens-status"><span id="focus-lens-msg">&nbsp;</span> <button class="btn btn-sm btn-outline" id="focus-lens-cancel" hidden>Cancel</button></div>
-                        <canvas id="focus-lens-chart" class="focus-lens-chart" hidden></canvas>
                         <div class="focus-hint text-muted" id="focus-lens-comp"></div>
                         <div class="focus-hint text-muted" id="focus-lens-track-msg"></div>
                         <button class="btn btn-sm btn-outline" id="focus-lens-reset-learning" title="Forget the focus-vs-temperature samples, e.g. after moving or refitting the camera">Reset temperature learning</button>
@@ -1018,6 +1014,6 @@
     <script src="/static/sky_catalog.js"></script>
     <script src="/app.js?v=20261019ps2"></script>
     <script src="/static/activity.js?v=20261016h"></script>
-    <script src="/static/focus.js?v=20261019fa"></script>
+    <script src="/static/focus.js?v=20261019fc"></script>
 </body>
 </html>
