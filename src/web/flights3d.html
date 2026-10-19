@@ -148,9 +148,9 @@
         // Basemap rule: no OpenStreetMap-derived data. The base is elevation only (no borders, no labels);
         // airports and runways come from OurAirports (public domain); the satellite layer is imagery only
         // (no labels, no borders); Google Maps (Map Tiles API, region VN) is offered when a key is configured.
-        const POLL_MS = 5000;
+        const POLL_MS = 3000;
         const TRAIL_CHOICES = [600, 900, 0, 180];   // seconds; 0 = off
-        const MAX_EXTRAP_S = 20;
+        const MAX_EXTRAP_S = 30;
         const PLANE_PX = 46;          // on-screen length of a 40 m airliner at any zoom (planes are drawn larger than life)
         const DEM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
         const SAT = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
@@ -173,27 +173,29 @@
         let lastFetch = 0, haveTrails = false;
 
         // ---------------------------------------------------------------- map: dark 3D terrain from elevation only
-        const RELIEF = ["interpolate", ["linear"], ["elevation"],
-            -200, "#03060d", 0, "#060a14", 30, "#08101d", 150, "#0b1526", 400, "#101d33",
-            800, "#16263f", 1300, "#1d3150", 2000, "#283f60", 3000, "#3a5476"];
+        const RELIEF = ["interpolate", ["linear"], ["elevation"],   // near-grey: saturation close to 0
+            -200, "#050506", 0, "#08090b", 30, "#0a0b0d", 150, "#0d0e11", 400, "#111316",
+            800, "#16181c", 1300, "#1c1f23", 2000, "#24272c", 3000, "#2f3237"];
         const map = new maplibregl.Map({
             container: "map",
             style: {
                 version: 8,
                 sources: {
-                    dem: { type: "raster-dem", tiles: [DEM], encoding: "terrarium", tileSize: 256, maxzoom: 14,
+                    // 3D surface from coarse tiles (z11, ~75 m): finer DEM tiles carry noise (trees, buildings) that
+                    // makes flat runways bumpy and swallows aircraft on the ground; hillshade keeps the fine detail
+                    dem: { type: "raster-dem", tiles: [DEM], encoding: "terrarium", tileSize: 256, maxzoom: 11,
                         attribution: "Terrain: Mapzen / AWS Terrain Tiles" },
                     "dem-shade": { type: "raster-dem", tiles: [DEM], encoding: "terrarium", tileSize: 256, maxzoom: 14 },
                 },
                 layers: [
-                    { id: "bg", type: "background", paint: { "background-color": "#060a14" } },
+                    { id: "bg", type: "background", paint: { "background-color": "#070809" } },
                     { id: "relief", type: "color-relief", source: "dem-shade", paint: { "color-relief-color": RELIEF } },
                     { id: "hillshade", type: "hillshade", source: "dem-shade",
                         paint: { "hillshade-exaggeration": 0.75, "hillshade-shadow-color": "#000000",
-                            "hillshade-highlight-color": "#4d6a94", "hillshade-accent-color": "#0a1424" } },
+                            "hillshade-highlight-color": "#5d636c", "hillshade-accent-color": "#0c0d10" } },
                 ],
                 terrain: { source: "dem", exaggeration: 1 },
-                sky: { "sky-color": "#070a13", "horizon-color": "#16233d", "fog-color": "#070a13",
+                sky: { "sky-color": "#070809", "horizon-color": "#17191d", "fog-color": "#070809",
                     "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.5, "fog-ground-blend": 0.35, "atmosphere-blend": 0 },
             },
             center: [105.9095, 21.0538], zoom: 9, pitch: 64, bearing: -20, maxPitch: 82,
@@ -284,7 +286,7 @@
                 paint: { "line-color": "#c7d7ff", "line-opacity": 0.75, "line-blur": 1,
                     "line-width": ["interpolate", ["linear"], ["zoom"], 6, 1.5, 10, 3, 12.5, 4] } }, before);
             map.addLayer({ id: "rwy", type: "fill", source: "rwy", minzoom: 11,
-                paint: { "fill-color": "#2c3548", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0, 12, 0.95] } }, before);
+                paint: { "fill-color": "#2a2c31", "fill-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0, 12, 0.95] } }, before);
             map.addLayer({ id: "rwy-centre", type: "line", source: "rwy-centre", minzoom: 12.5,
                 paint: { "line-color": "#e2e8f0", "line-opacity": 0.55, "line-width": 1, "line-dasharray": [6, 5] } }, before);
             const lights = (id, color, r0, r1, minzoom) => map.addLayer({ id, type: "circle", source: id, minzoom,
@@ -342,15 +344,15 @@
             map.setLayoutProperty("relief", "visibility", kind === "terrain" ? "visible" : "none");
             map.setPaintProperty("hillshade", "hillshade-exaggeration", kind === "terrain" ? 0.75 : 0.35);
             if (kind === "terrain" || map.getLayer(`g-${kind}`)) return;
-            if (kind === "sat") {   // imagery only, in a night look: dark, desaturated, tinted blue
+            if (kind === "sat") {   // imagery only, in a night look: dark and grey
                 map.addSource("g-sat", { type: "raster", tiles: [SAT], tileSize: 256, maxzoom: 19,
                     attribution: "Imagery © Esri, Maxar, Earthstar Geographics" });
                 map.addLayer({ id: "g-sat", type: "raster", source: "g-sat",
-                    paint: { "raster-brightness-max": 0.5, "raster-saturation": -0.6, "raster-contrast": 0.2 } }, "hillshade");
+                    paint: { "raster-brightness-max": 0.42, "raster-saturation": -1, "raster-contrast": 0.15 } }, "hillshade");
                 map.addSource("sat-night", { type: "geojson", data: { type: "Feature", properties: {},
                     geometry: { type: "Polygon", coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]]] } } });
                 map.addLayer({ id: "sat-night", type: "fill", source: "sat-night",
-                    paint: { "fill-color": "#0a1838", "fill-opacity": 0.45 } }, "hillshade");
+                    paint: { "fill-color": "#000000", "fill-opacity": 0.35 } }, "hillshade");
                 return;
             }
             try {
@@ -457,7 +459,12 @@
         function surface(x0, x1, leRoot, cr, ct, sweepDeg, thick, side, opts = {}) {
             const tanS = Math.tan(sweepDeg * D2R);
             const leTip = leRoot - (x1 - x0) * tanS;
-            const pts = [[x0, leRoot], [x1, leTip], [x1, leTip - ct]];
+            let pts = [[x0, leRoot], [x1, leTip], [x1, leTip - ct]];
+            if (opts.raked) {   // 787 / 777-300ER / 747-8: the last ~10% of span swept back much harder, no winglet
+                const xr = x1 - (x1 - x0) * 0.11, leR = leRoot - (xr - x0) * tanS;
+                const leT = leR - (x1 - xr) * Math.tan((sweepDeg + 22) * D2R);
+                pts = [[x0, leRoot], [xr, leR], [x1, leT], [x1, leT - ct * 0.35], [xr, leR - ct * 1.2]];
+            }
             if (opts.kink) {
                 const xk = x0 + (x1 - x0) * 0.33;
                 const teK = leRoot - (xk - x0) * tanS - Math.max(ct, cr * 0.55);
@@ -471,8 +478,26 @@
             return g;
         }
 
-        function buildModel(fam, type) {
-            const key = `${fam}|${type || ""}`;
+        // What tells types apart at a glance: nose, wingtips, nacelles, tail cone, cockpit windows
+        function typeStyle(type, fam, model) {
+            const t = (type || "").toUpperCase(), sub = t.slice(3);
+            const st = { nose: "airbus", tip: FAMILIES[fam].winglet ? "sharklet" : "none", engFlat: false, engScale: 1, cone: "normal", cockpit: "airbus" };
+            if (/^B73|^B3[789X]M/.test(t)) Object.assign(st, { nose: "boeing", tip: /M$/.test(t) ? "scimitar" : "blended", engFlat: true, cockpit: "boeing" });
+            else if (/^B75|^B76/.test(t)) Object.assign(st, { nose: "boeing", tip: "blended", cockpit: "boeing" });
+            else if (/^B78/.test(t)) Object.assign(st, { nose: "787", tip: "raked", cockpit: "787", engScale: 1.05 });
+            else if (/^B77/.test(t)) Object.assign(st, { nose: "boeing", tip: /[WLF9X8]/.test(sub) ? "raked" : "none", cone: "blade", cockpit: "boeing", engScale: /[WLF]/.test(sub) ? 1.08 : 1 });
+            else if (/^B74/.test(t)) Object.assign(st, { nose: "boeing", tip: t === "B748" ? "raked" : "sharklet", cockpit: "boeing" });
+            else if (/^A35/.test(t)) Object.assign(st, { nose: "a350", tip: "curved", cone: "blade", cockpit: "a350" });
+            else if (/^A33|^A34/.test(t)) st.tip = "sharklet";
+            else if (/^A(19|20|21)N$/.test(t)) Object.assign(st, { tip: "sharklet", engScale: 1.14 });
+            else if (/^A31[89]|^A32[01]$/.test(t)) st.tip = /SL|SHARKLET/i.test(model || "") ? "sharklet" : "fence";
+            else if (/^E1|^E2|^E7|^BCS/.test(t)) st.tip = "blended";
+            else if (/^C919|^ARJ/.test(t)) st.tip = "blended";
+            return st;
+        }
+
+        function buildModel(fam, type, st) {
+            const key = `${fam}|${type || ""}|${st.tip}|${st.nose}|${st.engScale}`;
             if (MODEL_CACHE.has(key)) return MODEL_CACHE.get(key);
             const f = FAMILIES[fam];
             const s = (TYPE_LEN[type] || f.L) / f.L;   // stretch the family to the type's real length
@@ -480,26 +505,34 @@
             const slots = { body: [], paint: [], brand: [], engine: [], dark: [], decalR: [], decalL: [] };
 
             // --- fuselage: lathe around Y (nose +Y), upswept tail cone, livery UVs (u along length, v around)
-            const noseLen = (f.nose ? 1.6 : 2.4) * R, tailLen = (fam === "ga" ? 4.5 : 3.3) * R;
+            const NOSE = { airbus: [2.4, 2.3, 0.5, 0], boeing: [2.9, 1.9, 0.6, 0.12], "787": [2.7, 2.1, 0.55, 0.06], a350: [2.6, 2.2, 0.52, 0.05] };
+            const [nl, np1, np2, droop] = f.nose ? [1.6, 2.3, 0.5, 0] : NOSE[st.nose] || NOSE.airbus;
+            const blade = st.cone === "blade";
+            const noseLen = nl * R, tailLen = (fam === "ga" ? 4.5 : blade ? 3.8 : 3.3) * R;
             const prof = [new THREE.Vector2(0, -half)];
             const N = 90;
             for (let i = 0; i <= N; i++) {
                 const y = -half + (L * i) / N;
                 const yn = half - y, yt = y + half;
                 let r = R;
-                if (yn < noseLen) { const q = yn / noseLen; r = R * Math.pow(1 - Math.pow(1 - q, 2.3), 0.5); }
-                if (yt < tailLen) { const q = yt / tailLen; r = Math.min(r, R * (0.16 + 0.84 * Math.pow(q, 0.75))); }
+                if (yn < noseLen) { const q = yn / noseLen; r = R * Math.pow(1 - Math.pow(1 - q, np1), np2); }
+                if (yt < tailLen) { const q = yt / tailLen; r = Math.min(r, R * ((blade ? 0.09 : 0.16) + (blade ? 0.91 : 0.84) * Math.pow(q, 0.75))); }
                 prof.push(new THREE.Vector2(Math.max(r, 0.001), y));
             }
             const fus = new THREE.LatheGeometry(prof, 36);
             const pos = fus.attributes.position, uv = fus.attributes.uv;
             for (let i = 0; i < pos.count; i++) {
-                const x = pos.getX(i), y = pos.getY(i);
-                let z = pos.getZ(i);
+                let x = pos.getX(i), z = pos.getZ(i);
+                const y = pos.getY(i);
                 const ang = (Math.atan2(x, z) / (2 * Math.PI) + 1) % 1;
                 uv.setXY(i, (y + half) / L, ang);
                 const yt = y + half, yn = half - y;
-                if (yt < tailLen) { const q = 1 - yt / tailLen; z += (R - z) * 0.42 * Math.pow(q, 1.5); }
+                if (yt < tailLen) {
+                    const q = 1 - yt / tailLen;
+                    z += (R - z) * (blade ? 0.3 : 0.42) * Math.pow(q, 1.5);
+                    if (blade) x *= 1 - 0.55 * q * q;   // 777 / A350: tail cone ends in a vertical blade
+                }
+                if (yn < noseLen && droop) z -= droop * R * Math.pow(1 - yn / noseLen, 1.5);   // Boeing noses sit lower
                 if (f.double) z = z * 1.22 + R * 0.12;
                 if (f.hump && z > 0 && yn > 0.04 * L && yn < 0.36 * L) {
                     const q = Math.sin(Math.PI * Math.min(1, (yn - 0.04 * L) / (0.32 * L)));
@@ -518,24 +551,39 @@
             const x0 = R * 0.4, x1 = f.span / 2;
             const tipZ = wz + (x1 - x0) * Math.tan(f.dih * D2R);
             for (const side of [1, -1]) {
-                const w = surface(x0, x1, leRoot, f.cr, f.ct, f.sweep, thick, side, { kink: !f.high });
+                const w = surface(x0, x1, leRoot, f.cr, f.ct, f.sweep, thick, side, { kink: !f.high, raked: st.tip === "raked" });
                 w.rotateY(-side * f.dih * D2R);
                 w.translate(0, 0, wz);
                 slots.paint.push(w);
-                if (f.winglet) {
-                    const tipLe = leRoot - (x1 - x0) * Math.tan(f.sweep * D2R);
-                    const sh = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(f.ct * 0.95, 0),
-                        new THREE.Vector2(f.ct * 0.25 - f.winglet * 0.6, f.winglet), new THREE.Vector2(-f.winglet * 0.6, f.winglet)]);
-                    const g = new THREE.ExtrudeGeometry(sh, { depth: 0.12, bevelEnabled: false });
+                const tipLe = leRoot - (x1 - x0) * Math.tan(f.sweep * D2R);
+                // vertical tip device: planform (chord, height) at the tip, canted outward by `cant` radians
+                const tipFin = (pts, cant, down = false) => {
+                    const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(([a, b]) => new THREE.Vector2(a, down ? -b : b))),
+                        { depth: 0.12, bevelEnabled: false });
                     g.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1));
-                    g.rotateY(side * 0.18);
+                    g.rotateY(side * cant * (down ? -1 : 1));
                     g.translate(side * x1, tipLe - f.ct * 0.98, tipZ);
                     slots.brand.push(g);
+                };
+                const ct = f.ct, hgt = f.winglet || 2.2 * R / 2;
+                if (st.tip === "sharklet") tipFin([[0, 0], [ct * 0.95, 0], [ct * 0.25 - hgt * 0.6, hgt], [-hgt * 0.6, hgt]], 0.18);
+                else if (st.tip === "fence") { tipFin([[-0.3, 0], [ct * 1.1, 0], [ct * 0.3, 0.9], [-0.2, 0.9]], 0); tipFin([[-0.3, 0], [ct * 1.1, 0], [ct * 0.45, 0.6]], 0, true); }
+                else if (st.tip === "blended") tipFin([[0, 0], [ct * 1.0, 0], [ct * 0.6, hgt * 0.35], [ct * 0.2 - hgt * 0.3, hgt * 1.1], [-hgt * 0.35, hgt * 1.1]], 0.1);
+                else if (st.tip === "scimitar") {
+                    tipFin([[0, 0], [ct * 1.0, 0], [ct * 0.6, hgt * 0.35], [ct * 0.2 - hgt * 0.3, hgt * 1.1], [-hgt * 0.35, hgt * 1.1]], 0.1);
+                    tipFin([[0, 0], [ct * 0.9, 0], [-hgt * 0.15, hgt * 0.5], [-hgt * 0.35, hgt * 0.5]], 0.35, true);
+                }
+                else if (st.tip === "curved") {   // A350: the wing bends smoothly up into its winglet
+                    const h2 = Math.max(hgt, 3.2);
+                    tipFin([[0, 0], [ct * 1.0, 0], [ct * 0.35 - h2 * 0.25, h2 * 0.45], [-h2 * 0.3, h2 * 0.45]], 0.95);
+                    const g2 = [[0, h2 * 0.4], [ct * 0.4 - h2 * 0.25, h2 * 0.4], [-h2 * 0.15, h2], [-h2 * 0.45, h2]];
+                    tipFin(g2, 0.32);
                 }
             }
 
             // --- engines under the wings (turbofans) with pylons and dark fan faces
-            for (const [ex, er, el] of f.eng || []) {
+            for (const [ex, er0, el0] of f.eng || []) {
+                const er = er0 * st.engScale, el = el0 * Math.sqrt(st.engScale);
                 const prof2 = [[0, -0.62], [0.3, -0.6], [0.55, -0.5], [0.8, -0.28], [0.97, -0.02], [1, 0.22], [0.96, 0.44], [0.86, 0.5]]
                     .map(([r, y]) => new THREE.Vector2(r * er, y * el));
                 for (const side of [1, -1]) {
@@ -544,6 +592,11 @@
                     const zc = wz + (ex - x0) * Math.tan(f.dih * D2R) - er - thick * 0.6;
                     const yc = le + el * 0.15;
                     const n = new THREE.LatheGeometry(prof2, 24);
+                    if (st.engFlat) {   // 737: flattened bottom of the nacelle (low ground clearance)
+                        const np = n.attributes.position;
+                        for (let i = 0; i < np.count; i++) if (np.getZ(i) < 0) np.setZ(i, np.getZ(i) * 0.72);
+                        n.computeVertexNormals();
+                    }
                     n.translate(x, yc, zc);
                     slots.engine.push(n);
                     const fan = new THREE.CircleGeometry(er * 0.86, 24);
@@ -613,7 +666,7 @@
             const geos = {};
             for (const [k, list] of Object.entries(slots)) if (list.length) geos[k] = mergeSlot(list);
             const tipLe = leRoot - (x1 - x0) * Math.tan(f.sweep * D2R);
-            const model = { geos, props, L, R, tailLen, noseLen, double: !!f.double, topZ, wingTip: x1, tipZ, tipY: tipLe - f.ct * 0.5 };
+            const model = { geos, props, L, R, tailLen, noseLen, double: !!f.double, topZ, wingTip: x1, tipZ, tipY: tipLe - f.ct * 0.5, style: st };
             MODEL_CACHE.set(key, model);
             return model;
         }
@@ -621,10 +674,24 @@
         // ---------------------------------------------------------------- liveries
         // Colours come from the airline's square logo (its background is the tail colour); its wordmark is
         // painted as fuselage titles. A few airlines' known details on top.
-        const LIVERY_EXTRA = {
-            VJC: { engine: "brand" }, HVN: { engine: "brand", belly: "#e6e9ee" }, BAV: { engine: "brand" },
-            CPA: { engine: "#d8dde3" }, KAL: { body: "#cfe3f3", belly: "#cfe3f3" }, ANA: { engine: "brand" },
-            EVA: { engine: "brand" }, SIA: { engine: "brand" },
+        // Per-airline paint on top of the logo colours: top = colour above the cheatline (else white),
+        // belly, cheatline stripes under the windows, engine colour ("brand" = logo background), title size
+        const LIVERIES = {
+            HVN: { engine: "brand", belly: "#e7ebef" }, VJC: { engine: "brand", titles: 1.6, belly: "#f3f5f8" },
+            BAV: { titles: 1.25 }, PIC: { stripes: ["#f47b20"] }, VAG: { titles: 1.2 }, VFC: {},
+            CSN: { stripes: ["#2b6cb0"] }, CES: { stripes: ["#1f4e9c", "#c8102e"] }, CCA: { titles: 1.2 },
+            CHH: { stripes: ["#c8102e", "#e8b100"] }, CXA: { stripes: ["#1c6fb5"] }, CSZ: { stripes: ["#c8102e"] },
+            CPA: { belly: "#bcc4cb", stripes: ["#006564"] }, HKE: { engine: "brand" }, CRK: { stripes: ["#00205b"] },
+            FDX: { top: "#4d148c", engine: "#4d148c", titles: 1.7 }, UPS: { belly: "#4b2e1f", engine: "#4b2e1f" },
+            KAL: { top: "#bfe0f2", belly: "#b9c0c8", engine: "#bfe0f2" }, AAR: { top: "#d8dbde", belly: "#c9cdd1" },
+            JAL: {}, ANA: { stripes: ["#13448f", "#00a0e2"], engine: "brand" }, EVA: { belly: "#0c5e3d", stripes: ["#f39800"], engine: "brand" },
+            CAL: { stripes: ["#8b1c62"] }, SIA: { stripes: ["#14275a", "#f0ab00"], engine: "#14275a" },
+            THA: { stripes: ["#5c2d91", "#d4a017"], engine: "#5c2d91" }, QTR: { engine: "#5c0632" }, UAE: { titles: 1.3 },
+            ETD: { top: "#d9cfbf", belly: "#c7b99e" }, THY: { stripes: ["#c8102e"] }, MAS: { stripes: ["#cc0000", "#003a70"] },
+            PAL: { stripes: ["#0038a8", "#ce1126"] }, CEB: { engine: "brand" }, TGW: { engine: "brand", titles: 1.3 },
+            AXM: { titles: 1.8 }, AIQ: { titles: 1.8 }, AWQ: { titles: 1.8 }, APG: { titles: 1.8 }, IAD: { titles: 1.8 },
+            JJA: { engine: "brand" }, TWB: { engine: "brand" }, JNA: {}, LAO: { stripes: ["#0b3b8c", "#d4202b"] },
+            CKS: { stripes: ["#c8102e", "#111111"] }, GTI: { stripes: ["#c8102e", "#1d3c78"] }, ABW: { titles: 1.3 },
         };
         const AIRLINE = new Map();   // IATA -> {square, word, brand, wordBox, ready}
 
@@ -683,18 +750,31 @@
             const { L, R, tailLen, noseLen } = model;
             const pxM = W / L, pyM = H / (2 * Math.PI * R * (model.double ? 1.15 : 1));
             const brand = art ? art.brand : "#64748b";
-            const body = extra.body || "#f3f5f8";
+            const body = "#f3f5f8";
             g.fillStyle = body; g.fillRect(0, 0, W, H);
+            if (extra.top) {   // colour above the cheatline (FedEx purple, Korean sky blue...)
+                g.fillStyle = extra.top;
+                g.fillRect(0, 0, W, H * 0.245); g.fillRect(0, H * 0.755, W, H * 0.245);
+            }
             // belly
             const belly = extra.belly || "#cfd4db";
             const grad = g.createLinearGradient(0, H * 0.3, 0, H * 0.7);
             grad.addColorStop(0, body); grad.addColorStop(0.12, belly); grad.addColorStop(0.88, belly); grad.addColorStop(1, body);
             g.fillStyle = grad; g.fillRect(0, H * 0.3, W, H * 0.4);
             // brand pinstripes along the lower sides, brand colour sweeping up the tail cone under the fin
-            g.fillStyle = brand;
             const sx0 = tailLen * pxM * 0.5, sw = W - (tailLen * 0.5 + noseLen * 0.8) * pxM;
-            g.fillRect(sx0, H * 0.305, sw, H * 0.012);
-            g.fillRect(sx0, H * 0.683, sw, H * 0.012);
+            if (extra.stripes) {   // cheatlines under the windows
+                extra.stripes.forEach((c, i) => {
+                    g.fillStyle = c;
+                    const v = 0.245 + i * 0.022;
+                    g.fillRect(sx0, H * v, sw, H * 0.016);
+                    g.fillRect(sx0, H * (1 - v - 0.016), sw, H * 0.016);
+                });
+            } else {
+                g.fillStyle = brand;
+                g.fillRect(sx0, H * 0.305, sw, H * 0.012);
+                g.fillRect(sx0, H * 0.683, sw, H * 0.012);
+            }
             if (art) {
                 const tg = g.createLinearGradient(0, 0, tailLen * pxM * 1.6, 0);
                 tg.addColorStop(0, brand); tg.addColorStop(0.55, brand); tg.addColorStop(1, "rgba(0,0,0,0)");
@@ -715,17 +795,28 @@
             for (const dx of [W - (noseLen + 1.0) * pxM, (tailLen + 0.6) * pxM]) {
                 for (const v of [0.205, 0.795]) g.strokeRect(dx - 0.45 * pxM, v * H - 1.0 * pyM, 0.9 * pxM, 1.9 * pyM);
             }
-            // cockpit windscreen
-            g.fillStyle = "#121a26";
+            // cockpit windscreen, by type: Airbus / Boeing panes, 787's four big windows, the A350's black "mask"
+            const cockpit = model.style ? model.style.cockpit : "airbus";
+            const pane = (x0, x1, a, b, r = 4) => { g.beginPath(); g.moveTo(x0, a * H); g.lineTo(x1, a * H + r); g.lineTo(x1, b * H - r); g.lineTo(x0, b * H); g.fill(); };
             const cx0 = W - noseLen * pxM * 0.78, cx1 = W - noseLen * pxM * 0.42;
-            for (const [a, b] of [[0.11, 0.2], [0.8, 0.89], [0.96, 1.0], [0, 0.04]]) {
-                g.beginPath(); g.moveTo(cx0, a * H); g.lineTo(cx1, a * H + 4); g.lineTo(cx1, b * H - 4); g.lineTo(cx0, b * H); g.fill();
+            g.fillStyle = "#121a26";
+            if (cockpit === "a350") {
+                g.fillStyle = "#0b0d10";
+                const m0 = W - noseLen * pxM * 0.92, m1 = W - noseLen * pxM * 0.3;
+                for (const [a, b] of [[0.06, 0.24], [0.76, 0.94], [0.94, 1.0], [0, 0.06]]) pane(m0, m1, a, b, 10);
+            } else if (cockpit === "787") {
+                for (const [a, b] of [[0.1, 0.21], [0.79, 0.9], [0.95, 1.0], [0, 0.05]]) pane(cx0 - 0.15 * noseLen * pxM, cx1, a, b, 8);
+            } else if (cockpit === "boeing") {
+                for (const [a, b] of [[0.12, 0.19], [0.81, 0.88], [0.965, 1.0], [0, 0.035]]) pane(cx0, cx1 + 0.08 * noseLen * pxM, a, b, 6);
+                for (const v of [0.215, 0.785]) g.fillRect(cx0 - 0.12 * noseLen * pxM, v * H - 4, 0.12 * noseLen * pxM, 8);   // eyebrow-less side window
+            } else {
+                for (const [a, b] of [[0.11, 0.2], [0.8, 0.89], [0.96, 1.0], [0, 0.04]]) pane(cx0, cx1, a, b);
             }
             // titles: the airline's wordmark above the windows, readable from both sides
             if (art && art.word) {
                 const [sx, sy, swd, sh] = art.wordBox;
-                const thPx = Math.min(1.35 * pyM, H * 0.085);
-                const tw = Math.min(thPx * (swd / sh) * (pxM / pyM), W * 0.42);
+                const thPx = Math.min(1.35 * pyM * (extra.titles || 1), H * 0.085 * (extra.titles || 1));
+                const tw = Math.min(thPx * (swd / sh) * (pxM / pyM), W * 0.5);
                 const th = tw * (sh / swd) * (pyM / pxM);
                 const xc = W * 0.62;
                 g.drawImage(art.word, sx, sy, swd, sh, xc - tw / 2, 0.125 * H - th / 2, tw, th);
@@ -744,7 +835,7 @@
             const key = `${modelKey}|${iata || icao3 || "-"}`;
             if (MAT_CACHE.has(key)) return MAT_CACHE.get(key);
             const art = airlineArt(iata);
-            const extra = LIVERY_EXTRA[icao3] || {};
+            const extra = LIVERIES[icao3] || {};
             const bodyTex = new THREE.CanvasTexture(document.createElement("canvas"));
             bodyTex.flipY = false; bodyTex.colorSpace = THREE.SRGBColorSpace; bodyTex.anisotropy = 4;
             const logoTex = new THREE.Texture();
@@ -791,8 +882,9 @@
 
         function makePlane(a, icao3) {
             const fam = familyFor(a.type);
-            const model = buildModel(fam, a.type);
-            const mats = liveryMaterials(model, `${fam}|${a.type || ""}`, a.airline_iata, icao3);
+            const st = typeStyle(a.type, fam, a.model);
+            const model = buildModel(fam, a.type, st);
+            const mats = liveryMaterials(model, `${fam}|${a.type || ""}|${st.cockpit}`, a.airline_iata, icao3);
             const g = new THREE.Group();
             g.matrixAutoUpdate = false;
             for (const [k, geo] of Object.entries(model.geos)) g.add(new THREE.Mesh(geo, mats[k]));
@@ -821,6 +913,7 @@
             g.userData.halo.visible = false;
             g.userData.phase = Math.random() * 2;
             g.userData.L = model.L;
+            g.userData.R = model.R;
             return g;
         }
 
@@ -1009,29 +1102,22 @@
                 seen.add(a.icao);
                 let s = aircraft.get(a.icao);
                 if (!s) {
-                    s = { mesh: null, label: document.createElement("div"), trail: null, drop: null, off: [0, 0, 0], disp: null, pts: [] };
+                    s = { mesh: null, label: document.createElement("div"), trail: null, drop: null, fix: null, disp: null, pts: [] };
                     s.label.className = "ac-label";
                     s.label.addEventListener("click", (ev) => { ev.stopPropagation(); select(a.icao, true); });
                     $("labels").appendChild(s.label);
                     aircraft.set(a.icao, s);
                 }
-                const prevDisp = s.disp;
                 s.a = a;
-                s.t0 = now - (a.age_s || 0);
-                s.base = merc(a.lon, a.lat, a.altitude_m);
+                setFix(s, a, now);
                 // (Re)build the model when its type or airline becomes known
                 const icao3 = /^[A-Z]{3}\d/.test(a.callsign || "") ? a.callsign.slice(0, 3) : "";
-                const key = `${familyFor(a.type)}|${a.type || ""}|${a.airline_iata || icao3}`;
+                const key = `${familyFor(a.type)}|${a.type || ""}|${a.model || ""}|${a.airline_iata || icao3}`;
                 if (!s.mesh || s.mesh.userData.key !== key) {
                     if (s.mesh) world.remove(s.mesh);
                     s.mesh = makePlane(a, icao3);
                     s.mesh.userData.key = key;
                     world.add(s.mesh);
-                }
-                if (prevDisp) {
-                    const p = predict(s, now);
-                    s.off = [prevDisp[0] - p[0], prevDisp[1] - p[1], prevDisp[2] - p[2]];
-                    s.offT = now;
                 }
                 mergeTrail(s, a.trail || [], now);
                 buildTrail(s);
@@ -1067,14 +1153,55 @@
             while (s.pts.length > 2 && now - s.pts[0].t > keep) s.pts.shift();
         }
 
-        // Position now: last fix moved along its ground track and climb rate (up to MAX_EXTRAP_S)
-        function predict(s, now) {
-            const a = s.a;
-            const dt = Math.min(Math.max(now - s.t0, 0), MAX_EXTRAP_S);
-            if (a.speed_kmh == null || a.heading_deg == null) return s.base.slice();
-            const v = a.speed_kmh / 3.6, h = a.heading_deg * D2R;
-            const p = enuToScene(Math.sin(h) * v * dt, Math.cos(h) * v * dt, (a.climb_m_min || 0) / 60 * dt);
-            return [s.base[0] + p[0], s.base[1] + p[1], s.base[2] + p[2]];
+        // ---------------------------------------------------------------- motion (like Flightradar24)
+        // Each aircraft flies its own prediction from the latest fix: along an arc at the measured turn rate,
+        // climbing at the reported rate. The drawn aircraft is moved by the prediction's velocity every frame
+        // and eased toward the predicted position and heading, so new data bends its path instead of jumping it.
+        const angDiff = (a, b) => ((a - b + 540) % 360) - 180;
+
+        function setFix(s, a, now) {
+            const t = now - (a.age_s || 0);
+            const old = s.fix;
+            if (old && Math.abs(t - old.t) < 0.05) return;   // same fix as last poll
+            const hdg = a.heading_deg != null ? a.heading_deg : old ? old.hdg : 0;
+            let turn = 0;
+            if (old && a.heading_deg != null && t - old.t > 0.5 && t - old.t < 30) {
+                const w = angDiff(hdg, old.hdg) / (t - old.t);
+                turn = Math.max(-3.5, Math.min(3.5, 0.5 * w + 0.5 * old.turn));
+            }
+            s.fix = { t, p: merc(a.lon, a.lat, a.altitude_m), hdg, turn,
+                v: a.speed_kmh != null ? a.speed_kmh / 3.6 : 0, vs: (a.climb_m_min || 0) / 60 };
+        }
+
+        // Predicted position (scene units), heading (deg) and velocity (scene units / s) at time t
+        function predictAt(f, t) {
+            const dt = Math.min(Math.max(t - f.t, 0), MAX_EXTRAP_S);
+            const h0 = f.hdg * D2R, w = f.turn * D2R, h = h0 + w * dt;
+            let e, n;
+            if (Math.abs(w) > 1e-4) { e = f.v / w * (Math.cos(h0) - Math.cos(h)); n = f.v / w * (Math.sin(h) - Math.sin(h0)); }
+            else { e = f.v * dt * Math.sin(h0); n = f.v * dt * Math.cos(h0); }
+            const d = enuToScene(e, n, f.vs * dt);
+            const moving = t - f.t < MAX_EXTRAP_S;
+            return { p: [f.p[0] + d[0], f.p[1] + d[1], f.p[2] + d[2]], hdg: f.hdg + f.turn * dt,
+                vel: moving ? enuToScene(f.v * Math.sin(h), f.v * Math.cos(h), f.vs) : [0, 0, 0] };
+        }
+
+        function stepDisplay(s, now, dt) {
+            const f = s.fix;
+            const tgt = predictAt(f, now);
+            const d = s.disp;
+            if (!d || Math.hypot(tgt.p[0] - d.p[0], tgt.p[1] - d.p[1]) > 8000 * mPerUnit) {
+                s.disp = { p: tgt.p.slice(), hdg: tgt.hdg, bank: 0, pitch: 0 };
+                return s.disp;
+            }
+            const ap = 1 - Math.exp(-dt / 1.6), ah = 1 - Math.exp(-dt / 0.9);
+            for (let i = 0; i < 3; i++) d.p[i] += tgt.vel[i] * dt + (tgt.p[i] - d.p[i] - tgt.vel[i] * dt) * ap;
+            d.hdg += angDiff(tgt.hdg, d.hdg) * ah;
+            const bank = Math.atan(f.v * f.turn * D2R / 9.81);
+            d.bank += (Math.max(-0.5, Math.min(0.5, bank)) - d.bank) * ah;
+            const pitch = f.v ? Math.atan2(f.vs, f.v) : 0;
+            d.pitch += (pitch - d.pitch) * ah;
+            return d;
         }
 
         // ---------------------------------------------------------------- custom layer
@@ -1102,23 +1229,31 @@
                 const screen = [];
                 const tmp = new THREE.Matrix4();
 
+                const frameDt = Math.min(0.25, Math.max(0, now - (this.lastT || now)));
+                this.lastT = now;
                 for (const [icao, s] of aircraft) {
-                    if (!s.mesh) continue;
-                    const p = predict(s, now);
-                    if (s.offT) {
-                        const f = Math.max(0, 1 - (now - s.offT) / 1.5);
-                        p[0] += s.off[0] * f; p[1] += s.off[1] * f; p[2] += s.off[2] * f;
-                        if (!f) s.offT = 0;
+                    if (!s.mesh || !s.fix) continue;
+                    const dsp = stepDisplay(s, now, frameDt);
+                    const p = dsp.p.slice();
+                    // Low aircraft: never below the terrain (baro altitude on the ground reads ~0 m, the DEM more)
+                    let groundZ = 0;
+                    if ((s.a.altitude_m || 0) < 3000) {
+                        if (!s.groundT || now - s.groundT > 0.5) {
+                            const ll = new maplibregl.MercatorCoordinate(origin.x + p[0], origin.y + p[1], 0).toLngLat();
+                            s.groundM = map.queryTerrainElevation(ll) || 0;
+                            s.groundT = now;
+                        }
+                        groundZ = s.groundM * mPerUnit;
+                        p[2] = Math.max(p[2], groundZ + (s.mesh.userData.R + 1.8) * k);
                     }
-                    s.disp = p;
                     const a = s.a;
-                    const h = (a.heading_deg || 0) * D2R;
-                    const pitch = a.speed_kmh ? Math.atan2((a.climb_m_min || 0) / 60, a.speed_kmh / 3.6) : 0;
+                    const h = dsp.hdg * D2R;
                     const mesh = s.mesh;
                     mesh.matrix.makeTranslation(p[0], p[1], p[2])
                         .multiply(tmp.makeScale(k, -k, k))
                         .multiply(tmp.makeRotationZ(-h))
-                        .multiply(tmp.makeRotationX(pitch));
+                        .multiply(tmp.makeRotationX(dsp.pitch))
+                        .multiply(tmp.makeRotationY(dsp.bank));
                     mesh.matrixWorldNeedsUpdate = true;
                     // lights: beacons 1 Hz, strobes double flash; props spin
                     const ud = mesh.userData, ph = now + ud.phase;
@@ -1130,18 +1265,21 @@
                     ud.halo.visible = kd !== "heard";
                     if (ud.halo.visible) ud.halo.material = HALO[kd];
 
-                    if (s.trail) moveTrailHead(s, p, now);
+                    if (s.trail) {   // the path ends at the tail, not inside the fuselage
+                        const back = mesh.userData.L * 0.5 * k;
+                        moveTrailHead(s, [p[0] - Math.sin(h) * back, p[1] + Math.cos(h) * back, p[2]], now);
+                    }
                     if (!s.drop) {
                         s.drop = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), DROP_MAT);
                         s.drop.frustumCulled = false;
                         world.add(s.drop);
                     }
                     const dp = s.drop.geometry.attributes.position;
-                    dp.setXYZ(0, p[0], p[1], p[2]); dp.setXYZ(1, p[0], p[1], 0); dp.needsUpdate = true;
+                    dp.setXYZ(0, p[0], p[1], p[2]); dp.setXYZ(1, p[0], p[1], groundZ); dp.needsUpdate = true;
 
                     if (icao === selected) {
-                        this.selPos = p;
-                        this.selHeading = a.heading_deg;
+                        this.selPos = p.slice();
+                        this.selHeading = dsp.hdg;
                         v4.set(p[0], p[1], p[2], 1).applyMatrix4(M);
                         this.sel = v4.w > 0 ? [(v4.x / v4.w + 1) / 2 * W, (1 - v4.y / v4.w) / 2 * H] : null;
                     }
@@ -1280,7 +1418,7 @@
                 show(a) {
                     ensure();
                     const icao3 = /^[A-Z]{3}\d/.test(a.callsign || "") ? a.callsign.slice(0, 3) : "";
-                    const k = `${familyFor(a.type)}|${a.type || ""}|${a.airline_iata || icao3}`;
+                    const k = `${familyFor(a.type)}|${a.type || ""}|${a.model || ""}|${a.airline_iata || icao3}`;
                     if (k !== key) {
                         if (plane) sc.remove(plane);
                         plane = makePlane(a, icao3);
