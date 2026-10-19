@@ -61,12 +61,22 @@ class LensSimCamera(SimulatedIMX335Controller):
         return _star_field(sigma, self.width, self.height), meta
 
 
+def _clean_station(svc):
+    """Keep the developer's real station config (sky mask, saved targets, rotation) out of these tests."""
+    svc.station_config["image_transform"] = {}
+    svc.station_config.pop("sky_mask", None)
+    lf = svc.station_config.setdefault("lens_focus", {})
+    for k in ("day_targets", "near_targets"):
+        lf.pop(k, None)
+
+
 @pytest.fixture
 def lens_client():
     AllSkyService.reset_instance()
     cam = LensSimCamera(width=640, height=480, seed=42)
     cam.open()
     svc = AllSkyService.get_instance(camera=cam)
+    _clean_station(svc)
     app = create_app(camera=cam)
     with TestClient(app) as c:
         yield c, svc, cam
@@ -400,7 +410,7 @@ def test_day_sweep_uses_distant_detail_not_the_nearby_wall():
     cam = SceneLensCamera(width=640, height=480, seed=42)
     cam.open()
     svc = AllSkyService.get_instance(camera=cam)
-    svc.station_config["image_transform"] = {}  # the scene's left/right must stay where they are drawn
+    _clean_station(svc)  # the scene's left/right must stay where they are drawn
     with TestClient(create_app(camera=cam)) as client:
         client.post("/api/focus/lens", json={"mode": "manual"})
         client.post("/api/focus/lens", json={"position": 0.6})
@@ -428,7 +438,7 @@ def test_day_sweep_with_only_a_nearby_wall_runs_on_until_its_peak():
     cam = WallOnly(width=640, height=480, seed=42)
     cam.open()
     svc = AllSkyService.get_instance(camera=cam)
-    svc.station_config["image_transform"] = {}
+    _clean_station(svc)
     with TestClient(create_app(camera=cam)) as client:
         client.post("/api/focus/lens", json={"mode": "manual"})
         client.post("/api/focus/lens", json={"position": 0.3})
@@ -459,7 +469,7 @@ def test_sweep_stops_soon_after_the_peak_even_with_flat_regions():
     cam = WallAndCloud(width=640, height=480, seed=42)
     cam.open()
     svc = AllSkyService.get_instance(camera=cam)
-    svc.station_config["image_transform"] = {}
+    _clean_station(svc)
     with TestClient(create_app(camera=cam)) as client:
         client.post("/api/focus/lens", json={"mode": "manual"})
         client.post("/api/focus/lens", json={"position": 0.3})
@@ -490,3 +500,26 @@ def test_refocus_period_is_configurable(lens_client):
     assert st["refocus_every_h"] == 3 and 3 * 3600 - 60 < st["next_auto_sweep_in_s"] <= 3 * 3600
     client.post("/api/focus/lens", json={"refocus_every_h": 0})
     assert svc._auto_sweep_interval_s() > 365 * 86400  # off: only when there is no valid focus
+
+
+def test_day_targets_avoid_sky_moving_cloud_and_known_walls(lens_client):
+    client, svc, cam = lens_client
+    rng = np.random.default_rng(2)
+    frame = np.full((480, 640, 3), 170, np.uint8)
+    roof = rng.integers(40, 220, (60, 60), dtype=np.uint8)
+    wall = rng.integers(30, 200, (60, 60), dtype=np.uint8)
+    cloud = cv2.GaussianBlur(rng.integers(100, 240, (60, 60), dtype=np.uint8), (0, 0), 1.0)
+    frame[300:360, 100:160] = np.dstack([roof] * 3)   # distant rooftop (static)
+    frame[300:360, 480:540] = np.dstack([wall] * 3)   # wall next to the camera (known near)
+    frame[80:140, 300:360] = np.dstack([cloud] * 3)   # cloud: moves between frames
+    frame2 = frame.copy()
+    frame2[80:140, 300:360] = np.roll(frame[80:140, 300:360], 6, axis=1)
+    svc._lens_cfg()["near_targets"] = [{"cx": 510 / 640, "cy": 330 / 480}]
+    svc.focus.roi_size = 64
+    c = svc._day_focus_candidates(frame, frame2, k=4, side=64)
+    assert c and abs(c[0]["cx"] - 130 / 640) < 0.06 and abs(c[0]["cy"] - 330 / 480) < 0.06
+    assert not any(abs(t["cx"] - 510 / 640) < 0.06 for t in c)                      # wall skipped
+    assert not any(abs(t["cx"] - 330 / 640) < 0.06 and t["cy"] < 0.35 for t in c)  # cloud skipped
+    svc._remember_day_targets([{"cx": c[0]["cx"], "cy": c[0]["cy"], "vertex": 0.3}], [])
+    again = svc._day_focus_candidates(frame, frame2, k=4, side=64)
+    assert again[0].get("saved")  # the remembered target comes first next time

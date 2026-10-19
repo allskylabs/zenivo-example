@@ -2952,6 +2952,12 @@ class AllSkyService:
 
     def _lens_finish(self, position: Optional[float], state: str, message: str, source: str) -> None:
         sw = self.focus.sweep
+        cfg = self._lens_cfg()
+        saved = cfg.get("position")
+        if state != "done" and cfg.get("mode") == "auto" and saved is not None and float(saved) <= SKY_MAX_DIOPTRES:
+            # A failed refocus keeps the last good focus; try again one refocus period later, not every
+            # 30 min (each attempt pauses archiving for a few minutes)
+            cfg["next_auto_sweep"] = time.time() + self._auto_sweep_interval_s()
         if state == "done" and position is not None and float(position) > SKY_MAX_DIOPTRES:
             # Focused on something nearer than 1 m (window frame, railing, dome dust): not the sky
             back = (self.station_config.get("lens_focus") or {}).get("base_position")
@@ -3107,6 +3113,9 @@ class AllSkyService:
         if -12.0 <= sun <= 3.0:
             return False  # twilight: stars too faint, daylight too low and changing
         point = find_focus_point(frame, sky_mask=self._focus_sky_mask(frame))
+        if point is not None and point["method"] == "contrast":
+            cands = self._day_focus_candidates(frame, k=1)  # static detail, not sky/cloud or a known wall
+            point = {**point, "cx": cands[0]["cx"], "cy": cands[0]["cy"]} if cands else None
         if point is None or (sun < -12.0 and point["method"] == "contrast"):
             return False
 
@@ -3326,8 +3335,13 @@ class AllSkyService:
             # By day measure several detailed tiles besides the zoom on the same frames: in a scene of sky,
             # cloud and a nearby wall, the wall must not be the only thing the sweep can see
             tiles: List[Dict[str, float]] = []
+            main_allowed = True
             if method == "contrast":
-                for t in find_focus_tiles(frame, k=8):
+                frame2, _, since = self._focus_new_frame(since, timeout_s=15.0)
+                cands = self._day_focus_candidates(frame, frame2, k=8, side=rw)
+                main_allowed = any(abs(t["cx"] - self.focus.cx) * fw <= rw / 2 and abs(t["cy"] - self.focus.cy) * fh <= rh / 2
+                                   for t in self._day_focus_candidates(frame, frame2, k=40, side=rw)) or not cands
+                for t in cands:
                     if abs(t["cx"] - self.focus.cx) * fw > rw or abs(t["cy"] - self.focus.cy) * fh > rh:
                         tiles.append({"cx": t["cx"], "cy": t["cy"]})
             sw["tiles"] = [{"cx": round(t["cx"], 4), "cy": round(t["cy"], 4)} for t in tiles]
@@ -3382,6 +3396,8 @@ class AllSkyService:
                 res = analyse_sweep(done_pos, curves[r], lower)
                 res["roi"] = 0 if r == 0 else r
                 results.append(res)
+            if not main_allowed and results[0]["ok"] and results[0]["vertex"] <= SKY_MAX_DIOPTRES:
+                results[0].update({"ok": False, "reason": "sky/cloud"})  # the zoom sits on sky or drifting cloud
             if not lower:
                 # A relative change means nothing on an almost featureless tile (contrast near 0: noise
                 # alone looks like a big swing). Only regions with real detail - a peak at least 25 % of
@@ -3393,6 +3409,13 @@ class AllSkyService:
                         x.update({"ok": False, "reason": "weak"})
             sky = [x for x in results if x["ok"] and x["vertex"] <= SKY_MAX_DIOPTRES]
             near = [x for x in results if x["ok"] and x["vertex"] > SKY_MAX_DIOPTRES]
+            if method == "contrast":
+                def where(x):
+                    return ({"cx": self.focus.cx, "cy": self.focus.cy} if x["roi"] == 0 else
+                            {"cx": tiles[x["roi"] - 1]["cx"], "cy": tiles[x["roi"] - 1]["cy"]})
+                good = [dict(where(x), vertex=x["vertex"], spread=x["spread"])
+                        for x in sorted(sky, key=lambda x: -x["spread"])]
+                self._remember_day_targets(good, [dict(where(x), vertex=x["vertex"]) for x in near])
             sw["regions"] = [{k: x.get(k) for k in ("roi", "ok", "reason", "vertex", "spread")} for x in results]
             if not sky:
                 pos_back = start_pos if start_pos is not None and start_pos <= SKY_MAX_DIOPTRES else lo
@@ -3468,12 +3491,70 @@ class AllSkyService:
         except Exception as exc:
             self._lens_finish(None, "failed", str(exc), "sweep")
 
+    # ------------------------------------------------------------------
+    # Day focus targets: static detail, never sky or cloud, remembered across refocuses
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _near_any(t: Dict[str, float], others: List[Dict[str, Any]], r: float = 0.06) -> bool:
+        return any(abs(t["cx"] - o["cx"]) < r and abs(t["cy"] - o["cy"]) < r for o in others or [])
+
+    def _day_focus_candidates(self, frame: np.ndarray, frame2: Optional[np.ndarray] = None, k: int = 8,
+                              side: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Where to measure focus by day, best first: the remembered good targets, then the most detailed
+        tiles. Skipped: anything in the station sky mask (sky and cloud), tiles that change between two
+        frames (drifting cloud), and places already found to be nearer than 1 m (walls next to the camera)."""
+        cfg = self._lens_cfg()
+        h, w = frame.shape[:2]
+        side = side or min(self.focus.roi_size, w, h)
+        mask = self._focus_sky_mask(frame)
+        near = cfg.get("near_targets") or []
+
+        def ok(t):
+            x0 = int(min(max(0, t["cx"] * w - side / 2), w - side))
+            y0 = int(min(max(0, t["cy"] * h - side / 2), h - side))
+            if mask is not None and float(mask[y0:y0 + side, x0:x0 + side].mean()) > 0.3:
+                return False  # sky / cloud
+            if self._near_any(t, near):
+                return False  # a known nearby object
+            if frame2 is not None and frame2.shape == frame.shape:
+                a = cv2.cvtColor(frame[y0:y0 + side, x0:x0 + side], cv2.COLOR_BGR2GRAY).astype(np.float32)
+                b = cv2.cvtColor(frame2[y0:y0 + side, x0:x0 + side], cv2.COLOR_BGR2GRAY).astype(np.float32)
+                # A static tile differs between frames by sensor noise only, a drifting one by about its
+                # own variation: compare with the tile's spread rather than its brightness
+                if float(np.abs(a - b).mean()) > max(3.0, 0.25 * float(a.std())):
+                    return False  # moving between frames: cloud
+            return True
+
+        out: List[Dict[str, Any]] = []
+        for t in (cfg.get("day_targets") or []):
+            if ok(t) and not self._near_any(t, out):
+                out.append({"cx": t["cx"], "cy": t["cy"], "saved": True})
+        for t in find_focus_tiles(frame, k=k * 2):
+            if len(out) >= k:
+                break
+            if ok(t) and not self._near_any(t, out):
+                out.append({"cx": t["cx"], "cy": t["cy"]})
+        return out[:k]
+
+    def _remember_day_targets(self, good: List[Dict[str, Any]], near: List[Dict[str, Any]]) -> None:
+        cfg = self._lens_cfg()
+        now = time.time()
+        targets = [t for t in (cfg.get("day_targets") or []) if not self._near_any(t, good)]
+        cfg["day_targets"] = ([{**t, "t": round(now, 1)} for t in good] + targets)[:5]
+        nears = [t for t in (cfg.get("near_targets") or []) if not self._near_any(t, near)]
+        cfg["near_targets"] = ([{**t, "t": round(now, 1)} for t in near] + nears)[:30]
+        if not os.environ.get("PYTEST_CURRENT_TEST"):
+            self._save_station_config()
+
     def focus_auto_point(self) -> Dict[str, Any]:
         """Move the zoom onto the best thing to focus on in the current frame (see find_focus_point)."""
         frame = self.last_frame
         if frame is None:
             frame, _ = self.capture_frame()
         point = find_focus_point(frame, sky_mask=self._focus_sky_mask(frame))
+        if point is not None and point["method"] == "contrast":
+            cands = self._day_focus_candidates(frame, k=1)
+            point = {**point, "cx": cands[0]["cx"], "cy": cands[0]["cy"]} if cands else None
         if point is None:
             state = self.get_focus_state()
             state.update({"found": False, "message": "nothing to focus on in the frame (blank sky, cloud or fog)"})
