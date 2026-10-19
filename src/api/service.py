@@ -2393,6 +2393,8 @@ class AllSkyService:
         h, w = frame.shape[:2]
         if (w, h) == (tw, th) or tw > w or th > h:
             return frame
+        if abs(tw / th - w / h) > 0.02:
+            th = max(1, round(h * tw / w))  # a size saved for another camera's aspect: keep this frame's shape
         return cv2.resize(frame, (tw, th), interpolation=cv2.INTER_AREA)
 
     def _resolution_presets(self) -> List[Dict[str, Any]]:
@@ -2414,6 +2416,7 @@ class AllSkyService:
         self._restore_lens()
         info = describe_camera(self.camera)
         if info.get("backend") in ("rts5869", "simulator"):
+            self._restore_imx335_identity()
             return
         w, h = int(self.camera.width), int(self.camera.height)
         pitch = float(info.get("pixel_pitch_um", 2.0))
@@ -2464,6 +2467,29 @@ class AllSkyService:
         allowed = {(p["width"], p["height"]) for p in self._resolution_presets()}
         if (int(res.get("width", 0)), int(res.get("height", 0))) not in allowed:
             self.station_config["output_resolution"] = {"width": w, "height": h}
+        self._save_station_config()
+
+    def _restore_imx335_identity(self) -> None:
+        """Back on the IMX335 after another camera ran (e.g. a 1280x720 webcam): undo its sensor spec,
+        optical centre and output size, or the 4:3 frame gets squashed into the old camera's shape."""
+        from src.calibration.station_solver import IMX335_SPEC
+
+        sensor = self.station_config.get("camera_sensor") or {}
+        res = self.station_config.get("output_resolution") or {}
+        allowed = {(p["width"], p["height"]) for p in self.RESOLUTION_PRESETS}
+        foreign = (int(sensor.get("width_px", 0) or 0), int(sensor.get("height_px", 0) or 0)) != (2592, 1944)
+        bad_res = (int(res.get("width", 0) or 0), int(res.get("height", 0) or 0)) not in allowed
+        if not (foreign or bad_res):
+            return
+        if foreign:
+            self.station_config["camera_sensor"] = dict(IMX335_SPEC)
+            optics = self.station_config.setdefault("optics", {})
+            centre = (self.station_config.get("bright_star_solution") or {}).get("optical_center_px")
+            cx, cy = (float(centre[0]), float(centre[1])) if centre else (1296.0, 972.0)
+            optics.update({"optical_center_x_px": cx, "optical_center_y_px": cy, "horizon_radius_90_px": 894.2})
+        if bad_res:
+            self.station_config["output_resolution"] = {"width": 2592, "height": 1944}
+        self.activity.info("camera", f"Restored IMX335 station identity (sensor spec reset={foreign}, output size reset={bad_res})")
         self._save_station_config()
 
     def get_resolution_options(self) -> Dict[str, Any]:
