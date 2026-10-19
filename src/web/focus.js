@@ -159,6 +159,12 @@
         badge.textContent = st.active ? "LIVE" : "OFF";
         badge.classList.toggle("on", st.active);
         showExpiry(s.expires_in_s);
+        if (st.active && !st.running) {
+            // Focus mode turned on elsewhere (AF sweep, another tab): stream it here too
+            st.lastTs = 0;
+            frameLoop();
+            startOverviewTimer();
+        }
         if (s.lens) applyLens(s.lens);
         emptyMsg.hidden = st.active && !!st.bitmap;
         if (st.active && !st.bitmap) {
@@ -787,7 +793,8 @@
         clearInterval(lensPoll);
         if (lensCard.hidden && !lensSweepRunning) ms = 15000;
         lensPoll = setInterval(async () => {
-            try { const s = await api("/api/focus"); if (s.lens) applyLens(s.lens); } catch (e) { /* retry */ }
+            // Full state, not just the lens: the server also starts focus mode by itself (AF sweeps)
+            try { applyState(await api("/api/focus")); } catch (e) { /* retry */ }
         }, ms);
     }
 
