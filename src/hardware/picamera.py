@@ -16,6 +16,8 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 
+from src.pipeline.highlights import desaturate_highlights
+
 from .driver_interface import CameraDriverInterface
 
 logger = logging.getLogger("allsky.picamera")
@@ -300,6 +302,8 @@ class PiCameraController(CameraDriverInterface):
 
         if frame.ndim == 3 and frame.shape[2] == 4:
             frame = frame[:, :, :3]
+        # Clipped sunlit cloud edges come out of the ISP as orange / green fringes: make them neutral
+        desaturate_highlights(frame)
         now = time.time()
         frame_dur_us = float(md.get("FrameDuration", md.get("ExposureTime", want_us)))
         self._last_ts = now
