@@ -2862,6 +2862,7 @@ class AllSkyService:
             "samples": self.lens_comp.samples[-20:],
         }
         info["tracking"] = self.focus_tracker.state()
+        info["refocus_every_h"] = float(cfg.get("refocus_every_h", self.REFOCUS_EVERY_H_DEFAULT))
         nxt = cfg.get("next_auto_sweep")
         info["next_auto_sweep_in_s"] = round(max(0.0, float(nxt) - time.time())) if nxt is not None else 0
         if self.focus_tracker.next_ts:
@@ -2871,9 +2872,18 @@ class AllSkyService:
 
     def set_lens(self, position: Optional[float] = None, delta: Optional[float] = None,
                  tracking: Optional[bool] = None, mode: Optional[str] = None,
-                 reset_learning: bool = False) -> Dict[str, Any]:
+                 reset_learning: bool = False, refocus_every_h: Optional[float] = None) -> Dict[str, Any]:
         if not self._lens_supported():
             raise RuntimeError("This camera has no motorised lens")
+        if refocus_every_h is not None:
+            cfg = self._lens_cfg()
+            cfg["refocus_every_h"] = max(0.0, float(refocus_every_h))
+            if cfg["refocus_every_h"] > 0:
+                cfg["next_auto_sweep"] = float(cfg.get("last_auto_sweep") or time.time()) + self._auto_sweep_interval_s()
+            if not os.environ.get("PYTEST_CURRENT_TEST"):
+                self._save_station_config()
+            if position is None and delta is None and mode is None and tracking is None and not reset_learning:
+                return self.get_focus_state()
         if tracking is not None and mode is None:
             mode = "auto" if tracking else "manual"
         if mode is not None or reset_learning:
@@ -2977,7 +2987,9 @@ class AllSkyService:
                 pass
             sw["final_score"] = score
             if sw.get("auto"):
-                self._lens_cfg()["next_auto_sweep"] = time.time() + self.AUTO_SWEEP_INTERVAL_S
+                cfg_l = self._lens_cfg()
+                cfg_l["last_auto_sweep"] = time.time()
+                cfg_l["next_auto_sweep"] = time.time() + self._auto_sweep_interval_s()
             self.finish_focus("auto_sweep" if sw.get("auto") else source, method=method, score=score, note=message)
             sw.update({"state": state, "message": message + " · saved, focus mode off", "progress": 1.0,
                        "finished_at": time.time()})
@@ -3062,7 +3074,12 @@ class AllSkyService:
         self.stop_focus("focus finished and saved")
         return {"record": rec, **self.get_focus_state()}
 
-    AUTO_SWEEP_INTERVAL_S = 12 * 3600.0  # full automatic sweep at most twice a day; tracking covers between
+    REFOCUS_EVERY_H_DEFAULT = 2.0  # AF: full sweep every 2 h by default; tracking/compensation cover between
+
+    def _auto_sweep_interval_s(self) -> float:
+        """Refocus period of AF mode (lens_focus.refocus_every_h; 0 = only when there is no valid focus)."""
+        h = float(self._lens_cfg().get("refocus_every_h", self.REFOCUS_EVERY_H_DEFAULT))
+        return h * 3600.0 if h > 0 else 10 * 365 * 86400.0
     AUTO_SWEEP_RETRY_S = 1800.0
 
     def _focus_sky_mask(self, frame: np.ndarray) -> Optional[np.ndarray]:
@@ -3073,7 +3090,7 @@ class AllSkyService:
 
     def _maybe_auto_sweep(self, frame: np.ndarray, now: float, cfg: Dict[str, Any]) -> bool:
         """Auto lens mode runs a full sweep autofocus by itself when there is no valid sky focus (none saved,
-        or one nearer than 1 m), right after Auto is switched on, and every AUTO_SWEEP_INTERVAL_S, but only
+        or one nearer than 1 m), right after AF is chosen, and every refocus_every_h hours, but only
         when the frame has something to focus on (stars/lights by night, detail by day; never at twilight).
         It enters focus mode on the chosen point and leaves it again when done. True when one was started."""
         if self.focus.active or (self.focus.sweep and self.focus.sweep.get("state") == "running"):

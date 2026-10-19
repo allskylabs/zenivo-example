@@ -479,3 +479,14 @@ def test_weak_featureless_region_cannot_decide():
     sky_noise = [0.005 if i == 0 else 0.002 for i in range(20)]  # big relative swing, no detail
     res = analyse_sweep(pos, sky_noise, lower=False)
     assert res["ok"] and res["spread"] > 0.5  # alone it looks decisive, hence the 25 % floor in the sweep
+
+
+def test_refocus_period_is_configurable(lens_client):
+    client, svc, cam = lens_client
+    st = client.get("/api/focus").json()["lens"]
+    assert st["refocus_every_h"] == AllSkyService.REFOCUS_EVERY_H_DEFAULT
+    svc._lens_cfg()["last_auto_sweep"] = time.time()
+    st = client.post("/api/focus/lens", json={"refocus_every_h": 3}).json()["lens"]
+    assert st["refocus_every_h"] == 3 and 3 * 3600 - 60 < st["next_auto_sweep_in_s"] <= 3 * 3600
+    client.post("/api/focus/lens", json={"refocus_every_h": 0})
+    assert svc._auto_sweep_interval_s() > 365 * 86400  # off: only when there is no valid focus

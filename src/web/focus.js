@@ -671,6 +671,9 @@
         // MF: slider and nudges set the lens. AF: they only show where the app put it (moving one = MF)
         const mf = L.mode !== "auto";
         lensCard.classList.toggle("lens-af", !mf);
+        $("focus-af-row").hidden = mf;
+        const every = $("focus-refocus-every");
+        if (document.activeElement !== every && L.refocus_every_h !== undefined) every.value = String(L.refocus_every_h);
         lensSlider.title = mf ? "Drag to focus" : "AF moves the lens; drag to switch to MF";
         const sv = L.saved;
         $("focus-lens-saved").textContent = sv
@@ -696,7 +699,9 @@
             : `around ${tr.base.toFixed(3)} D ±${tr.max_offset} · ` +
               (last ? `last ${new Date(last.t * 1000).toLocaleTimeString()}: ${last.from} → ${last.to} D${last.temp_c != null ? ` at ${last.temp_c} °C` : ""}` : "no check yet") +
               (tr.next_in_s != null ? ` · next check in ${Math.round(tr.next_in_s / 60)} min` : "") +
-              ` · automatic sweep ${L.next_auto_sweep_in_s > 60 ? `in ${(L.next_auto_sweep_in_s / 3600).toFixed(1)} h` : "as soon as there is something to focus on"}`;
+              (L.refocus_every_h > 0
+                  ? ` · next refocus ${L.next_auto_sweep_in_s > 60 ? `in ${(L.next_auto_sweep_in_s / 3600).toFixed(1)} h` : "as soon as there is something to focus on"}`
+                  : " · periodic refocus off");
 
         const sw = L.sweep;
         const running = !!sw && sw.state === "running";
@@ -825,6 +830,19 @@
             lensCmd("/api/focus/lens", { mode: b.dataset.lensMode });
             if (b.dataset.lensMode === "auto") setLensPoll(700);  // AF starts (or schedules) a sweep
         }));
+    $("focus-refocus-every").addEventListener("change", (e) =>
+        lensCmd("/api/focus/lens", { refocus_every_h: parseFloat(e.target.value) }));
+    $("focus-refocus-now").addEventListener("click", async () => {
+        if (st.active) { lensCmd("/api/focus/lens", { mode: "auto" }); setLensPoll(700); return; }
+        // Not focusing yet: start focus mode, which in AF sweeps right away
+        st.history = []; st.showSweep = true;
+        try {
+            const started = await api("/api/focus/start", { method: "POST", body: { autofocus: true } });
+            applyState(started);
+            if (started.message) $("focus-statline").textContent = started.message;
+            frameLoop(); startOverviewTimer(); setLensPoll(700);
+        } catch (e) { alert(`Refocus: ${e.message}`); }
+    });
     $("focus-lens-reset-learning").addEventListener("click", () => {
         if (confirm("Forget all focus-vs-temperature samples?")) lensCmd("/api/focus/lens", { reset_learning: true });
     });

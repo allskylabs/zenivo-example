@@ -939,6 +939,18 @@
                             <button class="btn btn-sm btn-outline" data-lens-delta="0.02">+0.02</button>
                             <button class="btn btn-sm btn-outline" data-lens-delta="0.1">+0.1</button>
                         </div>
+                        <div class="focus-field focus-af-row" id="focus-af-row" hidden>
+                            <span class="focus-field-label">Refocus every</span>
+                            <select id="focus-refocus-every" title="AF runs a full sweep this often (when there is something to focus on)">
+                                <option value="0">Off</option>
+                                <option value="1">1 h</option>
+                                <option value="2">2 h</option>
+                                <option value="3">3 h</option>
+                                <option value="6">6 h</option>
+                                <option value="12">12 h</option>
+                            </select>
+                            <button class="btn btn-sm btn-primary" id="focus-refocus-now" title="Find focus now (enters focus mode for the sweep)">Refocus now</button>
+                        </div>
                         <div class="focus-meter" id="focus-lens-progress-wrap" hidden><div class="focus-meter-fill good" id="focus-lens-progress"></div></div>
                         <div class="focus-hint focus-lens-status"><span id="focus-lens-msg">&nbsp;</span> <button class="btn btn-sm btn-outline" id="focus-lens-cancel" hidden>Cancel</button></div>
                         <div class="focus-hint text-muted" id="focus-lens-comp"></div>
@@ -1014,6 +1026,6 @@
     <script src="/static/sky_catalog.js"></script>
     <script src="/app.js?v=20261019ps2"></script>
     <script src="/static/activity.js?v=20261016h"></script>
-    <script src="/static/focus.js?v=20261019fe"></script>
+    <script src="/static/focus.js?v=20261019ff"></script>
 </body>
 </html>
