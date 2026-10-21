@@ -31,9 +31,9 @@
             background: var(--bg);
             color: var(--text);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            font-size: 13px;
-            line-height: 1.3;
-            padding: 8px;
+            font-size: 18px;
+            line-height: 1.35;
+            padding: 10px;
             overflow-y: auto;
             overflow-x: hidden;
         }
@@ -43,157 +43,164 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 6px;
+            gap: 8px;
             background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 6px 8px;
-            margin-bottom: 6px;
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin-bottom: 8px;
         }
         .topbar-left {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
             min-width: 0;
         }
         .dot {
-            width: 9px;
-            height: 9px;
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
             background: var(--amber);
             flex-shrink: 0;
         }
-        .dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+        .dot.online { background: var(--green); box-shadow: 0 0 8px var(--green); }
         .dot.offline { background: var(--red); }
         .title {
-            font-weight: 700;
-            font-size: 13px;
+            font-weight: 900;
+            font-size: 19px;
+            color: #fff;
             white-space: nowrap;
         }
         .telem-mini {
-            color: var(--muted);
+            color: #cbd5e1;
             font-family: ui-monospace, monospace;
-            font-size: 11px;
+            font-size: 15px;
+            font-weight: 700;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .topbar-actions {
             display: flex;
-            gap: 4px;
+            gap: 6px;
             flex-shrink: 0;
         }
 
         /* Compact Card */
         .box {
             background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 7px;
-            margin-bottom: 6px;
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            padding: 9px 10px;
+            margin-bottom: 8px;
         }
         .box-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            font-size: 11px;
-            font-weight: 700;
+            font-size: 15px;
+            font-weight: 900;
             text-transform: uppercase;
-            color: var(--muted);
-            letter-spacing: 0.4px;
-            margin-bottom: 6px;
+            color: var(--accent);
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
         }
 
         /* Buttons */
         button {
             background: var(--input);
-            border: 1px solid var(--border);
-            color: var(--text);
-            border-radius: 4px;
-            padding: 5px 7px;
-            font-size: 12px;
-            font-weight: 600;
+            border: 1.5px solid var(--border);
+            color: #ffffff;
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 16px;
+            font-weight: 800;
             cursor: pointer;
             transition: background 0.1s, border-color 0.1s;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 4px;
+            gap: 5px;
             white-space: nowrap;
         }
         button:hover {
             background: var(--hover);
-            border-color: #4b5a7a;
+            border-color: var(--accent);
         }
         button:active {
             transform: translateY(1px);
         }
         button.active {
-            background: var(--accent-bg);
+            background: var(--accent);
             border-color: var(--accent);
-            color: #7dd3fc;
+            color: #090d16;
+            font-weight: 900;
         }
         button.btn-live {
-            background: rgba(239, 68, 68, 0.2);
+            background: rgba(239, 68, 68, 0.25);
             border-color: var(--red);
-            color: #fca5a5;
+            color: #fecaca;
         }
         button.btn-live.active {
             background: var(--red);
             color: #fff;
         }
         button.btn-sm {
-            padding: 3px 6px;
-            font-size: 11px;
+            padding: 6px 10px;
+            font-size: 15px;
+            font-weight: 800;
         }
 
         /* Grids */
         .grid-4 {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 4px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
         }
         .grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 4px;
+            gap: 6px;
         }
         .row {
             display: flex;
             align-items: center;
-            gap: 5px;
-            margin-top: 5px;
+            gap: 6px;
+            margin-top: 7px;
         }
         .row:first-child { margin-top: 0; }
         .lbl {
-            font-size: 11px;
-            color: var(--muted);
-            min-width: 44px;
+            font-size: 15px;
+            font-weight: 800;
+            color: #e2e8f0;
+            min-width: 56px;
             flex-shrink: 0;
         }
         .val {
             font-family: ui-monospace, monospace;
-            font-size: 11px;
+            font-size: 16px;
+            font-weight: 900;
             color: var(--accent);
-            min-width: 36px;
+            min-width: 48px;
             text-align: right;
             flex-shrink: 0;
         }
 
         input[type="range"] {
             flex: 1;
-            height: 5px;
+            height: 8px;
             accent-color: var(--accent);
             cursor: pointer;
-            min-width: 40px;
+            min-width: 50px;
         }
         input[type="text"], input[type="number"], select {
             background: var(--input);
-            border: 1px solid var(--border);
-            color: var(--text);
-            border-radius: 4px;
-            padding: 4px 6px;
-            font-size: 12px;
+            border: 1.5px solid var(--border);
+            color: #ffffff;
+            border-radius: 6px;
+            padding: 7px 9px;
+            font-size: 16px;
+            font-weight: 700;
             outline: none;
             user-select: text;
             -webkit-user-select: text;
@@ -204,33 +211,33 @@
 
         /* Events & Replay List */
         .ev-list {
-            max-height: 195px;
+            max-height: 240px;
             overflow-y: auto;
-            margin-top: 5px;
-            border: 1px solid var(--border);
-            border-radius: 4px;
+            margin-top: 7px;
+            border: 1.5px solid var(--border);
+            border-radius: 6px;
             background: #0f131c;
         }
         .ev-item {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 4px 6px;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            gap: 8px;
+            padding: 7px 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
             cursor: pointer;
-            font-size: 12px;
+            font-size: 16px;
         }
         .ev-item:last-child { border-bottom: none; }
         .ev-item:hover { background: var(--hover); }
         .ev-item.active {
             background: var(--accent-bg);
-            border-left: 3px solid var(--accent);
+            border-left: 4px solid var(--accent);
         }
         .ev-thumb {
-            width: 34px;
-            height: 26px;
+            width: 48px;
+            height: 36px;
             object-fit: cover;
-            border-radius: 3px;
+            border-radius: 4px;
             background: #000;
             flex-shrink: 0;
         }
@@ -242,37 +249,41 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 4px;
-            font-weight: 600;
+            gap: 6px;
+            font-weight: 800;
+            font-size: 16px;
+            color: #fff;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .ev-sub {
-            font-size: 11px;
-            color: var(--muted);
+            font-size: 14px;
+            font-weight: 600;
+            color: #cbd5e1;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .ev-empty {
-            padding: 14px;
+            padding: 18px;
             text-align: center;
             color: var(--muted);
-            font-size: 12px;
+            font-size: 15px;
+            font-weight: 700;
         }
 
         /* Toast */
         .toast {
             position: fixed;
-            bottom: 8px;
-            right: 8px;
+            bottom: 12px;
+            right: 12px;
             background: var(--green);
             color: #051b11;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 4px 10px;
-            border-radius: 4px;
+            font-size: 15px;
+            font-weight: 900;
+            padding: 6px 14px;
+            border-radius: 6px;
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.15s;
@@ -300,11 +311,11 @@
     <div class="box">
         <div class="box-head">
             <span>Hiển thị &amp; Nguồn phát</span>
-            <span id="lbl-lst" style="font-family:monospace;color:var(--accent)">LST --:--:--</span>
+            <span id="lbl-lst" style="font-family:monospace;font-size:15px;color:#fff">LST --:--:--</span>
         </div>
 
         <!-- Chế độ nguồn -->
-        <div class="grid-4" style="margin-bottom: 5px;">
+        <div class="grid-4" style="margin-bottom: 6px;">
             <button type="button" class="mode-btn active" data-mode="live">🔴 Trực tiếp</button>
             <button type="button" class="mode-btn" data-mode="timelapse">🎬 Timelapse</button>
             <button type="button" class="mode-btn" data-mode="startrails">🌀 Startrails</button>
@@ -312,13 +323,13 @@
         </div>
 
         <!-- 8 nút bật/tắt nhanh -->
-        <div class="grid-4" style="margin-bottom: 5px;">
+        <div class="grid-4" style="margin-bottom: 6px;">
             <button type="button" id="tg-sky" title="Chòm sao & sao sáng">🌟 Chòm sao</button>
             <button type="button" id="tg-labels" title="Tên chòm sao & sao">🏷️ Tên sao</button>
-            <button type="button" id="tg-grid" title="Lưới tọa độ & La bàn">🧭 Lưới</button>
+            <button type="button" id="tg-grid" title="Lưới tọa độ & La bàn">🧭 Lưới/La bàn</button>
             <button type="button" id="tg-sunmoon" title="Vị trí Mặt trời & Mặt trăng">☀️ Trăng/MT</button>
-            <button type="button" id="tg-adsb" title="Radar máy bay ADS-B trực tiếp">✈️ ADS-B</button>
-            <button type="button" id="tg-events" title="Vệt sao băng & máy bay gần đây">☄️ Vệt bay</button>
+            <button type="button" id="tg-adsb" title="Radar máy bay ADS-B trực tiếp">✈️ Radar ADS-B</button>
+            <button type="button" id="tg-events" title="Vệt sao băng & máy bay gần đây">☄️ Vệt sự kiện</button>
             <button type="button" id="tg-badge" title="Bảng thông số góc trái">📊 LST/FOV</button>
             <button type="button" id="tg-night" title="Tông đỏ bảo vệ mắt">🔴 Đèn đỏ</button>
         </div>
@@ -383,10 +394,10 @@
         <div class="row">
             <span class="lbl">Sáng:</span>
             <input type="range" id="rng-bright" min="0.5" max="2.5" step="0.05" value="1.0">
-            <span id="val-bright" class="val" style="min-width:30px">1.0</span>
-            <span class="lbl" style="min-width:34px;margin-left:4px">T.Phản:</span>
+            <span id="val-bright" class="val" style="min-width:38px">1.0</span>
+            <span class="lbl" style="min-width:48px;margin-left:4px">T.Phản:</span>
             <input type="range" id="rng-contrast" min="0.5" max="2.5" step="0.05" value="1.0">
-            <span id="val-contrast" class="val" style="min-width:30px">1.0</span>
+            <span id="val-contrast" class="val" style="min-width:38px">1.0</span>
         </div>
     </div>
 
@@ -394,7 +405,7 @@
     <div class="box">
         <div class="box-head">
             <span>Tiêu đề OBS (Title)</span>
-            <select id="sel-title-pos" style="padding:1px 4px;font-size:11px;">
+            <select id="sel-title-pos" style="padding:3px 6px;font-size:14px;">
                 <option value="bottom-left">Góc dưới trái</option>
                 <option value="bottom-center">Giữa dưới</option>
                 <option value="top-left">Góc trên trái</option>
@@ -403,7 +414,7 @@
         </div>
         <div class="row">
             <input type="text" id="inp-title" placeholder="Tiêu đề chính..." style="flex:1.2;min-width:0;">
-            <input type="text" id="inp-sub" placeholder="Phụ đề / ghi chú..." style="flex:1;min-width:0;">
+            <input type="text" id="inp-sub" placeholder="Phụ đề..." style="flex:1;min-width:0;">
             <button type="button" id="btn-title-apply" class="btn-sm active">Hiện</button>
             <button type="button" id="btn-title-clear" class="btn-sm">Xóa</button>
         </div>
@@ -413,7 +424,7 @@
     <div class="box">
         <div class="box-head">
             <span>Xem lại Sao băng • Máy bay • Radar</span>
-            <div style="display:flex;gap:4px;">
+            <div style="display:flex;gap:5px;">
                 <button type="button" id="btn-ev-prev" class="btn-sm" title="Sự kiện trước">◀</button>
                 <button type="button" id="btn-ev-next" class="btn-sm" title="Sự kiện tiếp">▶</button>
                 <button type="button" id="btn-ev-reload" class="btn-sm" title="Tải lại danh sách">🔄</button>
@@ -436,7 +447,7 @@
     <div class="box" style="margin-bottom:0;">
         <div class="box-head">
             <span>Camera &amp; Phơi sáng</span>
-            <span id="cam-sky-info" style="color:var(--accent);font-weight:600">--</span>
+            <span id="cam-sky-info" style="color:#fff;font-size:14px;font-weight:800">--</span>
         </div>
         <div class="row">
             <button type="button" id="cam-auto" class="btn-sm" style="flex:1">Auto AE</button>
@@ -445,9 +456,9 @@
         </div>
         <div class="row">
             <span class="lbl">Phơi(s):</span>
-            <input type="number" id="inp-exp" step="0.5" min="0.001" max="90" value="5.0" style="width:58px">
-            <span class="lbl" style="min-width:32px">Gain:</span>
-            <input type="number" id="inp-gain" step="1" min="0" max="72" value="24" style="width:50px">
+            <input type="number" id="inp-exp" step="0.5" min="0.001" max="90" value="5.0" style="width:74px">
+            <span class="lbl" style="min-width:44px">Gain:</span>
+            <input type="number" id="inp-gain" step="1" min="0" max="72" value="24" style="width:66px">
             <button type="button" id="btn-cam-set" class="btn-sm" style="flex:1">Áp dụng</button>
         </div>
     </div>
@@ -788,7 +799,7 @@
                     return `<div class="ev-item ${i === selectedEventIdx ? "active" : ""}" data-idx="${i}">
                         ${thumb}
                         <div class="ev-info">
-                            <div class="ev-top"><span>${badge}</span><span style="color:var(--muted);font-weight:400;font-size:11px">${fmtTime(ev.timestamp)}</span></div>
+                            <div class="ev-top"><span>${badge}</span><span style="color:#cbd5e1;font-weight:700;font-size:14px">${fmtTime(ev.timestamp)}</span></div>
                             <div class="ev-sub">${detail}</div>
                         </div>
                         <button type="button" class="btn-sm ev-zoom-btn" data-idx="${i}" title="Phát & Zoom cận cảnh vị trí">🔍</button>
