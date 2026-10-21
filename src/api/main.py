@@ -106,6 +106,20 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         def serve_flights3d():
             return FileResponse(os.path.join(web_dir, "flights3d.html"), media_type="text/html", headers=no_cache)
 
+        # Standalone full-bleed WebSocket live image view for OBS / Kiosk
+        @app.api_route("/full", methods=["GET", "HEAD"])
+        @app.api_route("/live/full", methods=["GET", "HEAD"])
+        @app.api_route("/obs", methods=["GET", "HEAD"])
+        def serve_full_live():
+            return FileResponse(os.path.join(web_dir, "full.html"), media_type="text/html", headers=no_cache)
+
+        # Dedicated OBS Custom Browser Dock control panel
+        @app.api_route("/obs/dock", methods=["GET", "HEAD"])
+        @app.api_route("/obs/control", methods=["GET", "HEAD"])
+        @app.api_route("/dock", methods=["GET", "HEAD"])
+        def serve_obs_dock():
+            return FileResponse(os.path.join(web_dir, "obs_dock.html"), media_type="text/html", headers=no_cache)
+
         @app.get("/index.html")
         def serve_index_html():
             return page_shell()

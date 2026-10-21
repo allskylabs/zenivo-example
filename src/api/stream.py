@@ -207,23 +207,30 @@ def pack_asb1_binary_packet(
     return header_bytes + hist_bytes + jpeg_payload
 
 
-async def _build_full_binary_packet(service: AllSkyService, packet_type: int = 1) -> bytes:
+async def _build_full_binary_packet(
+    service: AllSkyService,
+    packet_type: int = 1,
+    full_res: bool = False,
+) -> bytes:
     """Capture/fetch latest telemetry, status, and JPEG and pack into a single ASB1 binary frame."""
     telem = await asyncio.to_thread(service.get_telemetry)
     status = await asyncio.to_thread(service.get_status)
     jpeg_bytes = b""
     frame, frame_ts = service.get_display_frame()
     if frame is not None:
-        # Viewers poll faster than the camera delivers; encode each frame once and share it
-        cached = _stream_jpeg_cache
-        if cached[0] is frame and cached[1] == frame_ts:
-            jpeg_bytes = cached[2]
+        if full_res:
+            jpeg_bytes = service.last_jpeg or await asyncio.to_thread(service.get_snapshot_jpeg)
         else:
-            perf = service.performance
-            jpeg_bytes = await asyncio.to_thread(
-                _encode_stream_jpeg, frame, int(perf["stream_max_width"]), int(perf["stream_jpeg_quality"])
-            ) or b""
-            _stream_jpeg_cache[:] = [frame, frame_ts, jpeg_bytes]
+            # Viewers poll faster than the camera delivers; encode each frame once and share it
+            cached = _stream_jpeg_cache
+            if cached[0] is frame and cached[1] == frame_ts:
+                jpeg_bytes = cached[2]
+            else:
+                perf = service.performance
+                jpeg_bytes = await asyncio.to_thread(
+                    _encode_stream_jpeg, frame, int(perf["stream_max_width"]), int(perf["stream_jpeg_quality"])
+                ) or b""
+                _stream_jpeg_cache[:] = [frame, frame_ts, jpeg_bytes]
     return pack_asb1_binary_packet(telem, status, jpeg_bytes, packet_type=packet_type, capture_ts=frame_ts)
 
 
@@ -258,13 +265,15 @@ async def handle_live_websocket(websocket: WebSocket, service: AllSkyService):
     Handles bidirectional WebSocket communication on /ws/live.
     - When ?binary=1 is passed: binary protocol (ASB1 server->client, ASC1 client->server); the only
       text message is a small {"type": "ae_lock"} JSON sent when the lock state or frame brightness changes.
+    - When ?full=1 is also passed: sends full native resolution JPEG (service.last_jpeg) instead of stream_max_width.
     - When ?binary=1 is omitted: legacy JSON mode for unit/E2E test compatibility.
     """
     await ws_manager.connect(websocket)
     binary_mode = websocket.query_params.get("binary", "0") in ("1", "true", "yes")
+    full_res = websocket.query_params.get("full", "0") in ("1", "true", "yes")
     try:
         if binary_mode:
-            pkt = await _build_full_binary_packet(service, packet_type=1)
+            pkt = await _build_full_binary_packet(service, packet_type=1, full_res=full_res)
             await websocket.send_bytes(pkt)
         else:
             status_payload = await asyncio.to_thread(service.get_status)
@@ -295,7 +304,7 @@ async def handle_live_websocket(websocket: WebSocket, service: AllSkyService):
                 sleep_s = max(0.35, min(2.0, exp_s * 0.95))
                 await asyncio.sleep(sleep_s)
                 if binary_mode:
-                    pkt = await _build_full_binary_packet(service, packet_type=1)
+                    pkt = await _build_full_binary_packet(service, packet_type=1, full_res=full_res)
                     await websocket.send_bytes(pkt)
                     await push_lock_state()
                 else:

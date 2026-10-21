@@ -126,6 +126,7 @@ class FocusConfigRequest(BaseModel):
     """Focus assistant region of interest and measurement method."""
     cx: Optional[float] = Field(None, ge=0.0, le=1.0, description="ROI centre x as a fraction of the frame width")
     cy: Optional[float] = Field(None, ge=0.0, le=1.0, description="ROI centre y as a fraction of the frame height")
+    roi_mode: Optional[str] = Field(None, pattern="^(auto|manual)$", description="auto: automatic focus target; manual: user-locked ROI")
     roi_size: Optional[int] = Field(None, ge=64, le=1024, description="ROI side in native pixels")
     method: Optional[str] = Field(None, pattern="^(auto|stars|lights|contrast)$", description="Focus measure")
     smooth: Optional[int] = Field(None, ge=1, le=30, description="Frames in the robust running average of the score")
@@ -228,3 +229,16 @@ class StoragePolicyRequest(BaseModel):
     min_free_gb: Optional[float] = Field(None, ge=0.1, le=1000)
     archive_interval_s: Optional[float] = Field(None, ge=5, le=3600)
     timelapse_refresh_s: Optional[float] = Field(None, ge=60, le=86400)
+
+
+class ObsOverlayRequest(BaseModel):
+    """OBS and live stream celestial overlay display settings."""
+    sky_overlay: Optional[bool] = Field(None, description="Show stars & constellations stick figures")
+    sky_labels: Optional[bool] = Field(None, description="Show star & constellation labels")
+    grid_overlay: Optional[bool] = Field(None, description="Show alt/az grid rings & N/E/S/W compass")
+    sun_moon: Optional[bool] = Field(None, description="Show Sun & Moon tracking markers")
+    badge: Optional[bool] = Field(None, description="Show astrometry info badge (LST, FOV, PA)")
+    fit: Optional[str] = Field(None, pattern="^(cover|contain)$", description="Framing fit mode")
+    bg: Optional[str] = Field(None, pattern="^(black|transparent)$", description="Background fill mode")
+    night_vision: Optional[bool] = Field(None, description="Night vision / red lighting mode")
+    opacity: Optional[float] = Field(None, ge=0.0, le=1.0, description="Overlay opacity level (0.0 to 1.0)")

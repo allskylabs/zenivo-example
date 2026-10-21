@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AllSky OBS Custom Dock</title>
+    <style>
+        :root {
+            --bg-base: #121316;
+            --bg-card: #1c1d22;
+            --bg-card-hover: #23252b;
+            --bg-input: #282a32;
+            --border: #2e313b;
+            --border-focus: #38bdf8;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.25);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+            font-size: 13px;
+            line-height: 1.4;
+            padding: 10px;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        .dock-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 10px;
+        }
+
+        .dock-title-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--warning);
+            box-shadow: 0 0 8px var(--warning);
+            transition: all 0.3s ease;
+        }
+
+        .status-dot.online {
+            background-color: var(--success);
+            box-shadow: 0 0 8px var(--success);
+        }
+
+        .status-dot.offline {
+            background-color: var(--danger);
+            box-shadow: 0 0 8px var(--danger);
+        }
+
+        .dock-title {
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            color: #fff;
+        }
+
+        .badge-live {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        /* Quick URL Bar */
+        .url-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 8px 10px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+        }
+
+        .url-info {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .url-info strong {
+            color: var(--accent);
+        }
+
+        .btn-icon {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            border-radius: var(--radius-sm);
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+        .btn-icon:hover {
+            background: var(--border);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .btn-icon:active {
+            transform: scale(0.96);
+        }
+
+        /* Section Card */
+        .section-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 10px;
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Presets Grid */
+        .presets-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+
+        .btn-preset {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            border-radius: var(--radius-sm);
+            padding: 8px 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.15s ease;
+        }
+
+        .btn-preset:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .btn-preset:active {
+            transform: scale(0.97);
+        }
+
+        /* Switch Rows */
+        .switch-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 7px 4px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            cursor: pointer;
+        }
+
+        .switch-row:last-child {
+            border-bottom: none;
+        }
+
+        .switch-label-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .switch-title {
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .switch-desc {
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        /* Custom Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 36px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border);
+            transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 20px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 2px;
+            bottom: 2px;
+            background-color: var(--text-muted);
+            transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(16px);
+            background-color: #0b1120;
+        }
+
+        /* Segmented Buttons */
+        .seg-control {
+            display: flex;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 2px;
+            gap: 2px;
+            margin-top: 4px;
+        }
+
+        .seg-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 5px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: center;
+        }
+
+        .seg-btn.active {
+            background: var(--accent);
+            color: #0b1120;
+            font-weight: 700;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Slider Control */
+        .range-wrapper {
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .range-slider {
+            flex: 1;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .range-val {
+            font-family: ui-monospace, monospace;
+            font-size: 11px;
+            color: var(--accent);
+            min-width: 36px;
+            text-align: right;
+            font-weight: 600;
+        }
+
+        /* Mini Preview Stage */
+        .preview-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .preview-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .preview-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* Telemetry Pill Grid */
+        .telem-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-top: 6px;
+        }
+
+        .telem-pill {
+            background: var(--bg-input);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-sm);
+            padding: 5px 8px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .telem-pill-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--text-dim);
+        }
+
+        .telem-pill-val {
+            font-size: 11px;
+            font-weight: 700;
+            font-family: ui-monospace, monospace;
+            color: var(--text-main);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(16, 185, 129, 0.95);
+            color: #0b1120;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 6px 14px;
+            border-radius: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 999;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Header -->
+    <header class="dock-header">
+        <div class="dock-title-group">
+            <div id="status-indicator" class="status-dot" title="Connecting..."></div>
+            <span class="dock-title">AllSky OBS Control</span>
+            <span class="badge-live" id="stream-type-badge">LIVE</span>
+        </div>
+        <div style="display: flex; gap: 4px;">
+            <button id="btn-refresh" class="btn-icon" title="Refresh Live Snapshot">📸 Snap</button>
+            <button id="btn-popout" class="btn-icon" title="Mở trang /obs trong tab mới">↗ View</button>
+        </div>
+    </header>
+
+    <!-- Browser Source URL Helper -->
+    <div class="url-card">
+        <div class="url-info" title="Browser Source URL cho OBS Studio">
+            OBS URL: <strong>https://allsky.hoan.uk/obs</strong>
+        </div>
+        <button id="btn-copy-url" class="btn-icon" title="Sao chép URL vào bộ nhớ tạm">📋 Copy</button>
+    </div>
+
+    <!-- Quick Presets -->
+    <section class="section-card">
+        <div class="section-title">
+            <span>Chế độ hiển thị nhanh (Presets)</span>
+        </div>
+        <div class="presets-grid">
+            <button id="preset-astro" class="btn-preset">🌌 Thiên văn đầy đủ</button>
+            <button id="preset-clean" class="btn-preset">🔭 Ngắm trời (sao mịn)</button>
+            <button id="preset-raw" class="btn-preset">📷 Camera thuần khiết</button>
+            <button id="preset-grid" class="btn-preset">🧭 Lưới &amp; La bàn</button>
+        </div>
+    </section>
+
+    <!-- Overlay Toggles -->
+    <section class="section-card">
+        <div class="section-title">
+            <span>Các lớp thiên văn (Overlays)</span>
+        </div>
+
+        <!-- Stars & Constellations -->
+        <label class="switch-row" for="chk-sky-overlay">
+            <div class="switch-label-group">
+                <span class="switch-title">🌟 Sao &amp; Chòm sao</span>
+                <span class="switch-desc">88 chòm sao IAU, đường nối &amp; sao sáng</span>
+            </div>
+            <div class="switch">
+                <input type="checkbox" id="chk-sky-overlay">
+                <span class="slider"></span>
+            </div>
+        </label>
+
+        <!-- Labels -->
+        <label class="switch-row" for="chk-sky-labels">
+            <div class="switch-label-group">
+                <span class="switch-title">🏷️ Tên &amp; Nhãn</span>
+                <span class="switch-desc">Tên chòm sao (Orion, Ursa Major...) &amp; sao</span>
+            </div>
+            <div class="switch">
+                <input type="checkbox" id="chk-sky-labels">
+                <span class="slider"></span>
+            </div>
+        </label>
+
+        <!-- Grid & Compass -->
+        <label class="switch-row" for="chk-grid-overlay">
+            <div class="switch-label-group">
+                <span class="switch-title">🧭 Lưới &amp; La bàn</span>
+                <span class="switch-desc">Vòng cao độ Alt/Az &amp; hướng Đông Tây Nam Bắc</span>
+            </div>
+            <div class="switch">
+                <input type="checkbox" id="chk-grid-overlay">
+                <span class="slider"></span>
+            </div>
+        </label>
+
+        <!-- Sun & Moon -->
+        <label class="switch-row" for="chk-sun-moon">
+            <div class="switch-label-group">
+                <span class="switch-title">☀️ Mặt trời &amp; Mặt trăng</span>
+                <span class="switch-desc">Vị trí thiên thể &amp; % pha chiếu sáng</span>
+            </div>
+            <div class="switch">
+                <input type="checkbox" id="chk-sun-moon" checked>
+                <span class="slider"></span>
+            </div>
+        </label>
+
+        <!-- Info Badge -->
+        <label class="switch-row" for="chk-badge">
+            <div class="switch-label-group">
+                <span class="switch-title">📊 Bảng thông số LST</span>
+                <span class="switch-desc">Góc nhìn FOV, PA và giờ thiên văn LST</span>
+            </div>
+            <div class="switch">
+                <input type="checkbox" id="chk-badge" checked>
+                <span class="slider"></span>
+            </div>
+        </label>
+    </section>
+
+    <!-- Display & Framing Options -->
+    <section class="section-card">
+        <div class="section-title">
+            <span>Khung hình &amp; Hiệu ứng (Visuals)</span>
+        </div>
+
+        <div style="margin-bottom: 8px;">
+            <span class="switch-title" style="font-size: 11px;">Khung hình (Fit Mode)</span>
+            <div class="seg-control" id="seg-fit">
+                <button type="button" class="seg-btn active" data-fit="cover">Cover (16:9 Tràn)</button>
+                <button type="button" class="seg-btn" data-fit="contain">Contain (4:3 Gốc)</button>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 8px;">
+            <span class="switch-title" style="font-size: 11px;">Nền (Background)</span>
+            <div class="seg-control" id="seg-bg">
+                <button type="button" class="seg-btn active" data-bg="black">Đen (Black)</button>
+                <button type="button" class="seg-btn" data-bg="transparent">Trong suốt (Alpha)</button>
+            </div>
+        </div>
+
+        <!-- Night Vision Switch -->
+        <label class="switch-row" for="chk-night-vision">
+            <div class="switch-label-group">
+                <span class="switch-title">🔴 Ánh sáng đỏ (Night Vision)</span>
+                <span class="switch-desc">Bảo vệ mắt quan sát bầu trời đêm</span>
+            </div>
+            <div class="switch">
+                <input type="checkbox" id="chk-night-vision">
+                <span class="slider"></span>
+            </div>
+        </label>
+
+        <!-- Opacity Slider -->
+        <div style="margin-top: 8px;">
+            <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600;">
+                <span>Độ mờ nét vẽ (Opacity)</span>
+                <span id="txt-opacity" class="range-val">100%</span>
+            </div>
+            <div class="range-wrapper">
+                <input type="range" id="rng-opacity" class="range-slider" min="0.2" max="1.0" step="0.05" value="1.0">
+            </div>
+        </div>
+    </section>
+
+    <!-- Mini Live Preview -->
+    <section class="section-card">
+        <div class="section-title">
+            <span>Mini Monitor</span>
+            <button id="btn-toggle-preview" class="btn-icon" style="padding: 2px 6px; font-size: 10px;">Thu gọn</button>
+        </div>
+        <div id="preview-box" class="preview-container">
+            <img id="preview-img" class="preview-img" alt="Preview" />
+        </div>
+    </section>
+
+    <!-- Telemetry Cards -->
+    <section class="section-card">
+        <div class="section-title">
+            <span>Thông số trực tiếp</span>
+        </div>
+        <div class="telem-grid">
+            <div class="telem-pill">
+                <span class="telem-pill-label">Phơi sáng / Gain</span>
+                <span class="telem-pill-val" id="tel-exp-gain">-- ms / -- dB</span>
+            </div>
+            <div class="telem-pill">
+                <span class="telem-pill-label">Giờ LST</span>
+                <span class="telem-pill-val" id="tel-lst">--:--:--</span>
+            </div>
+            <div class="telem-pill">
+                <span class="telem-pill-label">Bầu trời / Mây</span>
+                <span class="telem-pill-val" id="tel-sky">--</span>
+            </div>
+            <div class="telem-pill">
+                <span class="telem-pill-label">Mặt trời / Trăng</span>
+                <span class="telem-pill-val" id="tel-sun-moon">--° / --%</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">Đã cập nhật OBS</div>
+
+    <script>
+        (function () {
+            // Elements
+            const statusDot = document.getElementById("status-indicator");
+            const btnCopyUrl = document.getElementById("btn-copy-url");
+            const btnPopout = document.getElementById("btn-popout");
+            const btnRefresh = document.getElementById("btn-refresh");
+            const btnTogglePreview = document.getElementById("btn-toggle-preview");
+            const previewBox = document.getElementById("preview-box");
+            const previewImg = document.getElementById("preview-img");
+            const toast = document.getElementById("toast");
+
+            // Toggles
+            const chkSkyOverlay = document.getElementById("chk-sky-overlay");
+            const chkSkyLabels = document.getElementById("chk-sky-labels");
+            const chkGridOverlay = document.getElementById("chk-grid-overlay");
+            const chkSunMoon = document.getElementById("chk-sun-moon");
+            const chkBadge = document.getElementById("chk-badge");
+            const chkNightVision = document.getElementById("chk-night-vision");
+            const rngOpacity = document.getElementById("rng-opacity");
+            const txtOpacity = document.getElementById("txt-opacity");
+
+            // Segmented buttons
+            const segFit = document.getElementById("seg-fit");
+            const segBg = document.getElementById("seg-bg");
+
+            // Telemetry
+            const telExpGain = document.getElementById("tel-exp-gain");
+            const telLst = document.getElementById("tel-lst");
+            const telSky = document.getElementById("tel-sky");
+            const telSunMoon = document.getElementById("tel-sun-moon");
+
+            // State
+            let currentSettings = {
+                sky_overlay: false,
+                sky_labels: false,
+                grid_overlay: false,
+                sun_moon: true,
+                badge: true,
+                fit: "cover",
+                bg: "black",
+                night_vision: false,
+                opacity: 1.0,
+            };
+
+            let stationConfig = {
+                latitude_deg: 21.0285,
+                longitude_deg: 105.8542,
+            };
+
+            let ws = null;
+            let reconnectTimer = null;
+            let isSending = false;
+
+            function showToast(msg) {
+                toast.textContent = msg;
+                toast.classList.add("show");
+                clearTimeout(toast._timer);
+                toast._timer = setTimeout(() => toast.classList.remove("show"), 1800);
+            }
+
+            // Sync UI inputs with settings state
+            function syncUI(settings) {
+                if (!settings) return;
+                Object.assign(currentSettings, settings);
+
+                chkSkyOverlay.checked = !!currentSettings.sky_overlay;
+                chkSkyLabels.checked = !!currentSettings.sky_labels;
+                chkGridOverlay.checked = !!currentSettings.grid_overlay;
+                chkSunMoon.checked = currentSettings.sun_moon !== false;
+                chkBadge.checked = currentSettings.badge !== false;
+                chkNightVision.checked = !!currentSettings.night_vision;
+
+                if (currentSettings.opacity !== undefined) {
+                    rngOpacity.value = currentSettings.opacity;
+                    txtOpacity.textContent = `${Math.round(currentSettings.opacity * 100)}%`;
+                }
+
+                // Fit buttons
+                segFit.querySelectorAll(".seg-btn").forEach((btn) => {
+                    btn.classList.toggle("active", btn.dataset.fit === currentSettings.fit);
+                });
+
+                // Bg buttons
+                segBg.querySelectorAll(".seg-btn").forEach((btn) => {
+                    btn.classList.toggle("active", btn.dataset.bg === currentSettings.bg);
+                });
+            }
+
+            // Send updated settings to server
+            async function saveSettings(patch) {
+                if (isSending) return;
+                isSending = true;
+                Object.assign(currentSettings, patch);
+                syncUI(currentSettings);
+
+                try {
+                    const res = await fetch("/api/obs/overlay", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(patch),
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.settings) syncUI(data.settings);
+                        showToast("Đã đồng bộ sang OBS");
+                    }
+                } catch (e) {
+                    showToast("Lỗi đồng bộ: " + e.message);
+                } finally {
+                    isSending = false;
+                }
+            }
+
+            // Bind toggle change events
+            chkSkyOverlay.addEventListener("change", () => saveSettings({ sky_overlay: chkSkyOverlay.checked }));
+            chkSkyLabels.addEventListener("change", () => saveSettings({ sky_labels: chkSkyLabels.checked }));
+            chkGridOverlay.addEventListener("change", () => saveSettings({ grid_overlay: chkGridOverlay.checked }));
+            chkSunMoon.addEventListener("change", () => saveSettings({ sun_moon: chkSunMoon.checked }));
+            chkBadge.addEventListener("change", () => saveSettings({ badge: chkBadge.checked }));
+            chkNightVision.addEventListener("change", () => saveSettings({ night_vision: chkNightVision.checked }));
+
+            rngOpacity.addEventListener("input", () => {
+                txtOpacity.textContent = `${Math.round(rngOpacity.value * 100)}%`;
+            });
+            rngOpacity.addEventListener("change", () => {
+                saveSettings({ opacity: parseFloat(rngOpacity.value) });
+            });
+
+            // Segmented buttons click
+            segFit.querySelectorAll(".seg-btn").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const fit = btn.dataset.fit;
+                    saveSettings({ fit });
+                });
+            });
+
+            segBg.querySelectorAll(".seg-btn").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const bg = btn.dataset.bg;
+                    saveSettings({ bg });
+                });
+            });
+
+            // Presets
+            document.getElementById("preset-astro").addEventListener("click", () => {
+                saveSettings({
+                    sky_overlay: true,
+                    sky_labels: true,
+                    grid_overlay: true,
+                    sun_moon: true,
+                    badge: true,
+                });
+            });
+
+            document.getElementById("preset-clean").addEventListener("click", () => {
+                saveSettings({
+                    sky_overlay: true,
+                    sky_labels: false,
+                    grid_overlay: false,
+                    sun_moon: true,
+                    badge: false,
+                });
+            });
+
+            document.getElementById("preset-raw").addEventListener("click", () => {
+                saveSettings({
+                    sky_overlay: false,
+                    sky_labels: false,
+                    grid_overlay: false,
+                    sun_moon: false,
+                    badge: false,
+                });
+            });
+
+            document.getElementById("preset-grid").addEventListener("click", () => {
+                saveSettings({
+                    sky_overlay: false,
+                    sky_labels: false,
+                    grid_overlay: true,
+                    sun_moon: true,
+                    badge: true,
+                });
+            });
+
+            // Copy URL
+            btnCopyUrl.addEventListener("click", () => {
+                const url = window.location.origin + "/obs";
+                navigator.clipboard.writeText(url).then(() => {
+                    showToast("Đã chép: " + url);
+                }).catch(() => {
+                    prompt("Sao chép URL OBS Browser Source:", url);
+                });
+            });
+
+            // Popout
+            btnPopout.addEventListener("click", () => {
+                window.open("/obs", "_blank");
+            });
+
+            // Snapshot refresh
+            function refreshPreview() {
+                previewImg.src = "/api/live/snapshot.jpg?t=" + Date.now();
+            }
+            btnRefresh.addEventListener("click", () => {
+                refreshPreview();
+                showToast("Đã tải lại khung hình");
+            });
+
+            // Toggle preview
+            let previewCollapsed = false;
+            btnTogglePreview.addEventListener("click", () => {
+                previewCollapsed = !previewCollapsed;
+                previewBox.style.display = previewCollapsed ? "none" : "block";
+                btnTogglePreview.textContent = previewCollapsed ? "Mở" : "Thu gọn";
+            });
+
+            // LMST calculation for live clock
+            function updateClock() {
+                const now = new Date();
+                const jd = now.getTime() / 86400000.0 + 2440587.5;
+                const d = jd - 2451545.0;
+                const t = d / 36525.0;
+                const gmst =
+                    (280.46061837 +
+                        360.98564736629 * d +
+                        0.000387933 * t * t -
+                        (t * t * t) / 38710000.0) %
+                    360.0;
+                const lon = stationConfig.longitude_deg || 105.8542;
+                const lmstDeg = ((gmst + lon) % 360.0 + 360.0) % 360.0;
+                const totalH = lmstDeg / 15.0;
+                const h = Math.floor(totalH);
+                const m = Math.floor((totalH - h) * 60.0);
+                const s = Math.floor(((totalH - h) * 60.0 - m) * 60.0);
+                telLst.textContent = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+            }
+            setInterval(updateClock, 1000);
+
+            // WebSocket Connection for instant updates
+            function connectWebSocket() {
+                if (ws) {
+                    try { ws.close(); } catch (e) {}
+                    ws = null;
+                }
+                const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+                const wsUrl = proto + "//" + window.location.host + "/ws/live?binary=1";
+                try {
+                    ws = new WebSocket(wsUrl);
+                    ws.binaryType = "arraybuffer";
+
+                    ws.onopen = function () {
+                        statusDot.className = "status-dot online";
+                        statusDot.title = "Connected to AllSky Server";
+                    };
+
+                    ws.onmessage = function (ev) {
+                        if (ev.data instanceof ArrayBuffer) {
+                            // Extract frame timestamp and telemetry from ASB1 if needed
+                            const dv = new DataView(ev.data);
+                            if (dv.getUint8(0) === 0x41 && dv.getUint8(1) === 0x53) {
+                                const exp = dv.getFloat32(16, true);
+                                const gain = dv.getFloat32(20, true);
+                                telExpGain.textContent = `${(exp * 1000).toFixed(0)} ms / ${gain.toFixed(1)} dB`;
+                            }
+                        } else if (typeof ev.data === "string") {
+                            try {
+                                const msg = JSON.parse(ev.data);
+                                if (msg.type === "obs_overlay" && msg.settings) {
+                                    syncUI(msg.settings);
+                                }
+                            } catch (e) {}
+                        }
+                    };
+
+                    ws.onclose = function () {
+                        statusDot.className = "status-dot offline";
+                        statusDot.title = "Disconnected. Reconnecting...";
+                        ws = null;
+                        if (!reconnectTimer) {
+                            reconnectTimer = setTimeout(() => {
+                                reconnectTimer = null;
+                                connectWebSocket();
+                            }, 2500);
+                        }
+                    };
+                } catch (e) {
+                    statusDot.className = "status-dot offline";
+                }
+            }
+
+            // Initial load
+            fetch("/api/station/config")
+                .then((r) => r.json())
+                .then((cfg) => {
+                    if (cfg) stationConfig = cfg;
+                })
+                .catch(() => {});
+
+            fetch("/api/obs/overlay")
+                .then((r) => r.json())
+                .then((settings) => {
+                    syncUI(settings);
+                })
+                .catch(() => {});
+
+            // Polling telemetry
+            async function pollTelemetry() {
+                try {
+                    const res = await fetch("/api/telemetry");
+                    if (res.ok) {
+                        const d = await res.json();
+                        if (d.exposure_time_s !== undefined) {
+                            telExpGain.textContent = `${(d.exposure_time_s * 1000).toFixed(0)} ms / ${(d.gain_db || 0).toFixed(1)} dB`;
+                        }
+                        if (d.sky_state) {
+                            telSky.textContent = `${d.sky_state} (${(d.stars_detected_count || 0)} sao)`;
+                        }
+                        if (d.sun_altitude_deg !== undefined) {
+                            telSunMoon.textContent = `${d.sun_altitude_deg.toFixed(0)}° / ${d.moon_illumination_pct || 0}%`;
+                        }
+                    }
+                } catch (e) {}
+            }
+            setInterval(pollTelemetry, 6000);
+            pollTelemetry();
+
+            refreshPreview();
+            setInterval(refreshPreview, 10000);
+            connectWebSocket();
+            updateClock();
+        })();
+    </script>
+</body>
+</html>

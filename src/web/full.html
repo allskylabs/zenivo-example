@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AllSky Observatory — Full Live Frame (OBS)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #000;
+            cursor: none;
+        }
+        body.bg-transparent {
+            background: transparent !important;
+        }
+        #obs-stage {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #live-stream-img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            object-position: center center;
+            display: block;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+        body.fit-contain #live-stream-img {
+            object-fit: contain;
+        }
+        #reticle-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            display: block;
+        }
+        body.night-vision #reticle-canvas {
+            filter: drop-shadow(0 0 1px rgba(239, 68, 68, 0.4));
+        }
+    </style>
+</head>
+<body>
+    <div id="obs-stage">
+        <img id="live-stream-img" alt="Live AllSky Stream" draggable="false" />
+        <canvas id="reticle-canvas"></canvas>
+    </div>
+
+    <!-- Sky Catalog for Astrometric Reticle & Constellations -->
+    <script src="/static/sky_catalog.js"></script>
+
+    <script>
+        (function () {
+            const params = new URLSearchParams(window.location.search);
+            const img = document.getElementById("live-stream-img");
+            const canvas = document.getElementById("reticle-canvas");
+            const stage = document.getElementById("obs-stage");
+            const ASB1_HEADER_TOTAL = 4188; // 92B header + 4096B histogram
+
+            // Dynamic overlay settings (synchronized with /obs/dock and /live)
+            const overlayState = {
+                sky_overlay: false,
+                sky_labels: false,
+                grid_overlay: false,
+                sun_moon: true,
+                badge: true,
+                fit: "cover",
+                bg: "black",
+                night_vision: false,
+                opacity: 1.0,
+            };
+
+            // Station astrometry and optical parameters
+            let stationConfig = {
+                latitude_deg: 21.0285,
+                longitude_deg: 105.8542,
+                camera_sensor: { width_px: 2592, height_px: 1944 },
+                optics: {
+                    lens_model: "Fisheye 1.65mm f/2.0 AllSky",
+                    projection_type: "Fisheye Equidistant AllSky",
+                    optical_center_x_px: 1296,
+                    optical_center_y_px: 972,
+                    horizon_radius_90_px: 894.2,
+                    fov_horizontal_deg: 180,
+                },
+                orientation: {
+                    zenith_tilt_deg: 0.0,
+                    azimuth_deg: 180.0,
+                    north_position_angle_deg: 0.0,
+                },
+                image_transform: {
+                    flip_horizontal: false,
+                    flip_vertical: false,
+                    rotate_deg: 0,
+                },
+            };
+
+            const useFullRes = params.get("res") !== "stream";
+            let activeObjectUrl = null;
+            let lastFrameTs = -1;
+            let ws = null;
+            let reconnectTimer = null;
+
+            // Apply overlay settings to DOM and redraw
+            function applyOverlaySettings(settings) {
+                if (settings && typeof settings === "object") {
+                    Object.assign(overlayState, settings);
+                }
+                // URL query params override server defaults if specified
+                if (params.get("fit")) overlayState.fit = params.get("fit");
+                if (params.get("bg")) overlayState.bg = params.get("bg");
+                if (params.get("stars") !== null) overlayState.sky_overlay = params.get("stars") === "1" || params.get("stars") === "true";
+                if (params.get("labels") !== null) overlayState.sky_labels = params.get("labels") === "1" || params.get("labels") === "true";
+                if (params.get("grid") !== null) overlayState.grid_overlay = params.get("grid") === "1" || params.get("grid") === "true";
+                if (params.get("badge") !== null) overlayState.badge = params.get("badge") === "1" || params.get("badge") === "true";
+                if (params.get("sun_moon") !== null) overlayState.sun_moon = params.get("sun_moon") === "1" || params.get("sun_moon") === "true";
+                if (params.get("night") !== null) overlayState.night_vision = params.get("night") === "1" || params.get("night") === "true";
+                if (params.get("opacity") !== null) overlayState.opacity = parseFloat(params.get("opacity"));
+
+                document.body.classList.toggle("fit-contain", overlayState.fit === "contain");
+                document.body.classList.toggle("bg-transparent", overlayState.bg === "transparent");
+                document.body.classList.toggle("night-vision", !!overlayState.night_vision);
+
+                if (canvas) {
+                    canvas.style.opacity = overlayState.opacity !== undefined ? overlayState.opacity : 1.0;
+                }
+                drawReticle();
+            }
+
+            // Astronomy projection helpers
+            function computeLmstDeg(lonDeg, dateObj) {
+                const jd = dateObj.getTime() / 86400000.0 + 2440587.5;
+                const d = jd - 2451545.0;
+                const t = d / 36525.0;
+                const gmst =
+                    (280.46061837 +
+                        360.98564736629 * d +
+                        0.000387933 * t * t -
+                        (t * t * t) / 38710000.0) %
+                    360.0;
+                return ((gmst + lonDeg) % 360.0 + 360.0) % 360.0;
+            }
+
+            function formatLstHms(deg) {
+                const totalHours = (((deg / 15.0) % 24.0) + 24.0) % 24.0;
+                const h = Math.floor(totalHours);
+                const m = Math.floor((totalHours - h) * 60.0);
+                const s = Math.floor(((totalHours - h) * 60.0 - m) * 60.0);
+                return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+            }
+
+            function sunMoonEquatorial(dateObj) {
+                const d2r = Math.PI / 180.0;
+                const r2d = 180.0 / Math.PI;
+                const d = dateObj.getTime() / 86400000.0 + 2440587.5 - 2451545.0;
+                const eps = (23.439 - 0.0000004 * d) * d2r;
+
+                const toEq = (eclLonDeg, eclLatDeg) => {
+                    const l = eclLonDeg * d2r;
+                    const b = eclLatDeg * d2r;
+                    const x = Math.cos(b) * Math.cos(l);
+                    const y = Math.cos(b) * Math.sin(l) * Math.cos(eps) - Math.sin(b) * Math.sin(eps);
+                    const z = Math.cos(b) * Math.sin(l) * Math.sin(eps) + Math.sin(b) * Math.cos(eps);
+                    const ra = ((Math.atan2(y, x) * r2d) % 360.0 + 360.0) % 360.0;
+                    const dec = Math.asin(Math.max(-1, Math.min(1, z))) * r2d;
+                    return { ra, dec };
+                };
+
+                const Ls = (280.46 + 0.9856474 * d) % 360.0;
+                const g = (357.528 + 0.9856003 * d) * d2r;
+                const sunLon = Ls + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g);
+
+                const Lm = (218.32 + 13.176396 * d) % 360.0;
+                const Mm = (134.96 + 13.064993 * d) * d2r;
+                const F = (93.27 + 13.22935 * d) * d2r;
+                const D = (297.85 + 12.190749 * d) * d2r;
+                const moonLon = Lm + 6.289 * Math.sin(Mm) + 1.274 * Math.sin(2 * D - Mm) + 0.658 * Math.sin(2 * D) - 0.186 * Math.sin(g);
+                const moonLat = 5.128 * Math.sin(F);
+                const elong = Math.acos(Math.cos((moonLon - sunLon) * d2r) * Math.cos(moonLat * d2r));
+                return {
+                    sun: toEq(sunLon, 0),
+                    moon: { ...toEq(moonLon, moonLat), illum: (1 - Math.cos(elong)) / 2 },
+                };
+            }
+
+            // Primary Reticle & Astrometric Overlay Renderer
+            function drawReticle() {
+                if (!canvas || !stage) return;
+                const w = stage.clientWidth;
+                const h = stage.clientHeight;
+                if (w <= 10 || h <= 10) return;
+
+                const pxRatio = Math.min(3, window.devicePixelRatio || 1);
+                canvas.width = Math.round(w * pxRatio);
+                canvas.height = Math.round(h * pxRatio);
+                const ctx = canvas.getContext("2d");
+                ctx.setTransform(pxRatio, 0, 0, pxRatio, 0, 0);
+                ctx.clearRect(0, 0, w, h);
+
+                const showSky = !!overlayState.sky_overlay;
+                const showLabels = !!overlayState.sky_labels;
+                const showGrid = !!overlayState.grid_overlay;
+                const showSunMoon = overlayState.sun_moon !== false;
+                const showBadge = overlayState.badge !== false;
+
+                if (!showSky && !showLabels && !showGrid && !showSunMoon && !showBadge) return;
+
+                const st = stationConfig || {};
+                const sensor = st.camera_sensor || {};
+                const optics = st.optics || {};
+                const ori = st.orientation || {};
+
+                const sensorW = Number(sensor.width_px || 2592);
+                const sensorH = Number(sensor.height_px || 1944);
+                const latDeg = Number(st.latitude_deg !== undefined ? st.latitude_deg : 21.0285);
+                const lonDeg = Number(st.longitude_deg !== undefined ? st.longitude_deg : 105.8542);
+
+                const optX = Number(optics.optical_center_x_px !== undefined ? optics.optical_center_x_px : sensorW / 2.0);
+                const optY = Number(optics.optical_center_y_px !== undefined ? optics.optical_center_y_px : sensorH / 2.0);
+                const r90SensorPx = Number(optics.horizon_radius_90_px !== undefined ? optics.horizon_radius_90_px : Math.min(sensorW, sensorH) * 0.46);
+
+                const northPaDeg = Number(ori.north_position_angle_deg || 0.0);
+                const tiltDeg = Number(ori.zenith_tilt_deg || 0.0);
+                const tiltAzDeg = Number(ori.azimuth_deg !== undefined ? ori.azimuth_deg : 180.0);
+
+                // Compute displayed image bounding box handling fit=cover vs fit=contain
+                const containerAspect = w / Math.max(1, h);
+                const sensorAspect = sensorW / Math.max(1, sensorH);
+                let renderW = w;
+                let renderH = h;
+                let offsetX = 0;
+                let offsetY = 0;
+
+                const isCover = overlayState.fit !== "contain";
+                if (isCover) {
+                    if (containerAspect > sensorAspect) {
+                        renderW = w;
+                        renderH = w / sensorAspect;
+                        offsetY = (h - renderH) / 2.0;
+                    } else {
+                        renderH = h;
+                        renderW = h * sensorAspect;
+                        offsetX = (w - renderW) / 2.0;
+                    }
+                } else {
+                    if (containerAspect > sensorAspect) {
+                        renderH = h;
+                        renderW = h * sensorAspect;
+                        offsetX = (w - renderW) / 2.0;
+                    } else {
+                        renderW = w;
+                        renderH = w / sensorAspect;
+                        offsetY = (h - renderH) / 2.0;
+                    }
+                }
+
+                const scaleX = renderW / sensorW;
+                const scaleY = renderH / sensorH;
+                const scaleMean = (scaleX + scaleY) * 0.5;
+
+                ctx.save();
+                if (!isCover) {
+                    ctx.beginPath();
+                    ctx.rect(offsetX, offsetY, renderW, renderH);
+                    ctx.clip();
+                }
+
+                const tf = st.image_transform || {};
+                const rot180 = Number(tf.rotate_deg || 0) % 360 === 180;
+                const mirrorX = !!tf.flip_horizontal !== rot180;
+                const mirrorY = !!tf.flip_vertical !== rot180;
+                const toImgX = (sx) => (mirrorX ? sensorW - sx : sx);
+                const toImgY = (sy) => (mirrorY ? sensorH - sy : sy);
+
+                const cxCanvas = offsetX + toImgX(optX) * scaleX;
+                const cyCanvas = offsetY + toImgY(optY) * scaleY;
+                const r90Canvas = r90SensorPx * scaleMean;
+
+                const nowUtc = new Date();
+                const lmstDeg = computeLmstDeg(lonDeg, nowUtc);
+                const latRad = (latDeg * Math.PI) / 180.0;
+                const sinLat = Math.sin(latRad);
+                const cosLat = Math.cos(latRad);
+                const northAngleRad = (northPaDeg * Math.PI) / 180.0;
+                const tiltRad = (tiltDeg * Math.PI) / 180.0;
+                const tiltAzRad = (tiltAzDeg * Math.PI) / 180.0;
+                const cosTilt = Math.cos(tiltRad);
+                const sinTilt = Math.sin(tiltRad);
+                const cosTiltAz = Math.cos(tiltAzRad);
+                const sinTiltAz = Math.sin(tiltAzRad);
+
+                const hfovDeg = Number(optics.fov_horizontal_deg || 0);
+                const lensProj = optics.lens_projection || (/gnomonic|rectilinear/i.test(String(optics.projection_type || "")) ? "rectilinear" : "");
+                const isFisheyePointing = !!optics.pointing_model && lensProj === "equidistant" && Number(optics.focal_length_px) > 0;
+                const isRectilinear = isFisheyePointing || (lensProj === "rectilinear" && hfovDeg > 1 && hfovDeg < 170);
+                const distK = Number(optics.distortion_k || 0);
+                let camX = null, camY = null, camZ = null, fPx = 0;
+                if (isRectilinear) {
+                    const d2r = Math.PI / 180.0;
+                    const pAlt = Number(ori.altitude_deg !== undefined ? ori.altitude_deg : 90.0 - tiltDeg) * d2r;
+                    const pAz = tiltAzDeg * d2r;
+                    const roll = northPaDeg * d2r;
+                    fPx = Number(optics.focal_length_px) > 0
+                        ? Number(optics.focal_length_px)
+                        : (sensorW / 2.0) / Math.tan((hfovDeg / 2.0) * d2r);
+                    camZ = [Math.cos(pAlt) * Math.sin(pAz), Math.cos(pAlt) * Math.cos(pAz), Math.sin(pAlt)];
+                    let vert = [-camZ[2] * camZ[0], -camZ[2] * camZ[1], 1.0 - camZ[2] * camZ[2]];
+                    const vLen = Math.hypot(vert[0], vert[1], vert[2]) || 1;
+                    vert = vert.map((c) => c / vLen);
+                    const zxv = [
+                        camZ[1] * vert[2] - camZ[2] * vert[1],
+                        camZ[2] * vert[0] - camZ[0] * vert[2],
+                        camZ[0] * vert[1] - camZ[1] * vert[0],
+                    ];
+                    const up = vert.map((c, i) => c * Math.cos(roll) + zxv[i] * Math.sin(roll));
+                    camY = up.map((c) => -c);
+                    camX = [
+                        camY[1] * camZ[2] - camY[2] * camZ[1],
+                        camY[2] * camZ[0] - camY[0] * camZ[2],
+                        camY[0] * camZ[1] - camY[1] * camZ[0],
+                    ];
+                }
+
+                function projectAltAzToCanvas(altDeg, azDeg) {
+                    if (isRectilinear) {
+                        const a = (altDeg * Math.PI) / 180.0;
+                        const z = (azDeg * Math.PI) / 180.0;
+                        const v = [Math.cos(a) * Math.sin(z), Math.cos(a) * Math.cos(z), Math.sin(a)];
+                        const dot = (u) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+                        const cz = dot(camZ);
+                        const thetaRad = Math.acos(Math.max(-1, Math.min(1, cz)));
+                        const theta = (thetaRad * 180.0) / Math.PI;
+                        let sensorPx, sensorPy;
+                        if (isFisheyePointing) {
+                            if (theta > 110) return { x: NaN, y: NaN, alt: altDeg, az: azDeg, theta, visible: false };
+                            const cx = dot(camX), cy = dot(camY);
+                            const rho = Math.hypot(cx, cy) || 1e-12;
+                            const r = fPx * (thetaRad + distK * thetaRad * thetaRad * thetaRad);
+                            sensorPx = optX + (r * cx) / rho;
+                            sensorPy = optY + (r * cy) / rho;
+                        } else {
+                            if (cz < 0.05) return { x: NaN, y: NaN, alt: altDeg, az: azDeg, theta, visible: false };
+                            sensorPx = optX + (fPx * dot(camX)) / cz;
+                            sensorPy = optY + (fPx * dot(camY)) / cz;
+                        }
+                        const canvasX = offsetX + toImgX(sensorPx) * scaleX;
+                        const canvasY = offsetY + toImgY(sensorPy) * scaleY;
+                        const inViewport =
+                            canvasX >= offsetX - 10 && canvasX <= offsetX + renderW + 10 &&
+                            canvasY >= offsetY - 10 && canvasY <= offsetY + renderH + 10;
+                        return { x: canvasX, y: canvasY, alt: altDeg, az: azDeg, theta, visible: inViewport && altDeg >= -1.5 };
+                    }
+                    const altRad = (altDeg * Math.PI) / 180.0;
+                    const azRad = (azDeg * Math.PI) / 180.0;
+                    const cosAlt = Math.cos(altRad);
+                    const sinAlt = Math.sin(altRad);
+
+                    let vN = cosAlt * Math.cos(azRad);
+                    let vE = cosAlt * Math.sin(azRad);
+                    let vZ = sinAlt;
+
+                    if (Math.abs(tiltDeg) > 0.01) {
+                        const uPar = vN * cosTiltAz + vE * sinTiltAz;
+                        const uPerp = -vN * sinTiltAz + vE * cosTiltAz;
+                        const uParRot = uPar * cosTilt - vZ * sinTilt;
+                        vZ = uPar * sinTilt + vZ * cosTilt;
+                        vN = uParRot * cosTiltAz - uPerp * sinTiltAz;
+                        vE = uParRot * sinTiltAz + uPerp * cosTiltAz;
+                    }
+
+                    const thetaDeg = (Math.acos(Math.max(-1.0, Math.min(1.0, vZ))) * 180.0) / Math.PI;
+                    const rPx = r90SensorPx * (thetaDeg / 90.0);
+                    const camAzRad = Math.atan2(vE, vN) - northAngleRad;
+
+                    const sensorPx = optX - rPx * Math.sin(camAzRad);
+                    const sensorPy = optY - rPx * Math.cos(camAzRad);
+
+                    const canvasX = offsetX + toImgX(sensorPx) * scaleX;
+                    const canvasY = offsetY + toImgY(sensorPy) * scaleY;
+                    const inDome = thetaDeg <= 93.0 && altDeg >= -1.5;
+                    const inViewport =
+                        canvasX >= offsetX - 10 &&
+                        canvasX <= offsetX + renderW + 10 &&
+                        canvasY >= offsetY - 10 &&
+                        canvasY <= offsetY + renderH + 10;
+
+                    return {
+                        x: canvasX,
+                        y: canvasY,
+                        alt: altDeg,
+                        az: azDeg,
+                        theta: thetaDeg,
+                        visible: inDome && inViewport,
+                    };
+                }
+
+                function projectRaDecToCanvas(raDeg, decDeg) {
+                    const haRad = ((((lmstDeg - raDeg) % 360.0) + 360.0) % 360.0) * (Math.PI / 180.0);
+                    const decRad = (decDeg * Math.PI) / 180.0;
+                    const sinDec = Math.sin(decRad);
+                    const cosDec = Math.cos(decRad);
+
+                    const sinAlt = Math.max(-1.0, Math.min(1.0, sinLat * sinDec + cosLat * cosDec * Math.cos(haRad)));
+                    const altRad = Math.asin(sinAlt);
+                    const altDeg = (altRad * 180.0) / Math.PI;
+
+                    const y = -Math.sin(haRad) * cosDec;
+                    const x = sinDec * cosLat - cosDec * sinLat * Math.cos(haRad);
+                    const azDeg = ((Math.atan2(y, x) * 180.0) / Math.PI + 360.0) % 360.0;
+
+                    return projectAltAzToCanvas(altDeg, azDeg);
+                }
+
+                // Theme color palettes (Standard vs Night Vision)
+                const isNight = !!overlayState.night_vision;
+                const colors = isNight
+                    ? {
+                          gridLine: "rgba(239, 68, 68, 0.35)",
+                          gridHorizon: "rgba(239, 68, 68, 0.75)",
+                          gridText: "rgba(252, 165, 165, 0.9)",
+                          compass: "#f87171",
+                          constLine: "rgba(239, 68, 68, 0.55)",
+                          starFill: "rgba(254, 202, 202, 0.95)",
+                          starGlow: "rgba(239, 68, 68, 0.75)",
+                          labelBg: "rgba(30, 0, 0, 0.75)",
+                          labelBorder: "rgba(239, 68, 68, 0.4)",
+                          labelText: "#fca5a5",
+                          badgeBg: "rgba(20, 0, 0, 0.8)",
+                          badgeBorder: "rgba(239, 68, 68, 0.45)",
+                          badgeText: "#fecaca",
+                      }
+                    : {
+                          gridLine: "rgba(56, 189, 248, 0.25)",
+                          gridHorizon: "rgba(56, 189, 248, 0.65)",
+                          gridText: "rgba(148, 163, 184, 0.85)",
+                          compass: "#38bdf8",
+                          constLine: "rgba(56, 189, 248, 0.45)",
+                          starFill: "rgba(255, 255, 255, 0.95)",
+                          starGlow: "rgba(56, 189, 248, 0.7)",
+                          labelBg: "rgba(2, 6, 23, 0.7)",
+                          labelBorder: "rgba(56, 189, 248, 0.3)",
+                          labelText: "rgba(186, 230, 253, 0.9)",
+                          badgeBg: "rgba(2, 6, 23, 0.72)",
+                          badgeBorder: "rgba(56, 189, 248, 0.35)",
+                          badgeText: "#e2e8f0",
+                      };
+
+                // 1. Grid & Compass Overlay
+                if (showGrid) {
+                    ctx.save();
+                    if (isRectilinear) {
+                        const polyline = (pts) => {
+                            let pen = false;
+                            ctx.beginPath();
+                            pts.forEach((p) => {
+                                if (!Number.isFinite(p.x) || p.theta > (isFisheyePointing ? 100 : 85)) { pen = false; return; }
+                                if (pen) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y);
+                                pen = true;
+                            });
+                            ctx.stroke();
+                        };
+                        for (let alt = 0; alt <= 75; alt += 15) {
+                            ctx.strokeStyle = alt === 0 ? colors.gridHorizon : colors.gridLine;
+                            ctx.lineWidth = alt === 0 ? 1.5 : 1;
+                            ctx.setLineDash(alt === 0 ? [] : [4, 4]);
+                            const pts = [];
+                            for (let az = 0; az <= 360; az += 2) pts.push(projectAltAzToCanvas(alt, az));
+                            polyline(pts);
+                            const tag = projectAltAzToCanvas(alt, tiltAzDeg);
+                            if (alt > 0 && tag.visible) {
+                                ctx.fillStyle = colors.gridText;
+                                ctx.font = "10px monospace";
+                                ctx.fillText(`${alt}°`, tag.x + 4, tag.y - 3);
+                            }
+                        }
+                        ctx.setLineDash([]);
+                        ctx.fillStyle = colors.compass;
+                        ctx.font = "bold 13px monospace";
+                        ctx.textAlign = "center";
+                        ["N", "NE", "E", "SE", "S", "SW", "W", "NW"].forEach((label, i) => {
+                            for (const alt of [2, 20, 40]) {
+                                const p = projectAltAzToCanvas(alt, i * 45);
+                                if (p.visible) { ctx.fillText(label, p.x, p.y - 6); break; }
+                            }
+                        });
+                    } else {
+                        // AllSky Fisheye concentric rings
+                        [0, 30, 60].forEach((alt) => {
+                            const rPx = r90Canvas * ((90.0 - alt) / 90.0);
+                            ctx.beginPath();
+                            ctx.arc(cxCanvas, cyCanvas, rPx, 0, 2 * Math.PI);
+                            ctx.strokeStyle = alt === 0 ? colors.gridHorizon : colors.gridLine;
+                            ctx.lineWidth = alt === 0 ? 1.5 : 1;
+                            ctx.setLineDash(alt === 0 ? [] : [4, 4]);
+                            ctx.stroke();
+                        });
+                        ctx.setLineDash([]);
+
+                        // Zenith marker cross
+                        ctx.strokeStyle = colors.gridHorizon;
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(cxCanvas - 10, cyCanvas);
+                        ctx.lineTo(cxCanvas + 10, cyCanvas);
+                        ctx.moveTo(cxCanvas, cyCanvas - 10);
+                        ctx.lineTo(cxCanvas, cyCanvas + 10);
+                        ctx.stroke();
+
+                        // Cardinal compass labels
+                        ctx.font = "bold 13px monospace";
+                        ctx.fillStyle = colors.compass;
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "middle";
+                        const compassLabels = [
+                            { az: 0, text: "N" },
+                            { az: 90, text: "E" },
+                            { az: 180, text: "S" },
+                            { az: 270, text: "W" },
+                        ];
+                        compassLabels.forEach((c) => {
+                            const p = projectAltAzToCanvas(0, c.az);
+                            if (p.visible) {
+                                ctx.fillText(c.text, p.x, p.y);
+                            }
+                        });
+                    }
+                    ctx.restore();
+                }
+
+                // 2. Stars & Constellations
+                let visibleConstellationsCount = 0;
+                let visibleStarsCount = 0;
+                const catalog = window.ALLSKY_CATALOG || {};
+
+                if (showSky && catalog.constellations) {
+                    ctx.save();
+                    ctx.strokeStyle = colors.constLine;
+                    ctx.lineWidth = 1.2;
+
+                    catalog.constellations.forEach((c) => {
+                        let drawnLines = 0;
+                        if (c.lines) {
+                            c.lines.forEach((seg) => {
+                                const p1 = projectRaDecToCanvas(seg[0][0], seg[0][1]);
+                                const p2 = projectRaDecToCanvas(seg[1][0], seg[1][1]);
+                                if (p1.visible && p2.visible) {
+                                    ctx.beginPath();
+                                    ctx.moveTo(p1.x, p1.y);
+                                    ctx.lineTo(p2.x, p2.y);
+                                    ctx.stroke();
+                                    drawnLines++;
+                                }
+                            });
+                        }
+                        if (drawnLines > 0) visibleConstellationsCount++;
+                    });
+
+                    // Bright stars
+                    if (catalog.bright_stars) {
+                        catalog.bright_stars.forEach((s) => {
+                            const p = projectRaDecToCanvas(s.ra, s.dec);
+                            if (p.visible) {
+                                visibleStarsCount++;
+                                const mag = Number(s.mag !== undefined ? s.mag : 2.0);
+                                const radius = Math.max(1.8, Math.min(5.5, 4.8 - mag * 0.9));
+                                ctx.beginPath();
+                                ctx.arc(p.x, p.y, radius, 0, 2 * Math.PI);
+                                ctx.fillStyle = colors.starFill;
+                                ctx.shadowColor = colors.starGlow;
+                                ctx.shadowBlur = radius * 1.5;
+                                ctx.fill();
+                                ctx.shadowBlur = 0;
+                            }
+                        });
+                    }
+                    ctx.restore();
+                }
+
+                // 3. Labels (Constellations & Bright Stars)
+                if (showLabels && catalog.constellations) {
+                    ctx.save();
+                    ctx.font = "bold 11px sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+
+                    catalog.constellations.forEach((c) => {
+                        if (c.ra !== undefined && c.dec !== undefined) {
+                            const p = projectRaDecToCanvas(c.ra, c.dec);
+                            if (p.visible) {
+                                const txt = c.name || c.id;
+                                const m = ctx.measureText(txt);
+                                const bw = m.width + 10;
+                                const bh = 18;
+                                ctx.fillStyle = colors.labelBg;
+                                ctx.strokeStyle = colors.labelBorder;
+                                ctx.lineWidth = 1;
+                                ctx.fillRect(p.x - bw / 2, p.y - bh / 2, bw, bh);
+                                ctx.strokeRect(p.x - bw / 2, p.y - bh / 2, bw, bh);
+                                ctx.fillStyle = colors.labelText;
+                                ctx.fillText(txt, p.x, p.y);
+                            }
+                        }
+                    });
+
+                    // Bright star name tags
+                    if (catalog.bright_stars) {
+                        ctx.font = "10px sans-serif";
+                        ctx.textAlign = "left";
+                        catalog.bright_stars.forEach((s) => {
+                            if (s.name && Number(s.mag || 3.0) <= 2.2) {
+                                const p = projectRaDecToCanvas(s.ra, s.dec);
+                                if (p.visible) {
+                                    ctx.fillStyle = colors.labelText;
+                                    ctx.fillText(s.name, p.x + 8, p.y - 4);
+                                }
+                            }
+                        });
+                    }
+                    ctx.restore();
+                }
+
+                // 4. Sun & Moon Tracking
+                if (showSunMoon) {
+                    const sm = sunMoonEquatorial(nowUtc);
+                    const bodies = [
+                        { key: "sun", label: "Sun", pos: sm.sun, ring: "#facc15", text: "#fef08a", r: 10 },
+                        { key: "moon", label: `Moon ${Math.round(sm.moon.illum * 100)}%`, pos: sm.moon, ring: "#e2e8f0", text: "#f8fafc", r: 8 },
+                    ];
+                    ctx.save();
+                    ctx.font = "bold 11px sans-serif";
+                    ctx.textAlign = "left";
+                    bodies.forEach((b) => {
+                        const pt = projectRaDecToCanvas(b.pos.ra, b.pos.dec);
+                        if (!pt.visible) return;
+                        ctx.strokeStyle = isNight ? "#ef4444" : b.ring;
+                        ctx.lineWidth = 1.6;
+                        ctx.beginPath();
+                        ctx.arc(pt.x, pt.y, b.r, 0, 2 * Math.PI);
+                        ctx.stroke();
+                        if (b.key === "sun") {
+                            for (let i = 0; i < 8; i++) {
+                                const a = (i * Math.PI) / 4;
+                                ctx.beginPath();
+                                ctx.moveTo(pt.x + Math.cos(a) * (b.r + 2), pt.y + Math.sin(a) * (b.r + 2));
+                                ctx.lineTo(pt.x + Math.cos(a) * (b.r + 6), pt.y + Math.sin(a) * (b.r + 6));
+                                ctx.stroke();
+                            }
+                        }
+                        ctx.fillStyle = isNight ? "#fca5a5" : b.text;
+                        ctx.fillText(`${b.label} (${pt.alt.toFixed(0)}°)`, pt.x + b.r + 8, pt.y + 4);
+                    });
+                    ctx.restore();
+                }
+
+                // 5. Astrometry Info Badge
+                if (showBadge) {
+                    ctx.save();
+                    const badgeText = `LST ${formatLstHms(lmstDeg)} • Center (${optX.toFixed(0)}, ${optY.toFixed(0)}) • ${isRectilinear ? `FOV ${hfovDeg.toFixed(1)}°` : `R90=${r90SensorPx.toFixed(0)}px`} • PA=${northPaDeg.toFixed(1)}°`;
+                    ctx.font = "11px monospace";
+                    const bw = ctx.measureText(badgeText).width + 16;
+                    const bx = offsetX + 10;
+                    const by = offsetY + 10;
+                    ctx.fillStyle = colors.badgeBg;
+                    ctx.strokeStyle = colors.badgeBorder;
+                    ctx.lineWidth = 1;
+                    ctx.fillRect(bx, by, bw, 22);
+                    ctx.strokeRect(bx, by, bw, 22);
+                    ctx.fillStyle = colors.badgeText;
+                    ctx.textAlign = "left";
+                    ctx.fillText(badgeText, bx + 8, by + 15);
+                    ctx.restore();
+                }
+
+                ctx.restore();
+            }
+
+            // Frame buffer swap
+            function swapFrameBlob(blob) {
+                const nextUrl = URL.createObjectURL(blob);
+                const prevUrl = activeObjectUrl;
+                activeObjectUrl = nextUrl;
+
+                img.onload = function () {
+                    if (prevUrl && prevUrl !== nextUrl) {
+                        URL.revokeObjectURL(prevUrl);
+                    }
+                    drawReticle();
+                };
+                img.onerror = function () {
+                    if (activeObjectUrl === nextUrl) {
+                        URL.revokeObjectURL(nextUrl);
+                        activeObjectUrl = prevUrl;
+                    }
+                };
+                img.src = nextUrl;
+            }
+
+            // Binary ASB1 frame parser
+            function renderAsb1Packet(buf) {
+                if (!buf || buf.byteLength < ASB1_HEADER_TOTAL) return;
+                const dv = new DataView(buf);
+                if (
+                    dv.getUint8(0) !== 0x41 ||
+                    dv.getUint8(1) !== 0x53 ||
+                    dv.getUint8(2) !== 0x42 ||
+                    dv.getUint8(3) !== 0x31
+                ) {
+                    return;
+                }
+                const frameTs = dv.getFloat64(8, true);
+                const jpegLen = dv.getUint32(88, true);
+                if (jpegLen === 0 || buf.byteLength < ASB1_HEADER_TOTAL + jpegLen) {
+                    return;
+                }
+                if (frameTs > 0 && frameTs === lastFrameTs) {
+                    return;
+                }
+                lastFrameTs = frameTs;
+
+                const jpegView = new Uint8Array(buf, ASB1_HEADER_TOTAL, jpegLen);
+                const blob = new Blob([jpegView], { type: "image/jpeg" });
+                swapFrameBlob(blob);
+            }
+
+            function scheduleReconnect(delayMs) {
+                if (reconnectTimer) return;
+                reconnectTimer = setTimeout(function () {
+                    reconnectTimer = null;
+                    connectWebSocket();
+                }, delayMs);
+            }
+
+            function connectWebSocket() {
+                if (ws) {
+                    try {
+                        ws.close();
+                    } catch (err) {}
+                    ws = null;
+                }
+                const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+                const fullParam = useFullRes ? "&full=1" : "";
+                const wsUrl = proto + "//" + window.location.host + "/ws/live?binary=1" + fullParam;
+                try {
+                    ws = new WebSocket(wsUrl);
+                    ws.binaryType = "arraybuffer";
+
+                    ws.onopen = function () {
+                        console.info("[AllSky:FullView] Connected to", wsUrl);
+                    };
+
+                    ws.onmessage = function (ev) {
+                        if (ev.data instanceof ArrayBuffer) {
+                            renderAsb1Packet(ev.data);
+                        } else if (typeof ev.data === "string") {
+                            try {
+                                const msg = JSON.parse(ev.data);
+                                if (msg.type === "obs_overlay" && msg.settings) {
+                                    applyOverlaySettings(msg.settings);
+                                }
+                            } catch (e) {}
+                        }
+                    };
+
+                    ws.onerror = function (err) {
+                        console.error("[AllSky:FullView] WebSocket error:", err);
+                    };
+
+                    ws.onclose = function () {
+                        ws = null;
+                        lastFrameTs = -1;
+                        if (activeObjectUrl) {
+                            URL.revokeObjectURL(activeObjectUrl);
+                            activeObjectUrl = null;
+                        }
+                        img.src = "/api/stream/mjpeg";
+                        scheduleReconnect(2000);
+                    };
+                } catch (err) {
+                    img.src = "/api/stream/mjpeg";
+                    scheduleReconnect(3000);
+                }
+            }
+
+            // Fetch initial configuration from server
+            fetch("/api/station/config")
+                .then((r) => r.json())
+                .then((cfg) => {
+                    if (cfg && typeof cfg === "object") {
+                        stationConfig = cfg;
+                        drawReticle();
+                    }
+                })
+                .catch(() => {});
+
+            fetch("/api/obs/overlay")
+                .then((r) => r.json())
+                .then((settings) => {
+                    applyOverlaySettings(settings);
+                })
+                .catch(() => {
+                    applyOverlaySettings();
+                });
+
+            // Listen for window resize
+            window.addEventListener("resize", drawReticle);
+
+            // Periodic celestial redraw as the Earth turns (every 5 seconds)
+            setInterval(drawReticle, 5000);
+
+            // Initial snapshot & WebSocket initialization
+            img.src = "/api/live/snapshot.jpg?t=" + Date.now();
+            connectWebSocket();
+        })();
+    </script>
+</body>
+</html>

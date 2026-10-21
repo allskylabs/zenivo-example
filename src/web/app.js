@@ -13,6 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
         wsConnected: false,
         ws: null,
         sseSource: null,
+        streamPaused: false,
         prevFrameObjectUrl: null,
         nightVision: false,
     };
@@ -142,15 +143,34 @@ document.addEventListener("DOMContentLoaded", () => {
     // Clock & Night Vision
     // ------------------------------------------------------------------
     // Local wall-clock time for an ISO timestamp (any offset, incl. older UTC records): "YYYY-MM-DD HH:MM:SS"
+    // Run fn at most once per animation frame, however many events arrive (resize storms)
+    function rafDebounced(fn) {
+        let raf = 0;
+        return (...args) => {
+            if (raf) return;
+            raf = requestAnimationFrame(() => {
+                raf = 0;
+                fn(...args);
+            });
+        };
+    }
+    // The server does not publish its zone; day buckets are the station's local day (README rule: +07),
+    // so every wall-clock display uses this ONE offset instead of the viewer's browser timezone.
+    const STATION_UTC_OFFSET_MIN = 7 * 60;
+    // Date whose getUTC* fields read as station wall-clock time
+    function stationDate(d) {
+        return new Date(d.getTime() + STATION_UTC_OFFSET_MIN * 60000);
+    }
     function fmtLocalIso(iso, timeOnly) {
         const d = new Date(iso);
         if (isNaN(d)) return iso || "";
+        const sd = stationDate(d);
         const p = (n) => String(n).padStart(2, "0");
-        const hms = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-        return timeOnly ? hms : `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${hms}`;
+        const hms = `${p(sd.getUTCHours())}:${p(sd.getUTCMinutes())}:${p(sd.getUTCSeconds())}`;
+        return timeOnly ? hms : `${sd.getUTCFullYear()}-${p(sd.getUTCMonth() + 1)}-${p(sd.getUTCDate())} ${hms}`;
     }
     const tzLabel = (() => {
-        const m = -new Date().getTimezoneOffset();
+        const m = STATION_UTC_OFFSET_MIN;
         return `UTC${m >= 0 ? "+" : "-"}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ":" + String(Math.abs(m) % 60).padStart(2, "0") : ""}`;
     })();
 
@@ -248,16 +268,36 @@ document.addEventListener("DOMContentLoaded", () => {
         savePrefs({ nightVision: state.nightVision });
     });
 
-    // Overlays default to hidden; restore the viewer's last choice
+    // Overlays default to hidden; restore the viewer's last choice and sync with OBS/server
     [
-        [chkSkyOverlay, "skyOverlay"],
-        [chkSkyLabels, "skyLabels"],
-        [chkGridOverlay, "gridOverlay"],
-    ].forEach(([chk, key]) => {
+        [chkSkyOverlay, "skyOverlay", "sky_overlay"],
+        [chkSkyLabels, "skyLabels", "sky_labels"],
+        [chkGridOverlay, "gridOverlay", "grid_overlay"],
+    ].forEach(([chk, prefKey, apiKey]) => {
         if (!chk) return;
-        chk.checked = !!prefs[key];
-        chk.addEventListener("change", () => savePrefs({ [key]: chk.checked }));
+        chk.checked = !!prefs[prefKey];
+        chk.addEventListener("change", () => {
+            savePrefs({ [prefKey]: chk.checked });
+            fetch("/api/obs/overlay", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ [apiKey]: chk.checked }),
+            }).catch(() => {});
+        });
     });
+
+    // Initialize with synchronized OBS overlay state if available
+    fetch("/api/obs/overlay")
+        .then((r) => r.json())
+        .then((data) => {
+            if (data && typeof data === "object") {
+                if (chkSkyOverlay && typeof data.sky_overlay === "boolean") chkSkyOverlay.checked = data.sky_overlay;
+                if (chkSkyLabels && typeof data.sky_labels === "boolean") chkSkyLabels.checked = data.sky_labels;
+                if (chkGridOverlay && typeof data.grid_overlay === "boolean") chkGridOverlay.checked = data.grid_overlay;
+                drawReticle();
+            }
+        })
+        .catch(() => {});
 
     // ------------------------------------------------------------------
     // Page Routing: every section has its own URL (/live, /gallery, /settings, /calibration)
@@ -288,6 +328,12 @@ document.addEventListener("DOMContentLoaded", () => {
         b.classList.toggle("active", isActive);
         if (isActive) b.setAttribute("aria-current", "page");
     });
+    // On phone widths the tab bar scrolls sideways: bring the current tab into view without scrolling the page.
+    const tabBar = document.querySelector(".tab-bar");
+    const activeTab = tabBar && tabBar.querySelector(".tab-btn.active");
+    if (tabBar && activeTab && tabBar.scrollWidth > tabBar.clientWidth) {
+        tabBar.scrollLeft = activeTab.offsetLeft - (tabBar.clientWidth - activeTab.offsetWidth) / 2;
+    }
     document.title = `${PAGE_TITLES[currentPage]} — AllSky Observatory`;
 
     // ------------------------------------------------------------------
@@ -553,7 +599,16 @@ document.addEventListener("DOMContentLoaded", () => {
             true
         );
 
-        const calPollTimer = setInterval(pollCalibrationStatus, 500);
+        let calPollBusy = false; // don't stack requests when the server answers slower than 500 ms
+        const calPollTimer = setInterval(async () => {
+            if (calPollBusy) return;
+            calPollBusy = true;
+            try {
+                await pollCalibrationStatus();
+            } finally {
+                calPollBusy = false;
+            }
+        }, 500);
         try {
             const res = await fetch(`/api/calibration/auto-library?only_missing=${onlyMissing ? "true" : "false"}`, {
                 method: "POST",
@@ -574,9 +629,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     await new Promise((r) => setTimeout(r, 1000));
                     const st = await pollCalibrationStatus();
                     if (!st || st.state !== "running") {
-                        if (st && st.state === "completed") {
+                        if (!st) {
+                            showAlert(darkAlert, "⚠️ Lost contact with the station while waiting for calibration. It may still be running; reload to check.", "error", true);
+                        } else if (st.state === "completed") {
                             showAlert(darkAlert, `✅ ${st.message}`, "success", true);
-                        } else if (st && st.state === "error") {
+                        } else if (st.state === "error") {
                             showAlert(darkAlert, `❌ ${st.message}`, "error", true);
                         }
                         break;
@@ -1255,6 +1312,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 let data = await startRes.json();
                 const STAGES = { quick: "Quick single-frame solve", metering: "1/3 Metering", capturing: "2/3 Capturing", matching: "3/3 Matching", online: "3/3 Online solve" };
                 let lastPoll = 0;
+                let pollFails = 0;
+                let lostContact = false;
                 while (data.state === "running" && Date.now() - t0 < 6 * 60 * 1000) {
                     // Re-render every second (countdown); ask the server every 3 s
                     const secs = Math.round((Date.now() - t0) / 1000);
@@ -1266,14 +1325,26 @@ document.addEventListener("DOMContentLoaded", () => {
                     await new Promise((r) => setTimeout(r, 1000));
                     if (Date.now() - lastPoll >= 3000) {
                         lastPoll = Date.now();
-                        const stRes = await fetch("/api/station/plate-solve/status");
-                        if (stRes.ok) data = await stRes.json();
+                        // A single network blip must not abort the wait: retry a few times first
+                        try {
+                            const stRes = await fetch("/api/station/plate-solve/status");
+                            if (!stRes.ok) throw new Error(`HTTP ${stRes.status}`);
+                            data = await stRes.json();
+                            pollFails = 0;
+                        } catch (pollErr) {
+                            if (++pollFails >= 3) {
+                                lostContact = true;
+                                break;
+                            }
+                        }
                     }
                 }
                 if (data.state === "success") setStationFormDirty(false);
                 if (data.station_config) updateStationUI(data.station_config);
                 if (data.state === "success") {
                     showAlert(stationAlert, `✅ ${data.message || "Plate-solving complete!"}`, "success", true);
+                } else if (lostContact) {
+                    showAlert(stationAlert, "⚠️ Lost contact with the station while polling the plate-solve. It may still be running on the server; check the Activity Log or retry in a moment.", "error", true);
                 } else if (data.state === "running") {
                     showAlert(stationAlert, "⏳ Plate-solve is still running on the station; check the Activity Log for the result.", "info", true);
                 } else {
@@ -1346,7 +1417,7 @@ document.addEventListener("DOMContentLoaded", () => {
         };
         maskEditor.addEventListener("toggle", () => { if (maskEditor.open) loadMask(); });
         maskImg.addEventListener("load", drawMask);
-        window.addEventListener("resize", drawMask);
+        window.addEventListener("resize", rafDebounced(drawMask));
         maskCanvas.addEventListener("click", (ev) => {
             const r = maskCanvas.getBoundingClientRect();
             const x = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
@@ -1533,7 +1604,7 @@ document.addEventListener("DOMContentLoaded", () => {
             else if (e.key === "0") zoomAt(1, 0, 0);
         });
 
-        window.addEventListener("resize", () => applyView(false));
+        window.addEventListener("resize", rafDebounced(() => applyView(false)));
         document.addEventListener("fullscreenchange", () => setTimeout(() => applyView(false), 60));
         applyView(false);
     }
@@ -2449,7 +2520,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (liveImg) liveImg.addEventListener("load", fitViewportToFrame);
     fitViewportToFrame();
     if (liveImg) liveImg.addEventListener("load", drawReticle);
-    window.addEventListener("resize", drawReticle);
+    window.addEventListener("resize", rafDebounced(drawReticle));
     document.addEventListener("fullscreenchange", () => setTimeout(drawReticle, 80));
 
     // Re-render overlay immediately when user tweaks optical/orientation inputs in Diagnostics tab
@@ -2467,7 +2538,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Periodically refresh sky overlay as Earth rotates (every 5 seconds)
-    setInterval(drawReticle, 5000);
+    setInterval(() => {
+        if (document.hidden) return;
+        const anyOverlay =
+            (chkSkyOverlay ? chkSkyOverlay.checked : true) ||
+            (chkSkyLabels ? chkSkyLabels.checked : true) ||
+            (chkGridOverlay ? chkGridOverlay.checked : false);
+        if (!anyOverlay) return;
+        drawReticle();
+    }, 5000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) drawReticle(); });
     setTimeout(drawReticle, 150);
 
     // ------------------------------------------------------------------
@@ -2683,11 +2763,18 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderBinaryFrameBlob(blob) {
         if (!liveImg || !blob) return;
         const objUrl = URL.createObjectURL(blob);
-        liveImg.onload = () => {
-            if (state.prevFrameObjectUrl) {
-                URL.revokeObjectURL(state.prevFrameObjectUrl);
+        // Revoke the previous frame's URL before swapping; no per-frame onload handler is kept
+        if (state.prevFrameObjectUrl) {
+            URL.revokeObjectURL(state.prevFrameObjectUrl);
+        }
+        state.prevFrameObjectUrl = objUrl;
+        liveImg.onload = null;
+        // An aborted/failed load must not leave the URL alive
+        liveImg.onerror = () => {
+            if (state.prevFrameObjectUrl === objUrl) {
+                URL.revokeObjectURL(objUrl);
+                state.prevFrameObjectUrl = null;
             }
-            state.prevFrameObjectUrl = objUrl;
         };
         liveImg.src = objUrl;
     }
@@ -2718,6 +2805,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (msg.telemetry) updateTelemetryUI(msg.telemetry);
                     if (msg.data) updateTelemetryUI(msg.data);
                     if (msg.status) updateStatusUI(msg.status);
+                    if (msg.type === "obs_overlay" && msg.settings) {
+                        if (chkSkyOverlay && typeof msg.settings.sky_overlay === "boolean") chkSkyOverlay.checked = msg.settings.sky_overlay;
+                        if (chkSkyLabels && typeof msg.settings.sky_labels === "boolean") chkSkyLabels.checked = msg.settings.sky_labels;
+                        if (chkGridOverlay && typeof msg.settings.grid_overlay === "boolean") chkGridOverlay.checked = msg.settings.grid_overlay;
+                        drawReticle();
+                    }
                 } catch (e) {}
             };
             es.onerror = () => {
@@ -2836,6 +2929,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function initWebSocket() {
+        // Hidden tab: stream is paused; an already-open socket (or pending reconnect) is not duplicated
+        if (state.streamPaused || state.ws) return;
         const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
         const wsUrl = `${proto}//${window.location.host}/ws/live?binary=1`;
         let ws;
@@ -2863,6 +2958,11 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (msg.type === "ae_lock" && !state.dragging) {
                             syncModeButtons(msg.mode);
                             syncAeLock(msg.ae_lock);
+                        } else if (msg.type === "obs_overlay" && msg.settings) {
+                            if (chkSkyOverlay && typeof msg.settings.sky_overlay === "boolean") chkSkyOverlay.checked = msg.settings.sky_overlay;
+                            if (chkSkyLabels && typeof msg.settings.sky_labels === "boolean") chkSkyLabels.checked = msg.settings.sky_labels;
+                            if (chkGridOverlay && typeof msg.settings.grid_overlay === "boolean") chkGridOverlay.checked = msg.settings.grid_overlay;
+                            drawReticle();
                         }
                     } catch (e) {}
                 }
@@ -2871,6 +2971,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ws.onclose = () => {
                 state.wsConnected = false;
                 state.ws = null;
+                if (state.streamPaused) return; // closed on purpose while the tab is hidden
                 startSSEFallback();
                 setTimeout(initWebSocket, 2500);
             };
@@ -2886,6 +2987,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (currentPage === "tab-live") {
         initWebSocket();
+        // Hidden tab: drop the live stream (WS / SSE / MJPEG) and reopen it when the tab is visible again
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) {
+                state.streamPaused = true;
+                stopSSEFallback();
+                if (state.ws) {
+                    try {
+                        state.ws.close();
+                    } catch (e) {}
+                }
+                if (liveImg && liveImg.src.includes("/api/stream/mjpeg")) liveImg.removeAttribute("src");
+            } else if (state.streamPaused) {
+                state.streamPaused = false;
+                initWebSocket();
+            }
+        });
         // The binary stream carries registers only; fetch camera identity, limits and register support once
         fetch("/api/status")
             .then((res) => (res.ok ? res.json() : null))
@@ -2902,7 +3019,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         };
         refreshStatus();
-        setInterval(refreshStatus, 5000);
+        setInterval(() => {
+            if (document.hidden) return;
+            refreshStatus();
+        }, 5000);
+        document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshStatus(); });
     }
     pollCalibrationStatus();
     loadStationConfig();
@@ -2914,7 +3035,11 @@ document.addEventListener("DOMContentLoaded", () => {
         loadStarBoost();
         loadPerformance();
         loadWhiteBalance();
-        setInterval(loadWhiteBalance, 5000);
+        setInterval(() => {
+            if (document.hidden) return;
+            loadWhiteBalance();
+        }, 5000);
+        document.addEventListener("visibilitychange", () => { if (!document.hidden) loadWhiteBalance(); });
     }
 
     // ------------------------------------------------------------------
@@ -2943,9 +3068,11 @@ document.addEventListener("DOMContentLoaded", () => {
             return el;
         };
         const fmtTime = (t, withDate) => {
-            const d = new Date(t * 1000);
-            const hm = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-            return withDate ? `${d.toLocaleDateString([], { day: "2-digit", month: "short" })} ${hm}` : hm;
+            const d = stationDate(new Date(t * 1000));
+            const p = (n) => String(n).padStart(2, "0");
+            const hm = `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+            const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()];
+            return withDate ? `${p(d.getUTCDate())} ${mon} ${hm}` : hm;
         };
 
         function renderCloudChart() {
@@ -2991,7 +3118,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const span = end - start;
             const tickH = span <= 6 * 3600 ? 1 : span <= 26 * 3600 ? 3 : span <= 80 * 3600 ? 12 : span <= 170 * 3600 ? 24 : 120;
             const tickS = tickH * 3600;
-            const tzOff = new Date().getTimezoneOffset() * 60;
+            const tzOff = -STATION_UTC_OFFSET_MIN * 60;
             let t0 = Math.ceil((start - tzOff) / tickS) * tickS + tzOff;
             const maxTicks = Math.max(2, Math.floor(pw / 70));
             const stride = Math.max(1, Math.ceil(span / tickS / maxTicks));
@@ -3040,7 +3167,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const extra = best.m === "night" ? ` · ${best.stars} stars` : "";
             const conf = (best.conf ?? 1) < 0.5 ? " · low confidence" : "";
             const avg = best.n > 1 ? ` · avg of ${best.n}` : "";
-            cloudTip.innerHTML = `<strong>${best.cc.toFixed(0)}%</strong> cloud<br>${fmtTime(best.t, true)}<br>${mode}${extra}${conf}${avg}`;
+            cloudTip.innerHTML = `<strong>${best.cc.toFixed(0)}%</strong> cloud<br>${fmtTime(best.t, true)} ${tzLabel}<br>${mode}${extra}${conf}${avg}`;
             cloudTip.classList.remove("hidden");
             const left = (cx / cloudGeom.W) * rect.width;
             const tipW = cloudTip.offsetWidth;
@@ -3088,7 +3215,11 @@ document.addEventListener("DOMContentLoaded", () => {
             resizeTimer = setTimeout(renderCloudChart, 150);
         });
         loadCloudHistory();
-        setInterval(loadCloudHistory, 300000);
+        setInterval(() => {
+            if (document.hidden) return;
+            loadCloudHistory();
+        }, 300000);
+        document.addEventListener("visibilitychange", () => { if (!document.hidden) loadCloudHistory(); });
     }
 
     // ------------------------------------------------------------------
@@ -3235,14 +3366,14 @@ document.addEventListener("DOMContentLoaded", () => {
             let mediaHtml = "";
             if (item.type === "timelapse") {
                 mediaHtml = `
-                    <video controls autoplay loop muted playsinline preload="metadata" src="${mediaUrl}">
+                    <video controls autoplay loop muted playsinline preload="metadata" src="${escapeHtml(mediaUrl)}">
                         Your browser does not support MP4 video.
                     </video>
                 `;
             } else {
                 mediaHtml = `
-                    <a href="${mediaUrl}" data-viewer="${item.title || item.type}" title="Click to view full size" style="width:100%;height:100%;display:block;">
-                        <img src="${mediaUrl}" alt="${item.title || item.type}" loading="lazy" />
+                    <a href="${mediaUrl}" data-viewer="${escapeHtml(item.title || item.type)}" title="Click to view full size" style="width:100%;height:100%;display:block;">
+                        <img src="${escapeHtml(mediaUrl)}" alt="${escapeHtml(item.title || item.type)}" loading="lazy" />
                     </a>
                 `;
             }
@@ -3253,12 +3384,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
                 <div class="product-info">
                     <div class="product-title">
-                        <span>${item.title || item.type}</span>
+                        <span>${escapeHtml(item.title || item.type)}</span>
                         <span class="badge badge-accent">${sizeBadge}</span>
                     </div>
                     <div class="product-meta">
                         <span>${framesBadge}${framesBadge && tsFormatted ? " • " : ""}${tsFormatted}</span>
-                        <a href="${mediaUrl}" download class="btn btn-sm btn-outline" style="padding: 0.15rem 0.5rem; font-size: 0.72rem; text-decoration: none;">⬇️ Download</a>
+                        <a href="${escapeHtml(mediaUrl)}" download class="btn btn-sm btn-outline" style="padding: 0.15rem 0.5rem; font-size: 0.72rem; text-decoration: none;">⬇️ Download</a>
                     </div>
                 </div>
             `;
@@ -3280,7 +3411,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function dayKeyOf(date) {
         const p = (n) => String(n).padStart(2, "0");
-        return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
+        const sd = stationDate(date);
+        return `${sd.getUTCFullYear()}-${p(sd.getUTCMonth() + 1)}-${p(sd.getUTCDate())}`;
     }
 
     function renderDays() {
@@ -3319,13 +3451,13 @@ document.addEventListener("DOMContentLoaded", () => {
         let products = "";
         if (!isToday) {
             const tiles = [];
-            if (tl) tiles.push(`<video controls loop muted playsinline preload="metadata" src="${tl.url}#t=0.5" data-info="${tl.url.replace(/\.mp4$/, ".json")}"></video>`);
+            if (tl) tiles.push(`<video controls loop muted playsinline preload="metadata" src="${escapeHtml(tl.url)}#t=0.5" data-info="${escapeHtml(tl.url.replace(/\.mp4$/, ".json"))}"></video>`);
             [["keogram", "Keogram"], ["startrails", "Startrails"]].forEach(([k, label]) => {
-                if (p[k]) tiles.push(`<a class="day-tile" href="${p[k].url}" data-viewer="${label} — ${day.date}" title="View ${label}"><img src="${p[k].url}" alt="${label} ${day.date}" loading="lazy" /><span>${label}</span></a>`);
+                if (p[k]) tiles.push(`<a class="day-tile" href="${escapeHtml(p[k].url)}" data-viewer="${label} — ${escapeHtml(day.date)}" title="View ${label}"><img src="${escapeHtml(p[k].url)}" alt="${label} ${escapeHtml(day.date)}" loading="lazy" /><span>${label}</span></a>`);
             });
             if (tiles.length) {
                 products = `<div class="day-products">${tiles.join("")}</div>`;
-                if (tl) products = `<div class="day-actions"><a href="${tl.url}" download class="btn btn-sm btn-outline">⬇️ Video · ${formatSize(tl.size_kb)}</a></div>` + products;
+                if (tl) products = `<div class="day-actions"><a href="${escapeHtml(tl.url)}" download class="btn btn-sm btn-outline">⬇️ Video · ${formatSize(tl.size_kb)}</a></div>` + products;
             }
         }
 
@@ -3339,7 +3471,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return `
             <details class="day-block" ${first ? "open" : ""}>
                 <summary class="day-summary">
-                    <span class="day-date">${day.date}</span>
+                    <span class="day-date">${escapeHtml(day.date)}</span>
                     ${isToday ? `<span class="badge badge-accent">Today</span>` : ""}
                     <span class="badge">${evs.length} ${evs.length === 1 ? "event" : "events"}</span>
                     ${tl ? `<span class="text-muted day-meta">${tl.size_kb ? formatSize(tl.size_kb) + " video" : ""}</span>` : ""}
@@ -3386,8 +3518,8 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     function eventDetails(ev) {
-        if (ev.type === "clouds") return `Sky turned ${ev.state} (${Number(ev.cloud_cover_pct).toFixed(0)}% cloud)`;
-        if (ev.type === "flash") return `Sky brightness ${ev.sky_mean_before} → ${ev.sky_mean}`;
+        if (ev.type === "clouds") return `Sky turned ${escapeHtml(ev.state)} (${Number(ev.cloud_cover_pct).toFixed(0)}% cloud)`;
+        if (ev.type === "flash") return `Sky brightness ${escapeHtml(ev.sky_mean_before)} → ${escapeHtml(ev.sky_mean)}`;
         const parts = [`${Number(ev.length_px || 0).toFixed(0)} px`];
         if (ev.frames > 1) parts.push(`${ev.frames} frames`);
         if (ev.dashes > 1) parts.push(`${ev.dashes} dashes`);
@@ -3405,8 +3537,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!fl) return "";
         const name = escapeHtml(fl.callsign || fl.icao);
         const url = `https://globe.adsbexchange.com/?icao=${encodeURIComponent(String(fl.icao).toLowerCase())}`;
-        return `<a class="flight-tag" href="${url}" target="_blank" rel="noopener" title="ICAO ${escapeHtml(fl.icao)} · az ${fl.az_deg}° alt ${fl.alt_deg}° · match ${fl.match_px} px">✈ ${name}</a>`
-            + ` <span class="flight-meta">${Number(fl.altitude_m).toLocaleString()} m · ${fl.distance_km} km</span>`;
+        return `<a class="flight-tag" href="${url}" target="_blank" rel="noopener" title="ICAO ${escapeHtml(fl.icao)} · az ${escapeHtml(fl.az_deg)}° alt ${escapeHtml(fl.alt_deg)}° · match ${escapeHtml(fl.match_px)} px">✈ ${name}</a>`
+            + ` <span class="flight-meta">${escapeHtml(Number(fl.altitude_m).toLocaleString())} m · ${escapeHtml(fl.distance_km)} km</span>`;
     }
 
     const EVENT_COLORS = { meteor: "#f59e0b", plane: "#38bdf8", satellite: "#a78bfa", clouds: "#94a3b8", flash: "#facc15" };
@@ -3473,7 +3605,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         const fl = ev.flight;
         if (fl) {
-            facts.push(["Flight", flightHtml(ev)]);
+            facts.push(["Flight", flightHtml(ev), true]); // true = already-escaped HTML
             facts.push(["Altitude", `${Number(fl.altitude_m).toLocaleString()} m`]);
             if (fl.speed_kmh != null) facts.push(["Ground speed", `${fl.speed_kmh} km/h`]);
             if (fl.heading_deg != null) facts.push(["Heading", `${fl.heading_deg}° (${COMPASS[Math.round(fl.heading_deg / 45) % 8]})`]);
@@ -3524,7 +3656,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const pill = evQ(".ev-pill");
         pill.textContent = EVENT_LABELS[ev.type] || ev.type;
         pill.style.setProperty("--pill", EVENT_COLORS[ev.type] || "var(--accent)");
-        evQ(".ev-when strong").textContent = when.toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        evQ(".ev-when strong").textContent = `${fmtLocalIso(ev.timestamp)} ${tzLabel}`;
         evQ(".ev-when span").textContent = timeAgo(when);
         evQ(".ev-pos").textContent = `${evIndex + 1} / ${evList.length}`;
         evQ(".ev-prev").disabled = evIndex === 0;
@@ -3538,7 +3670,7 @@ document.addEventListener("DOMContentLoaded", () => {
         figSky.querySelector("figcaption").textContent = ev.moving_dot ? "Whole sky, path marked" : (crop ? "Whole sky, event boxed" : "Whole sky");
         evQ(".ev-images").classList.toggle("single", !crop || !ev.sky_url);
         evQ(".ev-summary").textContent = eventSummary(ev);
-        evQ(".ev-facts").innerHTML = eventFacts(ev).map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+        evQ(".ev-facts").innerHTML = eventFacts(ev).map(([k, v, isHtml]) => `<div><dt>${escapeHtml(k)}</dt><dd>${isHtml ? v : escapeHtml(v)}</dd></div>`).join("");
         const oc = evQ(".ev-open-crop"), os = evQ(".ev-open-sky");
         oc.hidden = !crop; os.hidden = !ev.sky_url;
         if (crop) oc.href = crop;
@@ -3587,13 +3719,13 @@ document.addEventListener("DOMContentLoaded", () => {
     function eventRowHtml(ev, i) {
         const when = new Date(ev.timestamp);
         const thumb = ev.thumbnail_url
-            ? `<img class="event-thumb" src="${ev.thumbnail_url}" alt="${ev.type}" loading="lazy" />`
+            ? `<img class="event-thumb" src="${escapeHtml(ev.thumbnail_url)}" alt="${escapeHtml(ev.type)}" loading="lazy" />`
             : "--";
         return `
             <tr class="event-row" data-event-idx="${i}" title="Click for details">
                 <td>${thumb}</td>
-                <td><span class="ev-pill" style="--pill:${EVENT_COLORS[ev.type] || "var(--accent)"}">${EVENT_LABELS[ev.type] || ev.type}</span></td>
-                <td title="${ev.timestamp}">${when.toLocaleTimeString()}<br><span class="text-muted">${timeAgo(when)}</span></td>
+                <td><span class="ev-pill" style="--pill:${EVENT_COLORS[ev.type] || "var(--accent)"}">${escapeHtml(EVENT_LABELS[ev.type] || ev.type)}</span></td>
+                <td title="${escapeHtml(ev.timestamp)}">${fmtLocalIso(ev.timestamp, true)} ${tzLabel}<br><span class="text-muted">${timeAgo(when)}</span></td>
                 <td>${eventDetails(ev)}${ev.flight ? `<br>${flightHtml(ev)}` : ""}</td>
                 <td><button type="button" class="btn btn-sm btn-outline">Details</button></td>
             </tr>`;
@@ -3677,11 +3809,11 @@ document.addEventListener("DOMContentLoaded", () => {
             liveEventsSeen.add(ev.event_id);
             const label = EVENT_LABELS[ev.type] || ev.type;
             const thumb = ev.thumbnail_url
-                ? `<img src="${ev.thumbnail_url}" alt="${ev.type}" loading="lazy" />`
+                ? `<img src="${escapeHtml(ev.thumbnail_url)}" alt="${escapeHtml(ev.type)}" loading="lazy" />`
                 : `<span class="no-thumb"></span>`;
             li.innerHTML = `${thumb}<div>
-                <div class="ev-type">${label}</div>
-                <div class="ev-time" title="${when.toLocaleString()}">${when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · ${timeAgo(when)}</div>
+                <div class="ev-type">${escapeHtml(label)}</div>
+                <div class="ev-time" title="${fmtLocalIso(ev.timestamp)} ${tzLabel}">${fmtLocalIso(ev.timestamp, true)} · ${timeAgo(when)}</div>
                 <div class="ev-detail">${ev.flight ? flightHtml(ev) : eventDetails(ev)}</div></div>`;
             liveEventsList.appendChild(li);
         });
@@ -3742,9 +3874,9 @@ document.addEventListener("DOMContentLoaded", () => {
             return `<li class="flight${a.in_view ? " in-view" : ""}">
                 <div class="fl-top"><a href="${url}" target="_blank" rel="noopener" class="flight-tag">✈ ${name}</a>${hdg}<span class="fl-where">${where}</span></div>
                 <div class="fl-meta">
-                    <span title="Altitude">${Number(a.altitude_m).toLocaleString()} m${climb}</span>
-                    <span title="Ground speed">${a.speed_kmh != null ? `${a.speed_kmh} km/h` : "-- km/h"}</span>
-                    <span title="Distance from the camera">${a.distance_km} km</span>
+                    <span title="Altitude">${escapeHtml(Number(a.altitude_m).toLocaleString())} m${climb}</span>
+                    <span title="Ground speed">${a.speed_kmh != null ? `${escapeHtml(a.speed_kmh)} km/h` : "-- km/h"}</span>
+                    <span title="Distance from the camera">${escapeHtml(a.distance_km)} km</span>
                 </div></li>`;
         }).join("");
     }
@@ -3785,6 +3917,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!eventToggles.length) return;
         try {
             const res = await fetch("/api/events/config");
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             syncEventConfigUI(await res.json());
         } catch (err) {
             showAlert(stationAlert, `❌ Could not load event detection settings: ${err.message}`, "error", true);

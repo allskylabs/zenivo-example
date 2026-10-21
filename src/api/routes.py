@@ -29,6 +29,7 @@ from src.api.schemas import (
     FocusConfigRequest,
     LensRequest,
     LensAutofocusRequest,
+    ObsOverlayRequest,
 )
 from src.api.service import AllSkyService
 from src.api.stream import mjpeg_frame_generator, handle_live_websocket, sse_event_generator
@@ -780,3 +781,30 @@ def reset_station_calibration(service: AllSkyService = Depends(get_service)):
 def get_station_plate_solve_status(service: AllSkyService = Depends(get_service)):
     """State of the background plate-solve job (idle / running / success / failed)."""
     return service.get_plate_solve_status()
+
+
+# ----------------------------------------------------------------------
+# OBS Studio & Live Overlay Synchronization Endpoints
+# ----------------------------------------------------------------------
+
+
+@router.get("/api/obs/overlay")
+def get_obs_overlay(service: AllSkyService = Depends(get_service)):
+    """Retrieve current OBS overlay settings (stars, labels, grid, compass, framing, theme)."""
+    return service.get_obs_overlay()
+
+
+@router.post("/api/obs/overlay")
+async def set_obs_overlay(
+    req: ObsOverlayRequest,
+    service: AllSkyService = Depends(get_service),
+):
+    """Update OBS overlay display settings and broadcast instantly to all connected viewers."""
+    patch = {k: v for k, v in req.model_dump().items() if v is not None}
+    updated = service.set_obs_overlay(patch)
+    try:
+        from src.api.stream import ws_manager
+        await ws_manager.broadcast_json({"type": "obs_overlay", "settings": updated})
+    except Exception:
+        pass
+    return {"success": True, "settings": updated}
