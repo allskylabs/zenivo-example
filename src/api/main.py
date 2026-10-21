@@ -49,7 +49,11 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
     web_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))
     if os.path.isdir(web_dir):
         # The page shell must revalidate so a new ?v= on app.js/style.css reaches browsers
-        no_cache = {"Cache-Control": "no-cache"}
+        no_cache = {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
 
         # Mount static directory
         app.mount("/static", StaticFiles(directory=web_dir), name="static")

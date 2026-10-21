@@ -523,3 +523,57 @@ def test_day_targets_avoid_sky_moving_cloud_and_known_walls(lens_client):
     svc._remember_day_targets([{"cx": c[0]["cx"], "cy": c[0]["cy"], "vertex": 0.3}], [])
     again = svc._day_focus_candidates(frame, frame2, k=4, side=64)
     assert again[0].get("saved")  # the remembered target comes first next time
+
+
+def test_16x9_bottom_horizon_found_under_92pct_sky_mask(lens_client):
+    client, svc, cam = lens_client
+    rng = np.random.default_rng(11)
+    h, w = 648, 1152  # 16:9 camera (downscales to 768x432 in find_focus_tiles, where 432 % 64 = 48)
+    frame = np.full((h, w, 3), 65, np.uint8)
+    # Cloud texture inside the top 90 % sky mask that is sharper than the sky but must be rejected by sky_mask
+    cloud = rng.integers(50, 140, (80, 120), dtype=np.uint8)
+    frame[120:200, 300:420] = np.dstack([cloud] * 3)
+    # Distant rooftop / horizon lights in the bottom 8 % (y = 590..648, cy ~ 0.926)
+    horizon = rng.integers(20, 230, (54, 120), dtype=np.uint8)
+    frame[590:644, 500:620] = np.dstack([horizon] * 3)
+    svc.station_config["sky_mask"] = {
+        "sky": [[[0.0, 0.0], [1.0, 0.0], [1.0, 0.89], [0.0, 0.89]]],
+        "obstruction": [[[0.0, 0.89], [1.0, 0.89], [1.0, 1.0], [0.0, 1.0]]],
+    }
+    svc.last_frame = frame
+    cands = svc._day_focus_candidates(frame, k=1)
+    assert cands and cands[0]["cy"] >= 0.88, cands
+    pt = svc.focus_auto_point()
+    assert pt["found"] is True and pt["point"]["cy"] >= 0.88
+
+
+def test_skyglow_night_star_hfr_with_sky_mask():
+    from src.analytics.focus import find_focus_point, measure_focus
+    rng = np.random.default_rng(19)
+    h, w = 648, 1152
+    img = np.clip(134.0 + rng.normal(0, 1.5, (h, w)), 0, 255).astype(np.float32)
+    yy, xx = np.mgrid[0:h, 0:w]
+    for sx, sy, amp in [(720, 260, 105.0), (680, 220, 80.0), (760, 290, 75.0), (500, 180, 90.0)]:
+        img += amp * np.exp(-((xx - sx) ** 2 + (yy - sy) ** 2) / (2 * 1.4 ** 2))
+    frame = np.dstack([np.clip(img, 0, 255).astype(np.uint8)] * 3)
+    sky_mask = np.zeros((h, w), dtype=np.uint8)
+    sky_mask[40:560, 40:1110] = 1
+    pt = find_focus_point(frame, sky_mask=sky_mask, is_night=True)
+    assert pt is not None and pt["method"] == "stars"
+    assert abs(pt["cx"] - 720 / w) < 0.03 and abs(pt["cy"] - 260 / h) < 0.03
+    crop = frame[260 - 128:260 + 128, 720 - 128:720 + 128]
+    res = measure_focus(crop, "auto")
+    assert res["method"] == "stars" and res["lower_is_better"] is True
+    assert res["hfr"] < 2.2 and res["fwhm"] < 4.4 and res["n_sources"] >= 3
+
+
+def test_manual_vs_auto_roi_mode_preserved(lens_client):
+    client, svc, cam = lens_client
+    st = client.post("/api/focus/config", json={"cx": 0.22, "cy": 0.33}).json()
+    assert st["roi_mode"] == "manual" and st["cx"] == 0.22 and st["cy"] == 0.33
+    started = client.post("/api/focus/start", json={"roi_mode": "manual", "autofocus": False}).json()
+    assert started["roi_mode"] == "manual" and started["cx"] == 0.22 and started["cy"] == 0.33
+    auto_st = client.post("/api/focus/auto-point").json()
+    assert auto_st["roi_mode"] == "auto" and auto_st["found"] is True
+
+

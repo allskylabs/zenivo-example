@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllSky Observatory — Edge Dashboard</title>
-    <link rel="stylesheet" href="/style.css?v=20261021gl2">
+    <link rel="stylesheet" href="/style.css?v=20261021fixaf1">
 </head>
 <body class="dark-mode">
     <!-- Top Navigation Header -->
@@ -836,11 +836,51 @@
                             </div>
                         </aside>
                     </div>
-                    <div class="focus-chart-head">
-                        <strong id="focus-chart-title">Focus curve</strong>
-                        <button class="btn btn-sm btn-outline" id="focus-reset" title="Forget the curve and best score (R)">Reset (R)</button>
+                    <div class="focus-charts-grid">
+                        <!-- Chart 1: Lens V-Curve (Vị trí lens vs Kích thước sao HFR / Độ nét) -->
+                        <div class="focus-chart-card">
+                            <div class="focus-chart-head">
+                                <div class="focus-chart-title-wrap">
+                                    <strong id="focus-lens-chart-title">Lens V-Curve</strong>
+                                    <span class="focus-badge" id="focus-chart-fit-badge">V-CURVE</span>
+                                </div>
+                                <div class="focus-seg" id="focus-chart-metric">
+                                    <button data-chart-metric="starsize" class="active" title="Kích thước sao: HFR / FWHM (px) - Càng nhỏ càng nét">Kích thước sao (HFR)</button>
+                                    <button data-chart-metric="sharpness" title="Độ nét: Edge contrast / Sharpness - Càng lớn càng nét">Độ nét (Sharpness)</button>
+                                </div>
+                                <div class="header-actions focus-chart-actions">
+                                    <button class="btn btn-sm btn-success" id="focus-go-best" hidden title="Quay lại vị trí lens nét nhất tìm được trên biểu đồ">★ Tốt nhất (<span id="focus-best-pos-val">—</span>)</button>
+                                    <button class="btn btn-sm btn-outline" id="focus-record-point" title="Ghi nhận điểm đo tại vị trí lens hiện tại vào biểu đồ">Ghi điểm</button>
+                                    <button class="btn btn-sm btn-outline" id="focus-reset" title="Xóa dữ liệu biểu đồ và làm mới (R)">Reset (R)</button>
+                                </div>
+                            </div>
+                            <canvas id="focus-lens-chart" class="focus-chart"></canvas>
+                            <div class="focus-chart-summary" id="focus-chart-summary">
+                                <span>Vị trí lens: <b id="focus-curve-cur-pos">—</b></span>
+                                <span id="focus-curve-best-wrap">· Điểm nét nhất: <b id="focus-curve-best-info" class="text-success">—</b></span>
+                                <span id="focus-curve-n-wrap">· Đã đo: <b id="focus-curve-points-count">0</b> vị trí</span>
+                                <span id="focus-curve-hint" class="text-muted">· Bấm biểu đồ để chọn vị trí</span>
+                            </div>
+                        </div>
+
+                        <!-- Chart 2: Live Time History (Độ nét & Kích thước sao theo chuỗi frame) -->
+                        <div class="focus-chart-card">
+                            <div class="focus-chart-head">
+                                <div class="focus-chart-title-wrap">
+                                    <strong id="focus-time-chart-title">Live Time History (Theo thời gian thực)</strong>
+                                    <span class="focus-badge">TIME STREAM</span>
+                                </div>
+                                <div class="focus-chart-subtext text-muted">
+                                    Độ nét &amp; HFR theo chuỗi frame liên tục
+                                </div>
+                            </div>
+                            <canvas id="focus-time-chart" class="focus-chart"></canvas>
+                            <div class="focus-chart-summary">
+                                <span>Dải đo: <b id="focus-time-range-info">60 frame gần nhất</b></span>
+                                <span id="focus-time-status-info" class="text-muted">· Dải mờ: mức nhiễu nền (noise band)</span>
+                            </div>
+                        </div>
                     </div>
-                    <canvas id="focus-chart" class="focus-chart"></canvas>
                 </div>
                 <div class="focus-side">
                     <div class="card">
@@ -870,10 +910,17 @@
                         <div class="focus-field">
                             <span class="focus-field-label">Measure</span>
                             <div class="focus-seg" id="focus-method">
-                                <button data-method="auto" class="active" title="Pick stars, lights or contrast from the image">Auto</button>
-                                <button data-method="stars" title="Half-flux radius of unsaturated stars (night sky)">Stars</button>
-                                <button data-method="lights" title="Half-flux radius of bright point lights, saturated allowed (night town)">Lights</button>
-                                <button data-method="contrast" title="Edge contrast (daytime: buildings, trees, antennas)">Day</button>
+                                <button data-method="auto" class="active" title="Tự động: ban đêm đo kích thước sao (HFR/FWHM px), ban ngày đo tương phản cạnh">Auto</button>
+                                <button data-method="stars" title="Đo kích thước sao HFR / FWHM (px) — sao càng nhỏ càng nét">Stars (HFR)</button>
+                                <button data-method="lights" title="Đo kích thước điểm sáng HFR (px) — càng nhỏ càng nét">Lights</button>
+                                <button data-method="contrast" title="Đo độ tương phản cạnh (ban ngày: nhà cửa, cây cối, đường chân trời)">Day</button>
+                            </div>
+                        </div>
+                        <div class="focus-field">
+                            <span class="focus-field-label" title="Chế độ chọn vị trí vùng lấy nét (ROI): Tự động chọn ngôi sao/chi tiết tốt nhất hoặc Thủ công giữ cố định nơi bạn bấm chọn">Vị trí Focus</span>
+                            <div class="focus-seg" id="focus-roi-mode">
+                                <button data-roi-mode="auto" class="active" title="Tự động tìm ngôi sao sáng nhất (ban đêm) hoặc vùng chi tiết nhất (ban ngày)">Tự động (Auto)</button>
+                                <button data-roi-mode="manual" title="Thủ công: giữ cố định khung lấy nét tại vị trí bạn bấm chọn trên ảnh">Thủ công (Manual)</button>
                             </div>
                         </div>
                         <div class="focus-field">
@@ -898,30 +945,22 @@
                             </select>
                         </div>
                         <div class="btn-group focus-btns">
-                            <button class="btn btn-sm btn-outline" id="focus-pick-star" title="Centre the zoom on the best unsaturated star">Find star</button>
-                            <button class="btn btn-sm btn-outline" id="focus-pick-light" title="Centre the zoom on the brightest point light">Find light</button>
-                            <button class="btn btn-sm btn-primary" id="focus-auto-point" title="Put the zoom on the best focus target: a star or light by night, the most detailed area by day">Auto point</button>
+                            <button class="btn btn-sm btn-outline" id="focus-pick-star" title="Tìm và khóa vào ngôi sao sáng chưa bão hòa tốt nhất">Find star</button>
+                            <button class="btn btn-sm btn-outline" id="focus-pick-light" title="Tìm và khóa vào điểm sáng rõ nhất">Find light</button>
+                            <button class="btn btn-sm btn-primary" id="focus-auto-point" title="Tự động đặt vùng lấy nét vào ngôi sao (ban đêm) hoặc vùng chi tiết (ban ngày)">Auto point</button>
                         </div>
                     </div>
-                    <div class="card" id="focus-lens-card" hidden>
+                    <div class="card" id="focus-lens-card">
                         <div class="card-header">
-                            <h2>Lens</h2>
+                            <h2>Lens &amp; Focus <span class="focus-badge" id="focus-lens-type-badge">MANUAL</span></h2>
                             <div class="focus-seg focus-afmf" id="focus-lens-mode">
-                                <button data-lens-mode="auto" title="AF: the app finds focus by itself (sweep on stars, lights or detail) and keeps it (temperature, periodic checks). Click again to refocus now.">AF</button>
-                                <button data-lens-mode="manual" title="MF: you set the focus with the slider; the lens stays exactly there">MF</button>
+                                <button data-lens-mode="auto" id="focus-lens-mode-af" title="AF: the app finds focus by itself (sweep on stars, lights or detail) and keeps it (temperature, periodic checks). Click again to refocus now.">AF</button>
+                                <button data-lens-mode="manual" id="focus-lens-mode-mf" title="MF: manual focus with the slider or dial; points are plotted on the curve">MF</button>
                             </div>
                         </div>
                         <div class="focus-lens-pos"><b id="focus-lens-pos">—</b> <span class="text-muted" id="focus-lens-dist"></span></div>
-                        <div class="focus-hint text-muted" id="focus-lens-saved">&nbsp;</div>
-                        <input type="range" id="focus-lens-slider" min="0" max="3" step="0.005" value="0" aria-label="Lens position (dioptres)">
-                        <div class="btn-group focus-btns focus-lens-nudge">
-                            <button class="btn btn-sm btn-outline" data-lens-delta="-0.1">−0.1</button>
-                            <button class="btn btn-sm btn-outline" data-lens-delta="-0.02">−0.02</button>
-                            <button class="btn btn-sm btn-outline" data-lens-delta="-0.005">−0.005</button>
-                            <button class="btn btn-sm btn-outline" data-lens-delta="0.005">+0.005</button>
-                            <button class="btn btn-sm btn-outline" data-lens-delta="0.02">+0.02</button>
-                            <button class="btn btn-sm btn-outline" data-lens-delta="0.1">+0.1</button>
-                        </div>
+                        <div class="focus-meter" id="focus-lens-progress-wrap" hidden><div class="focus-meter-fill good" id="focus-lens-progress"></div></div>
+                        <div class="focus-hint focus-lens-status"><span id="focus-lens-msg">&nbsp;</span> <button class="btn btn-sm btn-outline" id="focus-lens-cancel" hidden>Cancel</button></div>
                         <div class="focus-field focus-af-row" id="focus-af-row" hidden>
                             <span class="focus-field-label">Refocus every</span>
                             <select id="focus-refocus-every" title="AF runs a full sweep this often (when there is something to focus on)">
@@ -934,8 +973,16 @@
                             </select>
                             <button class="btn btn-sm btn-primary" id="focus-refocus-now" title="Find focus now (enters focus mode for the sweep)">Refocus now</button>
                         </div>
-                        <div class="focus-meter" id="focus-lens-progress-wrap" hidden><div class="focus-meter-fill good" id="focus-lens-progress"></div></div>
-                        <div class="focus-hint focus-lens-status"><span id="focus-lens-msg">&nbsp;</span> <button class="btn btn-sm btn-outline" id="focus-lens-cancel" hidden>Cancel</button></div>
+                        <div class="focus-hint text-muted" id="focus-lens-saved">&nbsp;</div>
+                        <input type="range" id="focus-lens-slider" min="0" max="3" step="0.005" value="0" aria-label="Lens position (dioptres)">
+                        <div class="btn-group focus-btns focus-lens-nudge">
+                            <button class="btn btn-sm btn-outline" data-lens-delta="-0.1">−0.1</button>
+                            <button class="btn btn-sm btn-outline" data-lens-delta="-0.02">−0.02</button>
+                            <button class="btn btn-sm btn-outline" data-lens-delta="-0.005">−0.005</button>
+                            <button class="btn btn-sm btn-outline" data-lens-delta="0.005">+0.005</button>
+                            <button class="btn btn-sm btn-outline" data-lens-delta="0.02">+0.02</button>
+                            <button class="btn btn-sm btn-outline" data-lens-delta="0.1">+0.1</button>
+                        </div>
                         <div class="focus-hint text-muted" id="focus-lens-comp"></div>
                         <div class="focus-hint text-muted" id="focus-lens-track-msg"></div>
                         <button class="btn btn-sm btn-outline" id="focus-lens-reset-learning" title="Forget the focus-vs-temperature samples, e.g. after moving or refitting the camera">Reset temperature learning</button>
@@ -1007,8 +1054,8 @@
 
     <!-- App JavaScript -->
     <script src="/static/sky_catalog.js"></script>
-    <script src="/app.js?v=20261021dy2"></script>
-    <script src="/static/activity.js?v=20261016h"></script>
-    <script src="/static/focus.js?v=20261019ff"></script>
+    <script src="/app.js?v=20261021lg2"></script>
+    <script src="/static/activity.js?v=20261021lg1"></script>
+    <script src="/static/focus.js?v=20261022af2"></script>
 </body>
 </html>

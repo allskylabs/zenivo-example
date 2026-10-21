@@ -6,22 +6,23 @@
     <title>AllSky OBS Custom Dock</title>
     <style>
         :root {
-            --bg-base: #121316;
-            --bg-card: #1c1d22;
-            --bg-card-hover: #23252b;
-            --bg-input: #282a32;
-            --border: #2e313b;
+            --bg-base: #101114;
+            --bg-card: #18191f;
+            --bg-card-hover: #21232b;
+            --bg-input: #262833;
+            --border: #333644;
             --border-focus: #38bdf8;
-            --text-main: #f1f5f9;
-            --text-muted: #94a3b8;
-            --text-dim: #64748b;
+            --text-main: #f8fafc;
+            --text-muted: #cbd5e1;
+            --text-dim: #94a3b8;
             --accent: #38bdf8;
-            --accent-glow: rgba(56, 189, 248, 0.25);
+            --accent-hover: #7dd3fc;
+            --accent-glow: rgba(56, 189, 248, 0.35);
             --success: #10b981;
             --warning: #f59e0b;
             --danger: #ef4444;
-            --radius-sm: 6px;
-            --radius-md: 10px;
+            --radius-sm: 8px;
+            --radius-md: 12px;
         }
 
         * {
@@ -36,9 +37,9 @@
             background-color: var(--bg-base);
             color: var(--text-main);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
-            font-size: 13px;
-            line-height: 1.4;
-            padding: 10px;
+            font-size: 15px;
+            line-height: 1.45;
+            padding: 12px;
             overflow-y: auto;
             overflow-x: hidden;
         }
@@ -48,51 +49,52 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding-bottom: 8px;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 12px;
         }
 
         .dock-title-group {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
         }
 
         .status-dot {
-            width: 10px;
-            height: 10px;
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
             background-color: var(--warning);
-            box-shadow: 0 0 8px var(--warning);
+            box-shadow: 0 0 10px var(--warning);
             transition: all 0.3s ease;
+            flex-shrink: 0;
         }
 
         .status-dot.online {
             background-color: var(--success);
-            box-shadow: 0 0 8px var(--success);
+            box-shadow: 0 0 10px var(--success);
         }
 
         .status-dot.offline {
             background-color: var(--danger);
-            box-shadow: 0 0 8px var(--danger);
+            box-shadow: 0 0 10px var(--danger);
         }
 
         .dock-title {
-            font-size: 14px;
-            font-weight: 700;
+            font-size: 17px;
+            font-weight: 800;
             letter-spacing: 0.3px;
-            color: #fff;
+            color: #ffffff;
         }
 
         .badge-live {
-            background: rgba(16, 185, 129, 0.15);
-            color: var(--success);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            font-size: 10px;
-            font-weight: 700;
-            padding: 2px 6px;
-            border-radius: 4px;
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            font-size: 11px;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 6px;
             text-transform: uppercase;
         }
 
@@ -101,12 +103,12 @@
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
-            padding: 8px 10px;
-            margin-bottom: 12px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 6px;
+            gap: 8px;
         }
 
         .url-info {
@@ -114,12 +116,14 @@
             text-overflow: ellipsis;
             white-space: nowrap;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 11px;
+            font-size: 13px;
             color: var(--text-muted);
+            font-weight: 600;
         }
 
         .url-info strong {
             color: var(--accent);
+            font-weight: 700;
         }
 
         .btn-icon {
@@ -127,14 +131,14 @@
             border: 1px solid var(--border);
             color: var(--text-main);
             border-radius: var(--radius-sm);
-            padding: 4px 8px;
-            font-size: 11px;
-            font-weight: 600;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 700;
             cursor: pointer;
             transition: all 0.15s ease;
             display: inline-flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
             white-space: nowrap;
         }
 
@@ -153,17 +157,17 @@
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
-            padding: 10px;
-            margin-bottom: 12px;
+            padding: 12px 14px;
+            margin-bottom: 14px;
         }
 
         .section-title {
-            font-size: 11px;
-            font-weight: 700;
+            font-size: 13px;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.6px;
-            color: var(--text-dim);
-            margin-bottom: 8px;
+            letter-spacing: 0.8px;
+            color: var(--accent);
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -173,27 +177,32 @@
         .presets-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 6px;
+            gap: 8px;
             margin-bottom: 4px;
         }
 
         .btn-preset {
             background: var(--bg-input);
-            border: 1px solid var(--border);
+            border: 1.5px solid var(--border);
             color: var(--text-main);
             border-radius: var(--radius-sm);
-            padding: 8px 6px;
-            font-size: 11px;
-            font-weight: 600;
+            padding: 10px 8px;
+            font-size: 13px;
+            font-weight: 700;
             cursor: pointer;
             text-align: center;
             transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
 
         .btn-preset:hover {
             background: var(--bg-card-hover);
             border-color: var(--accent);
-            color: var(--accent);
+            color: var(--accent-hover);
+            box-shadow: 0 0 10px var(--accent-glow);
         }
 
         .btn-preset:active {
@@ -205,8 +214,8 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 7px 4px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            padding: 10px 4px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
             cursor: pointer;
         }
 
@@ -217,28 +226,31 @@
         .switch-label-group {
             display: flex;
             flex-direction: column;
-            gap: 1px;
+            gap: 3px;
+            padding-right: 12px;
         }
 
         .switch-title {
-            font-weight: 600;
+            font-size: 15px;
+            font-weight: 700;
             color: var(--text-main);
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
         }
 
         .switch-desc {
-            font-size: 10px;
+            font-size: 12px;
             color: var(--text-dim);
+            line-height: 1.35;
         }
 
-        /* Custom Toggle Switch */
+        /* Big Toggle Switch */
         .switch {
             position: relative;
             display: inline-block;
-            width: 36px;
-            height: 20px;
+            width: 52px;
+            height: 28px;
             flex-shrink: 0;
         }
 
@@ -256,30 +268,31 @@
             right: 0;
             bottom: 0;
             background-color: var(--bg-input);
-            border: 1px solid var(--border);
-            transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 20px;
+            border: 2px solid var(--border);
+            transition: .22s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 28px;
         }
 
         .slider:before {
             position: absolute;
             content: "";
-            height: 14px;
-            width: 14px;
+            height: 20px;
+            width: 20px;
             left: 2px;
             bottom: 2px;
-            background-color: var(--text-muted);
-            transition: .2s cubic-bezier(0.4, 0, 0.2, 1);
+            background-color: var(--text-dim);
+            transition: .22s cubic-bezier(0.4, 0, 0.2, 1);
             border-radius: 50%;
         }
 
         input:checked + .slider {
             background-color: var(--accent);
             border-color: var(--accent);
+            box-shadow: 0 0 12px var(--accent-glow);
         }
 
         input:checked + .slider:before {
-            transform: translateX(16px);
+            transform: translateX(24px);
             background-color: #0b1120;
         }
 
@@ -287,11 +300,11 @@
         .seg-control {
             display: flex;
             background: var(--bg-input);
-            border: 1px solid var(--border);
+            border: 1.5px solid var(--border);
             border-radius: var(--radius-sm);
-            padding: 2px;
-            gap: 2px;
-            margin-top: 4px;
+            padding: 3px;
+            gap: 4px;
+            margin-top: 6px;
         }
 
         .seg-btn {
@@ -299,10 +312,10 @@
             background: transparent;
             border: none;
             color: var(--text-muted);
-            padding: 5px 8px;
-            font-size: 11px;
-            font-weight: 600;
-            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 6px;
             cursor: pointer;
             transition: all 0.15s ease;
             text-align: center;
@@ -311,31 +324,32 @@
         .seg-btn.active {
             background: var(--accent);
             color: #0b1120;
-            font-weight: 700;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            font-weight: 800;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
         }
 
         /* Slider Control */
         .range-wrapper {
-            margin-top: 8px;
+            margin-top: 10px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
         }
 
         .range-slider {
             flex: 1;
+            height: 6px;
             accent-color: var(--accent);
             cursor: pointer;
         }
 
         .range-val {
             font-family: ui-monospace, monospace;
-            font-size: 11px;
+            font-size: 14px;
             color: var(--accent);
-            min-width: 36px;
+            min-width: 44px;
             text-align: right;
-            font-weight: 600;
+            font-weight: 800;
         }
 
         /* Mini Preview Stage */
@@ -344,7 +358,7 @@
             width: 100%;
             aspect-ratio: 16 / 9;
             background: #000;
-            border: 1px solid var(--border);
+            border: 1.5px solid var(--border);
             border-radius: var(--radius-sm);
             overflow: hidden;
             margin-top: 8px;
@@ -370,29 +384,31 @@
         .telem-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 6px;
+            gap: 8px;
             margin-top: 6px;
         }
 
         .telem-pill {
             background: var(--bg-input);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: var(--radius-sm);
-            padding: 5px 8px;
+            padding: 8px 10px;
             display: flex;
             flex-direction: column;
+            gap: 2px;
         }
 
         .telem-pill-label {
-            font-size: 9px;
+            font-size: 11px;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.4px;
+            letter-spacing: 0.5px;
             color: var(--text-dim);
         }
 
         .telem-pill-val {
-            font-size: 11px;
-            font-weight: 700;
+            font-size: 14px;
+            font-weight: 800;
             font-family: ui-monospace, monospace;
             color: var(--text-main);
             overflow: hidden;
@@ -403,16 +419,16 @@
         /* Toast notification */
         .toast {
             position: fixed;
-            bottom: 12px;
+            bottom: 16px;
             left: 50%;
             transform: translateX(-50%) translateY(20px);
-            background: rgba(16, 185, 129, 0.95);
+            background: rgba(16, 185, 129, 0.96);
             color: #0b1120;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 6px 14px;
-            border-radius: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            font-size: 13px;
+            font-weight: 800;
+            padding: 8px 18px;
+            border-radius: 24px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
             opacity: 0;
             pointer-events: none;
             transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -433,29 +449,29 @@
             <span class="dock-title">AllSky OBS Control</span>
             <span class="badge-live" id="stream-type-badge">LIVE</span>
         </div>
-        <div style="display: flex; gap: 4px;">
-            <button id="btn-refresh" class="btn-icon" title="Refresh Live Snapshot">📸 Snap</button>
-            <button id="btn-popout" class="btn-icon" title="Mở trang /obs trong tab mới">↗ View</button>
+        <div style="display: flex; gap: 6px;">
+            <button id="btn-refresh" class="btn-icon" title="Làm mới khung hình">📸 Snap</button>
+            <button id="btn-popout" class="btn-icon" title="Mở /obs trong tab mới">↗ Xem</button>
         </div>
     </header>
 
     <!-- Browser Source URL Helper -->
     <div class="url-card">
         <div class="url-info" title="Browser Source URL cho OBS Studio">
-            OBS URL: <strong>https://allsky.hoan.uk/obs</strong>
+            URL: <strong>https://allsky.hoan.uk/obs</strong>
         </div>
-        <button id="btn-copy-url" class="btn-icon" title="Sao chép URL vào bộ nhớ tạm">📋 Copy</button>
+        <button id="btn-copy-url" class="btn-icon" title="Sao chép URL vào bộ nhớ tạm">📋 Copy URL</button>
     </div>
 
     <!-- Quick Presets -->
     <section class="section-card">
         <div class="section-title">
-            <span>Chế độ hiển thị nhanh (Presets)</span>
+            <span>Chế độ nhanh (Presets)</span>
         </div>
         <div class="presets-grid">
             <button id="preset-astro" class="btn-preset">🌌 Thiên văn đầy đủ</button>
-            <button id="preset-clean" class="btn-preset">🔭 Ngắm trời (sao mịn)</button>
-            <button id="preset-raw" class="btn-preset">📷 Camera thuần khiết</button>
+            <button id="preset-clean" class="btn-preset">🔭 Ngắm sao sạch</button>
+            <button id="preset-raw" class="btn-preset">📷 Video mộc (Raw)</button>
             <button id="preset-grid" class="btn-preset">🧭 Lưới &amp; La bàn</button>
         </div>
     </section>
@@ -463,14 +479,14 @@
     <!-- Overlay Toggles -->
     <section class="section-card">
         <div class="section-title">
-            <span>Các lớp thiên văn (Overlays)</span>
+            <span>Bật / Tắt lớp hiển thị (Overlays)</span>
         </div>
 
         <!-- Stars & Constellations -->
         <label class="switch-row" for="chk-sky-overlay">
             <div class="switch-label-group">
                 <span class="switch-title">🌟 Sao &amp; Chòm sao</span>
-                <span class="switch-desc">88 chòm sao IAU, đường nối &amp; sao sáng</span>
+                <span class="switch-desc">88 chòm sao IAU, đường nối &amp; sao định vị</span>
             </div>
             <div class="switch">
                 <input type="checkbox" id="chk-sky-overlay">
@@ -482,7 +498,7 @@
         <label class="switch-row" for="chk-sky-labels">
             <div class="switch-label-group">
                 <span class="switch-title">🏷️ Tên &amp; Nhãn</span>
-                <span class="switch-desc">Tên chòm sao (Orion, Ursa Major...) &amp; sao</span>
+                <span class="switch-desc">Tên chòm sao (Orion, Puppis...) &amp; tên sao sáng</span>
             </div>
             <div class="switch">
                 <input type="checkbox" id="chk-sky-labels">
@@ -494,7 +510,7 @@
         <label class="switch-row" for="chk-grid-overlay">
             <div class="switch-label-group">
                 <span class="switch-title">🧭 Lưới &amp; La bàn</span>
-                <span class="switch-desc">Vòng cao độ Alt/Az &amp; hướng Đông Tây Nam Bắc</span>
+                <span class="switch-desc">Vòng cao độ Alt/Az và hướng Đông Tây Nam Bắc</span>
             </div>
             <div class="switch">
                 <input type="checkbox" id="chk-grid-overlay">
@@ -530,19 +546,19 @@
     <!-- Display & Framing Options -->
     <section class="section-card">
         <div class="section-title">
-            <span>Khung hình &amp; Hiệu ứng (Visuals)</span>
+            <span>Khung hình &amp; Hiệu ứng</span>
         </div>
 
-        <div style="margin-bottom: 8px;">
-            <span class="switch-title" style="font-size: 11px;">Khung hình (Fit Mode)</span>
+        <div style="margin-bottom: 10px;">
+            <span class="switch-title" style="font-size: 13px;">Khung hình (Fit Mode)</span>
             <div class="seg-control" id="seg-fit">
-                <button type="button" class="seg-btn active" data-fit="cover">Cover (16:9 Tràn)</button>
+                <button type="button" class="seg-btn active" data-fit="cover">Cover (16:9 Tràn viền)</button>
                 <button type="button" class="seg-btn" data-fit="contain">Contain (4:3 Gốc)</button>
             </div>
         </div>
 
-        <div style="margin-bottom: 8px;">
-            <span class="switch-title" style="font-size: 11px;">Nền (Background)</span>
+        <div style="margin-bottom: 10px;">
+            <span class="switch-title" style="font-size: 13px;">Màu nền (Background)</span>
             <div class="seg-control" id="seg-bg">
                 <button type="button" class="seg-btn active" data-bg="black">Đen (Black)</button>
                 <button type="button" class="seg-btn" data-bg="transparent">Trong suốt (Alpha)</button>
@@ -553,7 +569,7 @@
         <label class="switch-row" for="chk-night-vision">
             <div class="switch-label-group">
                 <span class="switch-title">🔴 Ánh sáng đỏ (Night Vision)</span>
-                <span class="switch-desc">Bảo vệ mắt quan sát bầu trời đêm</span>
+                <span class="switch-desc">Tông đỏ thiên văn bảo vệ mắt ban đêm</span>
             </div>
             <div class="switch">
                 <input type="checkbox" id="chk-night-vision">
@@ -562,9 +578,9 @@
         </label>
 
         <!-- Opacity Slider -->
-        <div style="margin-top: 8px;">
-            <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600;">
-                <span>Độ mờ nét vẽ (Opacity)</span>
+        <div style="margin-top: 10px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700;">
+                <span>Độ rõ nét vẽ (Opacity)</span>
                 <span id="txt-opacity" class="range-val">100%</span>
             </div>
             <div class="range-wrapper">
@@ -576,8 +592,8 @@
     <!-- Mini Live Preview -->
     <section class="section-card">
         <div class="section-title">
-            <span>Mini Monitor</span>
-            <button id="btn-toggle-preview" class="btn-icon" style="padding: 2px 6px; font-size: 10px;">Thu gọn</button>
+            <span>Màn hình xem trước (Monitor)</span>
+            <button id="btn-toggle-preview" class="btn-icon" style="padding: 3px 8px; font-size: 11px;">Thu gọn</button>
         </div>
         <div id="preview-box" class="preview-container">
             <img id="preview-img" class="preview-img" alt="Preview" />
@@ -610,7 +626,7 @@
     </section>
 
     <!-- Toast Notification -->
-    <div id="toast" class="toast">Đã cập nhật OBS</div>
+    <div id="toast" class="toast">Đã đồng bộ OBS</div>
 
     <script>
         (function () {
@@ -646,9 +662,9 @@
 
             // State
             let currentSettings = {
-                sky_overlay: false,
-                sky_labels: false,
-                grid_overlay: false,
+                sky_overlay: true,
+                sky_labels: true,
+                grid_overlay: true,
                 sun_moon: true,
                 badge: true,
                 fit: "cover",
@@ -841,7 +857,7 @@
                         0.000387933 * t * t -
                         (t * t * t) / 38710000.0) %
                     360.0;
-                const lon = stationConfig.longitude_deg || 105.8542;
+                const lon = stationConfig.longitude_deg || 105.9095;
                 const lmstDeg = ((gmst + lon) % 360.0 + 360.0) % 360.0;
                 const totalH = lmstDeg / 15.0;
                 const h = Math.floor(totalH);
@@ -870,7 +886,6 @@
 
                     ws.onmessage = function (ev) {
                         if (ev.data instanceof ArrayBuffer) {
-                            // Extract frame timestamp and telemetry from ASB1 if needed
                             const dv = new DataView(ev.data);
                             if (dv.getUint8(0) === 0x41 && dv.getUint8(1) === 0x53) {
                                 const exp = dv.getFloat32(16, true);

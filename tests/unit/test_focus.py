@@ -125,3 +125,23 @@ def test_focus_ends_without_user_action(client, monkeypatch):
         client.get("/api/focus/frame")  # a forgotten tab keeps polling
         time.sleep(0.3)
     assert not svc.focus.active
+
+
+def test_constant_flux_star_hfr_and_bayer_hot_pixel_rejection():
+    rng = np.random.default_rng(7)
+    size = 256
+    yy, xx = np.mgrid[0:size, 0:size]
+    scores = []
+    for sigma in (1.0, 1.3, 1.8, 2.5, 3.2):
+        img = np.full((size, size), 20, np.float32) + rng.normal(0, 2.0, (size, size))
+        for x, y, flux in [(60, 70, 800.0), (140, 90, 650.0), (190, 180, 700.0), (80, 190, 550.0)]:
+            peak = flux / (2.0 * np.pi * sigma ** 2)
+            img += peak * np.exp(-((xx - x) ** 2 + (yy - y) ** 2) / (2.0 * sigma ** 2))
+        # Inject single and 2-pixel Bayer-like hot spikes that must never be mistaken for sharp 1.16px stars
+        img[110, 110] = 180
+        img[110, 111] = 140
+        res = measure_focus(np.clip(img, 0, 255).astype(np.uint8), method="stars")
+        assert res["score"] is not None
+        scores.append(res["score"])
+    assert all(a < b for a, b in zip(scores, scores[1:])), scores
+

@@ -106,6 +106,7 @@
     }
 
     async function poll() {
+        if (document.hidden) return;
         try {
             const since = lastSeenId === null ? 0 : lastSeenId;
             const res = await fetch(`/api/logs?since_id=${since}&limit=50`);
@@ -155,4 +156,5 @@
 
     poll();
     setInterval(poll, POLL_MS);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
 })();

@@ -205,6 +205,7 @@ class PiCameraController(CameraDriverInterface):
 
     # ------------------------------------------------------------------
     def set_hardware_exposure(self, exposure_s: float, gain_db: float) -> Dict[str, Any]:
+        prev_exp = float(getattr(self, "current_exposure_s", 0.0) or 0.0)
         exp = max(self.min_exposure_s, min(self.max_exposure_s, float(exposure_s)))
         gain = max(self.min_gain_db, min(self.max_gain_db, float(gain_db)))
         self.current_exposure_s = exp
@@ -236,7 +237,19 @@ class PiCameraController(CameraDriverInterface):
             if self._has_brightness:
                 ctrls["Brightness"] = self.isp_brightness
                 ctrls["Contrast"] = self.isp_contrast
-            self.picam.set_controls(ctrls)
+            if self.is_open and prev_exp - exp > 0.8:
+                # Flushing queued multi-second night frames avoids a 3x prev_exp (10-15 s) stall when entering AF
+                try:
+                    if self.lens_range and self.lens_position_target is not None:
+                        ctrls["AfMode"] = 0
+                        ctrls["LensPosition"] = float(self.lens_position_target)
+                    self.picam.stop()
+                    self.picam.set_controls(ctrls)
+                    self.picam.start()
+                except Exception:
+                    self.picam.set_controls(ctrls)
+            else:
+                self.picam.set_controls(ctrls)
         return {
             "requested_exposure_s": exposure_s,
             "actual_exposure_s": round(exp, 6),
@@ -290,8 +303,16 @@ class PiCameraController(CameraDriverInterface):
                     # exposure. Only a value repeated over three frames is trusted as the floor below.
                     exp_ok = len(seen_us) >= 3 and all(abs(u - got_us) <= 2.0 for u in seen_us[-3:])
                 gain_ok = abs(got_gain - want_gain) <= max(0.08 * want_gain, 0.1)
-                done = (exp_ok and gain_ok) or time.time() > deadline or attempt == 5
+                lens_ok = True
+                if not getattr(self, "_lens_settled", True) and not self._af_running and self.lens_position_target is not None:
+                    got_lens = md.get("LensPosition")
+                    if attempt == 0:
+                        lens_ok = False  # frame was already exposing when set_lens_position was called
+                    elif got_lens is not None and attempt < 2:
+                        lens_ok = abs(float(got_lens) - float(self.lens_position_target)) <= 0.025
+                done = (exp_ok and gain_ok and lens_ok) or time.time() > deadline or attempt == 5
                 if done:
+                    self._lens_settled = True
                     # Copy only the frame that is kept, once, under a read-only DMA sync
                     # (make_array() maps it read-write, so every release also wrote the cache back)
                     frame = self._copy_main(req)
@@ -374,6 +395,9 @@ class PiCameraController(CameraDriverInterface):
             return None
         lo, hi, _ = self.lens_range
         pos = round(min(hi, max(lo, float(dioptres))), 4)
+        prev = self.lens_position if self.lens_position is not None else self.lens_position_target
+        if prev is None or abs(pos - float(prev)) >= 0.005:
+            self._lens_settled = False
         self.lens_position_target = pos
         self._af_running = False
         if self.picam is not None:

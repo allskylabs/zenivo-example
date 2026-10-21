@@ -9,6 +9,18 @@
 
     const onFocusPage = (window.location.pathname.replace(/\/+$/, "") || "/") === "/focus";
 
+    const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    // Same rule as app.js (fmtLocalIso + tzLabel): local wall-clock time with a zone label, "YYYY-MM-DD HH:MM[:SS] UTC+7"
+    function fmtWhen(t, timeOnly, noSec) {
+        const d = new Date(t);
+        if (isNaN(d)) return "—";
+        const p = (n) => String(n).padStart(2, "0");
+        const hm = `${p(d.getHours())}:${p(d.getMinutes())}` + (noSec ? "" : `:${p(d.getSeconds())}`);
+        const m = -d.getTimezoneOffset(), a = Math.abs(m);
+        const tz = `UTC${m >= 0 ? "+" : "-"}${Math.floor(a / 60)}${a % 60 ? ":" + String(a % 60).padStart(2, "0") : ""}`;
+        return `${timeOnly ? "" : `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} `}${hm} ${tz}`;
+    }
+
     // Saved focus results (station config focus_history), shown on the focus page and in Settings
     function fmtRecScore(r) {
         if (r.score === null || r.score === undefined) return "—";
@@ -27,11 +39,10 @@
         if (!records || !records.length) { el.innerHTML = '<span class="text-muted">No focus saved yet.</span>'; return; }
         const rows = records.slice().reverse().map((r, i) => {
             const idx = records.length - 1 - i;
-            const when = new Date(r.finished_at);
             const near = r.near || (r.lens_position || 0) > 1;
             return `<tr class="${near ? "near" : i === 0 ? "latest" : ""}" title="${near ? "Focused nearer than 1 m: not the sky" : ""}">
-                <td>${when.toLocaleDateString()} ${when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
-                <td>${r.source}</td><td>${r.method || "—"}</td>
+                <td>${fmtWhen(r.finished_at, false, true)}</td>
+                <td>${esc(r.source)}</td><td>${esc(r.method || "—")}</td>
                 <td class="num">${fmtRecScore(r)}</td><td class="num">${fmtRecLens(r)}</td>
                 <td class="num">${r.sensor_temp_c ?? "—"}${r.sensor_temp_c != null ? " °C" : ""}</td>
                 <td class="num">${fmtExp(r.exposure_s)} · ${(r.gain_db ?? 0).toFixed(0)} dB</td>
@@ -53,7 +64,9 @@
         if (settingsHist) {
             const load = async () => {
                 try {
-                    const s = await (await fetch("/api/focus", { cache: "no-store" })).json();
+                    const res = await fetch("/api/focus", { cache: "no-store" });
+                    if (!res.ok) return;
+                    const s = await res.json();
                     renderHistory(settingsHist, s.history_records, async (i) => { if (await useRecord(i)) load(); });
                 } catch (e) { /* offline */ }
             };
@@ -67,12 +80,22 @@
         const nav = document.querySelector(".tab-bar");
         if (nav) nav.after(bar);
         bar.querySelector("button").addEventListener("click", async () => {
-            await fetch("/api/focus/stop", { method: "POST" });
-            bar.hidden = true;
+            const btn = bar.querySelector("button");
+            try {
+                const res = await fetch("/api/focus/stop", { method: "POST" });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                bar.hidden = true;
+            } catch (e) {
+                btn.textContent = `Stop failed (${e.message}), retry`;
+                setTimeout(() => { btn.textContent = "Stop focus mode"; }, 5000);
+            }
         });
         const check = async () => {
             try {
-                const s = await (await fetch("/api/focus", { cache: "no-store" })).json();
+                const res = await fetch("/api/focus", { cache: "no-store" });
+                if (!res.ok) return;
+                const s = await res.json();
+                if (typeof s.active !== "boolean") return;
                 bar.hidden = !s.active;
             } catch (e) { /* offline: keep the last state */ }
         };
@@ -87,8 +110,10 @@
     const ctx = canvas.getContext("2d");
     const wrap = $("focus-zoom-wrap");
     const emptyMsg = $("focus-zoom-empty");
-    const chart = $("focus-chart");
-    const chartCtx = chart.getContext("2d");
+    const lensChart = $("focus-lens-chart");
+    const lensChartCtx = lensChart ? lensChart.getContext("2d") : null;
+    const timeChart = $("focus-time-chart");
+    const timeChartCtx = timeChart ? timeChart.getContext("2d") : null;
     const toggleBtn = $("focus-toggle");
     const badge = $("focus-badge");
     const overviewImg = $("focus-overview");
@@ -100,7 +125,11 @@
     const markersChk = $("focus-markers");
     const crossChk = $("focus-crosshair");
 
-    const METHOD_LABEL = { stars: "Stars · HFR", lights: "Lights · HFR", contrast: "Day · edge contrast" };
+    const METHOD_LABEL = {
+        stars: "Stars · Kích thước sao HFR",
+        lights: "Lights · Kích thước điểm sáng HFR",
+        contrast: "Day · Độ tương phản cạnh",
+    };
     const HISTORY_MAX = 240;
 
     const st = {
@@ -109,16 +138,32 @@
         lastTs: 0,
         cx: 0.5,
         cy: 0.5,
+        roiMode: "auto",
         roiSize: 256,
         method: "auto",
         frameW: 0,
         frameH: 0,
         history: [],      // {t, score (raw), sm (running average from the server)}
+        lensHistory: [],  // [{ pos, score, hfr, fwhm, contrast, method, samples, t }]
+        lensPos: 0.0,
+        motorized: false,
+        chartMetric: "starsize", // "starsize" (HFR px) or "sharpness" (edge contrast / score)
+        bestLensPos: null,
+        bestLensVal: null,
+        curveFit: null,
+        hoverPoint: null,
+        chartPad: { l: 64, r: 24, t: 24, b: 38 },
+        chartXMin: 0.0,
+        chartXMax: 1.0,
+        chartYMin: 0.0,
+        chartYMax: 10.0,
         family: null,
         lastResult: null,
         bitmap: null,
         overviewTimer: null,
         fpsTimes: [],
+        actionSeq: 0,     // bumped by every POST; a poll reply from before it is stale
+        overviewBusyAt: 0,
     };
 
     function familyOf(method) {
@@ -127,6 +172,7 @@
 
     async function api(path, opts = {}) {
         const init = { method: opts.method || "GET", headers: {} };
+        if (init.method !== "GET") st.actionSeq++;
         if (opts.body !== undefined) {
             init.headers["Content-Type"] = "application/json";
             init.body = JSON.stringify(opts.body);
@@ -140,15 +186,34 @@
         return r.json();
     }
 
+    function syncRoiModeUi() {
+        document.querySelectorAll("#focus-roi-mode button").forEach((b) =>
+            b.classList.toggle("active", b.dataset.roiMode === st.roiMode)
+        );
+    }
+
     function applyState(s) {
         st.active = !!s.active;
         st.cx = s.cx;
         st.cy = s.cy;
+        if (s.roi_mode) st.roiMode = s.roi_mode;
         st.roiSize = s.roi_size;
         st.method = s.method;
         if (s.frame_width) { st.frameW = s.frame_width; st.frameH = s.frame_height; }
         roiSizeSel.value = String(s.roi_size);
         document.querySelectorAll("#focus-method button").forEach((b) => b.classList.toggle("active", b.dataset.method === s.method));
+        syncRoiModeUi();
+        if (s.method === "stars" || s.method === "lights") {
+            st.chartMetric = "starsize";
+            document.querySelectorAll("#focus-chart-metric button").forEach((btn) =>
+                btn.classList.toggle("active", btn.dataset.chartMetric === "starsize")
+            );
+        } else if (s.method === "contrast") {
+            st.chartMetric = "sharpness";
+            document.querySelectorAll("#focus-chart-metric button").forEach((btn) =>
+                btn.classList.toggle("active", btn.dataset.chartMetric === "sharpness")
+            );
+        }
         if (s.smooth) document.querySelectorAll("#focus-smooth button").forEach((b) => b.classList.toggle("active", +b.dataset.smooth === s.smooth));
         if (s.exposure_s !== undefined && document.activeElement !== $("focus-exp")) $("focus-exp").value = +s.exposure_s.toPrecision(4);
         if (s.gain_db !== undefined && document.activeElement !== $("focus-gain")) $("focus-gain").value = +s.gain_db.toFixed(1);
@@ -229,8 +294,8 @@
         const fresh = Date.now() - when.getTime() < 10 * 60 * 1000 && !s.active;
         box.innerHTML =
             (fresh ? '<div class="ok">✓ Focus saved to Settings, focus mode off</div>' : "") +
-            `<div>Last saved <b>${when.toLocaleString()}</b> (${r.source})</div>` +
-            `<div>${r.method || "—"} <b>${fmtRecScore(r)}</b>${r.fwhm_px ? ` · FWHM ${r.fwhm_px} px` : ""}</div>` +
+            `<div>Last saved <b>${fmtWhen(r.finished_at)}</b> (${esc(r.source)})</div>` +
+            `<div>${esc(r.method || "—")} <b>${fmtRecScore(r)}</b>${r.fwhm_px ? ` · FWHM ${r.fwhm_px} px` : ""}</div>` +
             (r.lens_position != null ? `<div>Lens <b>${fmtRecLens(r)}</b>${r.lens_mode ? ` · ${r.lens_mode}` : ""}</div>` : "") +
             `<div>${r.sensor_temp_c != null ? `${r.sensor_temp_c} °C · ` : ""}${fmtExp(r.exposure_s)}, ${(r.gain_db ?? 0).toFixed(0)} dB</div>`;
     }
@@ -248,11 +313,48 @@
         showExpiry(res.expires_in_s);
         st.frameW = res.frame_width;
         st.frameH = res.frame_height;
+        const livePos = res.lens_target ?? res.lens_position;
+        if (livePos !== undefined && livePos !== null) {
+            st.lensPos = livePos;
+            const posEl = $("focus-lens-pos");
+            if (posEl) posEl.textContent = `${Number(livePos).toFixed(3)} D`;
+            const distEl = $("focus-lens-dist");
+            if (distEl) {
+                const lag = res.lens_target != null && res.lens_position != null && Math.abs(res.lens_target - res.lens_position) > 0.003;
+                const distStr = fmtDist(livePos);
+                const lagStr = lag ? ` · đang chỉnh ${Number(res.lens_position).toFixed(3)} D` : "";
+                distEl.textContent = distStr ? `(${distStr}${lagStr})` : lagStr;
+                distEl.classList.toggle("text-warning", livePos > 1);
+            }
+            if (lensSlider && !sliderDragging) lensSlider.value = livePos;
+        }
+        if (res.sweep) {
+            const sw = res.sweep;
+            const running = sw.state === "running";
+            const cancelBtn = $("focus-lens-cancel");
+            const progWrap = $("focus-lens-progress-wrap");
+            const progBar = $("focus-lens-progress");
+            const msgEl = $("focus-lens-msg");
+            if (cancelBtn) cancelBtn.hidden = !running;
+            if (progWrap) progWrap.hidden = !running;
+            if (progBar) progBar.style.width = Math.round((sw.progress || 0) * 100) + "%";
+            if (msgEl) {
+                msgEl.textContent = running
+                    ? `${sw.mode === "camera" ? "Camera AF" : "Sweep"} · ${sw.phase || ""}${sw.method ? " · " + sw.method : ""} · ${sw.steps ?? 0} steps`
+                    : `${sw.mode === "camera" ? "Camera AF" : "Sweep"} ${sw.state}: ${sw.message || ""}`;
+                msgEl.classList.toggle("text-warning", sw.state === "rejected" || sw.state === "failed");
+            }
+            if (running && !lensSweepRunning) {
+                lensSweepRunning = true;
+                setLensPoll(700);
+            }
+        }
         const fam = familyOf(res.method);
         if (fam !== st.family) { st.history = []; st.family = fam; }
         if (res.score !== null && res.score !== undefined) {
             st.history.push({ t: res.frame_ts, score: res.score, sm: res.smoothed ?? res.score });
             if (st.history.length > HISTORY_MAX) st.history.shift();
+            recordLensMeasurement(res);
         }
         const now = performance.now();
         st.fpsTimes.push(now);
@@ -372,20 +474,377 @@
         $("focus-stat-n").textContent = String(vals.length);
     }
 
-    function drawChart() {
-        const dpr = window.devicePixelRatio || 1;
-        const w = chart.clientWidth, h = chart.clientHeight;
-        if (chart.width !== Math.round(w * dpr) || chart.height !== Math.round(h * dpr)) {
-            chart.width = Math.round(w * dpr);
-            chart.height = Math.round(h * dpr);
+    function fitQuadratic(pts, metricKey, lowerIsBetter) {
+        const valid = pts.filter((p) => p[metricKey] !== null && p[metricKey] !== undefined && isFinite(p[metricKey]));
+        if (valid.length < 3) return null;
+        const xs = valid.map((p) => p.pos);
+        const ys = valid.map((p) => p[metricKey]);
+        const xMin = Math.min(...xs), xMax = Math.max(...xs);
+        if (xMax - xMin < 0.015) return null;
+
+        const n = valid.length;
+        let sx = 0, sx2 = 0, sx3 = 0, sx4 = 0;
+        let sy = 0, sxy = 0, sx2y = 0;
+        for (let i = 0; i < n; i++) {
+            const x = xs[i], y = ys[i];
+            const x2 = x * x;
+            sx += x; sx2 += x2; sx3 += x2 * x; sx4 += x2 * x2;
+            sy += y; sxy += x * y; sx2y += x2 * y;
         }
-        const c = chartCtx;
+        const m = [
+            [sx4, sx3, sx2, sx2y],
+            [sx3, sx2, sx, sxy],
+            [sx2, sx, n, sy]
+        ];
+        for (let i = 0; i < 3; i++) {
+            let maxRow = i;
+            for (let k = i + 1; k < 3; k++) {
+                if (Math.abs(m[k][i]) > Math.abs(m[maxRow][i])) maxRow = k;
+            }
+            const tmp = m[i]; m[i] = m[maxRow]; m[maxRow] = tmp;
+            if (Math.abs(m[i][i]) < 1e-12) return null;
+            for (let k = i + 1; k < 3; k++) {
+                const factor = m[k][i] / m[i][i];
+                for (let j = i; j <= 3; j++) m[k][j] -= factor * m[i][j];
+            }
+        }
+        const a = m[2][3] / m[2][2];
+        const b = (m[1][3] - m[1][2] * a) / m[1][1];
+        const c = (m[0][3] - m[0][2] * a - m[0][1] * b) / m[0][0];
+        if (!isFinite(a) || !isFinite(b) || !isFinite(c)) return null;
+
+        const vertex = -b / (2 * a);
+        const yVertex = a * vertex * vertex + b * vertex + c;
+        const expectedSign = lowerIsBetter ? a > 0 : a < 0;
+        return { a, b, c, vertex, yVertex, xMin, xMax, expectedSign };
+    }
+
+    function recordLensMeasurement(res) {
+        if (!res) return;
+        const pos = res.lens_position !== undefined && res.lens_position !== null ? res.lens_position : (st.lensPos || 0.0);
+        st.lensPos = pos;
+        const method = res.method || "auto";
+        const score = res.score;
+        if (score === null || score === undefined) return;
+        const hfr = res.hfr ?? (method !== "contrast" ? score : null);
+        const fwhm = res.fwhm;
+        const contrast = res.contrast ?? (method === "contrast" ? score : null);
+
+        const match = st.lensHistory.find((p) => Math.abs(p.pos - pos) <= 0.0035);
+        if (match) {
+            match.samples = (match.samples || 1) + 1;
+            match.score = match.score * 0.7 + score * 0.3;
+            if (hfr != null) match.hfr = (match.hfr != null ? match.hfr * 0.7 + hfr * 0.3 : hfr);
+            if (fwhm != null) match.fwhm = (match.fwhm != null ? match.fwhm * 0.7 + fwhm * 0.3 : fwhm);
+            if (contrast != null) match.contrast = (match.contrast != null ? match.contrast * 0.7 + contrast * 0.3 : contrast);
+            match.t = res.frame_ts;
+        } else {
+            st.lensHistory.push({
+                pos: Number(pos.toFixed(4)),
+                score,
+                hfr,
+                fwhm,
+                contrast,
+                method,
+                samples: 1,
+                t: res.frame_ts
+            });
+            st.lensHistory.sort((a, b) => a.pos - b.pos);
+            if (st.lensHistory.length > 250) st.lensHistory.shift();
+        }
+        updateCurveSummary();
+    }
+
+    function updateCurveSummary() {
+        setTxt("focus-curve-cur-pos", `${(st.lensPos || 0).toFixed(3)} D`);
+        const count = st.lensHistory.length;
+        setTxt("focus-curve-points-count", String(count));
+        const goBest = $("focus-go-best");
+        const bestWrap = $("focus-curve-best-wrap");
+        if (st.bestLensPos != null) {
+            const valStr = st.bestLensVal != null
+                ? (st.chartMetric === "starsize" ? `${st.bestLensVal.toFixed(2)} px` : st.bestLensVal.toFixed(1))
+                : "";
+            setTxt("focus-curve-best-info", `${st.bestLensPos.toFixed(3)} D${valStr ? " (" + valStr + ")" : ""}`);
+            setTxt("focus-best-pos-val", `${st.bestLensPos.toFixed(3)} D`);
+            if (goBest) goBest.hidden = false;
+            if (bestWrap) bestWrap.hidden = false;
+        } else {
+            setTxt("focus-curve-best-info", "—");
+            if (goBest) goBest.hidden = true;
+        }
+    }
+
+    function drawChart() {
+        drawLensChart();
+        drawTimeStreamChart();
+    }
+
+    function drawLensChart() {
+        if (!lensChart || !lensChartCtx) return;
+        const dpr = window.devicePixelRatio || 1;
+        const w = lensChart.clientWidth, h = lensChart.clientHeight;
+        if (lensChart.width !== Math.round(w * dpr) || lensChart.height !== Math.round(h * dpr)) {
+            lensChart.width = Math.round(w * dpr);
+            lensChart.height = Math.round(h * dpr);
+        }
+        const c = lensChartCtx;
         c.setTransform(dpr, 0, 0, dpr, 0, 0);
         c.clearRect(0, 0, w, h);
-        const swPts = st.sweep && (st.sweep.points || []).filter((p) => p.score !== null && p.score !== undefined);
-        const sweepView = st.showSweep && st.sweep && st.sweep.mode !== "camera" && swPts && swPts.length >= 2;
-        $("focus-chart-title").textContent = sweepView ? "Focus vs lens position" : "Focus curve";
-        if (sweepView) { drawSweepChart(c, w, h, st.sweep); return; }
+
+        const isStarSize = st.chartMetric === "starsize";
+        const titleEl = $("focus-lens-chart-title");
+        if (titleEl) {
+            titleEl.textContent = isStarSize
+                ? "Vị trí lens vs Kích thước sao (HFR)"
+                : "Vị trí lens vs Độ nét (Sharpness)";
+        }
+        drawLensPositionChart(c, w, h);
+    }
+
+    function drawTimeStreamChart() {
+        if (!timeChart || !timeChartCtx) return;
+        const dpr = window.devicePixelRatio || 1;
+        const w = timeChart.clientWidth, h = timeChart.clientHeight;
+        if (timeChart.width !== Math.round(w * dpr) || timeChart.height !== Math.round(h * dpr)) {
+            timeChart.width = Math.round(w * dpr);
+            timeChart.height = Math.round(h * dpr);
+        }
+        const c = timeChartCtx;
+        c.setTransform(dpr, 0, 0, dpr, 0, 0);
+        c.clearRect(0, 0, w, h);
+
+        drawTimeChart(c, w, h);
+    }
+
+    function drawLensPositionChart(c, w, h) {
+        let pts = st.lensHistory.slice();
+        if (st.sweep && st.sweep.points) {
+            const swMethod = st.sweep.method || "auto";
+            st.sweep.points.forEach((sp) => {
+                if (sp.score == null || !isFinite(sp.score)) return;
+                const match = pts.find((p) => Math.abs(p.pos - sp.pos) <= 0.0035);
+                if (!match) {
+                    pts.push({
+                        pos: Number(sp.pos.toFixed(4)),
+                        score: sp.score,
+                        hfr: swMethod !== "contrast" ? sp.score : null,
+                        contrast: swMethod === "contrast" ? sp.score : null,
+                        method: swMethod,
+                        samples: 1,
+                        phase: sp.phase,
+                        t: Date.now() / 1000
+                    });
+                }
+            });
+            pts.sort((a, b) => a.pos - b.pos);
+        }
+
+        const isStarSize = st.chartMetric === "starsize";
+        const hasHfr = pts.some((p) => p.hfr != null);
+        const useHfr = isStarSize && (hasHfr || pts.length === 0);
+        const metricKey = useHfr ? "hfr" : (pts.some((p) => p.contrast != null) ? "contrast" : "score");
+        const lowerIsBetter = useHfr || (st.lastResult && st.lastResult.lower_is_better);
+
+        const pad = st.chartPad;
+        const curPos = st.lensPos ?? 0.0;
+
+        if (pts.length === 0) {
+            const x0 = 0.0, x1 = 1.0;
+            const X = (v) => pad.l + ((v - x0) / (x1 - x0)) * (w - pad.l - pad.r);
+            c.strokeStyle = "#1e293b"; c.fillStyle = "#64748b"; c.lineWidth = 1;
+            c.font = "11px ui-monospace, monospace";
+            for (let k = 0; k <= 5; k++) {
+                const xv = x0 + ((x1 - x0) * k) / 5;
+                const xx = X(xv);
+                c.beginPath(); c.moveTo(xx, pad.t); c.lineTo(xx, h - pad.b); c.stroke();
+                c.textAlign = "center";
+                c.fillText(`${xv.toFixed(2)} D`, xx, h - 20);
+                c.textAlign = "left";
+            }
+            const curX = X(Math.min(x1, Math.max(x0, curPos)));
+            c.strokeStyle = "rgba(56, 189, 248, 0.7)";
+            c.setLineDash([4, 4]);
+            c.beginPath(); c.moveTo(curX, pad.t); c.lineTo(curX, h - pad.b); c.stroke();
+            c.setLineDash([]);
+            c.fillStyle = "#38bdf8";
+            c.fillText(`Hiện tại ${curPos.toFixed(3)} D`, Math.min(curX + 6, w - pad.r - 95), pad.t + 16);
+
+            c.fillStyle = "#64748b";
+            c.font = "10px sans-serif";
+            c.textAlign = "center";
+            c.fillText("Vị trí lens (Dioptres) →", pad.l + (w - pad.l - pad.r) / 2, h - 5);
+
+            c.fillStyle = "#94a3b8";
+            c.font = "13px sans-serif";
+            c.fillText("Biểu đồ V-Curve: Vị trí Lens vs Kích thước sao (HFR) / Độ nét", w / 2, h / 2 - 10);
+            c.font = "11px sans-serif";
+            c.fillStyle = "#64748b";
+            c.fillText("Kéo thanh trượt vị trí lens (MF) hoặc bật AF để ghi nhận các điểm đo và vẽ đường cong.", w / 2, h / 2 + 12);
+            c.textAlign = "left";
+            return;
+        }
+
+        const xs = pts.map((p) => p.pos);
+        const ys = pts.map((p) => p[metricKey] ?? p.score).filter((v) => v != null && isFinite(v));
+        if (ys.length === 0) return;
+
+        let x0 = Math.min(0, ...xs, curPos);
+        let x1 = Math.max(0.4, ...xs, curPos) + 0.05;
+        if (x1 - x0 < 0.2) x1 = x0 + 0.2;
+        st.chartXMin = x0; st.chartXMax = x1;
+
+        let y0 = Math.min(...ys), y1 = Math.max(...ys);
+        const ySpan = Math.max(0.1, y1 - y0);
+        y0 = Math.max(0, y0 - ySpan * 0.15);
+        y1 = y1 + ySpan * 0.15;
+        st.chartYMin = y0; st.chartYMax = y1;
+
+        const X = (v) => pad.l + ((v - x0) / (x1 - x0)) * (w - pad.l - pad.r);
+        const Y = (v) => {
+            const f = (v - y0) / (y1 - y0);
+            return lowerIsBetter
+                ? pad.t + f * (h - pad.t - pad.b)
+                : pad.t + (1 - f) * (h - pad.t - pad.b);
+        };
+        st.chartYFunc = (p) => Y(p[metricKey] ?? p.score);
+
+        c.strokeStyle = "#1e293b"; c.fillStyle = "#64748b"; c.lineWidth = 1;
+        c.font = "11px ui-monospace, monospace";
+        [y0, (y0 + y1) / 2, y1].forEach((v) => {
+            const yy = Y(v);
+            c.beginPath(); c.moveTo(pad.l, yy); c.lineTo(w - pad.r, yy); c.stroke();
+            const label = useHfr ? `${v.toFixed(2)} px` : v.toPrecision(4);
+            c.textAlign = "right";
+            c.fillText(label, pad.l - 6, yy + 4);
+            c.textAlign = "left";
+        });
+
+        const numTicks = Math.max(3, Math.min(7, Math.floor((w - pad.l - pad.r) / 75)));
+        for (let k = 0; k <= numTicks; k++) {
+            const xv = x0 + ((x1 - x0) * k) / numTicks;
+            const xx = X(xv);
+            c.beginPath(); c.moveTo(xx, pad.t); c.lineTo(xx, h - pad.b); c.stroke();
+            c.textAlign = "center";
+            c.fillText(`${xv.toFixed(2)} D`, xx, h - 20);
+            c.textAlign = "left";
+        }
+
+        const fit = fitQuadratic(pts, metricKey, lowerIsBetter);
+        st.curveFit = fit;
+        let bestPos = null, bestVal = null;
+        if (fit && fit.expectedSign && fit.vertex >= x0 - 0.1 && fit.vertex <= x1 + 0.1) {
+            bestPos = fit.vertex;
+            bestVal = fit.yVertex;
+        } else {
+            const bestP = pts.reduce((b, p) => {
+                const val = p[metricKey] ?? p.score;
+                if (val == null) return b;
+                if (!b) return p;
+                const bVal = b[metricKey] ?? b.score;
+                return lowerIsBetter ? (val < bVal ? p : b) : (val > bVal ? p : b);
+            }, null);
+            if (bestP) {
+                bestPos = bestP.pos;
+                bestVal = bestP[metricKey] ?? bestP.score;
+            }
+        }
+        st.bestLensPos = bestPos;
+        st.bestLensVal = bestVal;
+        updateCurveSummary();
+
+        if (fit) {
+            c.strokeStyle = "#10b981";
+            c.lineWidth = 2.5;
+            c.shadowColor = "rgba(16, 185, 129, 0.4)";
+            c.shadowBlur = 6;
+            c.beginPath();
+            const steps = 60;
+            for (let k = 0; k <= steps; k++) {
+                const xv = x0 + ((x1 - x0) * k) / steps;
+                const yv = fit.a * xv * xv + fit.b * xv + fit.c;
+                const xx = X(xv), yy = Y(yv);
+                if (k === 0) c.moveTo(xx, yy); else c.lineTo(xx, yy);
+            }
+            c.stroke();
+            c.shadowBlur = 0;
+        }
+
+        pts.forEach((p) => {
+            const val = p[metricKey] ?? p.score;
+            if (val == null || !isFinite(val)) return;
+            const px = X(p.pos), py = Y(val);
+            const isBest = bestPos != null && Math.abs(p.pos - bestPos) < 0.005;
+            c.fillStyle = isBest ? "#10b981" : "#38bdf8";
+            c.beginPath();
+            c.arc(px, py, isBest ? 5 : 3.5, 0, Math.PI * 2);
+            c.fill();
+            if (isBest) {
+                c.strokeStyle = "rgba(16, 185, 129, 0.5)";
+                c.lineWidth = 2;
+                c.beginPath(); c.arc(px, py, 8, 0, Math.PI * 2); c.stroke();
+            }
+        });
+
+        if (bestPos != null && bestPos >= x0 && bestPos <= x1) {
+            const bx = X(bestPos);
+            c.strokeStyle = "rgba(16, 185, 129, 0.85)";
+            c.lineWidth = 1.5;
+            c.setLineDash([4, 3]);
+            c.beginPath(); c.moveTo(bx, pad.t); c.lineTo(bx, h - pad.b); c.stroke();
+            c.setLineDash([]);
+            c.fillStyle = "#10b981";
+            c.font = "bold 11px ui-monospace, monospace";
+            const valLabel = bestVal != null ? (useHfr ? `${bestVal.toFixed(2)} px` : bestVal.toFixed(1)) : "";
+            c.fillText(`★ Nét nhất ${bestPos.toFixed(3)} D${valLabel ? " (" + valLabel + ")" : ""}`, Math.min(bx + 6, w - pad.r - 140), pad.t + 12);
+        }
+
+        const curX = X(Math.min(x1, Math.max(x0, curPos)));
+        c.strokeStyle = "rgba(56, 189, 248, 0.8)";
+        c.lineWidth = 1.5;
+        c.setLineDash([2, 2]);
+        c.beginPath(); c.moveTo(curX, pad.t); c.lineTo(curX, h - pad.b); c.stroke();
+        c.setLineDash([]);
+        c.fillStyle = "#38bdf8";
+        c.font = "11px ui-monospace, monospace";
+        c.fillText(`Hiện tại ${curPos.toFixed(3)} D`, Math.min(curX + 6, w - pad.r - 110), pad.t + 26);
+
+        c.fillStyle = "#64748b";
+        c.font = "10px sans-serif";
+        c.fillText(useHfr ? "Kích thước sao (HFR px) ↓ nét hơn" : "Độ nét (Sharpness) ↑ nét hơn", pad.l + 4, pad.t - 8);
+        c.textAlign = "center";
+        c.fillText("Vị trí lens (Dioptres) →", pad.l + (w - pad.l - pad.r) / 2, h - 5);
+        c.textAlign = "left";
+
+        if (st.hoverPoint && st.hoverPoint.point) {
+            const p = st.hoverPoint.point;
+            const hx = st.hoverPoint.x, hy = st.hoverPoint.y;
+            c.fillStyle = "#f59e0b";
+            c.beginPath(); c.arc(hx, hy, 6, 0, Math.PI * 2); c.fill();
+
+            const tipW = 140, tipH = 46;
+            let tx = hx + 10, ty = hy - tipH - 8;
+            if (tx + tipW > w - pad.r) tx = hx - tipW - 10;
+            if (ty < pad.t) ty = hy + 12;
+
+            c.fillStyle = "rgba(15, 23, 42, 0.92)";
+            c.strokeStyle = "#334155";
+            c.lineWidth = 1;
+            c.fillRect(tx, ty, tipW, tipH);
+            c.strokeRect(tx, ty, tipW, tipH);
+
+            c.fillStyle = "#f8fafc";
+            c.font = "bold 11px ui-monospace, monospace";
+            c.fillText(`Vị trí: ${p.pos.toFixed(3)} D`, tx + 8, ty + 15);
+            c.fillStyle = "#94a3b8";
+            c.font = "10px ui-monospace, monospace";
+            const hfrStr = p.hfr != null ? `HFR: ${p.hfr.toFixed(2)} px` : (p.score ? `Score: ${p.score.toFixed(2)}` : "");
+            c.fillText(`${hfrStr} (${p.samples || 1} frame)`, tx + 8, ty + 30);
+            if (p.fwhm) c.fillText(`FWHM ≈ ${p.fwhm.toFixed(2)} px`, tx + 8, ty + 42);
+        }
+    }
+
+    function drawTimeChart(c, w, h) {
         const pts = st.history;
         const res = st.lastResult;
         if (!res || pts.length < 2) {
@@ -398,8 +857,6 @@
         const sm = pts.map((p) => p.sm);
         const raw = pts.map((p) => p.score);
         const lower = res.method !== "contrast";
-        // Scale on the averaged curve, never tighter than ±8 % of its level (or 4x the frame noise):
-        // otherwise a steady lens fills the chart with noise and every frame looks like a big jump
         let lo = Math.min(...sm), hi = Math.max(...sm);
         const mid = (lo + hi) / 2;
         const minSpan = Math.abs(mid) * Math.max(0.16, (8 * (res.noise_pct || 0)) / 100);
@@ -407,7 +864,6 @@
         const padV = (hi - lo) * 0.08;
         lo -= padV; hi += padV;
         const x = (i) => pad.l + (i / (HISTORY_MAX - 1)) * (w - pad.l - pad.r);
-        // Sharper is always up: the HFR axis is inverted
         const y = (v) => {
             const f = (Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo);
             return pad.t + (lower ? f : 1 - f) * (h - pad.t - pad.b);
@@ -421,7 +877,6 @@
             c.beginPath(); c.moveTo(pad.l, yy); c.lineTo(w - pad.r, yy); c.stroke();
             c.fillText(lower ? v.toFixed(2) : v.toPrecision(4), 4, yy + 4);
         });
-        // Noise band around the current average: changes inside it mean nothing
         if (res.noise_pct) {
             const cur = sm[sm.length - 1];
             const band = (Math.abs(cur) * res.noise_pct) / 100 / Math.sqrt(Math.max(1, res.smooth || 1));
@@ -435,7 +890,6 @@
             c.beginPath(); c.moveTo(pad.l, y(res.best)); c.lineTo(w - pad.r, y(res.best)); c.stroke();
             c.setLineDash([]);
         }
-        // Raw frames as faint dots, the averaged score as the line
         c.fillStyle = "rgba(56,189,248,0.28)";
         raw.forEach((v, i) => { c.beginPath(); c.arc(x(i), y(v), 1.6, 0, Math.PI * 2); c.fill(); });
         c.strokeStyle = "#38bdf8";
@@ -443,7 +897,6 @@
         c.beginPath();
         sm.forEach((v, i) => { if (i === 0) c.moveTo(x(i), y(v)); else c.lineTo(x(i), y(v)); });
         c.stroke();
-        // Sharpest and softest (averaged) points, so the lens can be turned back to where the peak was
         const sMin = Math.min(...sm), sMax = Math.max(...sm);
         const iBest = sm.indexOf(lower ? sMin : sMax), iWorst = sm.indexOf(lower ? sMax : sMin);
         const mark = (i, color, text, above) => {
@@ -481,13 +934,21 @@
     }
 
     function refreshOverview() {
+        // One request at a time: wait for the previous load/error (or 20 s) before asking again
+        if (Date.now() - st.overviewBusyAt < 20000) return;
+        st.overviewBusyAt = Date.now();
         overviewImg.src = `/api/focus/overview.jpg?width=800&stretch=${stretchChk.checked ? 1 : 0}&t=${Date.now()}`;
     }
+    const overviewDone = () => { st.overviewBusyAt = 0; };
+    overviewImg.addEventListener("load", overviewDone);
+    overviewImg.addEventListener("error", overviewDone);
+    // Back in view: one refresh now (the timer skips while hidden)
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshOverview(); });
 
     function startOverviewTimer() {
         clearInterval(st.overviewTimer);
         refreshOverview();
-        st.overviewTimer = setInterval(refreshOverview, st.active ? 3000 : 15000);
+        st.overviewTimer = setInterval(() => { if (!document.hidden) refreshOverview(); }, st.active ? 3000 : 15000);
     }
 
     // ------------------------------------------------------------------
@@ -527,10 +988,12 @@
             } else {
                 st.history = [];
                 st.showSweep = false;  // time curve, unless AF starts a sweep (then the sweep view returns)
+                const startBody = st.roiMode === "manual" ? { roi_mode: "manual" } : {};
                 // In AF the server sweeps right away; in MF it only streams for adjusting by hand
-                const started = await api("/api/focus/start", { method: "POST", body: {} });
+                const started = await api("/api/focus/start", { method: "POST", body: startBody });
                 applyState(started);
                 if (started.message) $("focus-statline").textContent = started.message;
+                if (started.lens && started.lens.sweep && started.lens.sweep.state === "running") setLensPoll(700);
                 frameLoop();
             }
             startOverviewTimer();
@@ -543,17 +1006,55 @@
 
     document.querySelectorAll("#focus-method button").forEach((b) =>
         b.addEventListener("click", () => configure({ method: b.dataset.method })));
+    document.querySelectorAll("#focus-roi-mode button").forEach((b) =>
+        b.addEventListener("click", async () => {
+            const mode = b.dataset.roiMode;
+            st.roiMode = mode;
+            syncRoiModeUi();
+            if (mode === "auto") {
+                try {
+                    const r = await api("/api/focus/auto-point", { method: "POST" });
+                    st.history = []; st.lastResult = null; updateStats(null); drawChart();
+                    applyState(r);
+                    $("focus-statline").textContent = r.message || "";
+                    if (r.found) await maybeSweepCurrentRoi();
+                } catch (e) { console.warn(e); }
+            } else {
+                await configure({ roi_mode: "manual" });
+            }
+        }));
     document.querySelectorAll("#focus-smooth button").forEach((b) =>
         b.addEventListener("click", () => configure({ smooth: parseInt(b.dataset.smooth, 10) })));
     roiSizeSel.addEventListener("change", () => configure({ roi_size: parseInt(roiSizeSel.value, 10) }));
-    $("focus-reset").addEventListener("click", () => configure({ reset: true }));
+    $("focus-reset").addEventListener("click", () => {
+        st.lensHistory = [];
+        st.bestLensPos = null;
+        st.bestLensVal = null;
+        st.curveFit = null;
+        updateCurveSummary();
+        configure({ reset: true });
+    });
+
+    async function maybeSweepCurrentRoi() {
+        if (!st.active || st.lensMode !== "auto" || !st.motorized) return;
+        st.showSweep = true;
+        try {
+            const s = await api("/api/focus/lens/autofocus", { method: "POST", body: { mode: "sweep" } });
+            applyState(s);
+            setLensPoll(700);
+        } catch (e) { console.warn(e); }
+    }
+
     $("focus-auto-point").addEventListener("click", async () => {
         try {
+            st.roiMode = "auto";
+            syncRoiModeUi();
             const r = await api("/api/focus/auto-point", { method: "POST" });
             st.history = []; st.lastResult = null; updateStats(null); drawChart();
             applyState(r);
             $("focus-statline").textContent = r.message || "";
             if (!r.found) alert(r.message);
+            else await maybeSweepCurrentRoi();
         } catch (e) { alert(`Auto point: ${e.message}`); }
     });
     [markersChk, crossChk].forEach((c) => c.addEventListener("change", drawZoom));
@@ -565,26 +1066,52 @@
             if (!r.found) alert(lights ? "No bright point light found in the frame." : "No star found in the frame. Try a longer exposure or Find light.");
             st.history = [];
             applyState(r);
+            if (r.found) await maybeSweepCurrentRoi();
         } catch (e) { alert(e.message); }
     }
     $("focus-pick-star").addEventListener("click", () => pickSource(false));
     $("focus-pick-light").addEventListener("click", () => pickSource(true));
 
-    overviewWrap.addEventListener("click", (ev) => {
+    overviewWrap.addEventListener("click", async (ev) => {
         const rect = overviewImg.getBoundingClientRect();
         const cx = (ev.clientX - rect.left) / rect.width;
         const cy = (ev.clientY - rect.top) / rect.height;
         if (cx < 0 || cx > 1 || cy < 0 || cy > 1) return;
-        st.cx = cx; st.cy = cy;
+        st.cx = cx; st.cy = cy; st.roiMode = "manual";
+        syncRoiModeUi();
         placeRoiBox();
-        configure({ cx, cy });
+        await configure({ cx, cy, roi_mode: "manual" });
+        await maybeSweepCurrentRoi();
     });
     overviewImg.addEventListener("load", placeRoiBox);
-    window.addEventListener("resize", () => { fitLayout(); placeRoiBox(); drawZoom(); drawChart(); });
+    let resizeRaf = 0;
+    window.addEventListener("resize", () => {
+        if (resizeRaf) return;
+        resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; fitLayout(); placeRoiBox(); drawZoom(); drawChart(); });
+    });
 
     document.addEventListener("keydown", (ev) => {
         if (ev.target.closest("input, select, textarea")) return;
-        if (ev.key === "r" || ev.key === "R") { configure({ reset: true }); return; }
+        if (ev.key === "r" || ev.key === "R") {
+            st.lensHistory = [];
+            st.bestLensPos = null;
+            st.bestLensVal = null;
+            st.curveFit = null;
+            updateCurveSummary();
+            configure({ reset: true });
+            return;
+        }
+        if (ev.key === " ") {
+            ev.preventDefault();
+            recordLensMeasurement(st.lastResult);
+            drawChart();
+            const recBtn = $("focus-record-point");
+            if (recBtn) {
+                recBtn.textContent = "Đã ghi ✓";
+                setTimeout(() => { recBtn.textContent = "Ghi điểm"; }, 1000);
+            }
+            return;
+        }
         const step = st.frameW ? (st.roiSize / 4) : 0;
         if (!step) return;
         const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[ev.key];
@@ -592,9 +1119,10 @@
         ev.preventDefault();
         const cx = Math.min(1, Math.max(0, st.cx + (d[0] * step) / st.frameW));
         const cy = Math.min(1, Math.max(0, st.cy + (d[1] * step) / st.frameH));
-        st.cx = cx; st.cy = cy;
+        st.cx = cx; st.cy = cy; st.roiMode = "manual";
+        syncRoiModeUi();
         placeRoiBox();
-        configure({ cx, cy });
+        configure({ cx, cy, roi_mode: "manual" });
     });
 
     async function setExposure(exp, gain) {
@@ -651,39 +1179,62 @@
 
     function fmtDist(d) {
         if (d === null || d === undefined) return "";
-        if (d < 0.02) return "(nominal ∞)";
-        return d > 1 ? `(≈ ${(1 / d).toFixed(2)} m — near focus, not the sky)` : `(≈ ${(1 / d).toFixed(1)} m)`;
+        if (d < 0.02) return "≈ ∞ (vô cực)";
+        return d > 1 ? `≈ ${(1 / d).toFixed(2)} m (gần)` : `≈ ${(1 / d).toFixed(1)} m`;
     }
 
     function applyLens(L) {
         lensCard.hidden = !L.available;
         if (!L.available) return;
+        const motorized = L.motorized !== false;
+        st.motorized = motorized;
+        st.lensMode = L.mode || "auto";
+        const typeBadge = $("focus-lens-type-badge");
+        if (typeBadge) {
+            typeBadge.textContent = motorized ? "MOTORIZED" : "MANUAL LENS";
+            typeBadge.title = motorized ? "Motorized autofocus lens" : "Manual focus CS/C-mount lens (ring marks)";
+        }
+        const afBtn = $("focus-lens-mode-af");
+        if (afBtn) {
+            afBtn.classList.toggle("disabled", !motorized);
+            afBtn.title = motorized
+                ? "AF: the app finds focus by itself (sweep on stars, lights or detail) and keeps it (temperature, periodic checks). Click again to refocus now."
+                : "Camera sử dụng ống kính xoay tay (không có motor). Hãy dùng chế độ MF.";
+        }
         // The commanded position updates at once; the position frames report lags a frame or two behind
         const pos = L.held ?? L.position;
+        if (pos !== null && pos !== undefined) {
+            st.lensPos = pos;
+            updateCurveSummary();
+        }
         // Outside focus mode frames are seconds apart, so the reported position is simply stale
         const lag = st.active && L.held != null && L.position != null && Math.abs(L.held - L.position) > 0.003;
         $("focus-lens-pos").textContent = pos === null || pos === undefined ? "—" : `${pos.toFixed(3)} D`;
-        $("focus-lens-dist").textContent = fmtDist(pos) + (lag ? ` · moving (at ${L.position.toFixed(3)})` : "");
+        const distStr = fmtDist(pos);
+        const lagStr = lag ? ` · đang chỉnh ${L.position.toFixed(3)} D` : "";
+        $("focus-lens-dist").textContent = distStr ? `(${distStr}${lagStr})` : lagStr;
         $("focus-lens-dist").classList.toggle("text-warning", pos > 1);
         lensSlider.max = Math.min(L.max, 3);
         lensSlider.min = L.min;
         if (!sliderDragging && pos !== null && pos !== undefined) lensSlider.value = pos;
         // MF: slider and nudges set the lens. AF: they only show where the app put it (moving one = MF)
-        const mf = L.mode !== "auto";
+        const mf = L.mode !== "auto" || !motorized;
         lensCard.classList.toggle("lens-af", !mf);
-        $("focus-af-row").hidden = mf;
+        $("focus-af-row").hidden = mf || !motorized;
         const every = $("focus-refocus-every");
         if (document.activeElement !== every && L.refocus_every_h !== undefined) every.value = String(L.refocus_every_h);
         lensSlider.title = mf ? "Drag to focus" : "AF moves the lens; drag to switch to MF";
         const sv = L.saved;
         $("focus-lens-saved").textContent = sv
-            ? `saved ${sv.position.toFixed(3)} D by ${sv.source}${sv.sensor_temp_c != null ? ` at ${sv.sensor_temp_c} °C` : ""} · ${new Date(sv.updated_at).toLocaleString()}`
+            ? `saved ${sv.position.toFixed(3)} D by ${sv.source}${sv.sensor_temp_c != null ? ` at ${sv.sensor_temp_c} °C` : ""} · ${fmtWhen(sv.updated_at)}`
             : `not saved yet — libcamera default ${L.default} D (≈ ${(1 / Math.max(L.default, 0.01)).toFixed(1)} m), not the sky`;
         const tr = L.tracking || {};
-        const auto = L.mode === "auto";
-        document.querySelectorAll("#focus-lens-mode button").forEach((b) => b.classList.toggle("active", b.dataset.lensMode === L.mode));
+        const auto = L.mode === "auto" && motorized;
+        document.querySelectorAll("#focus-lens-mode button").forEach((b) => b.classList.toggle("active", b.dataset.lensMode === (auto ? "auto" : "manual")));
         const cp = L.compensation || {};
-        $("focus-lens-comp").textContent = !auto
+        $("focus-lens-comp").textContent = !motorized
+            ? "MF: Xoay vòng nét trên ống kính và điều chỉnh thanh trượt vị trí tương ứng để vẽ biểu đồ V-curve."
+            : !auto
             ? "MF: drag the slider or use the nudges; the lens stays exactly there."
             : cp.n_rejected && !cp.learned && cp.rms_d
                 ? `Temperature model ignored: checks disagree (±${cp.rms_d} D); ${cp.n_rejected} outlier(s) dropped`
@@ -692,12 +1243,12 @@
                   ` (fit ±${cp.rms_d} D) · now ${cp.temp_c ?? "?"} °C → ${cp.target?.toFixed(3)} D`
                 : `Learning temperature drift: ${cp.n || 0} checks over ${cp.span_c || 0} °C (needs 3 over 3 °C)` +
                   (cp.temp_c != null ? ` · sensor ${cp.temp_c} °C` : "");
-        $("focus-lens-reset-learning").hidden = !auto || !(cp.n > 0);
+        $("focus-lens-reset-learning").hidden = !auto || !(cp.n > 0) || !motorized;
         const last = (tr.log || [])[tr.log ? tr.log.length - 1 : 0];
         $("focus-lens-track-msg").textContent = !auto ? "" : tr.base === null || tr.base === undefined
             ? "Run a sweep first: tracking follows the swept position."
             : `around ${tr.base.toFixed(3)} D ±${tr.max_offset} · ` +
-              (last ? `last ${new Date(last.t * 1000).toLocaleTimeString()}: ${last.from} → ${last.to} D${last.temp_c != null ? ` at ${last.temp_c} °C` : ""}` : "no check yet") +
+              (last ? `last ${fmtWhen(last.t * 1000, true)}: ${last.from} → ${last.to} D${last.temp_c != null ? ` at ${last.temp_c} °C` : ""}` : "no check yet") +
               (tr.next_in_s != null ? ` · next check in ${Math.round(tr.next_in_s / 60)} min` : "") +
               (L.refocus_every_h > 0
                   ? ` · next refocus ${L.next_auto_sweep_in_s > 60 ? `in ${(L.next_auto_sweep_in_s / 3600).toFixed(1)} h` : "as soon as there is something to focus on"}`
@@ -726,76 +1277,27 @@
 
     // Focus score against lens position for the last sweep, drawn in the main focus chart
     function drawSweepChart(c, w, h, sw) {
-        const pts = (sw.points || []).filter((p) => p.score !== null && p.score !== undefined);
-        const lower = sw.method !== "contrast";
-        const pad = { l: 56, r: 12, t: 16, b: 18 };
-        const xs = pts.map((p) => p.pos), ys = pts.map((p) => p.score);
-        const x0 = Math.min(...xs, 0), x1 = Math.max(...xs, x0 + 0.05);
-        let y0 = Math.min(...ys), y1 = Math.max(...ys);
-        if (y1 - y0 < 1e-9) { y1 += Math.abs(y1) * 0.05 + 1e-3; y0 -= Math.abs(y0) * 0.05 + 1e-3; }
-        const padV = (y1 - y0) * 0.08; y0 -= padV; y1 += padV;
-        const X = (v) => pad.l + ((v - x0) / (x1 - x0)) * (w - pad.l - pad.r);
-        // Sharper is always up: the HFR axis is inverted
-        const Y = (v) => { const f = (v - y0) / (y1 - y0); return pad.t + (lower ? f : 1 - f) * (h - pad.t - pad.b); };
-        c.strokeStyle = "#1e293b"; c.fillStyle = "#64748b"; c.lineWidth = 1;
-        c.font = "11px ui-monospace, monospace";
-        [y0, (y0 + y1) / 2, y1].forEach((v) => {
-            c.beginPath(); c.moveTo(pad.l, Y(v)); c.lineTo(w - pad.r, Y(v)); c.stroke();
-            c.fillText(lower ? v.toFixed(2) : v.toPrecision(4), 4, Y(v) + 4);
-        });
-        const ticks = 6;
-        for (let k = 0; k <= ticks; k++) {
-            const xv = x0 + ((x1 - x0) * k) / ticks;
-            c.fillText(`${xv.toFixed(2)} D`, Math.min(X(xv) - 14, w - 52), h - 3);
+        if (sw && sw.points) {
+            const swMethod = sw.method || "auto";
+            sw.points.forEach((sp) => {
+                if (sp.score == null || !isFinite(sp.score)) return;
+                const match = st.lensHistory.find((p) => Math.abs(p.pos - sp.pos) <= 0.0035);
+                if (!match) {
+                    st.lensHistory.push({
+                        pos: Number(sp.pos.toFixed(4)),
+                        score: sp.score,
+                        hfr: swMethod !== "contrast" ? sp.score : null,
+                        contrast: swMethod === "contrast" ? sp.score : null,
+                        method: swMethod,
+                        samples: 1,
+                        phase: sp.phase,
+                        t: Date.now() / 1000
+                    });
+                }
+            });
+            st.lensHistory.sort((a, b) => a.pos - b.pos);
         }
-        // Outward pass as a line, the return pass over the peak as orange dots
-        const out = pts.filter((p) => p.phase !== "refine"), back = pts.filter((p) => p.phase === "refine");
-        c.strokeStyle = "rgba(56,189,248,0.5)"; c.lineWidth = 1.5;
-        c.beginPath();
-        out.forEach((p, i) => { if (i === 0) c.moveTo(X(p.pos), Y(p.score)); else c.lineTo(X(p.pos), Y(p.score)); });
-        c.stroke();
-        c.fillStyle = "#38bdf8";
-        out.forEach((p) => { c.beginPath(); c.arc(X(p.pos), Y(p.score), 3, 0, Math.PI * 2); c.fill(); });
-        c.fillStyle = "#f59e0b";
-        back.forEach((p) => { c.beginPath(); c.arc(X(p.pos), Y(p.score), 3.5, 0, Math.PI * 2); c.fill(); });
-        // Fitted parabola around the peak (quality q = a(x-x0)^2 + b(x-x0) + c; score = -q for HFR)
-        const f = sw.fit;
-        if (f) {
-            c.strokeStyle = "#10b981"; c.lineWidth = 2.5;
-            c.beginPath();
-            for (let k = 0; k <= 40; k++) {
-                const xv = f.from + ((f.to - f.from) * k) / 40, d = xv - f.x0;
-                const q = f.a * d * d + f.b * d + f.c;
-                const sc = f.lower_is_better ? -q : q;
-                if (k === 0) c.moveTo(X(xv), Y(sc)); else c.lineTo(X(xv), Y(sc));
-            }
-            c.stroke();
-        }
-        const best = sw.best_position ?? (f ? f.vertex : null);
-        if (best !== null && best !== undefined) {
-            c.strokeStyle = "#10b981"; c.setLineDash([4, 4]); c.lineWidth = 1;
-            c.beginPath(); c.moveTo(X(best), pad.t); c.lineTo(X(best), h - pad.b); c.stroke();
-            c.setLineDash([]);
-            c.fillStyle = "#10b981";
-            c.fillText(`peak ${best.toFixed(3)} D`, Math.min(X(best) + 6, w - 110), pad.t + 10);
-        }
-        if (sw.state === "running" && pts.length) {
-            const last = pts[pts.length - 1];
-            c.fillStyle = "#f1f5f9";
-            c.beginPath(); c.arc(X(last.pos), Y(last.score), 5, 0, Math.PI * 2); c.fill();
-        }
-        c.fillStyle = "#64748b";
-        c.fillText("sharper ↑", w - pad.r - 64, pad.t + 10);
-        // Stats row for the sweep
-        const sharp = lower ? Math.min(...ys) : Math.max(...ys), soft = lower ? Math.max(...ys) : Math.min(...ys);
-        const fm = (v) => (lower ? `${v.toFixed(2)} px` : v.toPrecision(4));
-        setTxt("focus-stat-now", pts.length ? fm(pts[pts.length - 1].score) : "—");
-        setTxt("focus-stat-best", best != null ? `${fm(sharp)} @ ${best.toFixed(3)} D` : fm(sharp));
-        $("focus-stat-min").textContent = fm(Math.min(...ys));
-        $("focus-stat-max").textContent = fm(Math.max(...ys));
-        $("focus-stat-noise").textContent = "—";
-        $("focus-stat-n").textContent = `${pts.length} steps`;
-        void soft;
+        drawLensPositionChart(c, w, h);
     }
 
     function setLensPoll(ms) {
@@ -803,7 +1305,13 @@
         if (lensCard.hidden && !lensSweepRunning) ms = 15000;
         lensPoll = setInterval(async () => {
             // Full state, not just the lens: the server also starts focus mode by itself (AF sweeps)
-            try { applyState(await api("/api/focus")); } catch (e) { /* retry */ }
+            if (document.hidden) return;
+            const seq = st.actionSeq;
+            try {
+                const s = await api("/api/focus");
+                // Drop a reply requested before a user action: it would put back the old ROI / method
+                if (seq === st.actionSeq) applyState(s);
+            } catch (e) { /* retry */ }
         }, ms);
     }
 
@@ -825,24 +1333,36 @@
         lensCmd("/api/focus/lens", { position: parseFloat(lensSlider.value) });
     });
     $("focus-lens-cancel").addEventListener("click", () => lensCmd("/api/focus/lens/cancel"));
-    document.querySelectorAll("#focus-lens-mode button").forEach((b) =>
-        b.addEventListener("click", () => {
-            lensCmd("/api/focus/lens", { mode: b.dataset.lensMode });
-            if (b.dataset.lensMode === "auto") setLensPoll(700);  // AF starts (or schedules) a sweep
-        }));
-    $("focus-refocus-every").addEventListener("change", (e) =>
-        lensCmd("/api/focus/lens", { refocus_every_h: parseFloat(e.target.value) }));
-    $("focus-refocus-now").addEventListener("click", async () => {
-        if (st.active) { lensCmd("/api/focus/lens", { mode: "auto" }); setLensPoll(700); return; }
+
+    async function triggerAfSweep() {
+        if (st.active) {
+            st.showSweep = true;
+            await lensCmd("/api/focus/lens", { mode: "auto" });
+            setLensPoll(700);
+            return;
+        }
         // Not focusing yet: start focus mode, which in AF sweeps right away
         st.history = []; st.showSweep = true;
         try {
-            const started = await api("/api/focus/start", { method: "POST", body: { autofocus: true } });
+            const startBody = st.roiMode === "manual" ? { autofocus: true, roi_mode: "manual" } : { autofocus: true };
+            const started = await api("/api/focus/start", { method: "POST", body: startBody });
             applyState(started);
             if (started.message) $("focus-statline").textContent = started.message;
             frameLoop(); startOverviewTimer(); setLensPoll(700);
-        } catch (e) { alert(`Refocus: ${e.message}`); }
-    });
+        } catch (e) { alert(`Autofocus: ${e.message}`); }
+    }
+
+    document.querySelectorAll("#focus-lens-mode button").forEach((b) =>
+        b.addEventListener("click", () => {
+            if (b.dataset.lensMode === "auto") {
+                triggerAfSweep();
+            } else {
+                lensCmd("/api/focus/lens", { mode: b.dataset.lensMode });
+            }
+        }));
+    $("focus-refocus-every").addEventListener("change", (e) =>
+        lensCmd("/api/focus/lens", { refocus_every_h: parseFloat(e.target.value) }));
+    $("focus-refocus-now").addEventListener("click", triggerAfSweep);
     $("focus-lens-reset-learning").addEventListener("click", () => {
         if (confirm("Forget all focus-vs-temperature samples?")) lensCmd("/api/focus/lens", { reset_learning: true });
     });
@@ -858,6 +1378,82 @@
     document.addEventListener("pointerdown", touch);
     document.addEventListener("keydown", touch);
     keepBtn.addEventListener("click", () => { lastTouch = 0; touch(); keepBtn.hidden = true; });
+
+    // Chart metric toggle (Star Size HFR vs Sharpness)
+    document.querySelectorAll("#focus-chart-metric button").forEach((b) => {
+        b.addEventListener("click", () => {
+            st.chartMetric = b.dataset.chartMetric;
+            document.querySelectorAll("#focus-chart-metric button").forEach((btn) => btn.classList.toggle("active", btn === b));
+            drawChart();
+        });
+    });
+
+    // Record Point button
+    const recordPointBtn = $("focus-record-point");
+    if (recordPointBtn) {
+        recordPointBtn.addEventListener("click", () => {
+            if (st.lastResult) {
+                recordLensMeasurement(st.lastResult);
+                drawChart();
+                recordPointBtn.textContent = "Đã ghi ✓";
+                setTimeout(() => { recordPointBtn.textContent = "Ghi điểm"; }, 1200);
+            } else {
+                alert("Bật Focus Mode để nhận frame và ghi điểm đo.");
+            }
+        });
+    }
+
+    // Go to Best button
+    const goBestBtn = $("focus-go-best");
+    if (goBestBtn) {
+        goBestBtn.addEventListener("click", () => {
+            if (st.bestLensPos !== null && st.bestLensPos !== undefined) {
+                lensSlider.value = st.bestLensPos;
+                lensCmd("/api/focus/lens", { position: st.bestLensPos });
+            }
+        });
+    }
+
+    // Click on lens chart canvas to command lens position
+    if (lensChart) {
+        lensChart.addEventListener("click", (ev) => {
+            const rect = lensChart.getBoundingClientRect();
+            const x = ev.clientX - rect.left;
+            const pad = st.chartPad;
+            if (x < pad.l || x > rect.width - pad.r) return;
+            const f = (x - pad.l) / (rect.width - pad.l - pad.r);
+            const targetPos = st.chartXMin + f * (st.chartXMax - st.chartXMin);
+            const clampedPos = Math.round(Math.max(0, Math.min(3, targetPos)) * 1000) / 1000;
+            lensSlider.value = clampedPos;
+            lensCmd("/api/focus/lens", { position: clampedPos });
+        });
+
+        // Hover tooltip on lens chart
+        lensChart.addEventListener("mousemove", (ev) => {
+            if (!st.lensHistory.length) {
+                if (st.hoverPoint) { st.hoverPoint = null; drawLensChart(); }
+                return;
+            }
+            const rect = lensChart.getBoundingClientRect();
+            const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+            const pad = st.chartPad;
+            let closest = null, minD = 24;
+            st.lensHistory.forEach((p) => {
+                const px = pad.l + ((p.pos - st.chartXMin) / (st.chartXMax - st.chartXMin)) * (rect.width - pad.l - pad.r);
+                const py = st.chartYFunc ? st.chartYFunc(p) : 0;
+                const dist = Math.hypot(mx - px, my - py);
+                if (dist < minD) { minD = dist; closest = { point: p, x: px, y: py }; }
+            });
+            if (closest || st.hoverPoint) {
+                st.hoverPoint = closest;
+                drawLensChart();
+            }
+        });
+
+        lensChart.addEventListener("mouseleave", () => {
+            if (st.hoverPoint) { st.hoverPoint = null; drawLensChart(); }
+        });
+    }
 
     (async function init() {
         try {

@@ -24,6 +24,7 @@ LOWER_IS_BETTER = {"stars": True, "lights": True, "contrast": False}
 FAMILY = {"stars": "hfr", "lights": "hfr", "contrast": "contrast"}
 ROI_SIZES = (128, 192, 256, 384, 512, 768)
 SMOOTH_FRAMES = (1, 3, 5, 9, 15)
+ROI_MODES = ("auto", "manual")
 
 
 def smooth_scores(scores: List[float]) -> float:
@@ -74,30 +75,41 @@ def _background(gray: np.ndarray):
     return bg, max(noise, 0.75)
 
 
-def _point_sources(gray: np.ndarray, lights: bool, max_sources: int = 25) -> List[Dict[str, Any]]:
-    """Detect point sources and measure each one's HFR on a background-subtracted stamp."""
+def _point_sources(
+    gray: np.ndarray,
+    lights: bool,
+    max_sources: int = 25,
+    keep_mask: Optional[np.ndarray] = None,
+) -> List[Dict[str, Any]]:
+    """Detect point sources and measure each one's HFR (star size in px) on a background-subtracted stamp."""
     h, w = gray.shape
-    sat_level = 250 if gray.dtype == np.uint8 else float(gray.max()) * 0.98
+    sat_level = 244 if gray.dtype == np.uint8 else float(gray.max()) * 0.95
     # Local background by morphological opening (removes anything smaller than the kernel): the residual
     # (white top-hat) holds the point sources, and its noise is not inflated by buildings, trees or glow
-    k = 31 if lights else 15
+    k = 31 if lights else 17
     opened = cv2.morphologyEx(gray, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
     resid = cv2.subtract(gray, opened)
-    # Pixel noise from horizontal neighbour differences: edges are a minority, so the MAD ignores them
+    # Pixel noise from horizontal neighbour differences plus top-hat residual IQR (handles Bayer ISP correlation)
     rows = gray[::2] if gray.size > 65536 else gray
     d = rows[:, 1:].astype(np.int16) - rows[:, :-1].astype(np.int16)
-    noise = max(1.4826 * float(np.median(np.abs(d - np.median(d)))) / np.sqrt(2.0), 0.75)
+    noise_d1 = 1.4826 * float(np.median(np.abs(d - np.median(d)))) / np.sqrt(2.0)
+    res_sample = resid[::2, ::2] if resid.size > 65536 else resid
+    res_iqr = 0.7413 * float(np.percentile(res_sample, 75) - np.percentile(res_sample, 25))
+    noise = max(noise_d1, res_iqr, 0.75)
     # Light smoothing for peak finding only; a median filter would erase a perfectly focused star
     smooth = cv2.GaussianBlur(resid, (3, 3), 0)
     k_sigma = 8.0 if lights else 5.0
     thr = max(k_sigma * noise, 20.0 if lights else 4.0)
     win = 15 if lights else 7
     dil = cv2.dilate(smooth, np.ones((win, win), np.uint8))
-    ys, xs = np.nonzero((smooth == dil) & (smooth > thr))
+    cond = (smooth == dil) & (smooth > thr)
+    if keep_mask is not None and keep_mask.shape == gray.shape:
+        cond = cond & keep_mask
+    ys, xs = np.nonzero(cond)
     if len(xs) == 0:
         return []
     order = np.argsort(smooth[ys, xs])[::-1]
-    radius = 32 if lights else 14
+    radius = 32 if lights else 16
     yy, xx = np.mgrid[-radius:radius + 1, -radius:radius + 1].astype(np.float32)
     g32 = gray.astype(np.float32)
     taken: List[Dict[str, Any]] = []
@@ -112,24 +124,38 @@ def _point_sources(gray: np.ndarray, lights: bool, max_sources: int = 25) -> Lis
         saturated = peak >= sat_level
         if saturated and not lights:
             continue
-        # Local background from the stamp's border ring
+        # Local background and local noise from the stamp's border ring (rejects textured clouds/buildings)
         ring = np.concatenate([stamp[0], stamp[-1], stamp[1:-1, 0], stamp[1:-1, -1]])
         local_bg = float(np.median(ring))
+        ring_mad = 1.4826 * float(np.median(np.abs(ring - local_bg)))
+        ring_iqr = 0.7413 * float(np.percentile(ring, 75) - np.percentile(ring, 25))
+        ring_noise = max(ring_mad, ring_iqr, 1.0)
+        eff_noise = max(noise, ring_noise)
+        if peak - local_bg < max(k_sigma * eff_noise, 20.0 if lights else 4.0):
+            continue
         s = stamp - local_bg
-        # Keep only the source itself: the connected blob above 2.5 sigma that holds the peak, grown by
-        # one pixel for the faint wings. Scattered noise pixels far from the core would inflate HFR.
-        mask = (s > 2.5 * noise).astype(np.uint8)
-        n_lbl, labels = cv2.connectedComponents(mask, connectivity=8)
-        if n_lbl < 2:
+        s_smooth = cv2.GaussianBlur(s, (3, 3), 0)
+        py, px = np.unravel_index(int(np.argmax(s_smooth)), s.shape)
+        if py < 1 or py >= s.shape[0] - 1 or px < 1 or px >= s.shape[1] - 1:
             continue
-        py, px = np.unravel_index(int(np.argmax(cv2.GaussianBlur(s, (3, 3), 0))), s.shape)
-        lbl = labels[py, px]
-        if lbl == 0:
+        # Reject single/double hot pixels and Bayer-demosaiced spikes on raw unsmoothed stamp
+        raw_mask = (s > 2.5 * eff_noise).astype(np.uint8)
+        n_raw, raw_lbls = cv2.connectedComponents(raw_mask, connectivity=8)
+        if n_raw < 2 or raw_lbls[py, px] == 0:
             continue
-        blob = labels == lbl
+        raw_blob = raw_lbls == raw_lbls[py, px]
+        if int(raw_blob.sum()) < 3:
+            continue
+        patch3 = s[py - 1:py + 2, px - 1:px + 2]
+        if float(np.median(patch3)) < max(1.5 * eff_noise, 0.18 * float(s[py, px])):
+            continue
+        # Grow source footprint using 3x3 smoothed stamp (> 1.35 sigma) so faint defocused wings are not
+        # clipped off into a 2-3 px tip (~1.16 px HFR) while avoiding background quantization drift.
+        sm_mask = (s_smooth > 1.35 * eff_noise).astype(np.uint8)
+        _, sm_lbls = cv2.connectedComponents(sm_mask, connectivity=8)
+        blob = (sm_lbls == sm_lbls[py, px]) if sm_lbls[py, px] != 0 else raw_blob
         n_px = int(blob.sum())
-        # A single hot pixel, or a blob touching the stamp edge (cloud edge, extended object)
-        if n_px < 2 or blob[0].any() or blob[-1].any() or blob[:, 0].any() or blob[:, -1].any():
+        if n_px < 3 or blob[0].any() or blob[-1].any() or blob[:, 0].any() or blob[:, -1].any():
             continue
         keep = cv2.dilate(blob.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
         sv = np.where(keep, np.clip(s, 0, None), 0.0)
@@ -139,15 +165,31 @@ def _point_sources(gray: np.ndarray, lights: bool, max_sources: int = 25) -> Lis
         cx = float((sv * xx).sum() / flux)
         cy = float((sv * yy).sum() / flux)
         r = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2)
-        hfr = float((r * sv).sum() / flux)
-        if hfr > radius * 0.6:
+        hfr_mom = float((r * sv).sum() / flux)
+        if not lights:
+            ann = stamp[(r >= 8.5) & (r <= 15.0)]
+            bg_ann = float(np.median(ann)) if ann.size else local_bg
+            s_ap = stamp[r <= 6.0] - bg_ann - 1.0 * eff_noise
+            f_ap = max(flux, float(np.clip(s_ap, 0, None).sum()))
+            p_core = max(float(s[py, px]), 1.0)
+            alpha = min(0.65, (1.35 * eff_noise) / p_core)
+            f_tot = max(f_ap, flux / max(0.35, 1.0 - alpha))
+            hfr_fp = 1.1774 * float(np.sqrt(max(0.0, f_tot) / (2.0 * np.pi * p_core)))
+            hfr = max(hfr_mom, hfr_fp)
+        else:
+            hfr = hfr_mom
+        if not lights and int(raw_blob.sum()) <= 4 and hfr < 1.22:
+            continue
+        if hfr > radius * 0.62:
             continue
         taken.append({
-            "x": int(round(x + cx)), "y": int(round(y + cy)), "hfr": round(hfr, 3), "peak": round(peak, 1),
-            "snr": round((peak - local_bg) / noise, 1), "saturated": bool(saturated), "pixels": n_px,
+            "x": int(round(x + cx)), "y": int(round(y + cy)), "hfr": round(hfr, 3),
+            "fwhm": round(2.0 * hfr, 2), "peak": round(peak, 1), "flux": round(flux, 1),
+            "snr": round((peak - local_bg) / eff_noise, 1), "saturated": bool(saturated), "pixels": n_px,
         })
         if len(taken) >= max_sources:
             break
+    taken.sort(key=lambda s: (s["saturated"], -s["flux"]))
     return taken
 
 
@@ -174,15 +216,23 @@ def measure_focus(img: np.ndarray, method: str = "auto") -> Dict[str, Any]:
     chosen = method
     sources: List[Dict[str, Any]] = []
     if method == "auto":
-        # Dark sky/scene: try stars, then lights; bright scene or nothing point-like: contrast
-        if bg < 90:
+        # Dark or urban-skyglow night sky: try stars first (HFR star size), then lights; daytime scene: contrast
+        sample = gray[::2, ::2] if gray.size > 65536 else gray
+        iqr = float(np.percentile(sample, 75) - np.percentile(sample, 25))
+        if bg < 90 or (bg < 160 and iqr < 35):
             sources = _point_sources(gray, lights=False)
             chosen = "stars"
-            if len(sources) < 3:
+            if len(sources) < 3 and bg < 90:
                 lit = _point_sources(gray, lights=True)
                 if lit:
                     sources, chosen = lit, "lights"
                 elif not sources:
+                    chosen = "contrast"
+            elif not sources:
+                lit = _point_sources(gray, lights=True) if bg < 120 else []
+                if lit:
+                    sources, chosen = lit, "lights"
+                else:
                     chosen = "contrast"
         else:
             chosen = "contrast"
@@ -198,11 +248,20 @@ def measure_focus(img: np.ndarray, method: str = "auto") -> Dict[str, Any]:
         result["sources"] = []
         result["n_sources"] = 0
     else:
-        hfrs = [s["hfr"] for s in sources]
         result["sources"] = sources[:12]
         result["n_sources"] = len(sources)
-        if hfrs:
-            hfr = float(np.median(hfrs))
+        if sources:
+            unsat = [s for s in sources if not s.get("saturated") and float(s.get("peak", 0.0)) < 244.0]
+            pool = (unsat if unsat else sources)[:8]
+            max_snr = max(float(s.get("snr", 0.0)) for s in pool)
+            max_flux = max(float(s.get("flux", 0.0)) for s in pool)
+            strong = [
+                s for s in pool
+                if float(s.get("snr", 0.0)) >= max_snr * 0.45 and float(s.get("flux", 0.0)) >= max_flux * 0.35
+            ]
+            if strong:
+                pool = strong[:6]
+            hfr = float(np.median([float(s["hfr"]) for s in pool]))
             result["score"] = round(hfr, 3)
             result["hfr"] = round(hfr, 3)
             result["fwhm"] = round(2.0 * hfr, 2)  # Gaussian profile: FWHM = 2 x HFR
@@ -215,16 +274,32 @@ def measure_focus(img: np.ndarray, method: str = "auto") -> Dict[str, Any]:
     return result
 
 
-def find_best_star(img: np.ndarray, lights: bool = False) -> Optional[Dict[str, Any]]:
-    """Brightest well-measured point source in a (downscaled) frame, for picking the ROI automatically."""
+def find_best_star(
+    img: np.ndarray,
+    lights: bool = False,
+    keep_mask: Optional[np.ndarray] = None,
+) -> Optional[Dict[str, Any]]:
+    """Well-exposed unsaturated point source in a (downscaled) frame, for picking the ROI automatically.
+    Avoids saturated/near-clipped stars (whose flat-topped cores cannot measure HFR accurately) and
+    penalises stars near the extreme frame edge where wide-angle lens coma is strong."""
     gray = _to_gray(img)
-    sources = _point_sources(gray, lights=lights, max_sources=40)
+    h, w = gray.shape
+    sources = _point_sources(gray, lights=lights, max_sources=40, keep_mask=keep_mask)
     if not sources and not lights:
-        sources = _point_sources(gray, lights=True, max_sources=40)
+        sources = _point_sources(gray, lights=True, max_sources=40, keep_mask=keep_mask)
     if not sources:
         return None
-    # Prefer strong but unsaturated sources
-    sources.sort(key=lambda s: (s["saturated"], -s["snr"]))
+
+    def star_rank(s: Dict[str, Any]):
+        sat = bool(s.get("saturated")) or float(s.get("peak", 0.0)) >= 244.0
+        nx = s["x"] / max(w, 1)
+        ny = s["y"] / max(h, 1)
+        ex = max(0.0, 0.18 - nx, nx - 0.82)
+        ey = max(0.0, 0.18 - ny, ny - 0.82)
+        edge_pen = 1.0 + 12.0 * (ex + ey)
+        return (sat, -float(s.get("flux", 0.0)) / edge_pen)
+
+    sources.sort(key=star_rank)
     return sources[0]
 
 
@@ -242,6 +317,7 @@ class FocusSession:
         self.sweep_cancel = False
         self.cx = 0.5          # ROI centre, normalised to the native frame
         self.cy = 0.5
+        self.roi_mode = "auto"  # "auto" (automatic star/detail target) or "manual" (user-locked position)
         self.roi_size = 256    # native pixels
         self.method = "auto"
         self.smooth = 5        # frames in the robust running average
@@ -261,8 +337,10 @@ class FocusSession:
         self.best_method = None
         self.result_key = None
 
-    def configure(self, cx=None, cy=None, roi_size=None, method=None, smooth=None) -> None:
+    def configure(self, cx=None, cy=None, roi_size=None, method=None, smooth=None, roi_mode=None) -> None:
         changed = False
+        if roi_mode is not None and roi_mode in ROI_MODES:
+            self.roi_mode = roi_mode
         if smooth is not None:
             n = int(smooth)
             n = min(SMOOTH_FRAMES, key=lambda s: abs(s - n))
@@ -359,6 +437,7 @@ class FocusSession:
             "started_at": self.started_at,
             "cx": self.cx,
             "cy": self.cy,
+            "roi_mode": self.roi_mode,
             "roi_size": self.roi_size,
             "roi_sizes": list(ROI_SIZES),
             "method": self.method,
@@ -371,31 +450,54 @@ class FocusSession:
         }
 
 
-def find_focus_point(img: np.ndarray, grid_w: int = 12, sky_mask: Optional[np.ndarray] = None) -> Optional[Dict[str, Any]]:
+def find_focus_point(
+    img: np.ndarray,
+    grid_w: int = 12,
+    sky_mask: Optional[np.ndarray] = None,
+    is_night: Optional[bool] = None,
+) -> Optional[Dict[str, Any]]:
     """Pick where to focus, as fractions of the frame: by night the best star (else the brightest point
     light), by day the tile with the most fine detail (buildings, rooftops, cloud edges), skipping blank
     sky and the outermost tiles (frame edge, nearby walls). sky_mask (1 = open sky, frame size) keeps the
-    night search off buildings, their windows and lamps. Runs on a ~768 px copy (a few ms)."""
+    night search off buildings, their windows and lamps."""
     gray = _to_gray(img)
     h, w = gray.shape
     scale = min(1.0, 768.0 / w)
     small = cv2.resize(gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA) if scale < 1 else gray
     sh, sw = small.shape
     bright = float(np.percentile(small, 50))
-    if bright < 60:
-        search = small
+    iqr = float(np.percentile(small, 75) - np.percentile(small, 25))
+    try_stars = (is_night is True) or (is_night is not False and (bright < 60 or (bright < 155 and iqr < 40)))
+    if try_stars:
+        s_scale = min(1.0, 1152.0 / w)
+        s_img = cv2.resize(gray, (int(w * s_scale), int(h * s_scale)), interpolation=cv2.INTER_AREA) if s_scale < 1 else gray
+        s_h, s_w = s_img.shape
+        keep = np.ones((s_h, s_w), dtype=bool)
+        b = max(4, s_w // 25)
+        keep[:b, :] = keep[-b:, :] = False
+        keep[:, :b] = keep[:, -b:] = False
+        has_sky_mask = False
         if sky_mask is not None:
-            keep = cv2.resize(sky_mask.astype(np.uint8), (sw, sh), interpolation=cv2.INTER_NEAREST) > 0
-            keep = cv2.erode(keep.astype(np.uint8), np.ones((9, 9), np.uint8)) > 0  # not right at a roof edge
-            b = max(4, sw // 25)  # nor at the frame edge
-            keep[:b, :] = keep[-b:, :] = False
-            keep[:, :b] = keep[:, -b:] = False
-            if keep.mean() > 0.05:
-                search = np.where(keep, small, np.uint8(np.median(small)))
-        star = find_best_star(search)
+            m = cv2.resize(sky_mask.astype(np.uint8), (s_w, s_h), interpolation=cv2.INTER_NEAREST) > 0
+            m = cv2.erode(m.astype(np.uint8), np.ones((9, 9), np.uint8)) > 0  # not right at a roof edge
+            m[:b, :] = m[-b:, :] = False
+            m[:, :b] = m[:, -b:] = False
+            if m.mean() > 0.05:
+                keep = m
+                has_sky_mask = True
+        keep_unsat = keep
+        if s_scale < 1.0:
+            sat_native = cv2.resize((gray >= 242).astype(np.uint8), (s_w, s_h), interpolation=cv2.INTER_NEAREST)
+            sat_native = cv2.dilate(sat_native, np.ones((7, 7), np.uint8)) > 0
+            keep_unsat = keep & (~sat_native)
+        star = find_best_star(s_img, lights=False, keep_mask=keep_unsat)
+        if star is not None and is_night is None and bright >= 60 and (star["saturated"] or star["snr"] < 10.0):
+            star = None
+        if star is None and (is_night is True or bright < 60):
+            star = find_best_star(s_img, lights=True, keep_mask=keep if not has_sky_mask else None)
         if star is not None:
             kind = "lights" if star["saturated"] else "stars"
-            return {"cx": (star["x"] + 0.5) / sw, "cy": (star["y"] + 0.5) / sh, "method": kind, "detail": star}
+            return {"cx": (star["x"] + 0.5) / s_w, "cy": (star["y"] + 0.5) / s_h, "method": kind, "detail": star}
     tile = max(32, sw // grid_w)
     best = None
     scores = []
@@ -416,8 +518,9 @@ def find_focus_point(img: np.ndarray, grid_w: int = 12, sky_mask: Optional[np.nd
             "detail": {"contrast": round(c, 4), "median_tile": round(med, 4)}}
 
 
-def find_focus_tiles(img: np.ndarray, k: int = 8, grid_w: int = 12, border: bool = False) -> List[Dict[str, Any]]:
-    """The k most detailed tiles (as frame fractions), at least one tile apart, skipping the outermost
+def find_focus_tiles(img: np.ndarray, k: int = 8, grid_w: int = 12, border: bool = False,
+                     min_sep: int = 2) -> List[Dict[str, Any]]:
+    """The k most detailed tiles (as frame fractions), at least min_sep tiles apart, skipping the outermost
     tiles and anything not clearly above the frame's median detail. A daytime sweep measures them all at
     once, so a nearby wall among them cannot decide the focus."""
     gray = _to_gray(img)
@@ -428,20 +531,27 @@ def find_focus_tiles(img: np.ndarray, k: int = 8, grid_w: int = 12, border: bool
     tile = max(32, sw // grid_w)
     cells = []
     e = 0 if border else 1  # with border=True the outermost tiles count too (buildings often sit at the edge)
-    for ty in range(e, sh // tile - e):
-        for tx in range(e, sw // tile - e):
-            cells.append((_contrast(small[ty * tile:(ty + 1) * tile, tx * tile:(tx + 1) * tile]), tx, ty))
+    ys = [ty * tile for ty in range(e, sh // tile - e)]
+    if border and sh >= tile and (not ys or ys[-1] + tile < sh):
+        ys.append(sh - tile)
+    xs = [tx * tile for tx in range(e, sw // tile - e)]
+    if border and sw >= tile and (not xs or xs[-1] + tile < sw):
+        xs.append(sw - tile)
+    for ty, y0 in enumerate(ys):
+        for tx, x0 in enumerate(xs):
+            cells.append((_contrast(small[y0:y0 + tile, x0:x0 + tile]), tx, ty, x0, y0))
     if not cells:
         return []
-    med = float(np.median([c for c, _, _ in cells]))
-    picked: List[Tuple[float, int, int]] = []
-    for c, tx, ty in sorted(cells, reverse=True):
+    med = float(np.median([c for c, *_ in cells]))
+    picked: List[Tuple[float, int, int, int, int]] = []
+    for c, tx, ty, x0, y0 in sorted(cells, reverse=True):
         if c < max(med * 1.2, 1e-6) or len(picked) >= k:
             break
-        if any(max(abs(tx - px), abs(ty - py)) < 2 for _, px, py in picked):
+        if any(max(abs(tx - px), abs(ty - py)) < min_sep for _, px, py, _, _ in picked):
             continue
-        picked.append((c, tx, ty))
-    return [{"cx": (tx + 0.5) * tile / sw, "cy": (ty + 0.5) * tile / sh, "contrast": round(c, 4)} for c, tx, ty in picked]
+        picked.append((c, tx, ty, x0, y0))
+    return [{"cx": (x0 + 0.5 * tile) / sw, "cy": (y0 + 0.5 * tile) / sh, "contrast": round(c, 4)}
+            for c, _, _, x0, y0 in picked]
 
 
 def analyse_sweep(positions: List[float], scores: List[Optional[float]], lower: bool) -> Dict[str, Any]:
@@ -458,8 +568,14 @@ def analyse_sweep(positions: List[float], scores: List[Optional[float]], lower: 
     spread = (max(finite) - min(finite)) / max(abs(max(finite)), 1e-9)
     if spread < 0.05:
         return {"ok": False, "reason": "flat", "spread": round(spread, 4)}
-    med = [float(np.median([v for v in q[max(0, i - 1):i + 2] if np.isfinite(v)] or [float("-inf")]))
-           for i in range(len(q))]
+    med = []
+    for i in range(len(q)):
+        win = q[max(0, i - 1):i + 2]
+        fin = [v for v in win if np.isfinite(v)]
+        med.append(float(np.median(fin)) if np.isfinite(q[i]) and len(fin) >= min(2, len(win)) else float("-inf"))
+    if not any(np.isfinite(v) for v in med):
+        med = [float(np.median([v for v in q[max(0, i - 1):i + 2] if np.isfinite(v)] or [float("-inf")]))
+               for i in range(len(q))]
     ib = int(np.argmax(med))
     if ib == len(q) - 1:
         return {"ok": False, "reason": "near", "spread": round(spread, 4), "peak_index": ib}
