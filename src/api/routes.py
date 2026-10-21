@@ -808,3 +808,15 @@ async def set_obs_overlay(
     except Exception:
         pass
     return {"success": True, "settings": updated}
+
+
+@router.post("/api/obs/reload")
+async def reload_obs_overlay():
+    """Broadcast a reload command to connected OBS Browser Source viewers."""
+    try:
+        from src.api.stream import ws_manager
+        await ws_manager.broadcast_json({"type": "obs_reload"})
+    except Exception:
+        pass
+    return {"success": True}
+

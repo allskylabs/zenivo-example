@@ -1155,7 +1155,7 @@
                     ws = null;
                 }
                 const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-                const fullParam = useFullRes ? "&full=1" : "";
+                const fullParam = (useFullRes ? "&full=1" : "") + "&v=2";
                 const wsUrl = proto + "//" + window.location.host + "/ws/live?binary=1" + fullParam;
                 try {
                     ws = new WebSocket(wsUrl);
@@ -1169,6 +1169,8 @@
                                 const msg = JSON.parse(ev.data);
                                 if (msg.type === "obs_overlay" && msg.settings) {
                                     applyOverlaySettings(msg.settings);
+                                } else if (msg.type === "obs_reload") {
+                                    window.location.reload();
                                 }
                             } catch (e) {}
                         }

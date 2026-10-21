@@ -509,6 +509,11 @@
             let selectedEventIdx = -1;
             let starBoostOn = false;
 
+            let lastSliderDragTs = 0;
+            let pendingPatch = {};
+            let patchTimer = null;
+            let inFlight = false;
+
             function notify(msg) {
                 toast.textContent = msg;
                 toast.classList.add("show");
@@ -516,8 +521,16 @@
                 toast._t = setTimeout(() => toast.classList.remove("show"), 1200);
             }
 
-            function syncUI(s) {
-                if (s) Object.assign(state, s);
+            function syncUI(s, fromServer = false) {
+                if (s) {
+                    if (fromServer && Date.now() - lastSliderDragTs < 600) {
+                        // Do not overwrite sliders while user is actively dragging
+                        const { zoom, pan_x, pan_y, rotate, brightness, contrast, opacity, ...rest } = s;
+                        Object.assign(state, rest);
+                    } else {
+                        Object.assign(state, s);
+                    }
+                }
 
                 $("btn-go-live").classList.toggle("active", state.view_mode === "live");
                 document.querySelectorAll(".mode-btn").forEach((b) => {
@@ -538,44 +551,74 @@
                 $("btn-bg").textContent = state.bg === "transparent" ? "Alpha" : "Nền Đen";
                 $("btn-bg").classList.toggle("active", state.bg === "transparent");
 
-                $("rng-opacity").value = state.opacity ?? 1.0;
-                $("val-opacity").textContent = Math.round((state.opacity ?? 1.0) * 100) + "%";
+                if (!fromServer || Date.now() - lastSliderDragTs >= 600) {
+                    $("rng-opacity").value = state.opacity ?? 1.0;
+                    $("val-opacity").textContent = Math.round((state.opacity ?? 1.0) * 100) + "%";
 
-                $("rng-zoom").value = state.zoom ?? 1.0;
-                $("val-zoom").textContent = Number(state.zoom ?? 1.0).toFixed(1) + "x";
-                $("rng-panx").value = state.pan_x ?? 0;
-                $("rng-pany").value = state.pan_y ?? 0;
-                $("rng-rotate").value = state.rotate ?? 0;
-                $("val-rotate").textContent = Math.round(state.rotate ?? 0) + "°";
+                    $("rng-zoom").value = state.zoom ?? 1.0;
+                    $("val-zoom").textContent = Number(state.zoom ?? 1.0).toFixed(1) + "x";
+                    $("rng-panx").value = state.pan_x ?? 0;
+                    $("rng-pany").value = state.pan_y ?? 0;
+                    $("rng-rotate").value = state.rotate ?? 0;
+                    $("val-rotate").textContent = Math.round(state.rotate ?? 0) + "°";
+
+                    $("rng-bright").value = state.brightness ?? 1.0;
+                    $("val-bright").textContent = Number(state.brightness ?? 1.0).toFixed(2);
+                    $("rng-contrast").value = state.contrast ?? 1.0;
+                    $("val-contrast").textContent = Number(state.contrast ?? 1.0).toFixed(2);
+                }
 
                 $("btn-fliph").classList.toggle("active", !!state.flip_h);
                 $("btn-flipv").classList.toggle("active", !!state.flip_v);
-
-                $("rng-bright").value = state.brightness ?? 1.0;
-                $("val-bright").textContent = Number(state.brightness ?? 1.0).toFixed(2);
-                $("rng-contrast").value = state.contrast ?? 1.0;
-                $("val-contrast").textContent = Number(state.contrast ?? 1.0).toFixed(2);
 
                 if (document.activeElement !== $("inp-title")) $("inp-title").value = state.title_text || "";
                 if (document.activeElement !== $("inp-sub")) $("inp-sub").value = state.title_sub || "";
                 $("sel-title-pos").value = state.title_pos || "bottom-left";
             }
 
-            async function pushPatch(patch, msg) {
-                Object.assign(state, patch);
-                syncUI();
+            async function flushPatch(msg) {
+                if (inFlight || Object.keys(pendingPatch).length === 0) return;
+                inFlight = true;
+                const body = pendingPatch;
+                pendingPatch = {};
                 try {
                     const r = await fetch("/api/obs/overlay", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(patch),
+                        body: JSON.stringify(body),
                     });
                     if (r.ok) {
                         const d = await r.json();
-                        if (d.settings) syncUI(d.settings);
+                        if (d.settings) syncUI(d.settings, true);
                         if (msg) notify(msg);
                     }
-                } catch (e) {}
+                } catch (e) {} finally {
+                    inFlight = false;
+                    if (Object.keys(pendingPatch).length > 0) {
+                        flushPatch();
+                    }
+                }
+            }
+
+            function pushPatch(patch, msg, isSlider = false) {
+                if (isSlider) lastSliderDragTs = Date.now();
+                Object.assign(state, patch);
+                Object.assign(pendingPatch, patch);
+                syncUI();
+                if (isSlider) {
+                    if (!patchTimer) {
+                        patchTimer = setTimeout(() => {
+                            patchTimer = null;
+                            flushPatch(msg);
+                        }, 45);
+                    }
+                } else {
+                    if (patchTimer) {
+                        clearTimeout(patchTimer);
+                        patchTimer = null;
+                    }
+                    flushPatch(msg);
+                }
             }
 
             // Topbar buttons
@@ -586,7 +629,8 @@
             });
             $("btn-snap").addEventListener("click", () => {
                 fetch("/api/live/snapshot.jpg?t=" + Date.now()).catch(() => {});
-                notify("Đã làm mới ảnh");
+                fetch("/api/obs/reload", { method: "POST" }).catch(() => {});
+                notify("Đã làm mới OBS");
             });
             $("btn-open-obs").addEventListener("click", () => window.open("/obs", "_blank"));
 
@@ -636,14 +680,12 @@
             $("btn-bg").addEventListener("click", () => pushPatch({ bg: state.bg === "transparent" ? "black" : "transparent" }));
 
             $("rng-opacity").addEventListener("input", (e) => {
-                $("val-opacity").textContent = Math.round(e.target.value * 100) + "%";
+                pushPatch({ opacity: parseFloat(e.target.value) }, null, true);
             });
-            $("rng-opacity").addEventListener("change", (e) => pushPatch({ opacity: parseFloat(e.target.value) }));
 
             // Zoom, Pan, Rotate, Brightness, Contrast
             $("rng-zoom").addEventListener("input", (e) => {
-                $("val-zoom").textContent = Number(e.target.value).toFixed(1) + "x";
-                pushPatch({ zoom: parseFloat(e.target.value) });
+                pushPatch({ zoom: parseFloat(e.target.value) }, null, true);
             });
             document.querySelectorAll(".z-quick").forEach((b) => {
                 b.addEventListener("click", () => {
@@ -660,12 +702,11 @@
                 });
             });
             $("btn-pan-center").addEventListener("click", () => pushPatch({ pan_x: 0, pan_y: 0 }));
-            $("rng-panx").addEventListener("input", (e) => pushPatch({ pan_x: parseFloat(e.target.value) }));
-            $("rng-pany").addEventListener("input", (e) => pushPatch({ pan_y: parseFloat(e.target.value) }));
+            $("rng-panx").addEventListener("input", (e) => pushPatch({ pan_x: parseFloat(e.target.value) }, null, true));
+            $("rng-pany").addEventListener("input", (e) => pushPatch({ pan_y: parseFloat(e.target.value) }, null, true));
 
             $("rng-rotate").addEventListener("input", (e) => {
-                $("val-rotate").textContent = e.target.value + "°";
-                pushPatch({ rotate: parseFloat(e.target.value) });
+                pushPatch({ rotate: parseFloat(e.target.value) }, null, true);
             });
             document.querySelectorAll(".rot-quick").forEach((b) => {
                 b.addEventListener("click", () => pushPatch({ rotate: parseFloat(b.dataset.r) }));
@@ -674,12 +715,10 @@
             $("btn-flipv").addEventListener("click", () => pushPatch({ flip_v: !state.flip_v }));
 
             $("rng-bright").addEventListener("input", (e) => {
-                $("val-bright").textContent = Number(e.target.value).toFixed(2);
-                pushPatch({ brightness: parseFloat(e.target.value) });
+                pushPatch({ brightness: parseFloat(e.target.value) }, null, true);
             });
             $("rng-contrast").addEventListener("input", (e) => {
-                $("val-contrast").textContent = Number(e.target.value).toFixed(2);
-                pushPatch({ contrast: parseFloat(e.target.value) });
+                pushPatch({ contrast: parseFloat(e.target.value) }, null, true);
             });
 
             $("btn-reset-view").addEventListener("click", () => {
@@ -935,7 +974,7 @@
                         } else if (typeof ev.data === "string") {
                             try {
                                 const msg = JSON.parse(ev.data);
-                                if (msg.type === "obs_overlay" && msg.settings) syncUI(msg.settings);
+                                if (msg.type === "obs_overlay" && msg.settings) syncUI(msg.settings, true);
                             } catch (e) {}
                         }
                     };

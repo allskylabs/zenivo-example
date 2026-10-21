@@ -115,14 +115,16 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         @app.api_route("/live/full", methods=["GET", "HEAD"])
         @app.api_route("/obs", methods=["GET", "HEAD"])
         def serve_full_live():
-            return FileResponse(os.path.join(web_dir, "full.html"), media_type="text/html", headers=no_cache)
+            with open(os.path.join(web_dir, "full.html"), encoding="utf-8") as f:
+                return HTMLResponse(f.read(), headers=no_cache)
 
         # Dedicated OBS Custom Browser Dock control panel
         @app.api_route("/obs/dock", methods=["GET", "HEAD"])
         @app.api_route("/obs/control", methods=["GET", "HEAD"])
         @app.api_route("/dock", methods=["GET", "HEAD"])
         def serve_obs_dock():
-            return FileResponse(os.path.join(web_dir, "obs_dock.html"), media_type="text/html", headers=no_cache)
+            with open(os.path.join(web_dir, "obs_dock.html"), encoding="utf-8") as f:
+                return HTMLResponse(f.read(), headers=no_cache)
 
         @app.get("/index.html")
         def serve_index_html():

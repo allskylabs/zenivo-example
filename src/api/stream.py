@@ -207,10 +207,111 @@ def pack_asb1_binary_packet(
     return header_bytes + hist_bytes + jpeg_payload
 
 
+def _apply_obs_transform_fallback(frame: np.ndarray, service: AllSkyService) -> Optional[bytes]:
+    """
+    Apply OBS zoom, pan, rotate, flip, brightness/contrast, and event/product replay
+    server-side for legacy OBS Browser Source instances that have not yet reloaded v2 HTML.
+    """
+    import os
+    obs = service.get_obs_overlay()
+    mode = str(obs.get("view_mode") or "live")
+    zoom = float(obs.get("zoom") or 1.0)
+    pan_x = float(obs.get("pan_x") or 0.0)
+    pan_y = float(obs.get("pan_y") or 0.0)
+    rot = float(obs.get("rotate") or 0.0)
+    flip_h = bool(obs.get("flip_h"))
+    flip_v = bool(obs.get("flip_v"))
+    bright = float(obs.get("brightness") or 1.0)
+    contrast = float(obs.get("contrast") or 1.0)
+    replay_url = str(obs.get("replay_url") or "")
+    crop_url = str(obs.get("replay_crop_url") or "")
+
+    needs_work = (
+        mode != "live"
+        or abs(zoom - 1.0) > 0.01
+        or abs(pan_x) > 0.1
+        or abs(pan_y) > 0.1
+        or abs(rot) > 0.1
+        or flip_h
+        or flip_v
+        or abs(bright - 1.0) > 0.01
+        or abs(contrast - 1.0) > 0.01
+    )
+    if not needs_work:
+        return None
+
+    img = frame.copy()
+    h, w = img.shape[:2]
+
+    # 1. If in replay mode (event, keogram, startrails), load the target image
+    if mode in ("event", "keogram", "startrails") and replay_url:
+        local_path = None
+        if replay_url.startswith("/api/events/img/"):
+            parts = replay_url.split("/")
+            if len(parts) >= 6:
+                local_path = service.event_image_path(parts[4], parts[5].split("?")[0])
+        elif replay_url.startswith("/uploads/"):
+            rel = replay_url.lstrip("/").split("?")[0]
+            cand = os.path.join(service.output_dir, rel)
+            if os.path.isfile(cand):
+                local_path = cand
+        if local_path and os.path.isfile(local_path):
+            loaded = cv2.imread(local_path, cv2.IMREAD_COLOR)
+            if loaded is not None and loaded.size > 0:
+                img = cv2.resize(loaded, (w, h), interpolation=cv2.INTER_LINEAR)
+
+    # 2. Brightness & contrast
+    if abs(bright - 1.0) > 0.01 or abs(contrast - 1.0) > 0.01:
+        beta = (bright - 1.0) * 100.0
+        img = cv2.convertScaleAbs(img, alpha=contrast, beta=beta)
+
+    # 3. Flip
+    if flip_h and flip_v:
+        img = cv2.flip(img, -1)
+    elif flip_h:
+        img = cv2.flip(img, 1)
+    elif flip_v:
+        img = cv2.flip(img, 0)
+
+    # 4. Rotate
+    if abs(rot) > 0.1:
+        mat = cv2.getRotationMatrix2D((w * 0.5, h * 0.5), -rot, 1.0)
+        img = cv2.warpAffine(img, mat, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+
+    # 5. Zoom & Pan
+    if zoom > 1.01:
+        crop_w = max(64, int(round(w / zoom)))
+        crop_h = max(48, int(round(h / zoom)))
+        cx = int(round(w * 0.5 - (pan_x / 100.0) * w * 0.5))
+        cy = int(round(h * 0.5 - (pan_y / 100.0) * h * 0.5))
+        x0 = max(0, min(w - crop_w, cx - crop_w // 2))
+        y0 = max(0, min(h - crop_h, cy - crop_h // 2))
+        cropped = img[y0 : y0 + crop_h, x0 : x0 + crop_w]
+        img = cv2.resize(cropped, (w, h), interpolation=cv2.INTER_LINEAR)
+
+    # 6. Picture-in-Picture close-up crop for event replay
+    if mode == "event" and crop_url and crop_url.startswith("/api/events/img/"):
+        parts = crop_url.split("/")
+        if len(parts) >= 6:
+            cpath = service.event_image_path(parts[4], parts[5].split("?")[0])
+            if cpath and os.path.isfile(cpath):
+                cimg = cv2.imread(cpath, cv2.IMREAD_COLOR)
+                if cimg is not None and cimg.size > 0:
+                    pw = min(420, w // 4)
+                    pip = cv2.resize(cimg, (pw, pw), interpolation=cv2.INTER_LINEAR)
+                    y1, x1 = h - pw - 28, w - pw - 28
+                    img[y1 : y1 + pw, x1 : x1 + pw] = pip
+                    cv2.rectangle(img, (x1, y1), (x1 + pw, y1 + pw), (248, 189, 56), 3)
+
+    ret, jpeg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    return jpeg.tobytes() if ret else None
+
+
 async def _build_full_binary_packet(
     service: AllSkyService,
     packet_type: int = 1,
     full_res: bool = False,
+    client_v2: bool = False,
 ) -> bytes:
     """Capture/fetch latest telemetry, status, and JPEG and pack into a single ASB1 binary frame."""
     telem = await asyncio.to_thread(service.get_telemetry)
@@ -219,7 +320,12 @@ async def _build_full_binary_packet(
     frame, frame_ts = service.get_display_frame()
     if frame is not None:
         if full_res:
-            jpeg_bytes = service.last_jpeg or await asyncio.to_thread(service.get_snapshot_jpeg)
+            custom_jpeg = None if client_v2 else await asyncio.to_thread(_apply_obs_transform_fallback, frame, service)
+            if custom_jpeg is not None:
+                jpeg_bytes = custom_jpeg
+                frame_ts = time.time()  # force frame swap on client even when camera exposure is long
+            else:
+                jpeg_bytes = service.last_jpeg or await asyncio.to_thread(service.get_snapshot_jpeg)
         else:
             # Viewers poll faster than the camera delivers; encode each frame once and share it
             cached = _stream_jpeg_cache
@@ -271,9 +377,10 @@ async def handle_live_websocket(websocket: WebSocket, service: AllSkyService):
     await ws_manager.connect(websocket)
     binary_mode = websocket.query_params.get("binary", "0") in ("1", "true", "yes")
     full_res = websocket.query_params.get("full", "0") in ("1", "true", "yes")
+    client_v2 = websocket.query_params.get("v", "") == "2"
     try:
         if binary_mode:
-            pkt = await _build_full_binary_packet(service, packet_type=1, full_res=full_res)
+            pkt = await _build_full_binary_packet(service, packet_type=1, full_res=full_res, client_v2=client_v2)
             await websocket.send_bytes(pkt)
         else:
             status_payload = await asyncio.to_thread(service.get_status)
@@ -301,10 +408,10 @@ async def handle_live_websocket(websocket: WebSocket, service: AllSkyService):
         async def live_streamer():
             while True:
                 exp_s = float(getattr(service.camera, "current_exposure_s", 0.1))
-                sleep_s = max(0.35, min(2.0, exp_s * 0.95))
+                sleep_s = 0.45 if (full_res and not client_v2) else max(0.35, min(2.0, exp_s * 0.95))
                 await asyncio.sleep(sleep_s)
                 if binary_mode:
-                    pkt = await _build_full_binary_packet(service, packet_type=1, full_res=full_res)
+                    pkt = await _build_full_binary_packet(service, packet_type=1, full_res=full_res, client_v2=client_v2)
                     await websocket.send_bytes(pkt)
                     await push_lock_state()
                 else:
