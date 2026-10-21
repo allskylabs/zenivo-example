@@ -123,6 +123,10 @@ class StartrailsAccumulator:
             self.frame_count = 1
             return f.astype(np.uint8)
 
+        # A frame of another size (wrong camera or mode) cannot be stacked: skip it
+        if f.shape != self.composite.shape:
+            return self.composite.astype(np.uint8)
+
         self.frame_count += 1
 
         if not self.comet_mode:
@@ -173,3 +177,91 @@ class StartrailsAccumulator:
         """Reset the accumulator."""
         self.composite = None
         self.frame_count = 0
+
+
+class StartrailsFrameGate:
+    """
+    Decides whether an archived frame may enter the max-pixel startrails stack. A single bad frame
+    (daylight, a headlight or lightning flash, an AE glitch, a bumped camera) otherwise burns into
+    the composite for the rest of the night, so frames are rejected when:
+      - the sun is above ``max_sun_elev`` (twilight/day),
+      - more than ``max_saturated_frac`` of the sky is clipped,
+      - the median brightness leaves [low_ratio, high_ratio] x the running median of recent
+        accepted frames (or the absolute [min_median, max_median] window for the first frame),
+      - the static foreground has shifted more than ``max_shift_px`` (full-res) from the last
+        accepted frame (phase correlation on a 1/4-scale grey image, ~2 ms).
+    After ``reset_after`` consecutive brightness/alignment rejections the references are dropped,
+    so a genuine level change (moonrise) or a permanent camera move does not starve the stack.
+    """
+
+    def __init__(
+        self,
+        max_sun_elev: float = -12.0,
+        max_saturated_frac: float = 0.01,
+        min_median: float = 4.0,
+        max_median: float = 150.0,
+        low_ratio: float = 0.6,
+        high_ratio: float = 1.35,
+        max_shift_px: float = 4.0,
+        history: int = 9,
+        reset_after: int = 4,
+    ):
+        self.max_sun_elev = max_sun_elev
+        self.max_saturated_frac = max_saturated_frac
+        self.min_median = min_median
+        self.max_median = max_median
+        self.low_ratio = low_ratio
+        self.high_ratio = high_ratio
+        self.max_shift_px = max_shift_px
+        self.history = history
+        self.reset_after = reset_after
+        self.reset()
+
+    def reset(self) -> None:
+        self._medians: List[float] = []
+        self._ref: Optional[np.ndarray] = None
+        self._streak = 0
+        self.accepted = 0
+        self.rejected: dict = {}
+
+    def check(self, frame: np.ndarray, sun_elev: Optional[float] = None) -> Optional[str]:
+        """Return None when the frame is accepted (and update references), else the reject reason."""
+        reason = self._check(frame, sun_elev)
+        if reason is None:
+            self.accepted += 1
+        elif reason != "daylight":  # expected every day, not a fault worth counting
+            self.rejected[reason] = self.rejected.get(reason, 0) + 1
+        return reason
+
+    def _check(self, frame: np.ndarray, sun_elev: Optional[float]) -> Optional[str]:
+        if sun_elev is not None and sun_elev > self.max_sun_elev:
+            return "daylight"
+        small = cv2.resize(frame, (frame.shape[1] // 4, frame.shape[0] // 4), interpolation=cv2.INTER_AREA)
+        grey = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY) if small.ndim == 3 else small
+        if float(np.count_nonzero(grey >= 250)) / grey.size > self.max_saturated_frac:
+            return "saturated"
+        med = float(np.median(grey))
+        if self._medians:
+            ref_med = float(np.median(self._medians))
+            lo, hi = self.low_ratio * ref_med, self.high_ratio * ref_med
+        else:
+            lo, hi = self.min_median, self.max_median
+        if med > hi:
+            return self._soft_reject("too_bright")
+        if med < lo:
+            return self._soft_reject("too_dark")
+        g = grey.astype(np.float32)
+        if self._ref is not None and self._ref.shape == g.shape:
+            (dx, dy), resp = cv2.phaseCorrelate(self._ref, g)
+            if resp >= 0.1 and 4.0 * float(np.hypot(dx, dy)) > self.max_shift_px:
+                return self._soft_reject("misaligned")
+        self._ref = g
+        self._medians = (self._medians + [med])[-self.history:]
+        self._streak = 0
+        return None
+
+    def _soft_reject(self, reason: str) -> str:
+        self._streak += 1
+        if self._streak >= self.reset_after:
+            self._medians, self._ref, self._streak = [], None, 0
+        return reason

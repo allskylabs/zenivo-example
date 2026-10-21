@@ -17,6 +17,7 @@ def _svc(monkeypatch, tmp_path):
     for d in (svc.keograms_dir, svc.startrails_dir, svc.frames_archive_root):
         os.makedirs(d, exist_ok=True)
     monkeypatch.setattr(svc, "_trigger_background_timelapse_compile", lambda fps=12.0: None)
+    monkeypatch.setattr(svc, "_startrails_sun_elev", lambda dt=None: -30.0)
     svc.keogram_gen.reset()
     svc.startrails_acc.reset()
     return svc
@@ -25,7 +26,7 @@ def _svc(monkeypatch, tmp_path):
 def _archive(svc, n):
     ramp = np.linspace(0, 150, 972, dtype=np.float32)[:, None, None]
     for i in range(n):
-        frame = np.broadcast_to(ramp + 20 * i, (972, 1296, 3)).astype(np.uint8)
+        frame = np.broadcast_to(ramp + 8 * i, (972, 1296, 3)).astype(np.uint8)
         assert svc._maybe_archive_frame_and_update_products(frame, {}, force=True)
 
 
@@ -44,6 +45,7 @@ def test_restore_reads_saved_products_not_frames(monkeypatch, tmp_path):
     svc.startrails_acc.reset()
     svc._restore_today_products()
 
+    reads = [p for p in reads if str(p).startswith(str(tmp_path))]  # ignore other service threads
     assert len(reads) == 3  # newest frame (for its shape) + the two dated products
     assert len(svc.keogram_gen) == 5
     assert [t.isoformat() for t in svc.keogram_gen.timestamps] == [t.isoformat() for t in want_ts]

@@ -97,6 +97,9 @@ class KeogramGenerator:
         """
         ts = timestamp or datetime.now().astimezone()
         sl = extract_meridian_slice(frame, slice_width=self.slice_width)
+        # A frame of another size (wrong camera or mode) cannot join the strip: skip it, keep the timeline aligned
+        if self.slices and sl.shape[0] != self.slices[0].shape[0]:
+            return sl
         self.slices.append(sl)
         self.timestamps.append(ts)
 

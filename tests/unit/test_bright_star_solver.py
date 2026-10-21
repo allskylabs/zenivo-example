@@ -272,3 +272,43 @@ def test_fixed_lens_real_hanoi_city_sky():
     args["center_px"] = (2591 - 1338.2, 979.6)
     args["sky_mask"] = args["sky_mask"][:, ::-1].copy()
     assert not bss.solve_fixed_lens(mirrored, when=when, velocity=vel * [-1, 1], **args)["success"]
+
+
+def test_service_deep_solve_remeasures_wrong_lens(monkeypatch):
+    from src.api.service import AllSkyService
+
+    AllSkyService.reset_instance()
+    svc = AllSkyService.get_instance()
+    monkeypatch.setattr(svc, "_save_station_config", lambda: None)
+    svc.station_config["camera_sensor"] = {"width_px": FISH["w"] * 2, "height_px": FISH["h"] * 2, "pixel_pitch_um": 2.0}
+    wrong_f = FISH["f"] * 2 * 1.4
+    svc.station_config["optics"] = {
+        "projection_type": "Fisheye Equidistant", "lens_projection": "equidistant", "focal_length_px": wrong_f,
+        "optical_center_x_px": FISH["cx"] * 2, "optical_center_y_px": FISH["cy"] * 2, "distortion_k": 0.0,
+        "fov_horizontal_deg": 170.0,
+    }
+    svc.station_config.pop("sky_mask", None)
+    frames, times = _sky_series()
+    res = svc._solve_bright_star_pattern(frames[-1], LAT, LON, frames, times, refit_lens=True)
+    assert res is not None and res["success"], res
+    assert "fixed lens" not in svc.station_config["solve_source"]
+    assert abs(svc.station_config["optics"]["focal_length_px"] - FISH["f"] * 2) / (FISH["f"] * 2) < 0.05
+    AllSkyService.reset_instance()
+
+
+def test_service_reset_calibration_keeps_location_and_mask(monkeypatch):
+    from src.api.service import AllSkyService
+
+    AllSkyService.reset_instance()
+    svc = AllSkyService.get_instance()
+    monkeypatch.setattr(svc, "_save_station_config", lambda: None)
+    svc.station_config.update({"latitude_deg": 21.0538, "sky_mask": {"sky": [[[0, 0], [1, 0], [1, 1]]], "obstruction": []},
+                               "solve_source": "live_frame (bright-star pattern)", "bright_star_solution": {"x": 1}})
+    svc.station_config["optics"] = {"focal_length_px": 1.0, "lens_projection": "equidistant"}
+    res = svc.reset_station_calibration()
+    assert res["success"]
+    cfg = svc.station_config
+    assert cfg["solve_source"] == "not_solved_yet" and "bright_star_solution" not in cfg
+    assert "focal_length_px" not in cfg["optics"] and svc._lens_intrinsics(2592) is None
+    assert cfg["latitude_deg"] == 21.0538 and cfg["sky_mask"]["sky"]
+    AllSkyService.reset_instance()

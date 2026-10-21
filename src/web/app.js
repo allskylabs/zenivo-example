@@ -67,6 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const telemTemp = document.getElementById("telem-temp");
     const telemUptime = document.getElementById("telem-uptime");
     const telemTimestamp = document.getElementById("telemetry-timestamp");
+    const liveFrameInfo = viewportContainer ? makeFrameInfo(viewportContainer) : null;
     const hudHwDelta = document.getElementById("hud-hw-delta");
 
     // Registers
@@ -114,6 +115,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnStationAutoGps = document.getElementById("btn-station-auto-gps");
     const btnStationSave = document.getElementById("btn-station-save");
     const btnStationSolve = document.getElementById("btn-station-solve");
+    const chkStationDeep = document.getElementById("chk-station-deep");
     const stationAlert = document.getElementById("station-alert");
     const stationSolveBadge = document.getElementById("station-solve-badge");
     const stSensor = document.getElementById("st-sensor");
@@ -133,10 +135,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Gallery Elements
     const productsGrid = document.getElementById("products-grid");
-    const historyGrid = document.getElementById("history-grid");
-    const historyCountBadge = document.getElementById("history-count-badge");
-    const eventsTableBody = document.getElementById("events-table-body");
-    const eventCountBadge = document.getElementById("event-count-badge");
+    const dayList = document.getElementById("day-list");
+    const dayCountBadge = document.getElementById("day-count-badge");
 
     // ------------------------------------------------------------------
     // Clock & Night Vision
@@ -153,6 +153,62 @@ document.addEventListener("DOMContentLoaded", () => {
         const m = -new Date().getTimezoneOffset();
         return `UTC${m >= 0 ? "+" : "-"}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ":" + String(Math.abs(m) % 60).padStart(2, "0") : ""}`;
     })();
+
+    // Capture info (time / exposure / gain / brightness) is drawn as HTML over images, never into pixels
+    function fmtExposure(exp) {
+        return exp < 0.01 ? (exp * 1000).toFixed(2) + " ms" : exp < 0.1 ? (exp * 1000).toFixed(1) + " ms" : exp.toFixed(exp < 1 ? 3 : 1) + " s";
+    }
+    function setFrameInfo(el, time, exp, gain, brightness) {
+        if (!el) return;
+        if (!time) {
+            el.hidden = true;
+            return;
+        }
+        const parts = [];
+        if (typeof exp === "number") parts.push(`Exp ${fmtExposure(exp)}`);
+        if (typeof gain === "number") parts.push(`Gain ${gain.toFixed(1)} dB`);
+        el.innerHTML = `<div>${fmtLocalIso(time)} ${tzLabel}</div>`
+            + (parts.length ? `<div>${parts.join("  ")}</div>` : "")
+            + (typeof brightness === "number" ? `<div>Brightness ${brightness.toFixed(0)}/255</div>` : "");
+        el.hidden = false;
+    }
+    function makeFrameInfo(parent) {
+        const el = document.createElement("div");
+        el.className = "frame-info";
+        el.hidden = true;
+        parent.appendChild(el);
+        return el;
+    }
+    // Timelapse <video>: per-frame info from the sidecar JSON written next to the MP4
+    function attachVideoInfo(video, infoUrl) {
+        if (!video || !infoUrl) return;
+        const el = makeFrameInfo(video.parentElement);
+        fetch(`${infoUrl}${infoUrl.includes("?") ? "&" : "?"}t=${Date.now()}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((info) => {
+                if (!info || !Array.isArray(info.frames) || !info.frames.length) return;
+                const fps = info.fps || 12;
+                let last = -1;
+                const show = () => {
+                    const i = Math.min(info.frames.length - 1, Math.max(0, Math.floor(video.currentTime * fps + 1e-3)));
+                    if (i === last) return;
+                    last = i;
+                    const [t, exp, gain, bri] = info.frames[i];
+                    setFrameInfo(el, t, exp, gain, bri);
+                };
+                if (video.requestVideoFrameCallback) {
+                    const tick = () => {
+                        show();
+                        video.requestVideoFrameCallback(tick);
+                    };
+                    video.requestVideoFrameCallback(tick);
+                }
+                video.addEventListener("timeupdate", show);
+                video.addEventListener("seeked", show);
+                show();
+            })
+            .catch(() => {});
+    }
 
     function updateClock() {
         navClock.textContent = `${fmtLocalIso(new Date().toISOString(), true)} ${tzLabel}`;
@@ -1158,11 +1214,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Button 3: Capture & Plate-Solve via https://hoan.uk/astronomy/plate-solving (Only when user clicks!)
-    if (btnStationSolve) {
-        btnStationSolve.addEventListener("click", async () => {
+    // mode "deep" skips the known lens: re-reads the sensor and re-measures focal length, distortion, centre
+    const runStationSolve = async (btn, mode) => {
+            const idleLabel = btn.textContent;
+            const solveButtons = [btnStationSolve, chkStationDeep].filter(Boolean);
             const payload = readManualStationPayload("manual", true);
-            btnStationSolve.disabled = true;
-            btnStationSolve.textContent = "⏳ Capturing & plate-solving...";
+            solveButtons.forEach((b) => (b.disabled = true));
+            btn.textContent = "⏳ Capturing & plate-solving...";
             if (stationSolveBadge) {
                 stationSolveBadge.textContent = "SOLVING...";
                 stationSolveBadge.className = "badge badge-warning";
@@ -1191,7 +1249,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (!saveRes.ok) throw new Error(`saving coordinates failed (HTTP ${saveRes.status})`);
 
                 // The solver can take minutes: start it in the background and poll its status
-                const startRes = await fetch("/api/station/plate-solve/start?fov_hint=auto", { method: "POST" });
+                const startRes = await fetch(`/api/station/plate-solve/start?fov_hint=auto&mode=${mode}`, { method: "POST" });
                 if (!startRes.ok) throw new Error(`could not start plate-solve (HTTP ${startRes.status})`);
                 const t0 = Date.now();
                 let data = await startRes.json();
@@ -1203,7 +1261,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     const parts = [STAGES[data.stage] || "Starting"];
                     if (data.stage === "capturing" && data.frames_total) parts.push(`frame ${Math.min(data.frame + 1, data.frames_total)}/${data.frames_total}`);
                     if (data.eta_ts) parts.push(`~${Math.max(0, Math.round(data.eta_ts - Date.now() / 1000))} s left`);
-                    btnStationSolve.textContent = `⏳ ${parts.join(" · ")}`;
+                    btn.textContent = `⏳ ${parts.join(" · ")}`;
                     showAlert(stationAlert, `⏳ ${parts.join(" · ")} — ${data.message || "Plate-solving…"} (${secs} s elapsed)`, "info", true);
                     await new Promise((r) => setTimeout(r, 1000));
                     if (Date.now() - lastPoll >= 3000) {
@@ -1224,10 +1282,13 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (err) {
                 showAlert(stationAlert, `❌ Network connection error: ${err.message}`, "error", true);
             } finally {
-                btnStationSolve.disabled = false;
-                btnStationSolve.textContent = "🔭 Capture & Auto Plate-Solve";
+                solveButtons.forEach((b) => (b.disabled = false));
+                btn.textContent = idleLabel;
             }
-        });
+    };
+    if (btnStationSolve) {
+        btnStationSolve.addEventListener("click", () =>
+            runStationSolve(btnStationSolve, chkStationDeep && chkStationDeep.checked ? "deep" : "auto"));
     }
 
     // Plate-solve sky mask editor: polygons stored as frame fractions in station_config.sky_mask
@@ -2551,6 +2612,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (data.timestamp) {
             telemTimestamp.textContent = fmtLocalIso(data.timestamp, true);
         }
+        if (data.capture_time) {
+            setFrameInfo(liveFrameInfo, data.capture_time, data.exposure_s, data.gain_db, data.brightness);
+        }
         if (data.histogram) {
             drawHistogram(data.histogram);
         }
@@ -2726,6 +2790,8 @@ document.addEventListener("DOMContentLoaded", () => {
             sky_status: SKY_CODE_NAMES[skyCode] || "clear",
             sensor_temp_c: sensorTempC,
             timestamp: isoTs,
+            capture_time: jpegLen > 0 ? isoTs : undefined,
+            brightness: histMeanVal,
             histogram: {
                 r: rBins,
                 g: gBins,
@@ -2840,6 +2906,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     pollCalibrationStatus();
     loadStationConfig();
+    // A plate-solve run from another tab changes the lens/pointing the sky overlay uses: pick it up
+    setInterval(() => { if (!document.hidden) loadStationConfig(); }, 60000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) loadStationConfig(); });
     if (currentPage === "tab-settings") {
         loadResolutionOptions();
         loadStarBoost();
@@ -3157,7 +3226,10 @@ document.addEventListener("DOMContentLoaded", () => {
             card.className = "product-card";
             const mediaUrl = `${item.url}?t=${cacheBust}`;
             const sizeBadge = item.size_kb ? `${item.size_kb.toFixed(1)} KB` : "Pending";
-            const framesBadge = item.frame_count !== undefined ? `${item.frame_count} frames` : "";
+            const nRejected = item.rejected ? Object.values(item.rejected).reduce((a, b) => a + b, 0) : 0;
+            const framesBadge = item.frame_count !== undefined
+                ? `${item.frame_count} frames` + (nRejected ? ` (${nRejected} rejected)` : "")
+                : "";
             const tsFormatted = item.timestamp ? fmtLocalIso(item.timestamp) : "";
 
             let mediaHtml = "";
@@ -3191,54 +3263,89 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
             `;
             productsGrid.appendChild(card);
+            if (item.type === "timelapse") attachVideoInfo(card.querySelector("video"), item.info_url);
         });
-        renderHistory(data.history || []);
+        galleryHistory = data.history || [];
+        renderDays();
     }
 
     function formatSize(kb) {
         return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb.toFixed(0)} KB`;
     }
 
-    function renderHistory(days) {
-        if (!historyGrid) return;
-        historyGrid.innerHTML = "";
-        if (historyCountBadge) historyCountBadge.textContent = `${days.length} ${days.length === 1 ? "Day" : "Days"}`;
-        if (days.length === 0) {
-            historyGrid.innerHTML = "<p class='text-muted'>No products from previous days.</p>";
-            return;
+    // Gallery "By Day": one collapsible block per local day (newest first) holding that day's
+    // timelapse / keogram / startrails and its sky events. Today's live products stay in the grid above.
+    let galleryHistory = [];
+    let eventsMeta = { total_count: 0, enabled: {} };
+
+    function dayKeyOf(date) {
+        const p = (n) => String(n).padStart(2, "0");
+        return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
+    }
+
+    function renderDays() {
+        if (!dayList) return;
+        const todayKey = dayKeyOf(new Date());
+        const byDay = new Map();
+        const ensure = (key) => {
+            if (!byDay.has(key)) byDay.set(key, { date: key, product: null, events: [] });
+            return byDay.get(key);
+        };
+        ensure(todayKey);
+        galleryHistory.forEach((d) => { ensure(d.date).product = d; });
+        tableEvents.forEach((ev, i) => ensure(dayKeyOf(new Date(ev.timestamp))).events.push(i));
+
+        const days = [...byDay.values()].sort((a, b) => (a.date < b.date ? 1 : -1));
+        if (dayCountBadge) dayCountBadge.textContent = `${days.length} ${days.length === 1 ? "Day" : "Days"}`;
+
+        let notice = "";
+        if (tableEvents.length === 0) {
+            const on = Object.entries(eventsMeta.enabled || {}).filter(([, v]) => v).map(([k]) => EVENT_LABELS[k] || k);
+            notice = `No events yet. Detecting: ${on.join(", ") || "nothing (turn types on in Settings)"}.`;
+        } else if (eventsMeta.total_count > tableEvents.length) {
+            notice = `Showing the newest ${tableEvents.length} of ${eventsMeta.total_count} events.`;
+        }
+        dayList.innerHTML = (notice ? `<p class="text-muted day-notice">${notice}</p>` : "")
+            + days.map((day, n) => dayBlockHtml(day, todayKey, n === 0)).join("");
+        dayList.querySelectorAll("video[data-info]").forEach((v) => attachVideoInfo(v, v.dataset.info));
+    }
+
+    function dayBlockHtml(day, todayKey, first) {
+        const isToday = day.date === todayKey;
+        const p = day.product || {};
+        const evs = day.events;
+        const tl = p.timelapse;
+
+        let products = "";
+        if (!isToday) {
+            const tiles = [];
+            if (tl) tiles.push(`<video controls loop muted playsinline preload="metadata" src="${tl.url}#t=0.5" data-info="${tl.url.replace(/\.mp4$/, ".json")}"></video>`);
+            [["keogram", "Keogram"], ["startrails", "Startrails"]].forEach(([k, label]) => {
+                if (p[k]) tiles.push(`<a class="day-tile" href="${p[k].url}" data-viewer="${label} — ${day.date}" title="View ${label}"><img src="${p[k].url}" alt="${label} ${day.date}" loading="lazy" /><span>${label}</span></a>`);
+            });
+            if (tiles.length) {
+                products = `<div class="day-products">${tiles.join("")}</div>`;
+                if (tl) products = `<div class="day-actions"><a href="${tl.url}" download class="btn btn-sm btn-outline">⬇️ Video · ${formatSize(tl.size_kb)}</a></div>` + products;
+            }
         }
 
-        days.forEach((day) => {
-            const card = document.createElement("div");
-            card.className = "product-card";
-            const tl = day.timelapse;
-            // Past videos fetch only their header and first frame (#t=0.5) until played
-            const mediaHtml = tl
-                ? `<video controls loop muted playsinline preload="metadata" src="${tl.url}#t=0.5"></video>`
-                : "<span>No timelapse</span>";
-            const thumbs = [["keogram", "Keogram"], ["startrails", "Startrails"]]
-                .filter(([k]) => day[k])
-                .map(([k, label]) => `
-                    <a class="history-thumb" href="${day[k].url}" data-viewer="${label} — ${day.date}" title="View ${label}">
-                        <img src="${day[k].url}" alt="${label} ${day.date}" loading="lazy" />
-                        <span>${label}</span>
-                    </a>`)
-                .join("");
+        const eventsHtml = evs.length
+            ? `<div class="events-table-wrapper"><table class="events-table">
+                    <thead><tr><th>Image</th><th>Type</th><th>Time</th><th>Details</th><th>Whole sky</th></tr></thead>
+                    <tbody>${evs.map((i) => eventRowHtml(tableEvents[i], i)).join("")}</tbody>
+                </table></div>`
+            : `<p class="text-muted day-empty">No sky events.</p>`;
 
-            card.innerHTML = `
-                <div class="product-media">
-                    ${mediaHtml}
-                </div>
-                ${thumbs ? `<div class="history-thumbs">${thumbs}</div>` : ""}
-                <div class="product-info">
-                    <div class="product-title">
-                        <span>${day.date}</span>
-                        ${tl ? `<a href="${tl.url}" download class="btn btn-sm btn-outline" style="padding: 0.15rem 0.5rem; font-size: 0.72rem; text-decoration: none;">⬇️ Video · ${formatSize(tl.size_kb)}</a>` : ""}
-                    </div>
-                </div>
-            `;
-            historyGrid.appendChild(card);
-        });
+        return `
+            <details class="day-block" ${first ? "open" : ""}>
+                <summary class="day-summary">
+                    <span class="day-date">${day.date}</span>
+                    ${isToday ? `<span class="badge badge-accent">Today</span>` : ""}
+                    <span class="badge">${evs.length} ${evs.length === 1 ? "event" : "events"}</span>
+                    ${tl ? `<span class="text-muted day-meta">${tl.size_kb ? formatSize(tl.size_kb) + " video" : ""}</span>` : ""}
+                </summary>
+                <div class="day-body">${products}${eventsHtml}</div>
+            </details>`;
     }
 
     // In-page image viewer for keograms / startrails (Esc, click or ✕ to close)
@@ -3477,39 +3584,28 @@ document.addEventListener("DOMContentLoaded", () => {
     let tableEvents = [];
     let liveEventsData = [];
 
-    function renderEvents(evData) {
-        eventsTableBody.innerHTML = "";
-        const events = evData.events || [];
-        eventCountBadge.textContent = `${evData.total_count || 0} Events`;
-
-        if (events.length === 0) {
-            const on = Object.entries(evData.enabled || {}).filter(([, v]) => v).map(([k]) => EVENT_LABELS[k] || k);
-            eventsTableBody.innerHTML = `<tr><td colspan="5" class="text-muted" style="text-align:center;">No events yet. Detecting: ${on.join(", ") || "nothing (turn types on in Settings)"}.</td></tr>`;
-            return;
-        }
-
-        tableEvents = events;
-        events.forEach((ev, i) => {
-            const tr = document.createElement("tr");
-            tr.className = "event-row";
-            tr.dataset.eventIdx = i;
-            tr.title = "Click for details";
-            const when = new Date(ev.timestamp);
-            const thumb = ev.thumbnail_url
-                ? `<img class="event-thumb" src="${ev.thumbnail_url}" alt="${ev.type}" loading="lazy" />`
-                : "--";
-            tr.innerHTML = `
+    function eventRowHtml(ev, i) {
+        const when = new Date(ev.timestamp);
+        const thumb = ev.thumbnail_url
+            ? `<img class="event-thumb" src="${ev.thumbnail_url}" alt="${ev.type}" loading="lazy" />`
+            : "--";
+        return `
+            <tr class="event-row" data-event-idx="${i}" title="Click for details">
                 <td>${thumb}</td>
                 <td><span class="ev-pill" style="--pill:${EVENT_COLORS[ev.type] || "var(--accent)"}">${EVENT_LABELS[ev.type] || ev.type}</span></td>
-                <td title="${ev.timestamp}">${when.toLocaleString()}<br><span class="text-muted">${timeAgo(when)}</span></td>
+                <td title="${ev.timestamp}">${when.toLocaleTimeString()}<br><span class="text-muted">${timeAgo(when)}</span></td>
                 <td>${eventDetails(ev)}${ev.flight ? `<br>${flightHtml(ev)}` : ""}</td>
                 <td><button type="button" class="btn btn-sm btn-outline">Details</button></td>
-            `;
-            eventsTableBody.appendChild(tr);
-        });
+            </tr>`;
     }
 
-    eventsTableBody.addEventListener("click", (e) => {
+    function renderEvents(evData) {
+        tableEvents = evData.events || [];
+        eventsMeta = { total_count: evData.total_count || 0, enabled: evData.enabled || {} };
+        renderDays();
+    }
+
+    dayList.addEventListener("click", (e) => {
         if (e.target.closest("a")) return; // flight link
         const tr = e.target.closest("tr[data-event-idx]");
         if (tr) openEventViewer(tableEvents, Number(tr.dataset.eventIdx));
@@ -3529,7 +3625,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function loadEvents() {
         const q = eventsFilterType ? `&type=${eventsFilterType}` : "";
-        const res = await fetch(`/api/events?limit=50${q}`);
+        const res = await fetch(`/api/events?limit=100${q}`); // API max; By Day groups these by local date
         if (res.ok) renderEvents(await res.json());
     }
 

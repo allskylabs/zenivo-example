@@ -437,8 +437,8 @@ def get_camera_driver(
     """
     Factory: returns the camera driver for `camera_type`.
 
-    auto: RTS5869 + IMX335 if attached, else a Raspberry Pi CSI camera (libcamera), else the first
-    generic UVC/V4L2 webcam, else the simulator. Any failure to open a live camera falls back to the
+    auto: RTS5869 + IMX335 if attached, else a Raspberry Pi CSI camera (libcamera), else the simulator.
+    Generic UVC webcams need camera_type="v4l2". Any failure to open a live camera falls back to the
     simulator so the web service still comes up.
     """
     camera_type = (camera_type or "auto").lower()
@@ -458,10 +458,12 @@ def get_camera_driver(
             # Pi sensors pick their own native mode unless an explicit size is requested
             size = (width, height) if (width, height) != (SENSOR_WIDTH, SENSOR_HEIGHT) else (None, None)
             candidates.append(("picamera", lambda: PiCameraController(camera_num=camera_index, width=size[0], height=size[1])))
-    if camera_type in ("auto", "v4l2"):
+    # Generic webcams (e.g. a laptop's built-in camera) are used only when asked for by name: in "auto"
+    # they would take over the observatory whenever the IMX335 is briefly missing and archive daytime junk
+    if camera_type == "v4l2":
         from .uvc_generic import GenericUVCCameraController, find_uvc_device_nodes
 
-        nodes = [device_path] if (device_path and camera_type == "v4l2") else find_uvc_device_nodes(exclude_ids=("0bda:5869",))
+        nodes = [device_path] if device_path else find_uvc_device_nodes(exclude_ids=("0bda:5869",))
         if nodes:
             size = (width, height) if (width, height) != (SENSOR_WIDTH, SENSOR_HEIGHT) else (None, None)
             candidates.append(("v4l2", lambda: GenericUVCCameraController(device_path=nodes[0], width=size[0], height=size[1])))

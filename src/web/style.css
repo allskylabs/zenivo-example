@@ -747,9 +747,18 @@ input[type="range"] {
     margin-top: 1rem;
 }
 
-/* Past days keep card width even when only one or two exist */
+/* Past days: denser, smaller cards so a week of days reads as one overview */
 .history-grid {
-    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 0.9rem;
+}
+
+.history-grid .product-title {
+    font-size: 0.85rem;
+}
+
+.history-grid .product-info {
+    padding: 0.7rem;
 }
 
 .product-card {
@@ -820,7 +829,7 @@ input[type="range"] {
 .history-thumb {
     position: relative;
     display: block;
-    height: 90px;
+    height: 72px;
     background: #020408;
     overflow: hidden;
 }
@@ -1747,3 +1756,127 @@ body.no-scroll { overflow: hidden; }
 .focus-score .focus-statline { margin-top: 0.4rem; font-size: 0.7rem; text-align: center; }
 .focus-af-row[hidden] { display: none; }
 .focus-af-row select { flex: 1; min-width: 0; }
+
+/* Capture info (time / exposure / gain / brightness) shown over images instead of burned into them */
+.frame-info {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 4;
+    padding: 4px 7px;
+    border-radius: 5px;
+    background: rgba(2, 6, 23, 0.62);
+    color: #e2e8f0;
+    font: 500 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: pre;
+    pointer-events: none;
+}
+.frame-info[hidden] { display: none; }
+.product-media .frame-info { font-size: 11px; top: 6px; left: 6px; }
+
+/* By Day: one collapsible block per local day */
+.day-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.day-notice {
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+.day-block {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.day-summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    list-style: none;
+    font-weight: 600;
+}
+
+.day-summary::-webkit-details-marker {
+    display: none;
+}
+
+.day-summary::before {
+    content: "\25B8";
+    color: var(--text-muted);
+}
+
+.day-block[open] > .day-summary::before {
+    content: "\25BE";
+}
+
+.day-date {
+    font-family: var(--font-mono);
+}
+
+.day-meta {
+    font-size: 0.75rem;
+    font-weight: 400;
+}
+
+.day-body {
+    padding: 0 1rem 1rem;
+}
+
+.day-actions {
+    margin-bottom: 0.6rem;
+}
+
+.day-products {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.day-products > video,
+.day-tile {
+    position: relative;
+    display: block;
+    aspect-ratio: 4 / 3;
+    width: 100%;
+    background: #020408;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.day-products video,
+.day-tile img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.day-tile span {
+    position: absolute;
+    left: 0.4rem;
+    bottom: 0.3rem;
+    font-size: 0.7rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 4px;
+    background: rgba(2, 4, 8, 0.75);
+    color: var(--text-primary);
+}
+
+.day-empty {
+    font-size: 0.8rem;
+    margin: 0.5rem 0 0;
+}
+
+.day-block .events-table-wrapper {
+    margin-top: 0;
+}

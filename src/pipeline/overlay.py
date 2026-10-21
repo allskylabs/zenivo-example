@@ -324,3 +324,12 @@ def frame_brightness(frame: np.ndarray) -> float:
     if sub.ndim == 3:
         sub = cv2.cvtColor(np.ascontiguousarray(sub), cv2.COLOR_BGR2GRAY)
     return float(sub.mean())
+
+
+def stamp_info_box(width: int) -> Tuple[int, int]:
+    """(w, h) of the top-left area stamp_frame_info may draw on, for a frame of the given width."""
+    scale = max(0.4, width / 2000.0)
+    thick = max(1, int(round(scale * 1.6))) + 2
+    (tw, _), base = cv2.getTextSize("Exp 999.99 ms  Gain 99.9 dB", cv2.FONT_HERSHEY_SIMPLEX, 0.8 * scale, thick)
+    step = int(30 * scale)
+    return int(10 * scale) + tw + 4, int(28 * scale) + 2 * step + base + 4

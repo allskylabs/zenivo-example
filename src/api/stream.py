@@ -94,7 +94,7 @@ async def mjpeg_frame_generator(
         t_start = time.perf_counter()
         try:
             await asyncio.to_thread(service.capture_frame)
-            frame, _ = service.get_display_frame()  # star-boosted, with the time/exposure/gain stamp
+            frame, _ = service.get_display_frame()  # star-boosted; capture info goes out as telemetry
             if frame is not None and frame.size > 0:
                 h, w = frame.shape[:2]
                 if w > downscale_width:
@@ -144,6 +144,7 @@ def pack_asb1_binary_packet(
     status: Dict[str, Any],
     jpeg_bytes: Optional[bytes],
     packet_type: int = 1,
+    capture_ts: Optional[float] = None,
 ) -> bytes:
     """
     Pack telemetry, hardware registers, 4x256 uint32 histogram bins, and raw JPEG image
@@ -173,7 +174,7 @@ def pack_asb1_binary_packet(
         flags & 0xFF,
         sky_code & 0xFF,
         cal_code & 0xFF,
-        float(time.time()),
+        float(capture_ts or time.time()),  # capture time of the JPEG, shown by the web overlay
         float(telem.get("exposure_s", 0.04)),
         float(telem.get("gain_db", 12.0)),
         float(telem.get("hw_frame_delta_ms", 40.0)),
@@ -223,7 +224,7 @@ async def _build_full_binary_packet(service: AllSkyService, packet_type: int = 1
                 _encode_stream_jpeg, frame, int(perf["stream_max_width"]), int(perf["stream_jpeg_quality"])
             ) or b""
             _stream_jpeg_cache[:] = [frame, frame_ts, jpeg_bytes]
-    return pack_asb1_binary_packet(telem, status, jpeg_bytes, packet_type=packet_type)
+    return pack_asb1_binary_packet(telem, status, jpeg_bytes, packet_type=packet_type, capture_ts=frame_ts)
 
 
 # [frame object, capture timestamp, encoded JPEG] of the last frame sent to WebSocket viewers

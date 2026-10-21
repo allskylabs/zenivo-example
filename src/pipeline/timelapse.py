@@ -289,3 +289,40 @@ def compile_timelapse(
 
     os.replace(tmp_path, abs_out)
     return output_path
+
+
+def frame_quality_mask(
+    paths: List[str],
+    expected_hw: Tuple[int, int] = (972, 1296),
+    window: int = 7,
+    rel_tol: float = 0.3,
+    abs_tol: float = 20.0,
+) -> List[bool]:
+    """
+    Which archived frames are fit for the video (True) and which are skipped (False).
+
+    A frame is skipped when its size is not the archive size (a different camera or mode was
+    running), or when its mean brightness jumps away from the median of its neighbours
+    (a black or saturated glitch frame). Neighbours are taken in time order, so a slow dusk or
+    dawn ramp is followed and only single-frame or block glitches are removed. Frames are read at
+    1/4 scale, so the check is cheap. Skipped frames stay on disk; only the video leaves them out.
+    """
+    reduced_hw = ((expected_hw[0] + 3) // 4, (expected_hw[1] + 3) // 4)
+    sizes_ok: List[bool] = []
+    means: List[Optional[float]] = []
+    for p in paths:
+        im = cv2.imread(p, cv2.IMREAD_REDUCED_GRAYSCALE_4)
+        ok = im is not None and im.shape[:2] == reduced_hw
+        sizes_ok.append(ok)
+        means.append(float(im.mean()) if ok else None)
+
+    keep: List[bool] = []
+    for i, m in enumerate(means):
+        if m is None:
+            keep.append(False)
+            continue
+        near = [means[j] for j in range(max(0, i - window), min(len(means), i + window + 1))
+                if means[j] is not None]
+        med = float(np.median(near))
+        keep.append(abs(m - med) <= max(abs_tol, rel_tol * med))
+    return keep

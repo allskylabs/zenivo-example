@@ -762,10 +762,18 @@ def set_station_sky_mask(req: SkyMaskRequest, service: AllSkyService = Depends(g
 @router.post("/api/station/plate-solve/start")
 def start_station_plate_solve(
     fov_hint: str = Query(default="auto", max_length=16),
+    mode: str = Query(default="auto", pattern="^(auto|deep)$"),
     service: AllSkyService = Depends(get_service),
 ):
-    """Start plate-solving in the background; poll /api/station/plate-solve/status."""
-    return service.start_plate_solve_job(fov_hint=fov_hint)
+    """Start plate-solving in the background; poll /api/station/plate-solve/status.
+    mode=deep re-measures the lens and sensor instead of reusing the solved lens."""
+    return service.start_plate_solve_job(fov_hint=fov_hint, deep=mode == "deep")
+
+
+@router.post("/api/station/calibration/reset")
+def reset_station_calibration(service: AllSkyService = Depends(get_service)):
+    """Reset solved lens, sensor and mounting parameters to the attached camera's defaults."""
+    return service.reset_station_calibration()
 
 
 @router.get("/api/station/plate-solve/status")

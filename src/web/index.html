@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllSky Observatory — Edge Dashboard</title>
-    <link rel="stylesheet" href="/style.css?v=20261019fc">
+    <link rel="stylesheet" href="/style.css?v=20261021gl2">
 </head>
 <body class="dark-mode">
     <!-- Top Navigation Header -->
@@ -319,43 +319,23 @@
                     <!-- Injected dynamically via app.js -->
                 </div>
 
-                <!-- Products archived on previous days -->
-                <div class="section-heading mt-4">
-                    <h2>Previous Days</h2>
-                    <span class="badge" id="history-count-badge">0 Days</span>
+                <!-- By Day: products, timelapse and sky events grouped per local day -->
+                <div class="section-heading mt-4" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                        <h2>By Day</h2>
+                        <span class="badge" id="day-count-badge">0 Days</span>
+                    </div>
+                    <div class="events-filter" id="events-filter" style="margin-top: 0;">
+                        <button type="button" class="btn btn-sm btn-outline active" data-type="">All</button>
+                        <button type="button" class="btn btn-sm btn-outline" data-type="meteor">☄️ Meteors</button>
+                        <button type="button" class="btn btn-sm btn-outline" data-type="plane">✈️ Aircraft</button>
+                        <button type="button" class="btn btn-sm btn-outline" data-type="satellite">🛰️ Satellites</button>
+                        <button type="button" class="btn btn-sm btn-outline" data-type="clouds">☁️ Clouds</button>
+                        <button type="button" class="btn btn-sm btn-outline" data-type="flash">⚡ Flashes</button>
+                    </div>
                 </div>
-                <div class="products-grid history-grid" id="history-grid">
-                    <!-- Injected dynamically via app.js -->
-                </div>
-
-                <!-- Sky events: meteors, aircraft, satellites, clouds, flashes -->
-                <div class="section-heading mt-4">
-                    <h2>Sky Events</h2>
-                    <span class="badge" id="event-count-badge">0 Events</span>
-                </div>
-                <div class="events-filter" id="events-filter">
-                    <button type="button" class="btn btn-sm btn-outline active" data-type="">All</button>
-                    <button type="button" class="btn btn-sm btn-outline" data-type="meteor">☄️ Meteors</button>
-                    <button type="button" class="btn btn-sm btn-outline" data-type="plane">✈️ Aircraft</button>
-                    <button type="button" class="btn btn-sm btn-outline" data-type="satellite">🛰️ Satellites</button>
-                    <button type="button" class="btn btn-sm btn-outline" data-type="clouds">☁️ Clouds</button>
-                    <button type="button" class="btn btn-sm btn-outline" data-type="flash">⚡ Flashes</button>
-                </div>
-                <div class="events-table-wrapper">
-                    <table class="events-table">
-                        <thead>
-                            <tr>
-                                <th>Image</th>
-                                <th>Type</th>
-                                <th>Time</th>
-                                <th>Details</th>
-                                <th>Whole sky</th>
-                            </tr>
-                        </thead>
-                        <tbody id="events-table-body">
-                            <!-- Injected dynamically via app.js -->
-                        </tbody>
-                    </table>
+                <div id="day-list" class="day-list">
+                    <!-- One block per day, injected via app.js -->
                 </div>
             </div>
         </section>
@@ -702,6 +682,9 @@
                 <div class="settings-actions">
                     <button id="btn-station-save" class="btn btn-primary hidden" type="button">💾 Save configuration</button>
                     <button id="btn-station-solve" class="btn btn-outline" type="button">🔭 Capture &amp; Auto Plate-Solve</button>
+                    <label class="checkbox-label" title="Ignore the saved lens: re-read the sensor and re-measure focal length, distortion and optical centre from a 90 s star-tracking series (clear night). The old values are kept if the solve fails.">
+                        <input type="checkbox" id="chk-station-deep"> Deep solve (re-measure lens &amp; sensor)
+                    </label>
                 </div>
 
                 <div id="station-alert" class="alert-box hidden mt-3"></div>
@@ -1024,7 +1007,7 @@
 
     <!-- App JavaScript -->
     <script src="/static/sky_catalog.js"></script>
-    <script src="/app.js?v=20261019ps2"></script>
+    <script src="/app.js?v=20261021dy2"></script>
     <script src="/static/activity.js?v=20261016h"></script>
     <script src="/static/focus.js?v=20261019ff"></script>
 </body>
