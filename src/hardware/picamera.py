@@ -306,10 +306,10 @@ class PiCameraController(CameraDriverInterface):
                 lens_ok = True
                 if not getattr(self, "_lens_settled", True) and not self._af_running and self.lens_position_target is not None:
                     got_lens = md.get("LensPosition")
-                    if attempt == 0:
-                        lens_ok = False  # frame was already exposing when set_lens_position was called
-                    elif got_lens is not None and attempt < 2:
-                        lens_ok = abs(float(got_lens) - float(self.lens_position_target)) <= 0.025
+                    if attempt < 2:
+                        lens_ok = False  # buffer_count=2 has two pre-queued frames already exposing before set_controls
+                    elif got_lens is not None and attempt < 3:
+                        lens_ok = abs(float(got_lens) - float(self.lens_position_target)) <= 0.03
                 done = (exp_ok and gain_ok and lens_ok) or time.time() > deadline or attempt == 5
                 if done:
                     self._lens_settled = True
