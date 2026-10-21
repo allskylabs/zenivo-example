@@ -127,10 +127,28 @@ class AllSkyService:
         "grid_overlay": False,
         "sun_moon": True,
         "badge": True,
+        "adsb_overlay": False,
+        "events_overlay": False,
         "fit": "cover",
         "bg": "black",
         "night_vision": False,
         "opacity": 1.0,
+        "zoom": 1.0,
+        "pan_x": 0.0,
+        "pan_y": 0.0,
+        "rotate": 0.0,
+        "flip_h": False,
+        "flip_v": False,
+        "brightness": 1.0,
+        "contrast": 1.0,
+        "title_text": "",
+        "title_sub": "",
+        "title_pos": "bottom-left",
+        "view_mode": "live",
+        "replay_url": "",
+        "replay_crop_url": "",
+        "replay_label": "",
+        "replay_bbox": [],
     }
 
     def __init__(self, camera: Optional[CameraDriverInterface] = None):
@@ -3630,11 +3648,11 @@ class AllSkyService:
                     max_gain = float(lim.get("max_gain_db") or 36.0)
                     gain_ratio = 10.0 ** (max(0.0, max_gain - old_gain) / 20.0)
                     if method in ("stars", "lights"):
-                        sweep_exp = min(exp, max(0.45, min(1.25, exp / max(1.0, gain_ratio * 1.6))))
+                        sweep_exp = min(exp, 0.38)
                     else:
-                        sweep_exp = 0.20
+                        sweep_exp = 0.18
                     if exp > sweep_exp + 0.05:
-                        sweep_gain = min(max_gain, max(old_gain, old_gain + 20.0 * math.log10(exp / sweep_exp)))
+                        sweep_gain = max_gain if method in ("stars", "lights") else min(max_gain, max(old_gain, old_gain + 20.0 * math.log10(exp / sweep_exp)))
                         with self.lock:
                             self.camera.set_hardware_exposure(sweep_exp, sweep_gain)
                             self.last_capture_time = 0.0
@@ -3676,7 +3694,7 @@ class AllSkyService:
 
             # One pass from infinity (0 D) outwards, continuing over the whole lens range until every
             # measured region is clearly past its peak (30 % worse, or gone, for 3 steps)
-            sweep_hi = min(hi, 1.5) if not is_pytest else hi
+            sweep_hi = min(hi, 0.96 if method in ("stars", "lights") else 1.4) if not is_pytest else hi
             positions = self._sweep_positions(lo, sweep_hi)
             n_roi = 1 + len(tiles)
             curves: List[List[Optional[float]]] = [[] for _ in range(n_roi)]

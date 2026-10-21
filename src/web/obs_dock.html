@@ -3,961 +3,975 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AllSky OBS Custom Dock</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>AllSky OBS Control</title>
     <style>
         :root {
-            --bg-base: #101114;
-            --bg-card: #18191f;
-            --bg-card-hover: #21232b;
-            --bg-input: #262833;
-            --border: #333644;
-            --border-focus: #38bdf8;
-            --text-main: #f8fafc;
-            --text-muted: #cbd5e1;
-            --text-dim: #94a3b8;
+            --bg: #0d1017;
+            --card: #161b26;
+            --input: #1f2637;
+            --hover: #283147;
+            --border: #313b52;
+            --text: #f1f5f9;
+            --muted: #94a3b8;
             --accent: #38bdf8;
-            --accent-hover: #7dd3fc;
-            --accent-glow: rgba(56, 189, 248, 0.35);
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --radius-sm: 8px;
-            --radius-md: 12px;
+            --accent-bg: rgba(56, 189, 248, 0.18);
+            --green: #10b981;
+            --amber: #f59e0b;
+            --red: #ef4444;
         }
-
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            -webkit-user-select: none;
             user-select: none;
+            -webkit-user-select: none;
         }
-
         body {
-            background-color: var(--bg-base);
-            color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
-            font-size: 15px;
-            line-height: 1.45;
-            padding: 12px;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 13px;
+            line-height: 1.3;
+            padding: 8px;
             overflow-y: auto;
             overflow-x: hidden;
         }
 
         /* Header */
-        .dock-header {
+        .topbar {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding-bottom: 10px;
-            border-bottom: 2px solid var(--border);
-            margin-bottom: 12px;
+            gap: 6px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 8px;
+            margin-bottom: 6px;
         }
-
-        .dock-title-group {
+        .topbar-left {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 6px;
+            min-width: 0;
         }
-
-        .status-dot {
-            width: 12px;
-            height: 12px;
+        .dot {
+            width: 9px;
+            height: 9px;
             border-radius: 50%;
-            background-color: var(--warning);
-            box-shadow: 0 0 10px var(--warning);
-            transition: all 0.3s ease;
+            background: var(--amber);
+            flex-shrink: 0;
+        }
+        .dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+        .dot.offline { background: var(--red); }
+        .title {
+            font-weight: 700;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        .telem-mini {
+            color: var(--muted);
+            font-family: ui-monospace, monospace;
+            font-size: 11px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .topbar-actions {
+            display: flex;
+            gap: 4px;
             flex-shrink: 0;
         }
 
-        .status-dot.online {
-            background-color: var(--success);
-            box-shadow: 0 0 10px var(--success);
-        }
-
-        .status-dot.offline {
-            background-color: var(--danger);
-            box-shadow: 0 0 10px var(--danger);
-        }
-
-        .dock-title {
-            font-size: 17px;
-            font-weight: 800;
-            letter-spacing: 0.3px;
-            color: #ffffff;
-        }
-
-        .badge-live {
-            background: rgba(16, 185, 129, 0.2);
-            color: #34d399;
-            border: 1px solid rgba(16, 185, 129, 0.4);
-            font-size: 11px;
-            font-weight: 800;
-            padding: 3px 8px;
-            border-radius: 6px;
-            text-transform: uppercase;
-        }
-
-        /* Quick URL Bar */
-        .url-card {
-            background: var(--bg-card);
+        /* Compact Card */
+        .box {
+            background: var(--card);
             border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            padding: 10px 12px;
-            margin-bottom: 14px;
+            border-radius: 6px;
+            padding: 7px;
+            margin-bottom: 6px;
+        }
+        .box-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 8px;
-        }
-
-        .url-info {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 13px;
-            color: var(--text-muted);
-            font-weight: 600;
-        }
-
-        .url-info strong {
-            color: var(--accent);
+            font-size: 11px;
             font-weight: 700;
+            text-transform: uppercase;
+            color: var(--muted);
+            letter-spacing: 0.4px;
+            margin-bottom: 6px;
         }
 
-        .btn-icon {
-            background: var(--bg-input);
+        /* Buttons */
+        button {
+            background: var(--input);
             border: 1px solid var(--border);
-            color: var(--text-main);
-            border-radius: var(--radius-sm);
-            padding: 6px 12px;
-            font-size: 13px;
-            font-weight: 700;
+            color: var(--text);
+            border-radius: 4px;
+            padding: 5px 7px;
+            font-size: 12px;
+            font-weight: 600;
             cursor: pointer;
-            transition: all 0.15s ease;
+            transition: background 0.1s, border-color 0.1s;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            justify-content: center;
+            gap: 4px;
             white-space: nowrap;
         }
-
-        .btn-icon:hover {
-            background: var(--border);
+        button:hover {
+            background: var(--hover);
+            border-color: #4b5a7a;
+        }
+        button:active {
+            transform: translateY(1px);
+        }
+        button.active {
+            background: var(--accent-bg);
             border-color: var(--accent);
+            color: #7dd3fc;
+        }
+        button.btn-live {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: var(--red);
+            color: #fca5a5;
+        }
+        button.btn-live.active {
+            background: var(--red);
             color: #fff;
         }
-
-        .btn-icon:active {
-            transform: scale(0.96);
+        button.btn-sm {
+            padding: 3px 6px;
+            font-size: 11px;
         }
 
-        /* Section Card */
-        .section-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            padding: 12px 14px;
-            margin-bottom: 14px;
+        /* Grids */
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
         }
-
-        .section-title {
-            font-size: 13px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            color: var(--accent);
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        /* Presets Grid */
-        .presets-grid {
+        .grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 4px;
+            gap: 4px;
         }
-
-        .btn-preset {
-            background: var(--bg-input);
-            border: 1.5px solid var(--border);
-            color: var(--text-main);
-            border-radius: var(--radius-sm);
-            padding: 10px 8px;
-            font-size: 13px;
-            font-weight: 700;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.15s ease;
+        .row {
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 6px;
+            gap: 5px;
+            margin-top: 5px;
         }
-
-        .btn-preset:hover {
-            background: var(--bg-card-hover);
-            border-color: var(--accent);
-            color: var(--accent-hover);
-            box-shadow: 0 0 10px var(--accent-glow);
+        .row:first-child { margin-top: 0; }
+        .lbl {
+            font-size: 11px;
+            color: var(--muted);
+            min-width: 44px;
+            flex-shrink: 0;
         }
-
-        .btn-preset:active {
-            transform: scale(0.97);
-        }
-
-        /* Switch Rows */
-        .switch-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px 4px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-            cursor: pointer;
-        }
-
-        .switch-row:last-child {
-            border-bottom: none;
-        }
-
-        .switch-label-group {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-            padding-right: 12px;
-        }
-
-        .switch-title {
-            font-size: 15px;
-            font-weight: 700;
-            color: var(--text-main);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .switch-desc {
-            font-size: 12px;
-            color: var(--text-dim);
-            line-height: 1.35;
-        }
-
-        /* Big Toggle Switch */
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 52px;
-            height: 28px;
+        .val {
+            font-family: ui-monospace, monospace;
+            font-size: 11px;
+            color: var(--accent);
+            min-width: 36px;
+            text-align: right;
             flex-shrink: 0;
         }
 
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: var(--bg-input);
-            border: 2px solid var(--border);
-            transition: .22s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 28px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 20px;
-            width: 20px;
-            left: 2px;
-            bottom: 2px;
-            background-color: var(--text-dim);
-            transition: .22s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 50%;
-        }
-
-        input:checked + .slider {
-            background-color: var(--accent);
-            border-color: var(--accent);
-            box-shadow: 0 0 12px var(--accent-glow);
-        }
-
-        input:checked + .slider:before {
-            transform: translateX(24px);
-            background-color: #0b1120;
-        }
-
-        /* Segmented Buttons */
-        .seg-control {
-            display: flex;
-            background: var(--bg-input);
-            border: 1.5px solid var(--border);
-            border-radius: var(--radius-sm);
-            padding: 3px;
-            gap: 4px;
-            margin-top: 6px;
-        }
-
-        .seg-btn {
+        input[type="range"] {
             flex: 1;
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            padding: 8px 12px;
-            font-size: 13px;
-            font-weight: 700;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            text-align: center;
-        }
-
-        .seg-btn.active {
-            background: var(--accent);
-            color: #0b1120;
-            font-weight: 800;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-        }
-
-        /* Slider Control */
-        .range-wrapper {
-            margin-top: 10px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .range-slider {
-            flex: 1;
-            height: 6px;
+            height: 5px;
             accent-color: var(--accent);
             cursor: pointer;
+            min-width: 40px;
+        }
+        input[type="text"], input[type="number"], select {
+            background: var(--input);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 4px;
+            padding: 4px 6px;
+            font-size: 12px;
+            outline: none;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+        input[type="text"]:focus, input[type="number"]:focus, select:focus {
+            border-color: var(--accent);
         }
 
-        .range-val {
-            font-family: ui-monospace, monospace;
-            font-size: 14px;
-            color: var(--accent);
-            min-width: 44px;
-            text-align: right;
-            font-weight: 800;
+        /* Events & Replay List */
+        .ev-list {
+            max-height: 195px;
+            overflow-y: auto;
+            margin-top: 5px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: #0f131c;
         }
-
-        /* Mini Preview Stage */
-        .preview-container {
-            position: relative;
-            width: 100%;
-            aspect-ratio: 16 / 9;
-            background: #000;
-            border: 1.5px solid var(--border);
-            border-radius: var(--radius-sm);
-            overflow: hidden;
-            margin-top: 8px;
-        }
-
-        .preview-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        }
-
-        .preview-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-
-        /* Telemetry Pill Grid */
-        .telem-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-top: 6px;
-        }
-
-        .telem-pill {
-            background: var(--bg-input);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: var(--radius-sm);
-            padding: 8px 10px;
+        .ev-item {
             display: flex;
-            flex-direction: column;
-            gap: 2px;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer;
+            font-size: 12px;
         }
-
-        .telem-pill-label {
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--text-dim);
+        .ev-item:last-child { border-bottom: none; }
+        .ev-item:hover { background: var(--hover); }
+        .ev-item.active {
+            background: var(--accent-bg);
+            border-left: 3px solid var(--accent);
         }
-
-        .telem-pill-val {
-            font-size: 14px;
-            font-weight: 800;
-            font-family: ui-monospace, monospace;
-            color: var(--text-main);
+        .ev-thumb {
+            width: 34px;
+            height: 26px;
+            object-fit: cover;
+            border-radius: 3px;
+            background: #000;
+            flex-shrink: 0;
+        }
+        .ev-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .ev-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 4px;
+            font-weight: 600;
+            white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+        .ev-sub {
+            font-size: 11px;
+            color: var(--muted);
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .ev-empty {
+            padding: 14px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 12px;
         }
 
-        /* Toast notification */
+        /* Toast */
         .toast {
             position: fixed;
-            bottom: 16px;
-            left: 50%;
-            transform: translateX(-50%) translateY(20px);
-            background: rgba(16, 185, 129, 0.96);
-            color: #0b1120;
-            font-size: 13px;
-            font-weight: 800;
-            padding: 8px 18px;
-            border-radius: 24px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+            bottom: 8px;
+            right: 8px;
+            background: var(--green);
+            color: #051b11;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 4px;
             opacity: 0;
             pointer-events: none;
-            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-            z-index: 999;
+            transition: opacity 0.15s;
+            z-index: 99;
         }
-
-        .toast.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
+        .toast.show { opacity: 1; }
     </style>
 </head>
 <body>
-    <!-- Top Header -->
-    <header class="dock-header">
-        <div class="dock-title-group">
-            <div id="status-indicator" class="status-dot" title="Connecting..."></div>
-            <span class="dock-title">AllSky OBS Control</span>
-            <span class="badge-live" id="stream-type-badge">LIVE</span>
+    <!-- 1. Top Bar -->
+    <div class="topbar">
+        <div class="topbar-left">
+            <span id="status-dot" class="dot" title="Trạng thái kết nối"></span>
+            <span class="title">AllSky OBS</span>
+            <span id="telem-summary" class="telem-mini">--ms • --dB</span>
         </div>
-        <div style="display: flex; gap: 6px;">
-            <button id="btn-refresh" class="btn-icon" title="Làm mới khung hình">📸 Snap</button>
-            <button id="btn-popout" class="btn-icon" title="Mở /obs trong tab mới">↗ Xem</button>
+        <div class="topbar-actions">
+            <button id="btn-go-live" class="btn-live active" title="Về luồng Camera trực tiếp">🔴 LIVE</button>
+            <button id="btn-snap" class="btn-sm" title="Chụp/làm mới ảnh">📸</button>
+            <button id="btn-open-obs" class="btn-sm" title="Mở trang /obs">↗</button>
         </div>
-    </header>
-
-    <!-- Browser Source URL Helper -->
-    <div class="url-card">
-        <div class="url-info" title="Browser Source URL cho OBS Studio">
-            URL: <strong>https://allsky.hoan.uk/obs</strong>
-        </div>
-        <button id="btn-copy-url" class="btn-icon" title="Sao chép URL vào bộ nhớ tạm">📋 Copy URL</button>
     </div>
 
-    <!-- Quick Presets -->
-    <section class="section-card">
-        <div class="section-title">
-            <span>Chế độ nhanh (Presets)</span>
-        </div>
-        <div class="presets-grid">
-            <button id="preset-astro" class="btn-preset">🌌 Thiên văn đầy đủ</button>
-            <button id="preset-clean" class="btn-preset">🔭 Ngắm sao sạch</button>
-            <button id="preset-raw" class="btn-preset">📷 Video mộc (Raw)</button>
-            <button id="preset-grid" class="btn-preset">🧭 Lưới &amp; La bàn</button>
-        </div>
-    </section>
-
-    <!-- Overlay Toggles -->
-    <section class="section-card">
-        <div class="section-title">
-            <span>Bật / Tắt lớp hiển thị (Overlays)</span>
+    <!-- 2. Nguồn phát & Lớp hiển thị (Overlays) -->
+    <div class="box">
+        <div class="box-head">
+            <span>Hiển thị &amp; Nguồn phát</span>
+            <span id="lbl-lst" style="font-family:monospace;color:var(--accent)">LST --:--:--</span>
         </div>
 
-        <!-- Stars & Constellations -->
-        <label class="switch-row" for="chk-sky-overlay">
-            <div class="switch-label-group">
-                <span class="switch-title">🌟 Sao &amp; Chòm sao</span>
-                <span class="switch-desc">88 chòm sao IAU, đường nối &amp; sao định vị</span>
-            </div>
-            <div class="switch">
-                <input type="checkbox" id="chk-sky-overlay">
-                <span class="slider"></span>
-            </div>
-        </label>
-
-        <!-- Labels -->
-        <label class="switch-row" for="chk-sky-labels">
-            <div class="switch-label-group">
-                <span class="switch-title">🏷️ Tên &amp; Nhãn</span>
-                <span class="switch-desc">Tên chòm sao (Orion, Puppis...) &amp; tên sao sáng</span>
-            </div>
-            <div class="switch">
-                <input type="checkbox" id="chk-sky-labels">
-                <span class="slider"></span>
-            </div>
-        </label>
-
-        <!-- Grid & Compass -->
-        <label class="switch-row" for="chk-grid-overlay">
-            <div class="switch-label-group">
-                <span class="switch-title">🧭 Lưới &amp; La bàn</span>
-                <span class="switch-desc">Vòng cao độ Alt/Az và hướng Đông Tây Nam Bắc</span>
-            </div>
-            <div class="switch">
-                <input type="checkbox" id="chk-grid-overlay">
-                <span class="slider"></span>
-            </div>
-        </label>
-
-        <!-- Sun & Moon -->
-        <label class="switch-row" for="chk-sun-moon">
-            <div class="switch-label-group">
-                <span class="switch-title">☀️ Mặt trời &amp; Mặt trăng</span>
-                <span class="switch-desc">Vị trí thiên thể &amp; % pha chiếu sáng</span>
-            </div>
-            <div class="switch">
-                <input type="checkbox" id="chk-sun-moon" checked>
-                <span class="slider"></span>
-            </div>
-        </label>
-
-        <!-- Info Badge -->
-        <label class="switch-row" for="chk-badge">
-            <div class="switch-label-group">
-                <span class="switch-title">📊 Bảng thông số LST</span>
-                <span class="switch-desc">Góc nhìn FOV, PA và giờ thiên văn LST</span>
-            </div>
-            <div class="switch">
-                <input type="checkbox" id="chk-badge" checked>
-                <span class="slider"></span>
-            </div>
-        </label>
-    </section>
-
-    <!-- Display & Framing Options -->
-    <section class="section-card">
-        <div class="section-title">
-            <span>Khung hình &amp; Hiệu ứng</span>
+        <!-- Chế độ nguồn -->
+        <div class="grid-4" style="margin-bottom: 5px;">
+            <button type="button" class="mode-btn active" data-mode="live">🔴 Trực tiếp</button>
+            <button type="button" class="mode-btn" data-mode="timelapse">🎬 Timelapse</button>
+            <button type="button" class="mode-btn" data-mode="startrails">🌀 Startrails</button>
+            <button type="button" class="mode-btn" data-mode="keogram">📊 Keogram</button>
         </div>
 
-        <div style="margin-bottom: 10px;">
-            <span class="switch-title" style="font-size: 13px;">Khung hình (Fit Mode)</span>
-            <div class="seg-control" id="seg-fit">
-                <button type="button" class="seg-btn active" data-fit="cover">Cover (16:9 Tràn viền)</button>
-                <button type="button" class="seg-btn" data-fit="contain">Contain (4:3 Gốc)</button>
+        <!-- 8 nút bật/tắt nhanh -->
+        <div class="grid-4" style="margin-bottom: 5px;">
+            <button type="button" id="tg-sky" title="Chòm sao & sao sáng">🌟 Chòm sao</button>
+            <button type="button" id="tg-labels" title="Tên chòm sao & sao">🏷️ Tên sao</button>
+            <button type="button" id="tg-grid" title="Lưới tọa độ & La bàn">🧭 Lưới</button>
+            <button type="button" id="tg-sunmoon" title="Vị trí Mặt trời & Mặt trăng">☀️ Trăng/MT</button>
+            <button type="button" id="tg-adsb" title="Radar máy bay ADS-B trực tiếp">✈️ ADS-B</button>
+            <button type="button" id="tg-events" title="Vệt sao băng & máy bay gần đây">☄️ Vệt bay</button>
+            <button type="button" id="tg-badge" title="Bảng thông số góc trái">📊 LST/FOV</button>
+            <button type="button" id="tg-night" title="Tông đỏ bảo vệ mắt">🔴 Đèn đỏ</button>
+        </div>
+
+        <!-- Presets + Fit/Bg + Opacity -->
+        <div class="row">
+            <button type="button" id="pre-full" class="btn-sm" style="flex:1">🌌 Đầy đủ</button>
+            <button type="button" id="pre-clean" class="btn-sm" style="flex:1">🔭 Sạch</button>
+            <button type="button" id="pre-raw" class="btn-sm" style="flex:1">📷 Mộc</button>
+            <button type="button" id="btn-fit" class="btn-sm" style="flex:1" title="Đổi 16:9 Tràn viền / 4:3 Gốc">16:9 Cover</button>
+            <button type="button" id="btn-bg" class="btn-sm" title="Đổi nền Đen / Trong suốt">Nền Đen</button>
+        </div>
+        <div class="row">
+            <span class="lbl">Độ nét:</span>
+            <input type="range" id="rng-opacity" min="0.1" max="1.0" step="0.05" value="1.0">
+            <span id="val-opacity" class="val">100%</span>
+        </div>
+    </div>
+
+    <!-- 3. Zoom, Pan, Tilt/Xoay & Độ sáng -->
+    <div class="box">
+        <div class="box-head">
+            <span>Zoom • Pan • Tilt (Xoay)</span>
+            <button type="button" id="btn-reset-view" class="btn-sm">⟲ Reset khung</button>
+        </div>
+
+        <!-- Zoom -->
+        <div class="row">
+            <span class="lbl">Zoom:</span>
+            <input type="range" id="rng-zoom" min="1.0" max="6.0" step="0.1" value="1.0">
+            <span id="val-zoom" class="val">1.0x</span>
+            <button type="button" class="btn-sm z-quick" data-z="1">1x</button>
+            <button type="button" class="btn-sm z-quick" data-z="2">2x</button>
+            <button type="button" class="btn-sm z-quick" data-z="4">4x</button>
+        </div>
+
+        <!-- Pan X / Y + Nút điều hướng -->
+        <div class="row">
+            <span class="lbl">Pan:</span>
+            <button type="button" class="btn-sm pan-step" data-dx="-8" data-dy="0" title="Sang trái">◀</button>
+            <button type="button" class="btn-sm pan-step" data-dx="0" data-dy="-8" title="Lên trên">▲</button>
+            <button type="button" class="btn-sm pan-step" data-dx="0" data-dy="8" title="Xuống dưới">▼</button>
+            <button type="button" class="btn-sm pan-step" data-dx="8" data-dy="0" title="Sang phải">▶</button>
+            <button type="button" class="btn-sm" id="btn-pan-center" title="Về chính giữa">⏺</button>
+            <input type="range" id="rng-panx" min="-80" max="80" step="1" value="0" title="Pan ngang (X)">
+            <input type="range" id="rng-pany" min="-80" max="80" step="1" value="0" title="Pan dọc (Y)">
+        </div>
+
+        <!-- Tilt / Rotate + Flip -->
+        <div class="row">
+            <span class="lbl">Xoay:</span>
+            <input type="range" id="rng-rotate" min="-180" max="180" step="1" value="0">
+            <span id="val-rotate" class="val">0°</span>
+            <button type="button" class="btn-sm rot-quick" data-r="0">0°</button>
+            <button type="button" class="btn-sm rot-quick" data-r="90">90°</button>
+            <button type="button" class="btn-sm rot-quick" data-r="180">180°</button>
+            <button type="button" id="btn-fliph" class="btn-sm" title="Lật ngang">⇄H</button>
+            <button type="button" id="btn-flipv" class="btn-sm" title="Lật dọc">⇅V</button>
+        </div>
+
+        <!-- Brightness & Contrast -->
+        <div class="row">
+            <span class="lbl">Sáng:</span>
+            <input type="range" id="rng-bright" min="0.5" max="2.5" step="0.05" value="1.0">
+            <span id="val-bright" class="val" style="min-width:30px">1.0</span>
+            <span class="lbl" style="min-width:34px;margin-left:4px">T.Phản:</span>
+            <input type="range" id="rng-contrast" min="0.5" max="2.5" step="0.05" value="1.0">
+            <span id="val-contrast" class="val" style="min-width:30px">1.0</span>
+        </div>
+    </div>
+
+    <!-- 4. Tiêu đề (Title trên OBS) -->
+    <div class="box">
+        <div class="box-head">
+            <span>Tiêu đề OBS (Title)</span>
+            <select id="sel-title-pos" style="padding:1px 4px;font-size:11px;">
+                <option value="bottom-left">Góc dưới trái</option>
+                <option value="bottom-center">Giữa dưới</option>
+                <option value="top-left">Góc trên trái</option>
+                <option value="top-center">Giữa trên</option>
+            </select>
+        </div>
+        <div class="row">
+            <input type="text" id="inp-title" placeholder="Tiêu đề chính..." style="flex:1.2;min-width:0;">
+            <input type="text" id="inp-sub" placeholder="Phụ đề / ghi chú..." style="flex:1;min-width:0;">
+            <button type="button" id="btn-title-apply" class="btn-sm active">Hiện</button>
+            <button type="button" id="btn-title-clear" class="btn-sm">Xóa</button>
+        </div>
+    </div>
+
+    <!-- 5. Xem lại Sao băng, Máy bay, Vệ tinh & Radar ADS-B -->
+    <div class="box">
+        <div class="box-head">
+            <span>Xem lại Sao băng • Máy bay • Radar</span>
+            <div style="display:flex;gap:4px;">
+                <button type="button" id="btn-ev-prev" class="btn-sm" title="Sự kiện trước">◀</button>
+                <button type="button" id="btn-ev-next" class="btn-sm" title="Sự kiện tiếp">▶</button>
+                <button type="button" id="btn-ev-reload" class="btn-sm" title="Tải lại danh sách">🔄</button>
             </div>
         </div>
 
-        <div style="margin-bottom: 10px;">
-            <span class="switch-title" style="font-size: 13px;">Màu nền (Background)</span>
-            <div class="seg-control" id="seg-bg">
-                <button type="button" class="seg-btn active" data-bg="black">Đen (Black)</button>
-                <button type="button" class="seg-btn" data-bg="transparent">Trong suốt (Alpha)</button>
-            </div>
+        <div class="grid-4" id="ev-tabs">
+            <button type="button" class="ev-tab active" data-tab="all">Tất cả</button>
+            <button type="button" class="ev-tab" data-tab="meteor">☄️ Sao băng</button>
+            <button type="button" class="ev-tab" data-tab="plane">✈️ Máy bay</button>
+            <button type="button" class="ev-tab" data-tab="adsb">📡 Radar Live</button>
         </div>
 
-        <!-- Night Vision Switch -->
-        <label class="switch-row" for="chk-night-vision">
-            <div class="switch-label-group">
-                <span class="switch-title">🔴 Ánh sáng đỏ (Night Vision)</span>
-                <span class="switch-desc">Tông đỏ thiên văn bảo vệ mắt ban đêm</span>
-            </div>
-            <div class="switch">
-                <input type="checkbox" id="chk-night-vision">
-                <span class="slider"></span>
-            </div>
-        </label>
+        <div id="ev-list" class="ev-list">
+            <div class="ev-empty">Đang tải dữ liệu...</div>
+        </div>
+    </div>
 
-        <!-- Opacity Slider -->
-        <div style="margin-top: 10px;">
-            <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700;">
-                <span>Độ rõ nét vẽ (Opacity)</span>
-                <span id="txt-opacity" class="range-val">100%</span>
-            </div>
-            <div class="range-wrapper">
-                <input type="range" id="rng-opacity" class="range-slider" min="0.2" max="1.0" step="0.05" value="1.0">
-            </div>
+    <!-- 6. Điều khiển Camera nhanh -->
+    <div class="box" style="margin-bottom:0;">
+        <div class="box-head">
+            <span>Camera &amp; Phơi sáng</span>
+            <span id="cam-sky-info" style="color:var(--accent);font-weight:600">--</span>
         </div>
-    </section>
+        <div class="row">
+            <button type="button" id="cam-auto" class="btn-sm" style="flex:1">Auto AE</button>
+            <button type="button" id="cam-manual" class="btn-sm" style="flex:1">Manual</button>
+            <button type="button" id="cam-boost" class="btn-sm" style="flex:1">✨ Star Boost</button>
+        </div>
+        <div class="row">
+            <span class="lbl">Phơi(s):</span>
+            <input type="number" id="inp-exp" step="0.5" min="0.001" max="90" value="5.0" style="width:58px">
+            <span class="lbl" style="min-width:32px">Gain:</span>
+            <input type="number" id="inp-gain" step="1" min="0" max="72" value="24" style="width:50px">
+            <button type="button" id="btn-cam-set" class="btn-sm" style="flex:1">Áp dụng</button>
+        </div>
+    </div>
 
-    <!-- Mini Live Preview -->
-    <section class="section-card">
-        <div class="section-title">
-            <span>Màn hình xem trước (Monitor)</span>
-            <button id="btn-toggle-preview" class="btn-icon" style="padding: 3px 8px; font-size: 11px;">Thu gọn</button>
-        </div>
-        <div id="preview-box" class="preview-container">
-            <img id="preview-img" class="preview-img" alt="Preview" />
-        </div>
-    </section>
-
-    <!-- Telemetry Cards -->
-    <section class="section-card">
-        <div class="section-title">
-            <span>Thông số trực tiếp</span>
-        </div>
-        <div class="telem-grid">
-            <div class="telem-pill">
-                <span class="telem-pill-label">Phơi sáng / Gain</span>
-                <span class="telem-pill-val" id="tel-exp-gain">-- ms / -- dB</span>
-            </div>
-            <div class="telem-pill">
-                <span class="telem-pill-label">Giờ LST</span>
-                <span class="telem-pill-val" id="tel-lst">--:--:--</span>
-            </div>
-            <div class="telem-pill">
-                <span class="telem-pill-label">Bầu trời / Mây</span>
-                <span class="telem-pill-val" id="tel-sky">--</span>
-            </div>
-            <div class="telem-pill">
-                <span class="telem-pill-label">Mặt trời / Trăng</span>
-                <span class="telem-pill-val" id="tel-sun-moon">--° / --%</span>
-            </div>
-        </div>
-    </section>
-
-    <!-- Toast Notification -->
-    <div id="toast" class="toast">Đã đồng bộ OBS</div>
+    <div id="toast" class="toast">Đã đồng bộ</div>
 
     <script>
         (function () {
-            // Elements
-            const statusDot = document.getElementById("status-indicator");
-            const btnCopyUrl = document.getElementById("btn-copy-url");
-            const btnPopout = document.getElementById("btn-popout");
-            const btnRefresh = document.getElementById("btn-refresh");
-            const btnTogglePreview = document.getElementById("btn-toggle-preview");
-            const previewBox = document.getElementById("preview-box");
-            const previewImg = document.getElementById("preview-img");
-            const toast = document.getElementById("toast");
+            const $ = (id) => document.getElementById(id);
+            const statusDot = $("status-dot");
+            const telemSummary = $("telem-summary");
+            const lblLst = $("lbl-lst");
+            const toast = $("toast");
 
-            // Toggles
-            const chkSkyOverlay = document.getElementById("chk-sky-overlay");
-            const chkSkyLabels = document.getElementById("chk-sky-labels");
-            const chkGridOverlay = document.getElementById("chk-grid-overlay");
-            const chkSunMoon = document.getElementById("chk-sun-moon");
-            const chkBadge = document.getElementById("chk-badge");
-            const chkNightVision = document.getElementById("chk-night-vision");
-            const rngOpacity = document.getElementById("rng-opacity");
-            const txtOpacity = document.getElementById("txt-opacity");
-
-            // Segmented buttons
-            const segFit = document.getElementById("seg-fit");
-            const segBg = document.getElementById("seg-bg");
-
-            // Telemetry
-            const telExpGain = document.getElementById("tel-exp-gain");
-            const telLst = document.getElementById("tel-lst");
-            const telSky = document.getElementById("tel-sky");
-            const telSunMoon = document.getElementById("tel-sun-moon");
-
-            // State
-            let currentSettings = {
-                sky_overlay: true,
-                sky_labels: true,
-                grid_overlay: true,
+            let state = {
+                sky_overlay: false,
+                sky_labels: false,
+                grid_overlay: false,
                 sun_moon: true,
                 badge: true,
+                adsb_overlay: false,
+                events_overlay: false,
                 fit: "cover",
                 bg: "black",
                 night_vision: false,
                 opacity: 1.0,
+                zoom: 1.0,
+                pan_x: 0.0,
+                pan_y: 0.0,
+                rotate: 0.0,
+                flip_h: false,
+                flip_v: false,
+                brightness: 1.0,
+                contrast: 1.0,
+                title_text: "",
+                title_sub: "",
+                title_pos: "bottom-left",
+                view_mode: "live",
+                replay_url: "",
+                replay_crop_url: "",
+                replay_label: "",
             };
 
-            let stationConfig = {
-                latitude_deg: 21.0285,
-                longitude_deg: 105.8542,
-            };
+            let stationLon = 105.8542;
+            let currentTab = "all";
+            let eventsList = [];
+            let adsbList = [];
+            let selectedEventIdx = -1;
+            let starBoostOn = false;
 
-            let ws = null;
-            let reconnectTimer = null;
-            let isSending = false;
-
-            function showToast(msg) {
+            function notify(msg) {
                 toast.textContent = msg;
                 toast.classList.add("show");
-                clearTimeout(toast._timer);
-                toast._timer = setTimeout(() => toast.classList.remove("show"), 1800);
+                clearTimeout(toast._t);
+                toast._t = setTimeout(() => toast.classList.remove("show"), 1200);
             }
 
-            // Sync UI inputs with settings state
-            function syncUI(settings) {
-                if (!settings) return;
-                Object.assign(currentSettings, settings);
+            function syncUI(s) {
+                if (s) Object.assign(state, s);
 
-                chkSkyOverlay.checked = !!currentSettings.sky_overlay;
-                chkSkyLabels.checked = !!currentSettings.sky_labels;
-                chkGridOverlay.checked = !!currentSettings.grid_overlay;
-                chkSunMoon.checked = currentSettings.sun_moon !== false;
-                chkBadge.checked = currentSettings.badge !== false;
-                chkNightVision.checked = !!currentSettings.night_vision;
-
-                if (currentSettings.opacity !== undefined) {
-                    rngOpacity.value = currentSettings.opacity;
-                    txtOpacity.textContent = `${Math.round(currentSettings.opacity * 100)}%`;
-                }
-
-                // Fit buttons
-                segFit.querySelectorAll(".seg-btn").forEach((btn) => {
-                    btn.classList.toggle("active", btn.dataset.fit === currentSettings.fit);
+                $("btn-go-live").classList.toggle("active", state.view_mode === "live");
+                document.querySelectorAll(".mode-btn").forEach((b) => {
+                    b.classList.toggle("active", b.dataset.mode === state.view_mode);
                 });
 
-                // Bg buttons
-                segBg.querySelectorAll(".seg-btn").forEach((btn) => {
-                    btn.classList.toggle("active", btn.dataset.bg === currentSettings.bg);
-                });
+                $("tg-sky").classList.toggle("active", !!state.sky_overlay);
+                $("tg-labels").classList.toggle("active", !!state.sky_labels);
+                $("tg-grid").classList.toggle("active", !!state.grid_overlay);
+                $("tg-sunmoon").classList.toggle("active", state.sun_moon !== false);
+                $("tg-adsb").classList.toggle("active", !!state.adsb_overlay);
+                $("tg-events").classList.toggle("active", !!state.events_overlay);
+                $("tg-badge").classList.toggle("active", state.badge !== false);
+                $("tg-night").classList.toggle("active", !!state.night_vision);
+
+                $("btn-fit").textContent = state.fit === "contain" ? "4:3 Gốc" : "16:9 Cover";
+                $("btn-fit").classList.toggle("active", state.fit === "contain");
+                $("btn-bg").textContent = state.bg === "transparent" ? "Alpha" : "Nền Đen";
+                $("btn-bg").classList.toggle("active", state.bg === "transparent");
+
+                $("rng-opacity").value = state.opacity ?? 1.0;
+                $("val-opacity").textContent = Math.round((state.opacity ?? 1.0) * 100) + "%";
+
+                $("rng-zoom").value = state.zoom ?? 1.0;
+                $("val-zoom").textContent = Number(state.zoom ?? 1.0).toFixed(1) + "x";
+                $("rng-panx").value = state.pan_x ?? 0;
+                $("rng-pany").value = state.pan_y ?? 0;
+                $("rng-rotate").value = state.rotate ?? 0;
+                $("val-rotate").textContent = Math.round(state.rotate ?? 0) + "°";
+
+                $("btn-fliph").classList.toggle("active", !!state.flip_h);
+                $("btn-flipv").classList.toggle("active", !!state.flip_v);
+
+                $("rng-bright").value = state.brightness ?? 1.0;
+                $("val-bright").textContent = Number(state.brightness ?? 1.0).toFixed(2);
+                $("rng-contrast").value = state.contrast ?? 1.0;
+                $("val-contrast").textContent = Number(state.contrast ?? 1.0).toFixed(2);
+
+                if (document.activeElement !== $("inp-title")) $("inp-title").value = state.title_text || "";
+                if (document.activeElement !== $("inp-sub")) $("inp-sub").value = state.title_sub || "";
+                $("sel-title-pos").value = state.title_pos || "bottom-left";
             }
 
-            // Send updated settings to server
-            async function saveSettings(patch) {
-                if (isSending) return;
-                isSending = true;
-                Object.assign(currentSettings, patch);
-                syncUI(currentSettings);
-
+            async function pushPatch(patch, msg) {
+                Object.assign(state, patch);
+                syncUI();
                 try {
-                    const res = await fetch("/api/obs/overlay", {
+                    const r = await fetch("/api/obs/overlay", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(patch),
                     });
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.settings) syncUI(data.settings);
-                        showToast("Đã đồng bộ sang OBS");
+                    if (r.ok) {
+                        const d = await r.json();
+                        if (d.settings) syncUI(d.settings);
+                        if (msg) notify(msg);
                     }
-                } catch (e) {
-                    showToast("Lỗi đồng bộ: " + e.message);
-                } finally {
-                    isSending = false;
+                } catch (e) {}
+            }
+
+            // Topbar buttons
+            $("btn-go-live").addEventListener("click", () => {
+                selectedEventIdx = -1;
+                renderEventRows();
+                pushPatch({ view_mode: "live", replay_url: "", replay_crop_url: "", replay_label: "" }, "Đang phát LIVE");
+            });
+            $("btn-snap").addEventListener("click", () => {
+                fetch("/api/live/snapshot.jpg?t=" + Date.now()).catch(() => {});
+                notify("Đã làm mới ảnh");
+            });
+            $("btn-open-obs").addEventListener("click", () => window.open("/obs", "_blank"));
+
+            // View Mode buttons
+            document.querySelectorAll(".mode-btn").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const m = btn.dataset.mode;
+                    if (m === "live") {
+                        selectedEventIdx = -1;
+                        renderEventRows();
+                        pushPatch({ view_mode: "live", replay_url: "", replay_crop_url: "", replay_label: "" }, "Chế độ LIVE");
+                    } else if (m === "timelapse") {
+                        pushPatch({ view_mode: "timelapse", replay_url: "/uploads/allsky/timelapses/latest.mp4", replay_label: "🎬 TIMELAPSE HÔM NAY" }, "Phát Timelapse");
+                    } else if (m === "startrails") {
+                        pushPatch({ view_mode: "startrails", replay_url: "/uploads/allsky/startrails/latest.jpg", replay_label: "🌀 STARTRAILS" }, "Hiện Startrails");
+                    } else if (m === "keogram") {
+                        pushPatch({ view_mode: "keogram", replay_url: "/uploads/allsky/keograms/latest.jpg", replay_label: "📊 KEOGRAM" }, "Hiện Keogram");
+                    }
+                });
+            });
+
+            // 8 Overlay Toggles
+            const bindToggle = (id, key) => {
+                $(id).addEventListener("click", () => pushPatch({ [key]: !state[key] }));
+            };
+            bindToggle("tg-sky", "sky_overlay");
+            bindToggle("tg-labels", "sky_labels");
+            bindToggle("tg-grid", "grid_overlay");
+            bindToggle("tg-sunmoon", "sun_moon");
+            bindToggle("tg-adsb", "adsb_overlay");
+            bindToggle("tg-events", "events_overlay");
+            bindToggle("tg-badge", "badge");
+            bindToggle("tg-night", "night_vision");
+
+            // Presets & Fit/Bg
+            $("pre-full").addEventListener("click", () => pushPatch({
+                sky_overlay: true, sky_labels: true, grid_overlay: true, sun_moon: true, adsb_overlay: true, events_overlay: true, badge: true
+            }, "Preset: Đầy đủ"));
+            $("pre-clean").addEventListener("click", () => pushPatch({
+                sky_overlay: true, sky_labels: false, grid_overlay: false, sun_moon: true, adsb_overlay: false, events_overlay: false, badge: false
+            }, "Preset: Ngắm sao"));
+            $("pre-raw").addEventListener("click", () => pushPatch({
+                sky_overlay: false, sky_labels: false, grid_overlay: false, sun_moon: false, adsb_overlay: false, events_overlay: false, badge: false
+            }, "Preset: Video mộc"));
+
+            $("btn-fit").addEventListener("click", () => pushPatch({ fit: state.fit === "contain" ? "cover" : "contain" }));
+            $("btn-bg").addEventListener("click", () => pushPatch({ bg: state.bg === "transparent" ? "black" : "transparent" }));
+
+            $("rng-opacity").addEventListener("input", (e) => {
+                $("val-opacity").textContent = Math.round(e.target.value * 100) + "%";
+            });
+            $("rng-opacity").addEventListener("change", (e) => pushPatch({ opacity: parseFloat(e.target.value) }));
+
+            // Zoom, Pan, Rotate, Brightness, Contrast
+            $("rng-zoom").addEventListener("input", (e) => {
+                $("val-zoom").textContent = Number(e.target.value).toFixed(1) + "x";
+                pushPatch({ zoom: parseFloat(e.target.value) });
+            });
+            document.querySelectorAll(".z-quick").forEach((b) => {
+                b.addEventListener("click", () => {
+                    const z = parseFloat(b.dataset.z);
+                    pushPatch(z === 1 ? { zoom: 1.0, pan_x: 0, pan_y: 0 } : { zoom: z });
+                });
+            });
+
+            document.querySelectorAll(".pan-step").forEach((b) => {
+                b.addEventListener("click", () => {
+                    const nx = Math.max(-80, Math.min(80, (state.pan_x || 0) + parseFloat(b.dataset.dx)));
+                    const ny = Math.max(-80, Math.min(80, (state.pan_y || 0) + parseFloat(b.dataset.dy)));
+                    pushPatch({ pan_x: nx, pan_y: ny });
+                });
+            });
+            $("btn-pan-center").addEventListener("click", () => pushPatch({ pan_x: 0, pan_y: 0 }));
+            $("rng-panx").addEventListener("input", (e) => pushPatch({ pan_x: parseFloat(e.target.value) }));
+            $("rng-pany").addEventListener("input", (e) => pushPatch({ pan_y: parseFloat(e.target.value) }));
+
+            $("rng-rotate").addEventListener("input", (e) => {
+                $("val-rotate").textContent = e.target.value + "°";
+                pushPatch({ rotate: parseFloat(e.target.value) });
+            });
+            document.querySelectorAll(".rot-quick").forEach((b) => {
+                b.addEventListener("click", () => pushPatch({ rotate: parseFloat(b.dataset.r) }));
+            });
+            $("btn-fliph").addEventListener("click", () => pushPatch({ flip_h: !state.flip_h }));
+            $("btn-flipv").addEventListener("click", () => pushPatch({ flip_v: !state.flip_v }));
+
+            $("rng-bright").addEventListener("input", (e) => {
+                $("val-bright").textContent = Number(e.target.value).toFixed(2);
+                pushPatch({ brightness: parseFloat(e.target.value) });
+            });
+            $("rng-contrast").addEventListener("input", (e) => {
+                $("val-contrast").textContent = Number(e.target.value).toFixed(2);
+                pushPatch({ contrast: parseFloat(e.target.value) });
+            });
+
+            $("btn-reset-view").addEventListener("click", () => {
+                pushPatch({
+                    zoom: 1.0, pan_x: 0.0, pan_y: 0.0, rotate: 0.0,
+                    flip_h: false, flip_v: false, brightness: 1.0, contrast: 1.0
+                }, "Đã reset khung hình");
+            });
+
+            // Title Controls
+            const applyTitle = () => {
+                pushPatch({
+                    title_text: $("inp-title").value.trim(),
+                    title_sub: $("inp-sub").value.trim(),
+                    title_pos: $("sel-title-pos").value,
+                }, "Đã cập nhật tiêu đề");
+            };
+            $("btn-title-apply").addEventListener("click", applyTitle);
+            $("inp-title").addEventListener("keydown", (e) => { if (e.key === "Enter") applyTitle(); });
+            $("inp-sub").addEventListener("keydown", (e) => { if (e.key === "Enter") applyTitle(); });
+            $("sel-title-pos").addEventListener("change", applyTitle);
+            $("btn-title-clear").addEventListener("click", () => {
+                $("inp-title").value = "";
+                $("inp-sub").value = "";
+                pushPatch({ title_text: "", title_sub: "" }, "Đã ẩn tiêu đề");
+            });
+
+            // Events & ADS-B Replay List
+            function fmtTime(iso) {
+                try {
+                    const d = new Date(iso);
+                    return d.toLocaleTimeString("vi-VN", { hour12: false }) + " " + d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+                } catch (e) { return iso || ""; }
+            }
+
+            function selectEventForObs(idx, autoZoom) {
+                if (idx < 0 || idx >= eventsList.length) return;
+                selectedEventIdx = idx;
+                const ev = eventsList[idx];
+                const isMeteor = ev.type === "meteor";
+                const fl = ev.flight || ev.nearest_flight;
+                const icon = isMeteor ? "☄️ Sao băng" : ev.type === "satellite" ? "🛰️ Vệ tinh" : `✈️ ${fl ? (fl.callsign || fl.icao) : "Máy bay"}`;
+                const label = `${icon} • ${fmtTime(ev.timestamp)}${fl && fl.altitude_m ? ` • ${fl.altitude_m}m` : ""}`;
+                const skyUrl = ev.sky_url || ev.thumbnail_url || "";
+                const cropUrl = (ev.sky_url && ev.thumbnail_url && ev.thumbnail_url !== ev.sky_url) ? ev.thumbnail_url : "";
+
+                const patch = {
+                    view_mode: "event",
+                    replay_url: skyUrl,
+                    replay_crop_url: cropUrl,
+                    replay_label: label,
+                };
+
+                if (autoZoom && Array.isArray(ev.line) && ev.line.length >= 4) {
+                    const cx = (ev.line[0] + ev.line[2]) * 0.5;
+                    const cy = (ev.line[1] + ev.line[3]) * 0.5;
+                    patch.zoom = 2.6;
+                    patch.pan_x = Math.max(-75, Math.min(75, Number(((0.5 - cx) * 140).toFixed(1))));
+                    patch.pan_y = Math.max(-75, Math.min(75, Number(((0.5 - cy) * 140).toFixed(1))));
                 }
+                renderEventRows();
+                pushPatch(patch, "Phát trên OBS: " + icon);
             }
 
-            // Bind toggle change events
-            chkSkyOverlay.addEventListener("change", () => saveSettings({ sky_overlay: chkSkyOverlay.checked }));
-            chkSkyLabels.addEventListener("change", () => saveSettings({ sky_labels: chkSkyLabels.checked }));
-            chkGridOverlay.addEventListener("change", () => saveSettings({ grid_overlay: chkGridOverlay.checked }));
-            chkSunMoon.addEventListener("change", () => saveSettings({ sun_moon: chkSunMoon.checked }));
-            chkBadge.addEventListener("change", () => saveSettings({ badge: chkBadge.checked }));
-            chkNightVision.addEventListener("change", () => saveSettings({ night_vision: chkNightVision.checked }));
+            function renderEventRows() {
+                const container = $("ev-list");
+                if (currentTab === "adsb") {
+                    if (!adsbList.length) {
+                        container.innerHTML = `<div class="ev-empty">Không có máy bay ADS-B nào trong vùng phủ.</div>`;
+                        return;
+                    }
+                    container.innerHTML = adsbList.map((a, i) => {
+                        const call = a.callsign || a.icao || "UNKNOWN";
+                        const alt = a.altitude_m ? `${a.altitude_m}m` : "--m";
+                        const spd = a.speed_kmh ? `${a.speed_kmh}km/h` : "";
+                        const dist = a.distance_km ? `${a.distance_km}km` : "";
+                        const pos = a.alt_deg !== undefined ? `Cao ${Math.round(a.alt_deg)}° • Hướng ${Math.round(a.az_deg || 0)}°` : "";
+                        return `<div class="ev-item" data-adsb-idx="${i}">
+                            <div class="ev-info">
+                                <div class="ev-top"><span>✈️ ${call} ${a.in_view ? "🟢(Trong khung)" : ""}</span><span>${alt} • ${dist}</span></div>
+                                <div class="ev-sub">${pos} ${spd ? "• " + spd : ""}</div>
+                            </div>
+                            <button type="button" class="btn-sm adsb-pin" data-adsb-idx="${i}" title="Bật Radar & Ghim tiêu đề máy bay">Ghim OBS</button>
+                        </div>`;
+                    }).join("");
 
-            rngOpacity.addEventListener("input", () => {
-                txtOpacity.textContent = `${Math.round(rngOpacity.value * 100)}%`;
-            });
-            rngOpacity.addEventListener("change", () => {
-                saveSettings({ opacity: parseFloat(rngOpacity.value) });
-            });
+                    container.querySelectorAll(".adsb-pin").forEach((b) => {
+                        b.addEventListener("click", (e) => {
+                            e.stopPropagation();
+                            const ac = adsbList[Number(b.dataset.adsbIdx)];
+                            if (!ac) return;
+                            const call = ac.callsign || ac.icao;
+                            pushPatch({
+                                view_mode: "live",
+                                adsb_overlay: true,
+                                title_text: `✈️ Chuyến bay ${call}`,
+                                title_sub: `Độ cao: ${ac.altitude_m || "--"}m • Tốc độ: ${ac.speed_kmh || "--"}km/h • Cách trạm: ${ac.distance_km || "--"}km`,
+                            }, `Đã ghim ${call}`);
+                        });
+                    });
+                    return;
+                }
 
-            // Segmented buttons click
-            segFit.querySelectorAll(".seg-btn").forEach((btn) => {
-                btn.addEventListener("click", () => {
-                    const fit = btn.dataset.fit;
-                    saveSettings({ fit });
+                if (!eventsList.length) {
+                    container.innerHTML = `<div class="ev-empty">Chưa có sự kiện nào trong mục này.</div>`;
+                    return;
+                }
+
+                container.innerHTML = eventsList.map((ev, i) => {
+                    const isMeteor = ev.type === "meteor";
+                    const fl = ev.flight || ev.nearest_flight;
+                    const badge = isMeteor ? "☄️ Sao băng" : ev.type === "satellite" ? "🛰️ Vệ tinh" : `✈️ ${fl ? (fl.callsign || fl.icao) : "Máy bay"}`;
+                    const detail = fl
+                        ? `Cao ${fl.altitude_m || "--"}m • Cách ${fl.distance_km || "--"}km`
+                        : `Dài ${Math.round(ev.length_px || 0)}px • ${ev.frames || 1} khung`;
+                    const thumb = ev.thumbnail_url ? `<img class="ev-thumb" src="${ev.thumbnail_url}" loading="lazy" />` : "";
+                    return `<div class="ev-item ${i === selectedEventIdx ? "active" : ""}" data-idx="${i}">
+                        ${thumb}
+                        <div class="ev-info">
+                            <div class="ev-top"><span>${badge}</span><span style="color:var(--muted);font-weight:400;font-size:11px">${fmtTime(ev.timestamp)}</span></div>
+                            <div class="ev-sub">${detail}</div>
+                        </div>
+                        <button type="button" class="btn-sm ev-zoom-btn" data-idx="${i}" title="Phát & Zoom cận cảnh vị trí">🔍</button>
+                    </div>`;
+                }).join("");
+
+                container.querySelectorAll(".ev-item[data-idx]").forEach((row) => {
+                    row.addEventListener("click", (e) => {
+                        if (e.target.closest(".ev-zoom-btn")) return;
+                        selectEventForObs(Number(row.dataset.idx), false);
+                    });
                 });
-            });
-
-            segBg.querySelectorAll(".seg-btn").forEach((btn) => {
-                btn.addEventListener("click", () => {
-                    const bg = btn.dataset.bg;
-                    saveSettings({ bg });
+                container.querySelectorAll(".ev-zoom-btn").forEach((btn) => {
+                    btn.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        selectEventForObs(Number(btn.dataset.idx), true);
+                    });
                 });
-            });
-
-            // Presets
-            document.getElementById("preset-astro").addEventListener("click", () => {
-                saveSettings({
-                    sky_overlay: true,
-                    sky_labels: true,
-                    grid_overlay: true,
-                    sun_moon: true,
-                    badge: true,
-                });
-            });
-
-            document.getElementById("preset-clean").addEventListener("click", () => {
-                saveSettings({
-                    sky_overlay: true,
-                    sky_labels: false,
-                    grid_overlay: false,
-                    sun_moon: true,
-                    badge: false,
-                });
-            });
-
-            document.getElementById("preset-raw").addEventListener("click", () => {
-                saveSettings({
-                    sky_overlay: false,
-                    sky_labels: false,
-                    grid_overlay: false,
-                    sun_moon: false,
-                    badge: false,
-                });
-            });
-
-            document.getElementById("preset-grid").addEventListener("click", () => {
-                saveSettings({
-                    sky_overlay: false,
-                    sky_labels: false,
-                    grid_overlay: true,
-                    sun_moon: true,
-                    badge: true,
-                });
-            });
-
-            // Copy URL
-            btnCopyUrl.addEventListener("click", () => {
-                const url = window.location.origin + "/obs";
-                navigator.clipboard.writeText(url).then(() => {
-                    showToast("Đã chép: " + url);
-                }).catch(() => {
-                    prompt("Sao chép URL OBS Browser Source:", url);
-                });
-            });
-
-            // Popout
-            btnPopout.addEventListener("click", () => {
-                window.open("/obs", "_blank");
-            });
-
-            // Snapshot refresh
-            function refreshPreview() {
-                previewImg.src = "/api/live/snapshot.jpg?t=" + Date.now();
             }
-            btnRefresh.addEventListener("click", () => {
-                refreshPreview();
-                showToast("Đã tải lại khung hình");
+
+            async function loadEventsOrAdsb() {
+                try {
+                    if (currentTab === "adsb") {
+                        const r = await fetch("/api/adsb/aircraft?limit=30");
+                        if (r.ok) {
+                            const d = await r.json();
+                            adsbList = d.aircraft || [];
+                            renderEventRows();
+                        }
+                        return;
+                    }
+                    const q = currentTab === "all" ? "" : `&type=${currentTab}`;
+                    const r = await fetch(`/api/events?limit=50${q}`);
+                    if (r.ok) {
+                        const d = await r.json();
+                        eventsList = d.events || [];
+                        const c = d.counts || {};
+                        const tabs = document.querySelectorAll(".ev-tab");
+                        if (tabs[1] && c.meteor !== undefined) tabs[1].textContent = `☄️ Sao băng (${c.meteor})`;
+                        if (tabs[2] && c.plane !== undefined) tabs[2].textContent = `✈️ Máy bay (${c.plane})`;
+                        renderEventRows();
+                    }
+                } catch (e) {}
+            }
+
+            document.querySelectorAll(".ev-tab").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    currentTab = btn.dataset.tab;
+                    selectedEventIdx = -1;
+                    document.querySelectorAll(".ev-tab").forEach((b) => b.classList.toggle("active", b === btn));
+                    loadEventsOrAdsb();
+                });
             });
 
-            // Toggle preview
-            let previewCollapsed = false;
-            btnTogglePreview.addEventListener("click", () => {
-                previewCollapsed = !previewCollapsed;
-                previewBox.style.display = previewCollapsed ? "none" : "block";
-                btnTogglePreview.textContent = previewCollapsed ? "Mở" : "Thu gọn";
+            $("btn-ev-prev").addEventListener("click", () => {
+                if (!eventsList.length) return;
+                const next = selectedEventIdx <= 0 ? 0 : selectedEventIdx - 1;
+                selectEventForObs(next, false);
+            });
+            $("btn-ev-next").addEventListener("click", () => {
+                if (!eventsList.length) return;
+                const next = selectedEventIdx < 0 ? 0 : Math.min(eventsList.length - 1, selectedEventIdx + 1);
+                selectEventForObs(next, false);
+            });
+            $("btn-ev-reload").addEventListener("click", () => {
+                loadEventsOrAdsb();
+                notify("Đã làm mới sự kiện");
             });
 
-            // LMST calculation for live clock
+            // Camera Quick Controls
+            $("cam-auto").addEventListener("click", async () => {
+                await fetch("/api/camera/mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "auto" }) });
+                $("cam-auto").classList.add("active");
+                $("cam-manual").classList.remove("active");
+                notify("Chế độ Auto AE");
+            });
+            $("cam-manual").addEventListener("click", async () => {
+                await fetch("/api/camera/mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "manual" }) });
+                $("cam-manual").classList.add("active");
+                $("cam-auto").classList.remove("active");
+                notify("Chế độ Manual");
+            });
+            $("cam-boost").addEventListener("click", async () => {
+                starBoostOn = !starBoostOn;
+                await fetch("/api/camera/star-boost", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: starBoostOn }) });
+                $("cam-boost").classList.toggle("active", starBoostOn);
+                notify(starBoostOn ? "Bật Star Boost" : "Tắt Star Boost");
+            });
+            $("btn-cam-set").addEventListener("click", async () => {
+                const exp = parseFloat($("inp-exp").value) || 1.0;
+                const gain = parseFloat($("inp-gain").value) || 0.0;
+                await fetch("/api/camera/mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "manual" }) });
+                await fetch("/api/camera/exposure", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ exposure_s: exp, gain_db: gain }) });
+                $("cam-manual").classList.add("active");
+                $("cam-auto").classList.remove("active");
+                notify(`Đã đặt ${exp}s / ${gain}dB`);
+            });
+
+            // LST Clock
             function updateClock() {
                 const now = new Date();
                 const jd = now.getTime() / 86400000.0 + 2440587.5;
                 const d = jd - 2451545.0;
                 const t = d / 36525.0;
-                const gmst =
-                    (280.46061837 +
-                        360.98564736629 * d +
-                        0.000387933 * t * t -
-                        (t * t * t) / 38710000.0) %
-                    360.0;
-                const lon = stationConfig.longitude_deg || 105.9095;
-                const lmstDeg = ((gmst + lon) % 360.0 + 360.0) % 360.0;
+                const gmst = (280.46061837 + 360.98564736629 * d + 0.000387933 * t * t - (t * t * t) / 38710000.0) % 360.0;
+                const lmstDeg = ((gmst + stationLon) % 360.0 + 360.0) % 360.0;
                 const totalH = lmstDeg / 15.0;
                 const h = Math.floor(totalH);
                 const m = Math.floor((totalH - h) * 60.0);
                 const s = Math.floor(((totalH - h) * 60.0 - m) * 60.0);
-                telLst.textContent = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+                lblLst.textContent = `LST ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
             }
             setInterval(updateClock, 1000);
+            updateClock();
 
-            // WebSocket Connection for instant updates
-            function connectWebSocket() {
-                if (ws) {
-                    try { ws.close(); } catch (e) {}
-                    ws = null;
-                }
+            // WebSocket for instant sync
+            let ws = null;
+            function connectWs() {
                 const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-                const wsUrl = proto + "//" + window.location.host + "/ws/live?binary=1";
                 try {
-                    ws = new WebSocket(wsUrl);
+                    ws = new WebSocket(proto + "//" + window.location.host + "/ws/live?binary=1");
                     ws.binaryType = "arraybuffer";
-
-                    ws.onopen = function () {
-                        statusDot.className = "status-dot online";
-                        statusDot.title = "Connected to AllSky Server";
-                    };
-
-                    ws.onmessage = function (ev) {
+                    ws.onopen = () => { statusDot.className = "dot online"; };
+                    ws.onmessage = (ev) => {
                         if (ev.data instanceof ArrayBuffer) {
                             const dv = new DataView(ev.data);
                             if (dv.getUint8(0) === 0x41 && dv.getUint8(1) === 0x53) {
                                 const exp = dv.getFloat32(16, true);
                                 const gain = dv.getFloat32(20, true);
-                                telExpGain.textContent = `${(exp * 1000).toFixed(0)} ms / ${gain.toFixed(1)} dB`;
+                                const stars = dv.getUint32(32, true);
+                                telemSummary.textContent = `${exp >= 1 ? exp.toFixed(1) + "s" : (exp * 1000).toFixed(0) + "ms"} • ${gain.toFixed(1)}dB • ${stars}★`;
                             }
                         } else if (typeof ev.data === "string") {
                             try {
                                 const msg = JSON.parse(ev.data);
-                                if (msg.type === "obs_overlay" && msg.settings) {
-                                    syncUI(msg.settings);
-                                }
+                                if (msg.type === "obs_overlay" && msg.settings) syncUI(msg.settings);
                             } catch (e) {}
                         }
                     };
-
-                    ws.onclose = function () {
-                        statusDot.className = "status-dot offline";
-                        statusDot.title = "Disconnected. Reconnecting...";
-                        ws = null;
-                        if (!reconnectTimer) {
-                            reconnectTimer = setTimeout(() => {
-                                reconnectTimer = null;
-                                connectWebSocket();
-                            }, 2500);
-                        }
+                    ws.onclose = () => {
+                        statusDot.className = "dot offline";
+                        setTimeout(connectWs, 3000);
                     };
                 } catch (e) {
-                    statusDot.className = "status-dot offline";
+                    statusDot.className = "dot offline";
                 }
             }
 
-            // Initial load
-            fetch("/api/station/config")
-                .then((r) => r.json())
-                .then((cfg) => {
-                    if (cfg) stationConfig = cfg;
-                })
-                .catch(() => {});
+            // Initial data load
+            fetch("/api/station/config").then((r) => r.json()).then((c) => {
+                if (c && c.longitude_deg) stationLon = c.longitude_deg;
+            }).catch(() => {});
 
-            fetch("/api/obs/overlay")
-                .then((r) => r.json())
-                .then((settings) => {
-                    syncUI(settings);
-                })
-                .catch(() => {});
+            fetch("/api/obs/overlay").then((r) => r.json()).then((s) => syncUI(s)).catch(() => {});
 
-            // Polling telemetry
+            fetch("/api/camera/star-boost").then((r) => r.json()).then((d) => {
+                starBoostOn = !!(d && d.enabled);
+                $("cam-boost").classList.toggle("active", starBoostOn);
+            }).catch(() => {});
+
             async function pollTelemetry() {
                 try {
-                    const res = await fetch("/api/telemetry");
-                    if (res.ok) {
-                        const d = await res.json();
-                        if (d.exposure_time_s !== undefined) {
-                            telExpGain.textContent = `${(d.exposure_time_s * 1000).toFixed(0)} ms / ${(d.gain_db || 0).toFixed(1)} dB`;
+                    const r = await fetch("/api/telemetry");
+                    if (r.ok) {
+                        const d = await r.json();
+                        if (d.mode) {
+                            $("cam-auto").classList.toggle("active", d.mode === "auto");
+                            $("cam-manual").classList.toggle("active", d.mode !== "auto");
                         }
-                        if (d.sky_state) {
-                            telSky.textContent = `${d.sky_state} (${(d.stars_detected_count || 0)} sao)`;
-                        }
-                        if (d.sun_altitude_deg !== undefined) {
-                            telSunMoon.textContent = `${d.sun_altitude_deg.toFixed(0)}° / ${d.moon_illumination_pct || 0}%`;
-                        }
+                        const exp = d.exposure_time_s ?? d.exposure_s ?? 0;
+                        const gain = d.gain_db ?? 0;
+                        if (document.activeElement !== $("inp-exp") && exp > 0) $("inp-exp").value = Number(exp.toFixed(3));
+                        if (document.activeElement !== $("inp-gain")) $("inp-gain").value = Number(gain.toFixed(1));
+                        $("cam-sky-info").textContent = `${d.sky_state || d.sky_status || "clear"} • Mây ${Math.round(d.cloud_cover_pct || 0)}%`;
                     }
                 } catch (e) {}
             }
-            setInterval(pollTelemetry, 6000);
             pollTelemetry();
+            setInterval(pollTelemetry, 8000);
 
-            refreshPreview();
-            setInterval(refreshPreview, 10000);
-            connectWebSocket();
-            updateClock();
+            loadEventsOrAdsb();
+            setInterval(() => { if (currentTab === "adsb") loadEventsOrAdsb(); }, 6000);
+            connectWs();
         })();
     </script>
 </body>

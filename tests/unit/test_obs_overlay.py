@@ -51,10 +51,24 @@ def test_obs_overlay_post_update(api_client):
         "sky_overlay": True,
         "sky_labels": True,
         "grid_overlay": True,
+        "adsb_overlay": True,
+        "events_overlay": True,
         "fit": "contain",
         "bg": "transparent",
         "night_vision": True,
         "opacity": 0.85,
+        "zoom": 2.5,
+        "pan_x": 15.0,
+        "pan_y": -10.0,
+        "rotate": 90.0,
+        "flip_h": True,
+        "brightness": 1.2,
+        "contrast": 1.1,
+        "title_text": "AllSky Hanoi",
+        "title_sub": "Live Meteor Watch",
+        "title_pos": "bottom-center",
+        "view_mode": "event",
+        "replay_url": "/api/events/img/2026-10-22/test.jpg",
     }
     res = api_client.post("/api/obs/overlay", json=patch)
     assert res.status_code == 200
@@ -62,21 +76,26 @@ def test_obs_overlay_post_update(api_client):
     assert resp_data["success"] is True
     settings = resp_data["settings"]
     assert settings["sky_overlay"] is True
-    assert settings["sky_labels"] is True
-    assert settings["grid_overlay"] is True
+    assert settings["adsb_overlay"] is True
+    assert settings["events_overlay"] is True
     assert settings["fit"] == "contain"
     assert settings["bg"] == "transparent"
-    assert settings["night_vision"] is True
-    assert settings["opacity"] == 0.85
+    assert settings["zoom"] == 2.5
+    assert settings["pan_x"] == 15.0
+    assert settings["pan_y"] == -10.0
+    assert settings["rotate"] == 90.0
+    assert settings["flip_h"] is True
+    assert settings["title_text"] == "AllSky Hanoi"
+    assert settings["view_mode"] == "event"
 
     # Verify GET returns updated values
     get_res = api_client.get("/api/obs/overlay")
     assert get_res.status_code == 200
     get_data = get_res.json()
-    assert get_data["sky_overlay"] is True
-    assert get_data["sky_labels"] is True
-    assert get_data["grid_overlay"] is True
+    assert get_data["zoom"] == 2.5
+    assert get_data["title_text"] == "AllSky Hanoi"
     assert get_data["fit"] == "contain"
+
 
 
 def test_obs_html_routes(api_client):

@@ -232,13 +232,32 @@ class StoragePolicyRequest(BaseModel):
 
 
 class ObsOverlayRequest(BaseModel):
-    """OBS and live stream celestial overlay display settings."""
+    """OBS and live stream celestial overlay, transform, title, and replay settings."""
     sky_overlay: Optional[bool] = Field(None, description="Show stars & constellations stick figures")
     sky_labels: Optional[bool] = Field(None, description="Show star & constellation labels")
     grid_overlay: Optional[bool] = Field(None, description="Show alt/az grid rings & N/E/S/W compass")
     sun_moon: Optional[bool] = Field(None, description="Show Sun & Moon tracking markers")
     badge: Optional[bool] = Field(None, description="Show astrometry info badge (LST, FOV, PA)")
+    adsb_overlay: Optional[bool] = Field(None, description="Show live ADS-B aircraft positions on sky")
+    events_overlay: Optional[bool] = Field(None, description="Show recent meteor/aircraft streak lines on sky")
     fit: Optional[str] = Field(None, pattern="^(cover|contain)$", description="Framing fit mode")
     bg: Optional[str] = Field(None, pattern="^(black|transparent)$", description="Background fill mode")
     night_vision: Optional[bool] = Field(None, description="Night vision / red lighting mode")
     opacity: Optional[float] = Field(None, ge=0.0, le=1.0, description="Overlay opacity level (0.0 to 1.0)")
+    zoom: Optional[float] = Field(None, ge=0.5, le=10.0, description="Digital zoom factor (1.0 = 100%)")
+    pan_x: Optional[float] = Field(None, ge=-100.0, le=100.0, description="Horizontal pan percentage (-100 to 100)")
+    pan_y: Optional[float] = Field(None, ge=-100.0, le=100.0, description="Vertical pan percentage (-100 to 100)")
+    rotate: Optional[float] = Field(None, ge=-180.0, le=180.0, description="Tilt / rotation angle in degrees")
+    flip_h: Optional[bool] = Field(None, description="Mirror horizontally on OBS")
+    flip_v: Optional[bool] = Field(None, description="Flip vertically on OBS")
+    brightness: Optional[float] = Field(None, ge=0.2, le=3.0, description="Video brightness multiplier")
+    contrast: Optional[float] = Field(None, ge=0.2, le=3.0, description="Video contrast multiplier")
+    title_text: Optional[str] = Field(None, max_length=200, description="Main title overlay text")
+    title_sub: Optional[str] = Field(None, max_length=200, description="Subtitle overlay text")
+    title_pos: Optional[str] = Field(None, pattern="^(top-left|top-center|bottom-left|bottom-center)$", description="Title position")
+    view_mode: Optional[str] = Field(None, pattern="^(live|event|timelapse|keogram|startrails)$", description="Active display mode")
+    replay_url: Optional[str] = Field(None, max_length=500, description="Replay media URL")
+    replay_crop_url: Optional[str] = Field(None, max_length=500, description="Replay close-up crop image URL")
+    replay_label: Optional[str] = Field(None, max_length=300, description="Replay event description badge")
+    replay_bbox: Optional[List[float]] = Field(None, max_length=4, description="Optional normalized line/bbox for highlight")
+
