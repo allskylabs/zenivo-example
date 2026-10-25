@@ -2227,12 +2227,15 @@ class AllSkyService:
         if trail_s > 0:
             res["station"] = {"lat": station["latitude_deg"], "lon": station["longitude_deg"], "elevation_m": station["elevation_m"]}
             if sol:
+                # Frame edges in focal units (the page casts rays through them), plus the solver's own FOV
                 cx, cy = sol["optical_center_px"]
                 f = float(sol["focal_px"])
                 res["camera"] = {"az_deg": sol["pointing_az_deg"], "alt_deg": sol["pointing_alt_deg"],
                                  "roll_deg": sol.get("roll_deg", 0.0),
-                                 "hfov_deg": round(2 * math.degrees(math.atan(cx / f)), 2),
-                                 "vfov_deg": round(2 * math.degrees(math.atan(cy / f)), 2)}
+                                 "hfov_deg": sol.get("fov_horizontal_deg"), "vfov_deg": sol.get("fov_vertical_deg"),
+                                 "projection": sol.get("projection", "rectilinear"),
+                                 "distortion_k": float(sol.get("distortion_k") or 0.0),
+                                 "half_w": round(cx / f, 5), "half_h": round(cy / f, 5)}
         return res
 
     def _aircraft_info(self):

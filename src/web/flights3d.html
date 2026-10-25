@@ -1033,21 +1033,42 @@
             const s0 = merc(station.lon, station.lat, station.elevation_m || 0);
             if (camera) {
                 const R = pointingRotation(camera.az_deg, camera.alt_deg, camera.roll_deg || 0);
-                const th = Math.tan(camera.hfov_deg / 2 * D2R), tv = Math.tan(camera.vfov_deg / 2 * D2R);
-                const corners = [[-th, -tv], [th, -tv], [th, tv], [-th, tv]].map(([x, y]) => {
-                    const v = [0, 1, 2].map((i) => R.right[i] * x + R.down[i] * y + R.axis[i]);
+                const fish = camera.projection === "equidistant", k = camera.distortion_k || 0;
+                // Frame half-size in focal units; older servers only send the (rectilinear) FOV
+                const hw = camera.half_w ?? Math.tan(camera.hfov_deg / 2 * D2R), hh = camera.half_h ?? Math.tan(camera.vfov_deg / 2 * D2R);
+                // Camera-frame ray through image offset (x, y) in focal units (same model as bright_star_solver._pix_to_cam)
+                const camRay = (x, y) => {
+                    if (!fish) return [x, y, 1];
+                    const rn = Math.hypot(x, y);
+                    let t = rn;
+                    for (let i = 0; i < 8; i++) t -= (t + k * t ** 3 - rn) / (1 + 3 * k * t * t);   // Newton: t + k t^3 = rn
+                    const s = rn > 1e-12 ? Math.sin(t) / rn : 1;
+                    return [x * s, y * s, Math.cos(t)];
+                };
+                const toScene = ([x, y, z]) => {
+                    const v = [0, 1, 2].map((i) => R.right[i] * x + R.down[i] * y + R.axis[i] * z);
                     const d = 12000 / Math.hypot(...v);
                     const p = enuToScene(v[0] * d, v[1] * d, Math.max(v[2] * d, 0));   // rays below the horizon end on the ground
                     return new THREE.Vector3(s0[0] + p[0], s0[1] + p[1], s0[2] + p[2]);
-                });
-                const apex = new THREE.Vector3(...s0);
+                };
+                // Frame outline, sampled along each edge so a fisheye's edges curve as they do on the sky
+                const N = fish ? 16 : 1, cornerXY = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]], ring = [];
+                for (let c = 0; c < 4; c++) {
+                    const [ax, ay] = cornerXY[c], [bx, by] = cornerXY[(c + 1) % 4];
+                    for (let j = 0; j < N; j++) ring.push(toScene(camRay(ax + (bx - ax) * j / N, ay + (by - ay) * j / N)));
+                }
+                const apex = new THREE.Vector3(...s0), centre = toScene(camRay(0, 0));
                 const pts = [];
-                for (const c of corners) pts.push(apex, c);
-                for (let i = 0; i < 4; i++) pts.push(corners[i], corners[(i + 1) % 4]);
+                for (let c = 0; c < 4; c++) pts.push(apex, ring[c * N]);
+                for (let i = 0; i < ring.length; i++) pts.push(ring[i], ring[(i + 1) % ring.length]);
                 group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),
                     new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.7 })));
-                const face = new THREE.BufferGeometry().setFromPoints([corners[0], corners[1], corners[2], corners[0], corners[2], corners[3],
-                    apex, corners[0], corners[1], apex, corners[1], corners[2], apex, corners[2], corners[3], apex, corners[3], corners[0]]);
+                const tris = [];
+                for (let i = 0; i < ring.length; i++) {
+                    const a = ring[i], b = ring[(i + 1) % ring.length];
+                    tris.push(apex, a, b, centre, a, b);   // side wall and far cap
+                }
+                const face = new THREE.BufferGeometry().setFromPoints(tris);
                 group.add(new THREE.Mesh(face, new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.07,
                     side: THREE.DoubleSide, depthWrite: false })));
             }
