@@ -71,14 +71,14 @@
             display: block;
             z-index: 3;
         }
-        body.night-vision #obs-viewport {
-            filter: sepia(100%) hue-rotate(315deg) saturate(350%);
+        body.night-vision .media-layer {
+            filter: brightness(0.76) contrast(1.15) sepia(100%) hue-rotate(315deg) saturate(320%);
         }
 
         /* Picture-in-Picture Close-up for Meteor/Plane Event Replay */
         #replay-pip {
             position: absolute;
-            bottom: 24px;
+            top: 66px;
             right: 24px;
             width: min(320px, 28vw);
             aspect-ratio: 1 / 1;
@@ -510,7 +510,6 @@
                 const showBadge = overlayState.badge !== false;
                 const showAdsb = !!overlayState.adsb_overlay;
                 const showEvents = !!overlayState.events_overlay;
-
                 if (!showSky && !showLabels && !showGrid && !showSunMoon && !showBadge && !showAdsb && !showEvents) return;
 
                 const st = stationConfig || {};
@@ -947,6 +946,7 @@
                 }
 
                 // 5. Recent Meteor / Plane Streaks Overlay
+
                 if (showEvents && recentEvents.length > 0) {
                     ctx.save();
                     recentEvents.slice(0, 12).forEach((ev) => {
@@ -1013,13 +1013,13 @@
                         ctx.shadowBlur = 0;
                     });
 
-                    // Compact ADS-B radar box at bottom-right if no PiP active
+                    // Compact ADS-B radar box at top-right (below OBS datetime) if no PiP active
                     if (replayPip.style.display === "none") {
                         const topList = liveAircraft.slice(0, 5);
                         const boxW = 285;
                         const boxH = 26 + topList.length * 20;
-                        const bx = w - boxW - 14;
-                        const by = h - boxH - 14;
+                        const bx = w - boxW - 16;
+                        const by = 66;
                         ctx.fillStyle = "rgba(2, 6, 23, 0.78)";
                         ctx.strokeStyle = "rgba(16, 185, 129, 0.45)";
                         ctx.lineWidth = 1.2;
@@ -1066,15 +1066,32 @@
                 ctx.restore();
             }
 
-            // Interactive mouse wheel zoom & drag pan on /obs page
+            // Interactive mouse wheel zoom & drag pan on /obs page (synced back to server & dock)
             let dragging = false;
             let dragStartX = 0, dragStartY = 0;
+            let syncViewTimer = null;
+            function syncViewToServer() {
+                if (syncViewTimer) clearTimeout(syncViewTimer);
+                syncViewTimer = setTimeout(() => {
+                    syncViewTimer = null;
+                    fetch("/api/obs/overlay", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            zoom: overlayState.zoom,
+                            pan_x: overlayState.pan_x,
+                            pan_y: overlayState.pan_y,
+                        }),
+                    }).catch((err) => console.error("[OBS:Viewport] Failed to sync zoom/pan:", err));
+                }, 80);
+            }
             stage.addEventListener("wheel", (e) => {
                 e.preventDefault();
                 const delta = e.deltaY < 0 ? 0.2 : -0.2;
                 overlayState.zoom = Math.max(0.5, Math.min(8.0, Number((overlayState.zoom + delta).toFixed(2))));
                 if (overlayState.zoom === 1.0) { overlayState.pan_x = 0; overlayState.pan_y = 0; }
                 applyOverlaySettings();
+                syncViewToServer();
             }, { passive: false });
 
             stage.addEventListener("mousedown", (e) => {
@@ -1092,6 +1109,7 @@
                 overlayState.pan_x = Math.max(-100, Math.min(100, Number((overlayState.pan_x + dx).toFixed(1))));
                 overlayState.pan_y = Math.max(-100, Math.min(100, Number((overlayState.pan_y + dy).toFixed(1))));
                 applyOverlaySettings();
+                syncViewToServer();
             });
             window.addEventListener("mouseup", () => { dragging = false; });
 
@@ -1202,14 +1220,16 @@
                 })
                 .catch(() => {});
 
-            fetch("/api/obs/overlay")
-                .then((r) => r.json())
-                .then((settings) => {
-                    applyOverlaySettings(settings);
-                })
-                .catch(() => {
-                    applyOverlaySettings();
-                });
+            function fetchOverlaySettings() {
+                fetch("/api/obs/overlay")
+                    .then((r) => r.json())
+                    .then((settings) => {
+                        if (!dragging && !syncViewTimer) applyOverlaySettings(settings);
+                    })
+                    .catch((err) => console.error("[OBS:Overlay] Poll error:", err));
+            }
+            fetchOverlaySettings();
+            setInterval(fetchOverlaySettings, 2000);
 
             window.addEventListener("resize", drawReticle);
             setInterval(drawReticle, 5000);

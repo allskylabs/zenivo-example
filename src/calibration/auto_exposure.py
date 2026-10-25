@@ -277,6 +277,26 @@ class DayNightAutoExposure:
                 target_y = float(self.target_brightness)
                 effective_luma = mean_luma
 
+            # Daytime CMOS CDS Solarization ("Black Sun") Guard:
+            # On Sony IMX335, multi-hundred-ms or high-gain exposures in direct daylight flood the CDS reset
+            # sample (V_reset), causing pixel values to invert and collapse to ~100-145 DN (below target_y).
+            # Never allow night-range exposure (> 50ms) or high gain (> 6dB) to persist when Sun >= +2 deg.
+            if not locked and solar_elev >= 2.0 and (self.exposure_s > 0.05 or self.gain_db > 6.0):
+                self.gain_db = 0.0
+                self.exposure_s = max(min_exp, min(0.001, self.exposure_s * 0.05))
+                telemetry = {
+                    "solar_elevation_deg": round(solar_elev, 2),
+                    "profile": profile,
+                    "target_luma": target_y,
+                    "measured_p50": round(p50, 1),
+                    "measured_p98": round(p98, 1),
+                    "measured_mean": round(mean_luma, 1),
+                    "recommended_exposure_s": round(self.exposure_s, 6),
+                    "recommended_gain_db": round(self.gain_db, 1),
+                    "lock": self.lock_name(),
+                }
+                return self.exposure_s, self.gain_db, telemetry
+
             # Highlight clipping guard: only step down when a large fraction of the sky dome is saturating
             # (allow solar disk/corona up to 20% of sky ROI in daytime without forcing under-exposure of the rest of the sky)
             # By day the sun and the raw-saturated sky around it keep p90 at 255 whatever the exposure: that
@@ -322,7 +342,9 @@ class DayNightAutoExposure:
                 # One knob locked: same brightness step as below, all of it on the free knob
                 if effective_luma > high_band or highlights_clipped:
                     over_luma = max(effective_luma, sky_p85 * 0.78)
-                    factor = max(0.55, min(0.86, (target_y / max(target_y + 10.0, over_luma)) ** 0.60))
+                    min_factor = 0.25 if (effective_luma > 210.0 or p50 > 200.0) else 0.55
+                    exp_pow = 0.85 if min_factor < 0.5 else 0.60
+                    factor = max(min_factor, min(0.86, (target_y / max(target_y + 10.0, over_luma)) ** exp_pow))
                 else:
                     factor = min(1.40, max(1.15, min(3.0, target_y / max(8.0, effective_luma)) ** 0.50))
                     if solar_elev >= -2.0 and p90 < 246.0 and p90 * factor > 246.0:
@@ -346,13 +368,27 @@ class DayNightAutoExposure:
                     self.exposure_s = max(min_exp, min(0.0012, self.exposure_s * 0.15))
                 else:
                     ratio = target_y / max(target_y + 10.0, over_luma)
-                    step_factor = max(0.55, min(0.86, ratio ** 0.60))
-                    if self.gain_db > 0.0 and (solar_elev >= -4.0 or self.exposure_s <= 0.1 or self.gain_db > 12.0):
-                        # Take the step out of gain first; only the remainder once gain hits 0 dB goes to
+                    min_factor = 0.25 if (effective_luma > 210.0 or p50 > 200.0) else 0.55
+                    exp_pow = 0.85 if min_factor < 0.5 else 0.60
+                    step_factor = max(min_factor, min(0.86, ratio ** exp_pow))
+                    # At night with multi-second exposures (>2s), reduce exposure time before draining
+                    # gain below 22 dB so the camera recovers to a responsive 1.5-2s frame rate first.
+                    drain_gain_first = (
+                        self.gain_db > 0.0
+                        and (
+                            solar_elev >= -4.0
+                            or self.exposure_s <= 0.1
+                            or self.gain_db > 22.0
+                            or (self.exposure_s <= 2.0 and self.gain_db > 12.0)
+                        )
+                    )
+                    if drain_gain_first:
+                        # Take the step out of gain first; only the remainder once gain hits floor goes to
                         # exposure, so one step never darkens by more than step_factor (was -6 dB on top)
+                        gain_floor = 22.0 if (solar_elev < -4.0 and self.exposure_s > 2.0) else min_gain
                         step_db = -20.0 * math.log10(step_factor)
-                        used_db = min(self.gain_db - min_gain, step_db)
-                        self.gain_db = max(min_gain, round(self.gain_db - used_db, 1))
+                        used_db = max(0.0, min(self.gain_db - gain_floor, step_db))
+                        self.gain_db = max(gain_floor, round(self.gain_db - used_db, 1))
                         step_factor = 10.0 ** (-(step_db - used_db) / 20.0)
                     if step_factor < 0.99:
                         next_exp = min(self.exposure_s - min_step, self.exposure_s * step_factor)

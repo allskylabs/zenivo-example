@@ -16,7 +16,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 
-from src.pipeline.highlights import desaturate_highlights
+from src.pipeline.highlights import apply_virtual_nd, desaturate_highlights
 
 from .driver_interface import CameraDriverInterface
 
@@ -206,6 +206,7 @@ class PiCameraController(CameraDriverInterface):
     # ------------------------------------------------------------------
     def set_hardware_exposure(self, exposure_s: float, gain_db: float) -> Dict[str, Any]:
         prev_exp = float(getattr(self, "current_exposure_s", 0.0) or 0.0)
+        prev_gain = float(getattr(self, "current_gain_db", 0.0) or 0.0)
         exp = max(self.min_exposure_s, min(self.max_exposure_s, float(exposure_s)))
         gain = max(self.min_gain_db, min(self.max_gain_db, float(gain_db)))
         self.current_exposure_s = exp
@@ -219,6 +220,7 @@ class PiCameraController(CameraDriverInterface):
             self._want_us = floor * 1e6
             if self._has_brightness and exp < floor:
                 stops = min(self.ISP_ND_STOPS, math.log2(floor / exp))
+        self.nd_stops = round(stops, 3)
         self.isp_brightness = round(-self.ISP_BRIGHTNESS_PER_STOP * stops, 3)
         self.isp_contrast = round(1.0 - self.ISP_CONTRAST_PER_STOP * stops, 3)
         if self.picam is not None:
@@ -235,10 +237,19 @@ class PiCameraController(CameraDriverInterface):
                 ),
             }
             if self._has_brightness:
-                ctrls["Brightness"] = self.isp_brightness
-                ctrls["Contrast"] = self.isp_contrast
-            if self.is_open and prev_exp - exp > 0.8:
-                # Flushing queued multi-second night frames avoids a 3x prev_exp (10-15 s) stall when entering AF
+                # Keep the hardware ISP curve neutral (0.0 / 1.0) so raw-saturated solar glare rolls smoothly
+                # into 255; sub-floor darkening is applied by apply_virtual_nd() with a C1 shoulder
+                ctrls["Brightness"] = 0.0
+                ctrls["Contrast"] = 1.0
+            need_flush = (
+                prev_exp - exp > 0.8
+                or (
+                    max(prev_exp, exp) >= 1.5
+                    and (abs(prev_exp - exp) > 0.4 or abs(prev_gain - gain) > 1.5)
+                )
+            )
+            if self.is_open and need_flush:
+                # Flushing queued multi-second night frames avoids a 3-5x exp (30-55 s) stall waiting for DelayedControls
                 try:
                     if self.lens_range and self.lens_position_target is not None:
                         ctrls["AfMode"] = 0
@@ -325,6 +336,8 @@ class PiCameraController(CameraDriverInterface):
             frame = frame[:, :, :3]
         # Clipped sunlit cloud edges come out of the ISP as orange / green fringes: make them neutral
         desaturate_highlights(frame)
+        if getattr(self, "nd_stops", 0.0) > 0:
+            apply_virtual_nd(frame, self.nd_stops)
         now = time.time()
         frame_dur_us = float(md.get("FrameDuration", md.get("ExposureTime", want_us)))
         self._last_ts = now

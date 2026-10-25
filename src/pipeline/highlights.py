@@ -17,20 +17,21 @@ import numpy as np
 
 # Ramps on the brightest channel and on the chroma (brightest minus darkest channel): desaturation starts
 # at *_START and is full at *_FULL; the pixel weight is the product of both.
-# Measured on IMX708 NoIR day frames: sky / cloud ~100-210 DN with chroma <= ~50 (99.9th percentile),
-# sun fringes 140-255 DN with chroma up to ~135.
-HIGHLIGHT_START = 140
-HIGHLIGHT_FULL = 200
-CHROMA_START = 32
-CHROMA_FULL = 64
+# Measured on IMX708 NoIR day frames: ordinary sky / cloud has chroma <= ~18, whereas clipped sun fringes
+# sit at 130-255 DN with chroma 20..135.
+HIGHLIGHT_START = 135
+HIGHLIGHT_FULL = 195
+CHROMA_START = 26
+CHROMA_FULL = 56
 # Near clipping (this ramp on the brightest channel) a pixel is neutralised whatever its chroma, so the faint
-# tint left inside the sun disc does not show as a contour next to neutralised fringes
-CLIP_START = 225
-CLIP_FULL = 250
-# Only tiles of this size (px) that hold a bright, strongly coloured pixel are processed
+# tint left inside the sun disc does not show as a contour or blocky tile next to neutralised fringes
+CLIP_START = 220
+CLIP_FULL = 248
+# Only tiles of this size (px) that hold a bright, coloured or near-clipped pixel are processed
 TILE = 64
 
 _LUT_CACHE: dict = {}
+_ND_LUT_CACHE: dict = {}
 
 
 def _ramp_lut(start: int, full: int) -> np.ndarray:
@@ -39,6 +40,26 @@ def _ramp_lut(start: int, full: int) -> np.ndarray:
         t = np.clip((np.arange(256, dtype=np.float32) - start) / max(1, full - start), 0.0, 1.0)
         lut = _LUT_CACHE[(start, full)] = np.round(t * t * (3.0 - 2.0 * t) * 255.0).astype(np.uint8)  # smoothstep
     return lut
+
+
+def _nd_lut(stops: float) -> np.ndarray:
+    key = round(max(0.0, float(stops)), 2)
+    lut = _ND_LUT_CACHE.get(key)
+    if lut is None:
+        t = np.arange(256, dtype=np.float32) / 255.0
+        k = max(0.35, 1.0 - 0.17 * key)
+        y = k * t + (1.0 - k) * (t ** 7.0)
+        lut = _ND_LUT_CACHE[key] = np.clip(np.round(y * 255.0), 0, 255).astype(np.uint8)
+    return lut
+
+
+def apply_virtual_nd(frame_bgr: np.ndarray, stops: float) -> np.ndarray:
+    """Darken a uint8 BGR frame by `stops` below the sensor exposure floor using a smooth C1 tone curve
+    that attenuates sky/clouds linearly while rolling smoothly into 255 (no ISP hard-clip wall)."""
+    if stops <= 0.01 or frame_bgr.ndim != 3 or frame_bgr.dtype != np.uint8:
+        return frame_bgr
+    cv2.LUT(frame_bgr, _nd_lut(stops), dst=frame_bgr)
+    return frame_bgr
 
 
 def _max_chroma(block: np.ndarray):
@@ -67,10 +88,10 @@ def desaturate_highlights(
         return frame_bgr
     h, w = frame_bgr.shape[:2]
     # Find candidate areas on a 1/4 nearest-neighbour view (~1/16 of the work), then process only the
-    # tiles that hold them
+    # tiles that hold them (including near-clipped tinted pixels that CLIP_START..CLIP_FULL neutralises)
     small = cv2.resize(frame_bgr, (max(1, w // 4), max(1, h // 4)), interpolation=cv2.INTER_NEAREST)
     _, mx, chroma = _max_chroma(small)
-    cand = ((mx > start) & (chroma > chroma_start)).astype(np.uint8)
+    cand = (((mx > start) & (chroma > chroma_start)) | ((mx > CLIP_START) & (chroma > 0))).astype(np.uint8)
     if not cand.any():  # night, or a plain sky: no further work
         return frame_bgr
     cand = cv2.dilate(cand, np.ones((3, 3), np.uint8))  # +4 px: covers pixels the subsampling skipped

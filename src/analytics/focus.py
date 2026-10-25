@@ -204,7 +204,7 @@ def _contrast(gray: np.ndarray) -> float:
     return float((gx * gx + gy * gy).mean()) / max(mean * mean, 1.0) * 100.0
 
 
-def measure_focus(img: np.ndarray, method: str = "auto") -> Dict[str, Any]:
+def measure_focus(img: np.ndarray, method: str = "auto", is_night: Optional[bool] = None) -> Dict[str, Any]:
     """Measure the sharpness of an ROI (BGR or gray). Returns score, method and per-source details."""
     t0 = time.perf_counter()
     gray = _to_gray(img)
@@ -216,26 +216,29 @@ def measure_focus(img: np.ndarray, method: str = "auto") -> Dict[str, Any]:
     chosen = method
     sources: List[Dict[str, Any]] = []
     if method == "auto":
-        # Dark or urban-skyglow night sky: try stars first (HFR star size), then lights; daytime scene: contrast
-        sample = gray[::2, ::2] if gray.size > 65536 else gray
-        iqr = float(np.percentile(sample, 75) - np.percentile(sample, 25))
-        if bg < 90 or (bg < 160 and iqr < 35):
-            sources = _point_sources(gray, lights=False)
-            chosen = "stars"
-            if len(sources) < 3 and bg < 90:
-                lit = _point_sources(gray, lights=True)
-                if lit:
-                    sources, chosen = lit, "lights"
-                elif not sources:
-                    chosen = "contrast"
-            elif not sources:
-                lit = _point_sources(gray, lights=True) if bg < 120 else []
-                if lit:
-                    sources, chosen = lit, "lights"
-                else:
-                    chosen = "contrast"
-        else:
+        if is_night is False:
             chosen = "contrast"
+        else:
+            # Dark or urban-skyglow night sky: try stars first (HFR star size), then lights; daytime scene: contrast
+            sample = gray[::2, ::2] if gray.size > 65536 else gray
+            iqr = float(np.percentile(sample, 75) - np.percentile(sample, 25))
+            if is_night is True or bg < 90 or (bg < 160 and iqr < 35):
+                sources = _point_sources(gray, lights=False)
+                chosen = "stars"
+                if len(sources) < 3 and (is_night is True or bg < 90):
+                    lit = _point_sources(gray, lights=True)
+                    if lit:
+                        sources, chosen = lit, "lights"
+                    elif not sources:
+                        chosen = "contrast"
+                elif not sources:
+                    lit = _point_sources(gray, lights=True) if (is_night is True or bg < 120) else []
+                    if lit:
+                        sources, chosen = lit, "lights"
+                    else:
+                        chosen = "contrast"
+            else:
+                chosen = "contrast"
     elif method in ("stars", "lights"):
         sources = _point_sources(gray, lights=(method == "lights"))
 
@@ -372,11 +375,13 @@ class FocusSession:
         y0 = min(max(0, y0), frame_h - size)
         return x0, y0, size, size
 
-    def measure(self, img: np.ndarray) -> Dict[str, Any]:
+    def measure(self, img: np.ndarray, is_night: Optional[bool] = None) -> Dict[str, Any]:
         """measure_focus() with auto mode held on one score family, so a single frame without stars
         (passing cloud, wind shake) does not throw away the history; it switches after 5 misses."""
-        result = measure_focus(img, self.method)
-        if self.method != "auto" or self.best_method is None:
+        result = measure_focus(img, self.method, is_night=is_night)
+        if self.method != "auto" or self.best_method is None or is_night is False:
+            if is_night is False:
+                self._family_misses = 0
             return result
         if FAMILY[result["method"]] == FAMILY[self.best_method] and result.get("score") is not None:
             self._family_misses = 0
@@ -386,9 +391,9 @@ class FocusSession:
             self._family_misses = 0
             return result
         held = self.best_method if FAMILY[self.best_method] != "hfr" else "lights"
-        alt = measure_focus(img, held)
+        alt = measure_focus(img, held, is_night=is_night)
         if alt.get("score") is None and held == "lights":
-            alt = measure_focus(img, "stars")
+            alt = measure_focus(img, "stars", is_night=is_night)
         alt["requested_method"] = "auto"
         return alt
 

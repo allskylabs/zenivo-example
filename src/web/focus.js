@@ -148,6 +148,7 @@
         lensPos: 0.0,
         motorized: false,
         chartMetric: "starsize", // "starsize" (HFR px) or "sharpness" (edge contrast / score)
+        userPickedChartMetric: false,
         bestLensPos: null,
         bestLensVal: null,
         curveFit: null,
@@ -168,6 +169,15 @@
 
     function familyOf(method) {
         return method === "contrast" ? "contrast" : "hfr";
+    }
+
+    function syncChartMetric(method) {
+        const want = method === "contrast" ? "sharpness" : (method === "stars" || method === "lights") ? "starsize" : null;
+        if (!want) return;
+        st.chartMetric = want;
+        document.querySelectorAll("#focus-chart-metric button").forEach((btn) =>
+            btn.classList.toggle("active", btn.dataset.chartMetric === want)
+        );
     }
 
     async function api(path, opts = {}) {
@@ -204,15 +214,29 @@
         document.querySelectorAll("#focus-method button").forEach((b) => b.classList.toggle("active", b.dataset.method === s.method));
         syncRoiModeUi();
         if (s.method === "stars" || s.method === "lights") {
-            st.chartMetric = "starsize";
-            document.querySelectorAll("#focus-chart-metric button").forEach((btn) =>
-                btn.classList.toggle("active", btn.dataset.chartMetric === "starsize")
-            );
-        } else if (s.method === "contrast") {
-            st.chartMetric = "sharpness";
-            document.querySelectorAll("#focus-chart-metric button").forEach((btn) =>
-                btn.classList.toggle("active", btn.dataset.chartMetric === "sharpness")
-            );
+            syncChartMetric("stars");
+        } else if (s.method === "contrast" || s.best_method === "contrast" || (s.method === "auto" && s.exposure_s > 0 && s.exposure_s < 0.05)) {
+            syncChartMetric("contrast");
+        } else if (s.best_method === "stars" || s.best_method === "lights") {
+            syncChartMetric("stars");
+        }
+        if (st.history.length === 0 && Array.isArray(s.history) && s.history.length > 0) {
+            const effMethod = s.best_method || (s.method === "auto" ? (s.exposure_s > 0 && s.exposure_s < 0.05 ? "contrast" : "stars") : s.method);
+            st.family = familyOf(effMethod);
+            st.history = s.history
+                .filter((p) => p && p.score !== null && p.score !== undefined)
+                .map((p) => ({ t: p.t, score: p.score, sm: p.smoothed ?? p.score }));
+            if (!st.lastResult && st.history.length > 0) {
+                const lastP = st.history[st.history.length - 1];
+                st.lastResult = {
+                    method: effMethod,
+                    lower_is_better: effMethod !== "contrast",
+                    score: lastP.score,
+                    smoothed: lastP.sm,
+                    best: s.best,
+                    smooth: s.smooth || 5,
+                };
+            }
         }
         if (s.smooth) document.querySelectorAll("#focus-smooth button").forEach((b) => b.classList.toggle("active", +b.dataset.smooth === s.smooth));
         if (s.exposure_s !== undefined && document.activeElement !== $("focus-exp")) $("focus-exp").value = +s.exposure_s.toPrecision(4);
@@ -244,6 +268,7 @@
             emptyMsg.innerHTML = "<span>Press <strong>Start focus mode</strong> to stream a native-resolution crop.</span>";
         }
         placeRoiBox();
+        drawChart();
     }
 
     // ------------------------------------------------------------------
@@ -313,8 +338,17 @@
         showExpiry(res.expires_in_s);
         st.frameW = res.frame_width;
         st.frameH = res.frame_height;
+        if (res.method && st.method !== "auto" && res.method !== st.method) {
+            st.method = res.method;
+            document.querySelectorAll("#focus-method button").forEach((b) =>
+                b.classList.toggle("active", b.dataset.method === st.method)
+            );
+        }
+        if (res.method && !st.userPickedChartMetric) {
+            syncChartMetric(res.method);
+        }
         const livePos = res.lens_target ?? res.lens_position;
-        if (livePos !== undefined && livePos !== null) {
+        if (livePos !== undefined && livePos !== null && !sliderDragging) {
             st.lensPos = livePos;
             const posEl = $("focus-lens-pos");
             if (posEl) posEl.textContent = `${Number(livePos).toFixed(3)} D`;
@@ -326,7 +360,7 @@
                 distEl.textContent = distStr ? `(${distStr}${lagStr})` : lagStr;
                 distEl.classList.toggle("text-warning", livePos > 1);
             }
-            if (lensSlider && !sliderDragging) lensSlider.value = livePos;
+            if (lensSlider) lensSlider.value = livePos;
         }
         if (res.sweep) {
             const sw = res.sweep;
@@ -350,7 +384,12 @@
             }
         }
         const fam = familyOf(res.method);
-        if (fam !== st.family) { st.history = []; st.family = fam; }
+        if (fam !== st.family) {
+            st.history = [];
+            st.lensHistory = st.lensHistory.filter((p) => familyOf(p.method) === fam);
+            st.family = fam;
+            if (!st.userPickedChartMetric) syncChartMetric(res.method);
+        }
         if (res.score !== null && res.score !== undefined) {
             st.history.push({ t: res.frame_ts, score: res.score, sm: res.smoothed ?? res.score });
             if (st.history.length > HISTORY_MAX) st.history.shift();
@@ -475,22 +514,66 @@
     }
 
     function fitQuadratic(pts, metricKey, lowerIsBetter) {
-        const valid = pts.filter((p) => p[metricKey] !== null && p[metricKey] !== undefined && isFinite(p[metricKey]));
-        if (valid.length < 3) return null;
-        const xs = valid.map((p) => p.pos);
-        const ys = valid.map((p) => p[metricKey]);
-        const xMin = Math.min(...xs), xMax = Math.max(...xs);
+        const rawValid = pts.filter((p) => p[metricKey] !== null && p[metricKey] !== undefined && isFinite(p[metricKey]));
+        if (rawValid.length < 4) return null;
+
+        // Reject isolated single-point outliers (e.g. a single in-flight frame far from its neighbors)
+        const valid = rawValid.filter((p, idx) => {
+            if (rawValid.length < 6) return true;
+            const neigh = [];
+            for (let j = Math.max(0, idx - 2); j <= Math.min(rawValid.length - 1, idx + 2); j++) {
+                if (j !== idx) neigh.push(rawValid[j][metricKey]);
+            }
+            if (neigh.length < 2) return true;
+            neigh.sort((a, b) => a - b);
+            const med = neigh[Math.floor(neigh.length / 2)];
+            const allSorted = rawValid.map((q) => q[metricKey]).sort((a, b) => a - b);
+            const iqr = Math.max(1e-6, allSorted[Math.floor(allSorted.length * 0.75)] - allSorted[Math.floor(allSorted.length * 0.25)]);
+            return Math.abs(p[metricKey] - med) <= Math.max(iqr * 2.2, Math.abs(med) * 0.18);
+        });
+        if (valid.length < 4) return null;
+
+        const xsAll = valid.map((p) => p.pos);
+        const ysAll = valid.map((p) => p[metricKey]);
+        const xMin = Math.min(...xsAll), xMax = Math.max(...xsAll);
         if (xMax - xMin < 0.015) return null;
 
-        const n = valid.length;
+        // Find the robust peak index using a 3-point median window
+        let ib = 0;
+        let bestMed = lowerIsBetter ? Infinity : -Infinity;
+        for (let i = 0; i < valid.length; i++) {
+            const w = ysAll.slice(Math.max(0, i - 1), Math.min(valid.length, i + 2)).slice().sort((a, b) => a - b);
+            const med = w[Math.floor(w.length / 2)];
+            if (lowerIsBetter ? med < bestMed : med > bestMed) {
+                bestMed = med;
+                ib = i;
+            }
+        }
+
+        // Fit the parabola over the full arch around the peak (±0.60 D, or at least ±5 points)
+        const x0 = valid[ib].pos;
+        const halfSpan = Math.max(0.60, (xMax - xMin) * 0.55);
+        let sub = valid.filter((p) => Math.abs(p.pos - x0) <= halfSpan);
+        if (sub.length < Math.min(valid.length, 6)) {
+            const w0 = Math.max(0, ib - 5);
+            const w1 = Math.min(valid.length, ib + 6);
+            sub = valid.slice(w0, w1);
+        }
+        const wMin = sub[0].pos, wMax = sub[sub.length - 1].pos;
+        if (wMax - wMin < 0.01) return null;
+
+        // Center x at x0 = valid[ib].pos for numerical stability: y(x) = a2*(x-x0)^2 + a1*(x-x0) + a0
+        const n = sub.length;
         let sx = 0, sx2 = 0, sx3 = 0, sx4 = 0;
         let sy = 0, sxy = 0, sx2y = 0;
         for (let i = 0; i < n; i++) {
-            const x = xs[i], y = ys[i];
-            const x2 = x * x;
-            sx += x; sx2 += x2; sx3 += x2 * x; sx4 += x2 * x2;
-            sy += y; sxy += x * y; sx2y += x2 * y;
+            const dx = sub[i].pos - x0;
+            const y = sub[i][metricKey];
+            const dx2 = dx * dx;
+            sx += dx; sx2 += dx2; sx3 += dx2 * dx; sx4 += dx2 * dx2;
+            sy += y; sxy += dx * y; sx2y += dx2 * y;
         }
+        // Columns: [0] = a2 (dx^2), [1] = a1 (dx), [2] = a0 (1), [3] = RHS
         const m = [
             [sx4, sx3, sx2, sx2y],
             [sx3, sx2, sx, sxy],
@@ -508,21 +591,31 @@
                 for (let j = i; j <= 3; j++) m[k][j] -= factor * m[i][j];
             }
         }
-        const a = m[2][3] / m[2][2];
-        const b = (m[1][3] - m[1][2] * a) / m[1][1];
-        const c = (m[0][3] - m[0][2] * a - m[0][1] * b) / m[0][0];
-        if (!isFinite(a) || !isFinite(b) || !isFinite(c)) return null;
+        const a0 = m[2][3] / m[2][2];
+        const a1 = (m[1][3] - m[1][2] * a0) / m[1][1];
+        const a2 = (m[0][3] - m[0][2] * a0 - m[0][1] * a1) / m[0][0];
+        if (!isFinite(a2) || !isFinite(a1) || !isFinite(a0) || Math.abs(a2) < 1e-9) return null;
 
-        const vertex = -b / (2 * a);
-        const yVertex = a * vertex * vertex + b * vertex + c;
-        const expectedSign = lowerIsBetter ? a > 0 : a < 0;
-        return { a, b, c, vertex, yVertex, xMin, xMax, expectedSign };
+        const vertex = x0 - a1 / (2 * a2);
+        const dv = vertex - x0;
+        const yVertex = a2 * dv * dv + a1 * dv + a0;
+        const a = a2;
+        const b = a1 - 2 * a2 * x0;
+        const c = a2 * x0 * x0 - a1 * x0 + a0;
+        const hasTurnedOver = ib > 0 && ib < valid.length - 1;
+        const expectedSign = hasTurnedOver && (lowerIsBetter ? a2 > 0 : a2 < 0)
+            && vertex >= wMin - 0.1 && vertex <= wMax + 0.1;
+        return { a, b, c, a2, a1, a0, x0, vertex, yVertex, xMin, xMax, wMin, wMax, expectedSign };
     }
 
     function recordLensMeasurement(res) {
         if (!res) return;
         const pos = res.lens_position !== undefined && res.lens_position !== null ? res.lens_position : (st.lensPos || 0.0);
         st.lensPos = pos;
+        if (lensSweepRunning || (st.showSweep && st.sweep && (st.sweep.state === "done" || st.sweep.state === "rejected"))) {
+            updateCurveSummary();
+            return;  // Keep the sweep curve clean without in-flight or post-sweep single-frame outliers
+        }
         const method = res.method || "auto";
         const score = res.score;
         if (score === null || score === undefined) return;
@@ -617,37 +710,157 @@
         drawTimeChart(c, w, h);
     }
 
-    function drawLensPositionChart(c, w, h) {
-        let pts = st.lensHistory.slice();
-        if (st.sweep && st.sweep.points) {
-            const swMethod = st.sweep.method || "auto";
-            st.sweep.points.forEach((sp) => {
-                if (sp.score == null || !isFinite(sp.score)) return;
-                const match = pts.find((p) => Math.abs(p.pos - sp.pos) <= 0.0035);
-                if (!match) {
-                    pts.push({
-                        pos: Number(sp.pos.toFixed(4)),
-                        score: sp.score,
-                        hfr: swMethod !== "contrast" ? sp.score : null,
-                        contrast: swMethod === "contrast" ? sp.score : null,
-                        method: swMethod,
-                        samples: 1,
-                        phase: sp.phase,
-                        t: Date.now() / 1000
-                    });
-                }
-            });
-            pts.sort((a, b) => a.pos - b.pos);
+    function syncSweepPointsToLensHistory(sw) {
+        if (!sw || !sw.points) return;
+        if (sw.started_at && sw.started_at !== st.lastSweepStartedAt) {
+            st.lastSweepStartedAt = sw.started_at;
+            st.lensHistory = [];
         }
+        const swMethod = sw.method || "auto";
+        sw.points.forEach((sp) => {
+            if (sp.score == null || !isFinite(sp.score)) return;
+            const pos = Number(sp.pos.toFixed(4));
+            const match = st.lensHistory.find((p) => Math.abs(p.pos - pos) <= 0.0035);
+            if (match) {
+                match.score = sp.score;
+                match.hfr = swMethod !== "contrast" ? sp.score : null;
+                match.contrast = swMethod === "contrast" ? sp.score : null;
+                match.method = swMethod;
+                match.phase = sp.phase;
+            } else {
+                st.lensHistory.push({
+                    pos,
+                    score: sp.score,
+                    hfr: swMethod !== "contrast" ? sp.score : null,
+                    contrast: swMethod === "contrast" ? sp.score : null,
+                    method: swMethod,
+                    samples: 1,
+                    phase: sp.phase,
+                    t: Date.now() / 1000
+                });
+            }
+        });
+        st.lensHistory.sort((a, b) => a.pos - b.pos);
+    }
+
+    function drawLensPositionChart(c, w, h) {
+        if (st.sweep && st.sweep.points) {
+            syncSweepPointsToLensHistory(st.sweep);
+        }
+        let pts = st.lensHistory.slice();
 
         const isStarSize = st.chartMetric === "starsize";
         const hasHfr = pts.some((p) => p.hfr != null);
-        const useHfr = isStarSize && (hasHfr || pts.length === 0);
-        const metricKey = useHfr ? "hfr" : (pts.some((p) => p.contrast != null) ? "contrast" : "score");
-        const lowerIsBetter = useHfr || (st.lastResult && st.lastResult.lower_is_better);
+        const hasContrast = pts.some((p) => p.contrast != null);
+        const resIsContrast = st.lastResult && st.lastResult.method === "contrast";
+        const useHfr = isStarSize && !resIsContrast && (hasHfr || (!hasContrast && pts.length === 0));
+        const metricKey = useHfr ? "hfr" : (hasContrast || resIsContrast ? "contrast" : "score");
+        const lowerIsBetter = useHfr || Boolean(st.lastResult && st.lastResult.lower_is_better && !resIsContrast);
+
+        pts = pts.filter((p) => {
+            const v = p[metricKey] ?? p.score;
+            return v != null && isFinite(v);
+        });
 
         const pad = st.chartPad;
         const curPos = st.lensPos ?? 0.0;
+
+        // When focusing a manual lens by turning the physical ring without moving the Dioptre slider
+        // (only 0 or 1 lens position recorded, but live frame scores are streaming in st.history),
+        // plot the live focus curve across the recent frames so the chart is responsive during hand focusing.
+        if (pts.length <= 1 && st.history.length >= 1) {
+            const histPts = st.history.slice(-60);
+            const hVals = histPts.map((p) => p.sm ?? p.score).filter((v) => v != null && isFinite(v));
+            if (hVals.length >= 1) {
+                const n = hVals.length;
+                const xSpan = Math.max(15, n - 1);
+                const X = (i) => pad.l + (i / xSpan) * (w - pad.l - pad.r);
+                let y0 = Math.min(...hVals), y1 = Math.max(...hVals);
+                const mid = (y0 + y1) / 2;
+                const ySpan = Math.max(Math.abs(mid) * 0.08, y1 - y0, 0.1);
+                y0 = Math.max(0, mid - ySpan * 0.65);
+                y1 = mid + ySpan * 0.65;
+                const Y = (v) => {
+                    const f = (v - y0) / Math.max(1e-9, y1 - y0);
+                    return lowerIsBetter
+                        ? pad.t + f * (h - pad.t - pad.b)
+                        : pad.t + (1 - f) * (h - pad.t - pad.b);
+                };
+
+                c.strokeStyle = "#1e293b"; c.fillStyle = "#64748b"; c.lineWidth = 1;
+                c.font = "11px ui-monospace, monospace";
+                [y0, (y0 + y1) / 2, y1].forEach((v) => {
+                    const yy = Y(v);
+                    c.beginPath(); c.moveTo(pad.l, yy); c.lineTo(w - pad.r, yy); c.stroke();
+                    const label = useHfr ? `${v.toFixed(2)} px` : v.toPrecision(4);
+                    c.textAlign = "right";
+                    c.fillText(label, pad.l - 6, yy + 4);
+                    c.textAlign = "left";
+                });
+
+                for (let k = 0; k <= 5; k++) {
+                    const idx = Math.round((xSpan * k) / 5);
+                    const xx = X(idx);
+                    c.beginPath(); c.moveTo(xx, pad.t); c.lineTo(xx, h - pad.b); c.stroke();
+                    c.textAlign = "center";
+                    c.fillText(`#${idx + 1}`, xx, h - 20);
+                    c.textAlign = "left";
+                }
+
+                let bestIdx = 0;
+                for (let i = 1; i < n; i++) {
+                    if (lowerIsBetter ? hVals[i] < hVals[bestIdx] : hVals[i] > hVals[bestIdx]) bestIdx = i;
+                }
+                const bestVal = hVals[bestIdx];
+                st.bestLensPos = curPos;
+                st.bestLensVal = bestVal;
+                updateCurveSummary();
+
+                if (n >= 2) {
+                    c.strokeStyle = "#38bdf8";
+                    c.lineWidth = 2.5;
+                    c.beginPath();
+                    hVals.forEach((v, i) => {
+                        const xx = X(i), yy = Y(v);
+                        if (i === 0) c.moveTo(xx, yy); else c.lineTo(xx, yy);
+                    });
+                    c.stroke();
+                }
+
+                hVals.forEach((v, i) => {
+                    const px = X(i), py = Y(v);
+                    const isBest = i === bestIdx;
+                    c.fillStyle = isBest ? "#10b981" : "#38bdf8";
+                    c.beginPath();
+                    c.arc(px, py, isBest ? 5 : 3.5, 0, Math.PI * 2);
+                    c.fill();
+                    if (isBest) {
+                        c.strokeStyle = "rgba(16, 185, 129, 0.5)";
+                        c.lineWidth = 2;
+                        c.beginPath(); c.arc(px, py, 8, 0, Math.PI * 2); c.stroke();
+                    }
+                });
+
+                const bx = X(bestIdx), by = Y(bestVal);
+                c.strokeStyle = "rgba(16, 185, 129, 0.75)";
+                c.lineWidth = 1.5;
+                c.setLineDash([4, 3]);
+                c.beginPath(); c.moveTo(pad.l, by); c.lineTo(w - pad.r, by); c.stroke();
+                c.setLineDash([]);
+                c.fillStyle = "#10b981";
+                c.font = "bold 11px ui-monospace, monospace";
+                const valLabel = useHfr ? `${bestVal.toFixed(2)} px` : bestVal.toFixed(1);
+                c.fillText(`★ Đỉnh nét nhất: ${valLabel} (hiện tại: ${ useHfr ? hVals[n - 1].toFixed(2) + " px" : hVals[n - 1].toFixed(1) })`, pad.l + 6, pad.t + 12);
+
+                c.fillStyle = "#64748b";
+                c.font = "10px sans-serif";
+                c.fillText(useHfr ? "Kích thước sao (HFR px) ↓ nét hơn" : "Độ nét (Sharpness) ↑ nét hơn", pad.l + 4, pad.t - 8);
+                c.textAlign = "center";
+                c.fillText("Chuỗi frame đang chỉnh nét (kéo thanh vị trí lens D để vẽ theo Dioptres) →", pad.l + (w - pad.l - pad.r) / 2, h - 5);
+                c.textAlign = "left";
+                return;
+            }
+        }
 
         if (pts.length === 0) {
             const x0 = 0.0, x1 = 1.0;
@@ -680,16 +893,27 @@
             c.fillText("Biểu đồ V-Curve: Vị trí Lens vs Kích thước sao (HFR) / Độ nét", w / 2, h / 2 - 10);
             c.font = "11px sans-serif";
             c.fillStyle = "#64748b";
-            c.fillText("Kéo thanh trượt vị trí lens (MF) hoặc bật AF để ghi nhận các điểm đo và vẽ đường cong.", w / 2, h / 2 + 12);
+            c.fillText("Xoay vòng nét hoặc kéo thanh trượt vị trí lens (MF) để vẽ đường cong độ nét.", w / 2, h / 2 + 12);
             c.textAlign = "left";
             return;
         }
 
         const xs = pts.map((p) => p.pos);
-        const ys = pts.map((p) => p[metricKey] ?? p.score).filter((v) => v != null && isFinite(v));
-        if (ys.length === 0) return;
+        const ysRaw = pts.map((p) => p[metricKey] ?? p.score).filter((v) => v != null && isFinite(v));
+        if (ysRaw.length === 0) return;
 
-        let x0 = Math.min(0, ...xs, curPos);
+        // Ignore isolated single-point outliers when computing Y-axis scale
+        let ys = ysRaw;
+        if (ysRaw.length >= 6) {
+            const sortedY = ysRaw.slice().sort((a, b) => a - b);
+            const q25 = sortedY[Math.floor(sortedY.length * 0.25)];
+            const q75 = sortedY[Math.floor(sortedY.length * 0.75)];
+            const iqr = Math.max(1e-6, q75 - q25);
+            const filtered = ysRaw.filter((v) => v >= q25 - 2.5 * iqr && v <= q75 + 2.5 * iqr);
+            if (filtered.length >= 4) ys = filtered;
+        }
+
+        let x0 = Math.min(0, ...xs, curPos) - 0.015;
         let x1 = Math.max(0.4, ...xs, curPos) + 0.05;
         if (x1 - x0 < 0.2) x1 = x0 + 0.2;
         st.chartXMin = x0; st.chartXMax = x1;
@@ -722,7 +946,7 @@
 
         const numTicks = Math.max(3, Math.min(7, Math.floor((w - pad.l - pad.r) / 75)));
         for (let k = 0; k <= numTicks; k++) {
-            const xv = x0 + ((x1 - x0) * k) / numTicks;
+            const xv = Math.max(0, x0) + ((x1 - Math.max(0, x0)) * k) / numTicks;
             const xx = X(xv);
             c.beginPath(); c.moveTo(xx, pad.t); c.lineTo(xx, h - pad.b); c.stroke();
             c.textAlign = "center";
@@ -733,7 +957,10 @@
         const fit = fitQuadratic(pts, metricKey, lowerIsBetter);
         st.curveFit = fit;
         let bestPos = null, bestVal = null;
-        if (fit && fit.expectedSign && fit.vertex >= x0 - 0.1 && fit.vertex <= x1 + 0.1) {
+        if (st.sweep && st.sweep.best_position != null && st.sweep.fit && Boolean(st.sweep.fit.lower_is_better) === Boolean(lowerIsBetter)) {
+            bestPos = st.sweep.best_position;
+            bestVal = st.sweep.final_score ?? (fit ? fit.yVertex : null);
+        } else if (fit && fit.expectedSign && fit.vertex >= x0 - 0.1 && fit.vertex <= x1 + 0.1) {
             bestPos = fit.vertex;
             bestVal = fit.yVertex;
         } else {
@@ -753,16 +980,38 @@
         st.bestLensVal = bestVal;
         updateCurveSummary();
 
-        if (fit) {
+        c.save();
+        c.beginPath();
+        c.rect(pad.l, pad.t, w - pad.l - pad.r, h - pad.t - pad.b);
+        c.clip();
+
+        if (pts.length >= 2) {
+            c.strokeStyle = "rgba(56, 189, 248, 0.72)";
+            c.lineWidth = 2;
+            c.beginPath();
+            pts.forEach((p, idx) => {
+                const val = p[metricKey] ?? p.score;
+                const xx = X(p.pos), yy = Y(val);
+                if (idx === 0) c.moveTo(xx, yy); else c.lineTo(xx, yy);
+            });
+            c.stroke();
+        }
+
+        if (fit && fit.expectedSign) {
             c.strokeStyle = "#10b981";
             c.lineWidth = 2.5;
             c.shadowColor = "rgba(16, 185, 129, 0.4)";
             c.shadowBlur = 6;
             c.beginPath();
-            const steps = 60;
+            const fMin = Math.max(x0, fit.wMin ?? x0);
+            const fMax = Math.min(x1, fit.wMax ?? x1);
+            const steps = 48;
             for (let k = 0; k <= steps; k++) {
-                const xv = x0 + ((x1 - x0) * k) / steps;
-                const yv = fit.a * xv * xv + fit.b * xv + fit.c;
+                const xv = fMin + ((fMax - fMin) * k) / steps;
+                const dx = xv - (fit.x0 ?? 0);
+                const yv = fit.a2 !== undefined
+                    ? fit.a2 * dx * dx + fit.a1 * dx + fit.a0
+                    : fit.a * xv * xv + fit.b * xv + fit.c;
                 const xx = X(xv), yy = Y(yv);
                 if (k === 0) c.moveTo(xx, yy); else c.lineTo(xx, yy);
             }
@@ -774,8 +1023,8 @@
             const val = p[metricKey] ?? p.score;
             if (val == null || !isFinite(val)) return;
             const px = X(p.pos), py = Y(val);
-            const isBest = bestPos != null && Math.abs(p.pos - bestPos) < 0.005;
-            c.fillStyle = isBest ? "#10b981" : "#38bdf8";
+            const isBest = bestPos != null && Math.abs(p.pos - bestPos) < 0.015;
+            c.fillStyle = isBest ? "#10b981" : (p.phase === "refine" ? "#a7f3d0" : "#38bdf8");
             c.beginPath();
             c.arc(px, py, isBest ? 5 : 3.5, 0, Math.PI * 2);
             c.fill();
@@ -785,6 +1034,8 @@
                 c.beginPath(); c.arc(px, py, 8, 0, Math.PI * 2); c.stroke();
             }
         });
+
+        c.restore();
 
         if (bestPos != null && bestPos >= x0 && bestPos <= x1) {
             const bx = X(bestPos);
@@ -845,27 +1096,28 @@
     }
 
     function drawTimeChart(c, w, h) {
-        const pts = st.history;
+        const pts = st.history.slice(-60);
         const res = st.lastResult;
-        if (!res || pts.length < 2) {
+        if (!res || pts.length < 1) {
             c.fillStyle = "#64748b";
             c.font = "12px sans-serif";
             c.fillText("Score history appears here", 12, h / 2);
             return;
         }
         const pad = { l: 56, r: 10, t: 14, b: 16 };
-        const sm = pts.map((p) => p.sm);
+        const sm = pts.map((p) => p.sm ?? p.score);
         const raw = pts.map((p) => p.score);
         const lower = res.method !== "contrast";
         let lo = Math.min(...sm), hi = Math.max(...sm);
         const mid = (lo + hi) / 2;
-        const minSpan = Math.abs(mid) * Math.max(0.16, (8 * (res.noise_pct || 0)) / 100);
+        const minSpan = Math.max(0.1, Math.abs(mid) * Math.max(0.12, (8 * (res.noise_pct || 0)) / 100));
         if (hi - lo < minSpan) { lo = mid - minSpan / 2; hi = mid + minSpan / 2; }
         const padV = (hi - lo) * 0.08;
         lo -= padV; hi += padV;
-        const x = (i) => pad.l + (i / (HISTORY_MAX - 1)) * (w - pad.l - pad.r);
+        const xSpan = Math.max(15, pts.length - 1);
+        const x = (i) => pad.l + (i / xSpan) * (w - pad.l - pad.r);
         const y = (v) => {
-            const f = (Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo);
+            const f = (Math.min(hi, Math.max(lo, v)) - lo) / Math.max(1e-9, hi - lo);
             return pad.t + (lower ? f : 1 - f) * (h - pad.t - pad.b);
         };
         c.strokeStyle = "#1e293b";
@@ -891,12 +1143,14 @@
             c.setLineDash([]);
         }
         c.fillStyle = "rgba(56,189,248,0.28)";
-        raw.forEach((v, i) => { c.beginPath(); c.arc(x(i), y(v), 1.6, 0, Math.PI * 2); c.fill(); });
-        c.strokeStyle = "#38bdf8";
-        c.lineWidth = 2.5;
-        c.beginPath();
-        sm.forEach((v, i) => { if (i === 0) c.moveTo(x(i), y(v)); else c.lineTo(x(i), y(v)); });
-        c.stroke();
+        raw.forEach((v, i) => { c.beginPath(); c.arc(x(i), y(v), 2.0, 0, Math.PI * 2); c.fill(); });
+        if (sm.length >= 2) {
+            c.strokeStyle = "#38bdf8";
+            c.lineWidth = 2.5;
+            c.beginPath();
+            sm.forEach((v, i) => { if (i === 0) c.moveTo(x(i), y(v)); else c.lineTo(x(i), y(v)); });
+            c.stroke();
+        }
         const sMin = Math.min(...sm), sMax = Math.max(...sm);
         const iBest = sm.indexOf(lower ? sMin : sMax), iWorst = sm.indexOf(lower ? sMax : sMin);
         const mark = (i, color, text, above) => {
@@ -956,6 +1210,7 @@
     // ------------------------------------------------------------------
     async function configure(body) {
         st.showSweep = false;
+        if (body.method) st.userPickedChartMetric = false;
         st.history = [];
         st.lastResult = null;
         try {
@@ -987,6 +1242,7 @@
                 applyState(await api("/api/focus/stop", { method: "POST" }));
             } else {
                 st.history = [];
+                st.userPickedChartMetric = false;
                 st.showSweep = false;  // time curve, unless AF starts a sweep (then the sweep view returns)
                 const startBody = st.roiMode === "manual" ? { roi_mode: "manual" } : {};
                 // In AF the server sweeps right away; in MF it only streams for adjusting by hand
@@ -1013,6 +1269,7 @@
             syncRoiModeUi();
             if (mode === "auto") {
                 try {
+                    st.userPickedChartMetric = false;
                     const r = await api("/api/focus/auto-point", { method: "POST" });
                     st.history = []; st.lastResult = null; updateStats(null); drawChart();
                     applyState(r);
@@ -1048,6 +1305,7 @@
     $("focus-auto-point").addEventListener("click", async () => {
         try {
             st.roiMode = "auto";
+            st.userPickedChartMetric = false;
             syncRoiModeUi();
             const r = await api("/api/focus/auto-point", { method: "POST" });
             st.history = []; st.lastResult = null; updateStats(null); drawChart();
@@ -1203,17 +1461,19 @@
         }
         // The commanded position updates at once; the position frames report lags a frame or two behind
         const pos = L.held ?? L.position;
-        if (pos !== null && pos !== undefined) {
+        if (pos !== null && pos !== undefined && !sliderDragging) {
             st.lensPos = pos;
             updateCurveSummary();
         }
         // Outside focus mode frames are seconds apart, so the reported position is simply stale
         const lag = st.active && L.held != null && L.position != null && Math.abs(L.held - L.position) > 0.003;
-        $("focus-lens-pos").textContent = pos === null || pos === undefined ? "—" : `${pos.toFixed(3)} D`;
-        const distStr = fmtDist(pos);
-        const lagStr = lag ? ` · đang chỉnh ${L.position.toFixed(3)} D` : "";
-        $("focus-lens-dist").textContent = distStr ? `(${distStr}${lagStr})` : lagStr;
-        $("focus-lens-dist").classList.toggle("text-warning", pos > 1);
+        if (!sliderDragging) {
+            $("focus-lens-pos").textContent = pos === null || pos === undefined ? "—" : `${pos.toFixed(3)} D`;
+            const distStr = fmtDist(pos);
+            const lagStr = lag ? ` · đang chỉnh ${L.position.toFixed(3)} D` : "";
+            $("focus-lens-dist").textContent = distStr ? `(${distStr}${lagStr})` : lagStr;
+            $("focus-lens-dist").classList.toggle("text-warning", pos > 1);
+        }
         lensSlider.max = Math.min(L.max, 3);
         lensSlider.min = L.min;
         if (!sliderDragging && pos !== null && pos !== undefined) lensSlider.value = pos;
@@ -1264,38 +1524,22 @@
                 ? `${sw.mode === "camera" ? "Camera AF" : "Sweep"} · ${sw.phase}${sw.method ? " · " + sw.method : ""} · ${(sw.points || []).length} steps`
                 : `${sw.mode === "camera" ? "Camera AF" : "Sweep"} ${sw.state}: ${sw.message || ""}`;
             $("focus-lens-msg").classList.toggle("text-warning", sw.state === "rejected" || sw.state === "failed");
-            // Show the sweep while it runs, and the last one when the page opens with focus mode off
             if (running || (st.showSweep === undefined && !st.active)) st.showSweep = true;
-            if (st.showSweep) { st.sweep = sw; drawChart(); }
+            st.sweep = sw;
+            syncSweepPointsToLensHistory(sw);
+            drawChart();
         }
         if (running !== lensSweepRunning) {
             lensSweepRunning = running;
             setLensPoll(running ? 700 : 5000);
-            if (!running) { st.history = []; st.lastResult = null; updateStats(null); drawChart(); }
+            if (!running) drawChart();
         }
     }
 
     // Focus score against lens position for the last sweep, drawn in the main focus chart
     function drawSweepChart(c, w, h, sw) {
         if (sw && sw.points) {
-            const swMethod = sw.method || "auto";
-            sw.points.forEach((sp) => {
-                if (sp.score == null || !isFinite(sp.score)) return;
-                const match = st.lensHistory.find((p) => Math.abs(p.pos - sp.pos) <= 0.0035);
-                if (!match) {
-                    st.lensHistory.push({
-                        pos: Number(sp.pos.toFixed(4)),
-                        score: sp.score,
-                        hfr: swMethod !== "contrast" ? sp.score : null,
-                        contrast: swMethod === "contrast" ? sp.score : null,
-                        method: swMethod,
-                        samples: 1,
-                        phase: sp.phase,
-                        t: Date.now() / 1000
-                    });
-                }
-            });
-            st.lensHistory.sort((a, b) => a.pos - b.pos);
+            syncSweepPointsToLensHistory(sw);
         }
         drawLensPositionChart(c, w, h);
     }
@@ -1319,7 +1563,7 @@
         try {
             const s = await api(path, { method: "POST", body });
             applyState(s);
-            st.history = []; st.lastResult = null; updateStats(null); drawChart();
+            drawChart();
         } catch (e) { alert(`Lens: ${e.message}`); }
     }
     document.querySelectorAll("[data-lens-delta]").forEach((b) =>
@@ -1328,6 +1572,18 @@
     let sliderDragging = false;
     lensSlider.addEventListener("pointerdown", () => { sliderDragging = true; });
     window.addEventListener("pointerup", () => { sliderDragging = false; });
+    lensSlider.addEventListener("input", () => {
+        const val = parseFloat(lensSlider.value);
+        if (isFinite(val)) {
+            st.lensPos = val;
+            $("focus-lens-pos").textContent = `${val.toFixed(3)} D`;
+            const distStr = fmtDist(val);
+            $("focus-lens-dist").textContent = distStr ? `(${distStr})` : "";
+            $("focus-lens-dist").classList.toggle("text-warning", val > 1);
+            updateCurveSummary();
+            drawLensChart();
+        }
+    });
     lensSlider.addEventListener("change", () => {
         sliderDragging = false;
         lensCmd("/api/focus/lens", { position: parseFloat(lensSlider.value) });
@@ -1382,6 +1638,7 @@
     // Chart metric toggle (Star Size HFR vs Sharpness)
     document.querySelectorAll("#focus-chart-metric button").forEach((b) => {
         b.addEventListener("click", () => {
+            st.userPickedChartMetric = true;
             st.chartMetric = b.dataset.chartMetric;
             document.querySelectorAll("#focus-chart-metric button").forEach((btn) => btn.classList.toggle("active", btn === b));
             drawChart();

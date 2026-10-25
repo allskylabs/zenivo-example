@@ -18,7 +18,7 @@
 
 /* Night-adapted Vision Mode (Red light filter preserving rhodopsin) */
 body.night-mode {
-    filter: sepia(100%) hue-rotate(315deg) saturate(550%) contrast(110%);
+    filter: brightness(0.78) contrast(1.15) sepia(100%) hue-rotate(315deg) saturate(380%);
     background-color: #000000 !important;
 }
 
@@ -1582,7 +1582,7 @@ html, .focus-side, .log-list {
 .btn[hidden] { display: none !important; }
 
 /* Focus page layout v2: overview beside the zoom, compact side column */
-.focus-view-row { display: flex; gap: 0.75rem; flex: 1; min-height: 0; }
+.focus-view-row { display: flex; gap: 0.75rem; flex: 1 0 210px; min-height: 210px; }
 .focus-view-row .focus-zoom-wrap { flex: 1; min-width: 0; }
 .focus-aside { width: 280px; flex: none; display: flex; flex-direction: column; gap: 0.5rem; overflow-y: auto; }
 .focus-aside-title { font-size: 0.8rem; font-weight: 600; display: flex; justify-content: space-between; gap: 0.5rem; }

@@ -6,6 +6,7 @@ Provides:
 """
 
 import asyncio
+import math
 import struct
 import time
 import json
@@ -209,8 +210,9 @@ def pack_asb1_binary_packet(
 
 def _apply_obs_transform_fallback(frame: np.ndarray, service: AllSkyService) -> Optional[bytes]:
     """
-    Apply OBS zoom, pan, rotate, flip, brightness/contrast, and event/product replay
-    server-side for legacy OBS Browser Source instances that have not yet reloaded v2 HTML.
+    Apply OBS zoom, pan, rotate, flip, brightness/contrast, title banner, ADS-B radar,
+    recent event streaks, and event/product replay server-side for legacy OBS Browser Source
+    instances that have not yet reloaded v2 HTML.
     """
     import os
     obs = service.get_obs_overlay()
@@ -225,6 +227,13 @@ def _apply_obs_transform_fallback(frame: np.ndarray, service: AllSkyService) -> 
     contrast = float(obs.get("contrast") or 1.0)
     replay_url = str(obs.get("replay_url") or "")
     crop_url = str(obs.get("replay_crop_url") or "")
+    replay_label = str(obs.get("replay_label") or "")
+    replay_bbox = obs.get("replay_bbox") or []
+    title_text = str(obs.get("title_text") or "").strip()
+    title_sub = str(obs.get("title_sub") or "").strip()
+    title_pos = str(obs.get("title_pos") or "bottom-left")
+    show_events = bool(obs.get("events_overlay"))
+    show_adsb = bool(obs.get("adsb_overlay"))
 
     needs_work = (
         mode != "live"
@@ -236,6 +245,9 @@ def _apply_obs_transform_fallback(frame: np.ndarray, service: AllSkyService) -> 
         or flip_v
         or abs(bright - 1.0) > 0.01
         or abs(contrast - 1.0) > 0.01
+        or bool(title_text)
+        or show_events
+        or show_adsb
     )
     if not needs_work:
         return None
@@ -243,8 +255,8 @@ def _apply_obs_transform_fallback(frame: np.ndarray, service: AllSkyService) -> 
     img = frame.copy()
     h, w = img.shape[:2]
 
-    # 1. If in replay mode (event, keogram, startrails), load the target image
-    if mode in ("event", "keogram", "startrails") and replay_url:
+    # 1. If in replay mode (event, keogram, startrails, timelapse), load the target image/frame
+    if mode in ("event", "keogram", "startrails", "timelapse") and replay_url:
         local_path = None
         if replay_url.startswith("/api/events/img/"):
             parts = replay_url.split("/")
@@ -255,10 +267,41 @@ def _apply_obs_transform_fallback(frame: np.ndarray, service: AllSkyService) -> 
             cand = os.path.join(service.output_dir, rel)
             if os.path.isfile(cand):
                 local_path = cand
-        if local_path and os.path.isfile(local_path):
+        if local_path and os.path.isfile(local_path) and not local_path.endswith(".mp4"):
             loaded = cv2.imread(local_path, cv2.IMREAD_COLOR)
             if loaded is not None and loaded.size > 0:
                 img = cv2.resize(loaded, (w, h), interpolation=cv2.INTER_LINEAR)
+
+
+    # 1c. Draw recent event streaks if events_overlay is enabled
+    if show_events and mode in ("live", "event"):
+        try:
+            ev_data = service.get_events(limit=12)
+            for ev in (ev_data.get("events") or [])[:12]:
+                ln = ev.get("line")
+                if isinstance(ln, list) and len(ln) >= 4:
+                    p1 = (int(float(ln[0]) * w), int(float(ln[1]) * h))
+                    p2 = (int(float(ln[2]) * w), int(float(ln[3]) * h))
+                    col = (11, 158, 245) if ev.get("type") == "meteor" else (248, 189, 56)
+                    cv2.line(img, p1, p2, col, 2, cv2.LINE_AA)
+                    cv2.circle(img, p2, 5, col, -1, cv2.LINE_AA)
+        except Exception:
+            pass
+
+    # 1d. Draw live ADS-B aircraft positions on sky if adsb_overlay is enabled
+    if show_adsb and mode == "live":
+        try:
+            ac_data = service.get_aircraft_now(limit=30)
+            for ac in ac_data.get("aircraft") or []:
+                fxy = ac.get("frame_xy")
+                if isinstance(fxy, list) and len(fxy) == 2:
+                    ax, ay = int(float(fxy[0]) * w), int(float(fxy[1]) * h)
+                    cv2.circle(img, (ax, ay), 9, (129, 185, 16), 2, cv2.LINE_AA)
+                    call = str(ac.get("callsign") or ac.get("icao") or "ACFT")
+                    alt_km = f"{ac['altitude_m']/1000:.1f}km" if ac.get("altitude_m") else ""
+                    cv2.putText(img, f"{call} {alt_km}", (ax + 12, ay + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (153, 211, 52), 2, cv2.LINE_AA)
+        except Exception:
+            pass
 
     # 2. Brightness & contrast
     if abs(bright - 1.0) > 0.01 or abs(contrast - 1.0) > 0.01:
@@ -302,6 +345,42 @@ def _apply_obs_transform_fallback(frame: np.ndarray, service: AllSkyService) -> 
                     y1, x1 = h - pw - 28, w - pw - 28
                     img[y1 : y1 + pw, x1 : x1 + pw] = pip
                     cv2.rectangle(img, (x1, y1), (x1 + pw, y1 + pw), (248, 189, 56), 3)
+
+    # 7. Title / Lower-Third Banner (rendered onto fallback frame with PIL if available or OpenCV)
+    if title_text or (mode != "live" and replay_label):
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            draw = ImageDraw.Draw(pil_img, "RGBA")
+            font_lg = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", max(22, w // 68))
+            font_sm = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", max(16, w // 96))
+
+            if title_text:
+                tb = draw.textbbox((0, 0), title_text, font=font_lg)
+                tw, th = tb[2] - tb[0], tb[3] - tb[1]
+                sw, sh = 0, 0
+                if title_sub:
+                    sb = draw.textbbox((0, 0), title_sub, font=font_sm)
+                    sw, sh = sb[2] - sb[0], sb[3] - sb[1] + 6
+                bw = max(tw, sw) + 36
+                bh = th + sh + 24
+                bx = (w - bw) // 2 if "center" in title_pos else 28
+                by = 56 if "top" in title_pos else (h - bh - 28)
+                draw.rounded_rectangle([bx, by, bx + bw, by + bh], radius=8, fill=(2, 6, 23, 215), outline=(56, 189, 248, 220), width=2)
+                draw.text((bx + 18, by + 10), title_text, font=font_lg, fill=(255, 255, 255, 255))
+                if title_sub:
+                    draw.text((bx + 18, by + 14 + th), title_sub, font=font_sm, fill=(125, 211, 252, 255))
+
+            if mode != "live" and replay_label:
+                rb = draw.textbbox((0, 0), replay_label, font=font_sm)
+                rw, rh = rb[2] - rb[0] + 28, rb[3] - rb[1] + 16
+                rx, ry = w - rw - 24, 20
+                draw.rounded_rectangle([rx, ry, rx + rw, ry + rh], radius=6, fill=(15, 23, 42, 225), outline=(245, 158, 11, 230), width=2)
+                draw.text((rx + 14, ry + 7), replay_label, font=font_sm, fill=(254, 243, 199, 255))
+
+            img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+        except Exception:
+            pass
 
     ret, jpeg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
     return jpeg.tobytes() if ret else None

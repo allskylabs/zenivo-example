@@ -61,3 +61,9 @@ def test_startrails_skips_frames_of_another_size():
     acc.add_frame(np.zeros((730, 1296, 3), np.uint8))
     assert acc.frame_count == before
     assert acc.composite.shape == (972, 1296, 3)
+
+
+def test_widescreen_16_9_archive_frames_are_kept(tmp_path):
+    paths = [_write(tmp_path / f"w{i:02d}.jpg", 95 + (i % 5), size=(730, 1296)) for i in range(12)]
+    assert all(frame_quality_mask(paths))
+

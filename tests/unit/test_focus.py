@@ -145,3 +145,39 @@ def test_constant_flux_star_hfr_and_bayer_hot_pixel_rejection():
         scores.append(res["score"])
     assert all(a < b for a, b in zip(scores, scores[1:])), scores
 
+
+def test_daytime_focus_never_uses_hfr_and_preserves_history_on_lens_move(client, monkeypatch):
+    # Dark shaded foliage patch with bright sun-glint speckles that would look like stars/lights if is_night != False
+    shaded_patch = _stars(1.5, peak=220.0)
+    assert measure_focus(shaded_patch, method="auto", is_night=True)["method"] in ("stars", "lights")
+    day_res = measure_focus(shaded_patch, method="auto", is_night=False)
+    assert day_res["method"] == "contrast" and not day_res["lower_is_better"]
+
+    fs = FocusSession()
+    fs.best_method = "lights"
+    fs.method = "auto"
+    m = fs.measure(shaded_patch, is_night=False)
+    assert m["method"] == "contrast"
+
+    svc = AllSkyService.get_instance()
+    monkeypatch.setattr(svc, "_is_focus_night", lambda: False)
+    svc.focus.method = "lights"
+    svc.focus.best_method = "lights"
+
+    st = client.get("/api/focus").json()
+    assert st["method"] == "contrast"
+
+    st_start = client.post("/api/focus/start", json={"method": "lights"}).json()
+    assert st_start["method"] == "contrast"
+
+    r = client.get("/api/focus/frame", params={"since": 0})
+    assert r.status_code == 200
+    hdr = json.loads(r.headers["X-Focus"])
+    assert hdr["method"] == "contrast" and hdr["score"] is not None
+    assert len(svc.focus.history) >= 1
+
+    # Adjusting lens focus during focus session must preserve time history for live charts
+    prev_len = len(svc.focus.history)
+    client.post("/api/focus/lens", json={"position": 0.25})
+    assert len(svc.focus.history) == prev_len
+

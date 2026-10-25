@@ -90,3 +90,11 @@ def test_target_brightness_holds_inside_band():
     ae.target_brightness = 100.0
     exp, gain, _ = ae.process_frame_feedback(_frame(103), NIGHT, live_camera=True)
     assert (exp, gain) == (1.0, 12.0)
+
+
+def test_night_whiteout_reduces_long_exposure_before_draining_gain():
+    ae = DayNightAutoExposure(initial_exposure_s=9.5, initial_gain_db=22.0)
+    exp, gain, _ = ae.process_frame_feedback(_frame(245), NIGHT, live_camera=True)
+    assert exp < 5.0
+    assert gain == 22.0
+

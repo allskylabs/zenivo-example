@@ -271,7 +271,7 @@ def test_picamera_stale_frames_do_not_raise_exposure_floor(fake_picamera2):
 
 
 def test_picamera_darkens_below_sensor_floor_with_isp_brightness(fake_picamera2):
-    """At the floor the mode minimum is requested (no IPA digital gain); below it ISP Brightness takes over."""
+    """At the floor the mode minimum is requested (no IPA digital gain); below it virtual-ND darkening takes over."""
     cam = PiCameraController()
     cam.open()
     cam.picam.camera_controls["Brightness"] = (-1.0, 1.0, 0.0)
@@ -285,17 +285,18 @@ def test_picamera_darkens_below_sensor_floor_with_isp_brightness(fake_picamera2)
         assert cam.sensor_floor_s == pytest.approx(53e-6)
         assert cam.min_exposure_s == pytest.approx(53e-6 / 8)
         assert cam.picam.controls["ExposureTime"] == 26  # the mode minimum, not 53
-        assert cam.picam.controls["Brightness"] == pytest.approx(-0.1 * math.log2(53 / 30), abs=1e-3)
+        assert cam.isp_brightness == pytest.approx(-0.1 * math.log2(53 / 30), abs=1e-3)
+        assert cam.picam.controls["Brightness"] == 0.0  # hardware ISP curve kept neutral
 
         cam.set_hardware_exposure(53e-6, 0.0)
         assert cam.picam.controls["ExposureTime"] == 26
-        assert cam.picam.controls["Brightness"] == 0.0
+        assert cam.isp_brightness == 0.0
         _, meta = cam.capture_frame()
         assert meta["actual_exposure_s"] == pytest.approx(53e-6)
         assert "isp_brightness" not in meta
 
         cam.set_hardware_exposure(26.5e-6, 0.0)
-        assert cam.picam.controls["Brightness"] == pytest.approx(-0.1)
+        assert cam.isp_brightness == pytest.approx(-0.1)
         _, meta = cam.capture_frame()
         assert meta["actual_exposure_s"] == pytest.approx(26.5e-6, abs=1e-6)  # equivalent exposure
         assert meta["sensor_exposure_s"] == pytest.approx(53e-6)
@@ -304,14 +305,14 @@ def test_picamera_darkens_below_sensor_floor_with_isp_brightness(fake_picamera2)
 
         cam.set_hardware_exposure(1e-6, 0.0)  # clamped to three stops below the floor
         assert cam.current_exposure_s == pytest.approx(53e-6 / 8)
-        assert cam.picam.controls["Brightness"] == pytest.approx(-0.3)
-        assert cam.picam.controls["Contrast"] == pytest.approx(0.6)
+        assert cam.isp_brightness == pytest.approx(-0.3)
+        assert cam.isp_contrast == pytest.approx(0.6)
 
         _FakeRequest.get_metadata = real_md
         cam.set_hardware_exposure(0.002, 0.0)  # above the floor: plain exposure, brightness back to neutral
         assert cam.picam.controls["ExposureTime"] == 2000
-        assert cam.picam.controls["Brightness"] == 0.0
-        assert cam.picam.controls["Contrast"] == 1.0
+        assert cam.isp_brightness == 0.0
+        assert cam.isp_contrast == 1.0
         _, meta = cam.capture_frame()
         assert meta["actual_exposure_s"] == pytest.approx(0.002)
         assert cam.sensor_floor_s == pytest.approx(53e-6)

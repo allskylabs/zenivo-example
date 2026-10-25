@@ -244,11 +244,32 @@ class AdsbFeed:
                            **{k: a[k] for k in ("speed_kt", "track_deg", "vrate_fpm") if k in a}}
                     if trail_s > 0:
                         trail = [[round(plat, 5), round(plon, 5), round(palt), round(now - pt, 1)]
-                                 for pt, plat, plon, palt in a["trail"] if now - pt <= trail_s and pt < t]
+                                 for pt, plat, plon, palt in a["trail"]
+                                 if now - pt <= trail_s and (pt < t or (pt - t <= 0.1 and (plat != lat or plon != lon)))]
                         trail.append([round(lat, 5), round(lon, 5), round(alt), round(now - t, 1)])
                         rec["trail"] = trail
                     out.append(rec)
         return out
+
+
+def _project_cam_to_px(cam: np.ndarray, solution: Dict[str, Any]) -> Optional[Tuple[float, float]]:
+    """Project unit camera-frame vector to image pixel (x, y) for rectilinear or equidistant fisheye."""
+    cx, cy = solution["optical_center_px"]
+    f = float(solution["focal_px"])
+    proj = solution.get("projection", "rectilinear")
+    if proj == "equidistant":
+        theta = math.acos(max(-1.0, min(1.0, float(cam[2]))))
+        if theta > math.radians(110.0):
+            return None
+        k = float(solution.get("distortion_k") or 0.0)
+        rho = math.hypot(float(cam[0]), float(cam[1]))
+        if rho < 1e-12:
+            return float(cx), float(cy)
+        r = f * (theta + k * theta ** 3)
+        return float(cx + r * cam[0] / rho), float(cy + r * cam[1] / rho)
+    if cam[2] <= 0.05:
+        return None
+    return float(f * cam[0] / cam[2] + cx), float(f * cam[1] / cam[2] + cy)
 
 
 def frame_to_azalt(x_frac: float, y_frac: float, solution: Dict[str, Any]) -> Tuple[float, float]:
@@ -256,8 +277,19 @@ def frame_to_azalt(x_frac: float, y_frac: float, solution: Dict[str, Any]) -> Tu
     cx, cy = solution["optical_center_px"]
     f = float(solution["focal_px"])
     R = pointing_rotation(solution["pointing_az_deg"], solution["pointing_alt_deg"], solution.get("roll_deg", 0.0))
-    v = np.array([(x_frac * 2 * cx - cx) / f, (y_frac * 2 * cy - cy) / f, 1.0])
-    e = R @ (v / np.linalg.norm(v))
+    dx, dy = (x_frac * 2 * cx - cx) / f, (y_frac * 2 * cy - cy) / f
+    if solution.get("projection", "rectilinear") == "equidistant":
+        theta = math.hypot(dx, dy)
+        k = float(solution.get("distortion_k") or 0.0)
+        if k != 0.0:
+            for _ in range(3):
+                theta -= (theta + k * theta ** 3 - math.hypot(dx, dy)) / max(1e-6, 1.0 + 3.0 * k * theta ** 2)
+        phi = math.atan2(dy, dx)
+        v = np.array([math.sin(theta) * math.cos(phi), math.sin(theta) * math.sin(phi), math.cos(theta)])
+    else:
+        v = np.array([dx, dy, 1.0])
+        v = v / np.linalg.norm(v)
+    e = R @ v
     return round(math.degrees(math.atan2(e[0], e[1])) % 360.0, 1), round(math.degrees(math.asin(np.clip(e[2], -1, 1))), 1)
 
 
@@ -286,13 +318,13 @@ def sky_position(station: Dict[str, float], lat: float, lon: float, alt_m: float
         "distance_km": round(dist / 1000.0, 1),
         "ground_km": round(math.hypot(enu[0], enu[1]) / 1000.0, 1),
     }
-    if solution and solution.get("projection", "rectilinear") == "rectilinear" and dist > 0:
+    if solution and solution.get("projection", "rectilinear") in ("rectilinear", "equidistant") and dist > 0:
         cx, cy = solution["optical_center_px"]
-        f = float(solution["focal_px"])
         R = pointing_rotation(solution["pointing_az_deg"], solution["pointing_alt_deg"], solution.get("roll_deg", 0.0))
         cam = R.T @ (enu / dist)
-        if cam[2] > 0.05:
-            x, y = f * cam[0] / cam[2] + cx, f * cam[1] / cam[2] + cy
+        px_py = _project_cam_to_px(cam, solution)
+        if px_py is not None:
+            x, y = px_py
             if 0 <= x < 2 * cx and 0 <= y < 2 * cy:
                 out["frame_xy"] = [round(x / (2 * cx), 4), round(y / (2 * cy), 4)]
     return out
@@ -329,12 +361,12 @@ def match_flight(event: Dict[str, Any], tracks: List[Dict[str, Any]], station: D
     """The aircraft whose projected track lies on the event's line (frame fractions), or None.
 
     station: latitude_deg, longitude_deg, elevation_m. solution: the bright-star pointing solution
-    (pointing_az_deg, pointing_alt_deg, roll_deg, focal_px, optical_center_px, rectilinear)."""
+    (pointing_az_deg, pointing_alt_deg, roll_deg, focal_px, optical_center_px, rectilinear or equidistant)."""
     line = event.get("line")
-    if not line or not tracks or not solution or solution.get("projection", "rectilinear") != "rectilinear":
+    if not line or not tracks or not solution or solution.get("projection", "rectilinear") not in ("rectilinear", "equidistant"):
         return None
     cx, cy = solution["optical_center_px"]
-    W, H, f = 2.0 * cx, 2.0 * cy, float(solution["focal_px"])
+    W, H = 2.0 * cx, 2.0 * cy
     R = pointing_rotation(solution["pointing_az_deg"], solution["pointing_alt_deg"], solution.get("roll_deg", 0.0))
     a = np.array([line[0] * W, line[1] * H])
     b = np.array([line[2] * W, line[3] * H])
@@ -354,9 +386,10 @@ def match_flight(event: Dict[str, Any], tracks: List[Dict[str, Any]], station: D
             enu = enu_from_station(lat0, lon0, h0, *p)
             dist = float(np.linalg.norm(enu))
             cam = R.T @ (enu / dist)
-            if cam[2] < 0.05:
+            px_py = _project_cam_to_px(cam, solution)
+            if px_py is None:
                 break
-            proj.append((np.array([f * cam[0] / cam[2] + cx, f * cam[1] / cam[2] + cy]), enu, dist, p))
+            proj.append((np.array(px_py), enu, dist, p))
         if not proj or len(proj) < (2 if t1 - t0 > 0.5 else 1):
             continue
         if len(proj) == 2 and ordered:
@@ -371,7 +404,8 @@ def match_flight(event: Dict[str, Any], tracks: List[Dict[str, Any]], station: D
             for q in (q0, q1):
                 e = enu_from_station(lat0, lon0, h0, *q)
                 c = R.T @ (e / np.linalg.norm(e))
-                v.append(np.array([f * c[0] / c[2], f * c[1] / c[2]]) if c[2] > 0.05 else None)
+                px_py = _project_cam_to_px(c, solution)
+                v.append(np.array(px_py) if px_py is not None else None)
             if v[0] is not None and v[1] is not None and np.linalg.norm(v[1] - v[0]) > 0.5:
                 d = (v[1] - v[0]) / np.linalg.norm(v[1] - v[0])
                 cosv = float(d @ ev_dir)

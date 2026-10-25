@@ -293,7 +293,7 @@ def compile_timelapse(
 
 def frame_quality_mask(
     paths: List[str],
-    expected_hw: Tuple[int, int] = (972, 1296),
+    expected_hw: Optional[Tuple[int, int]] = None,
     window: int = 7,
     rel_tol: float = 0.3,
     abs_tol: float = 20.0,
@@ -307,14 +307,35 @@ def frame_quality_mask(
     dawn ramp is followed and only single-frame or block glitches are removed. Frames are read at
     1/4 scale, so the check is cheap. Skipped frames stay on disk; only the video leaves them out.
     """
-    reduced_hw = ((expected_hw[0] + 3) // 4, (expected_hw[1] + 3) // 4)
-    sizes_ok: List[bool] = []
-    means: List[Optional[float]] = []
+    raw_shapes: List[Optional[Tuple[int, int]]] = []
+    raw_means: List[Optional[float]] = []
+    shape_counts: Dict[Tuple[int, int], int] = {}
     for p in paths:
         im = cv2.imread(p, cv2.IMREAD_REDUCED_GRAYSCALE_4)
-        ok = im is not None and im.shape[:2] == reduced_hw
-        sizes_ok.append(ok)
-        means.append(float(im.mean()) if ok else None)
+        if im is not None and im.size > 0:
+            sh = (int(im.shape[0]), int(im.shape[1]))
+            raw_shapes.append(sh)
+            raw_means.append(float(im.mean()))
+            shape_counts[sh] = shape_counts.get(sh, 0) + 1
+        else:
+            raw_shapes.append(None)
+            raw_means.append(None)
+
+    if expected_hw is not None:
+        reduced_hw: Optional[Tuple[int, int]] = ((expected_hw[0] + 3) // 4, (expected_hw[1] + 3) // 4)
+    elif shape_counts:
+        default_reduced = ((972 + 3) // 4, (1296 + 3) // 4)
+        reduced_hw = max(
+            shape_counts.keys(),
+            key=lambda sh: (shape_counts[sh], 1 if sh == default_reduced else 0, sh[0] * sh[1]),
+        )
+    else:
+        reduced_hw = ((972 + 3) // 4, (1296 + 3) // 4)
+
+    means: List[Optional[float]] = [
+        m if (m is not None and sh == reduced_hw) else None
+        for sh, m in zip(raw_shapes, raw_means)
+    ]
 
     keep: List[bool] = []
     for i, m in enumerate(means):

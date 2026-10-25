@@ -575,15 +575,20 @@ class AllSkyService:
             self.last_metadata = meta
             self.last_capture_time = time.time()
 
-            # Automatic Sunrise Overexposure Guard: if left in manual night exposure after daybreak, switch to auto
+            # Automatic Sunrise Overexposure & CMOS Solarization Guard:
+            # If left in manual night exposure after daybreak, switch to auto (note: at >=0.25s in full daylight
+            # solar_elev >= 2.0, Sony IMX335 CDS reset overflow solarizes/inverts the frame so p90 drops to ~130-160)
             if not is_pytest and self.mode == "manual" and self.calibration_status.get("state") != "running":
                 try:
                     cur_exp_val = float(getattr(self.camera, "current_exposure_s", 0.1))
                     if cur_exp_val >= 0.08 and frame is not None and frame.shape[0] >= 200:
                         from src.calibration.auto_exposure import calculate_solar_elevation
                         solar_elev = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon)
-                        if solar_elev >= -2.0 and float(np.percentile(frame[::16, ::16], 90)) >= 245.0:
+                        p90_sample = float(np.percentile(frame[::16, ::16], 90))
+                        if (solar_elev >= -2.0 and p90_sample >= 245.0) or (solar_elev >= 2.0 and cur_exp_val >= 0.25):
                             self.mode = "auto"
+                            self.auto_exposure.lock_exposure_s = None
+                            self.auto_exposure.lock_gain_db = None
                 except Exception:
                     pass
 
@@ -714,12 +719,14 @@ class AllSkyService:
                         master_raw10 = np.load(raw_path)
                         self._dark_cache[raw_fname] = master_raw10
                 if master_raw10 is not None and master_raw10.shape == bayer10.shape:
+                    # Guard against light-contaminated dark frames (valid 10-bit darks have median <= 80 DN)
+                    valid_dark = master_raw10 if float(np.median(master_raw10[::16, ::16])) <= 150.0 else None
                     calibrated_bgr8 = demosaic_raw10_bayer(
                         bayer10,
-                        master_dark_bayer10=master_raw10,
-                        hot_pixel_mask=hot_mask,
+                        master_dark_bayer10=valid_dark,
+                        hot_pixel_mask=hot_mask if valid_dark is not None else None,
                     )
-                    return calibrated_bgr8, raw_fname
+                    return calibrated_bgr8, (raw_fname if valid_dark is not None else None)
 
             # 2. Fallback image-space subtraction (used in simulator/unit tests)
             fname = best["filename"]
@@ -1026,21 +1033,39 @@ class AllSkyService:
             return {"success": True, "mode": self.mode, "ae_lock": self.get_ae_lock()}
         with self.lock:
             ae = self.auto_exposure
+            lim = camera_limits(self.camera)
+            min_exp = float(lim.get("min_exposure_s") or 1e-6)
+            max_exp = float(lim.get("max_exposure_s") or 15.0)
+            max_gain = float(lim.get("max_gain_db") or 48.0)
+            old_exp = max(min_exp, float(getattr(self.camera, "current_exposure_s", ae.exposure_s) or ae.exposure_s))
+            old_gain = float(getattr(self.camera, "current_gain_db", ae.gain_db) or ae.gain_db)
             ae.lock_exposure_s = ae.lock_gain_db = None
             if lock == "exposure":
-                lim = camera_limits(self.camera)
-                v = float(value if value is not None else self.camera.current_exposure_s)
-                ae.lock_exposure_s = max(float(lim.get("min_exposure_s") or 1e-6), min(float(lim.get("max_exposure_s") or 15.0), v))
+                v = float(value if value is not None else old_exp)
+                ae.lock_exposure_s = max(min_exp, min(max_exp, v))
+                ae.exposure_s = ae.lock_exposure_s
+                if old_exp > 0 and ae.lock_exposure_s > 0 and abs(ae.lock_exposure_s - old_exp) / max(old_exp, 1e-6) > 0.05:
+                    ev_delta_db = 20.0 * math.log10(old_exp / ae.lock_exposure_s)
+                    ae.gain_db = max(0.0, min(max_gain, round(old_gain + ev_delta_db, 1)))
+                if self.last_frame is not None:
+                    ae.process_frame_feedback(self.last_frame)
             elif lock == "gain":
-                lim = camera_limits(self.camera)
-                v = float(value if value is not None else self.camera.current_gain_db)
-                ae.lock_gain_db = max(0.0, min(float(lim.get("max_gain_db") or 48.0), v))
+                v = float(value if value is not None else old_gain)
+                ae.lock_gain_db = max(0.0, min(max_gain, v))
+                ae.gain_db = ae.lock_gain_db
+                if abs(ae.lock_gain_db - old_gain) > 0.5:
+                    ev_scale = 10.0 ** ((old_gain - ae.lock_gain_db) / 20.0)
+                    ae.exposure_s = max(min_exp, min(max_exp, old_exp * ev_scale))
+                if self.last_frame is not None:
+                    ae.process_frame_feedback(self.last_frame)
+            else:
+                if self.last_frame is not None:
+                    ae.process_frame_feedback(self.last_frame)
             self.mode = "auto"
-            if lock != "none":
-                self.camera.set_hardware_exposure(
-                    ae.lock_exposure_s if ae.lock_exposure_s is not None else self.camera.current_exposure_s,
-                    ae.lock_gain_db if ae.lock_gain_db is not None else self.camera.current_gain_db,
-                )
+            self.camera.set_hardware_exposure(
+                ae.lock_exposure_s if ae.lock_exposure_s is not None else ae.exposure_s,
+                ae.lock_gain_db if ae.lock_gain_db is not None else ae.gain_db,
+            )
             self.last_capture_time = 0.0
             self._persist_camera_settings()
         if lock == "none":
@@ -2294,7 +2319,7 @@ class AllSkyService:
             return
         from src.analytics.adsb import frame_to_azalt, match_flight
 
-        if sol.get("projection", "rectilinear") == "rectilinear":
+        if sol.get("projection", "rectilinear") in ("rectilinear", "equidistant"):
             ln = ev["line"]
             ev["sky_from"] = dict(zip(("az_deg", "alt_deg"), frame_to_azalt(ln[0], ln[1], sol)))
             ev["sky_to"] = dict(zip(("az_deg", "alt_deg"), frame_to_azalt(ln[2], ln[3], sol)))
@@ -2753,7 +2778,22 @@ class AllSkyService:
     FOCUS_MAX_UNATTENDED_S = 900.0
     FOCUS_FPS = 10.0  # CSI cameras otherwise run at their 5 fps CPU-saving ceiling
 
+    def _is_focus_night(self) -> Optional[bool]:
+        """True at night (sun < -6 deg and exposure >= 50 ms), False in daytime, None under pytest."""
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            return None
+        exp = float(getattr(self.camera, "current_exposure_s", 0.0))
+        if 0.0 < exp < 0.05:
+            return False
+        try:
+            from src.calibration.auto_exposure import calculate_solar_elevation
+            return bool(calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon) < -6.0)
+        except Exception:
+            return None
+
     def get_focus_state(self) -> Dict[str, Any]:
+        if self._is_focus_night() is False and self.focus.method in ("stars", "lights"):
+            self.focus.method = "contrast"
         state = self.focus.state()
         state["exposure_s"] = float(getattr(self.camera, "current_exposure_s", 0.0))
         state["gain_db"] = float(getattr(self.camera, "current_gain_db", 0.0))
@@ -2775,6 +2815,8 @@ class AllSkyService:
         """Enter focus mode: native resolution, fastest capture rate, auto-exposure and archiving paused.
         Without explicit settings the focus point is picked from the picture. With autofocus (and a motorised
         lens) a sweep autofocus starts right away on that point; it saves the result and ends focus mode."""
+        if "method" not in config and self._is_focus_night() is False and self.focus.method in ("stars", "lights"):
+            config["method"] = "contrast"
         has_explicit_coords = "cx" in config or "cy" in config
         auto_point = (
             not has_explicit_coords
@@ -2852,6 +2894,8 @@ class AllSkyService:
         """Change ROI/method/smoothing; with nothing to change it only counts as a user action (keep-alive)."""
         if ("cx" in config or "cy" in config) and "roi_mode" not in config:
             config["roi_mode"] = "manual"
+        if "method" not in config and self._is_focus_night() is False and self.focus.method in ("stars", "lights"):
+            config["method"] = "contrast"
         with self._focus_lock:
             self.focus.last_action = time.time()
             self.focus.configure(**config)
@@ -2884,12 +2928,15 @@ class AllSkyService:
         self.focus.last_poll = time.time()
         fh, fw = frame.shape[:2]
         x0, y0, rw, rh = self.focus.roi_rect(fw, fh)
+        is_night = self._is_focus_night()
+        if is_night is False and self.focus.method in ("stars", "lights"):
+            self.focus.method = "contrast"
         key = (ts, x0, y0, rw, self.focus.method, bool(stretch))
         with self._focus_lock:
             if self.focus.result_key == key and self.focus.crop_jpeg is not None and self.focus.last_result:
                 return self.focus.crop_jpeg, self.focus.last_result
             crop = frame[y0:y0 + rh, x0:x0 + rw]
-            result = self.focus.record(self.focus.measure(crop), ts)
+            result = self.focus.record(self.focus.measure(crop, is_night=is_night), ts)
             view = display_stretch(crop) if stretch else crop
             ok, jpeg = cv2.imencode(".jpg", view, [cv2.IMWRITE_JPEG_QUALITY, 93])
             prev_ts = (self.focus.last_result or {}).get("frame_ts", 0.0)
@@ -3145,7 +3192,7 @@ class AllSkyService:
                 self._save_station_config()
             self.focus.last_action = time.time()
             with self._focus_lock:
-                self.focus.reset_stats()
+                self.focus.result_key = None
             return self.get_focus_state()
         if refocus_every_h is not None:
             cfg = self._lens_cfg()
@@ -3181,7 +3228,7 @@ class AllSkyService:
         self._save_lens(pos, "manual")
         self.focus.last_action = time.time()
         with self._focus_lock:
-            self.focus.reset_stats()
+            self.focus.result_key = None
         return self.get_focus_state()
 
     def _focus_sensor_window(self) -> Tuple[float, float, float, float]:
@@ -3226,14 +3273,20 @@ class AllSkyService:
         sw = self.focus.sweep
         cfg = self._lens_cfg()
         saved = cfg.get("position")
-        if state != "done" and cfg.get("mode") == "auto" and saved is not None and float(saved) <= SKY_MAX_DIOPTRES:
+        max_accept_d = SKY_MAX_DIOPTRES
+        if source == "sweep":
+            if self.focus.roi_mode == "manual":
+                max_accept_d = float(self.camera.lens_range[1]) if self._lens_supported() else 3.0
+            elif sw and sw.get("method") == "contrast":
+                max_accept_d = 1.65
+        if state != "done" and cfg.get("mode") == "auto" and saved is not None and float(saved) <= max_accept_d:
             # A failed refocus keeps the last good focus; try again one refocus period later, not every
             # 30 min (each attempt pauses archiving for a few minutes)
             cfg["next_auto_sweep"] = time.time() + self._auto_sweep_interval_s()
-        if state == "done" and position is not None and float(position) > SKY_MAX_DIOPTRES:
+        if state == "done" and position is not None and float(position) > max_accept_d:
             # Focused on something nearer than 1 m (window frame, railing, dome dust): not the sky
             back = (self.station_config.get("lens_focus") or {}).get("base_position")
-            if back is None or float(back) > SKY_MAX_DIOPTRES:
+            if back is None or float(back) > max_accept_d:
                 back = self.camera.lens_range[0]
             self.camera.set_lens_position(float(back))
             msg = (f"focused on a near object ({1 / float(position):.2f} m, {float(position):.3f} D), not the sky: "
@@ -3241,7 +3294,7 @@ class AllSkyService:
             sw.update({"state": "rejected", "message": msg, "progress": 1.0, "finished_at": time.time(),
                        "rejected_position": round(float(position), 4)})
             with self._focus_lock:
-                self.focus.reset_stats()
+                self.focus.result_key = None
             self.activity.warning("camera", f"Lens autofocus ({sw.get('mode')}): {msg}")
             if sw.get("auto") and self.focus.active:
                 self.stop_focus("automatic autofocus rejected")
@@ -3252,7 +3305,7 @@ class AllSkyService:
                 self._save_lens(position, source)
                 sw["best_position"] = position
         with self._focus_lock:
-            self.focus.reset_stats()
+            self.focus.result_key = None
         if state == "done" and self.focus.active:
             sw["phase"] = "saving"
             # Measure the result where the lens now sits, record it in settings, tell the user, leave focus mode
@@ -3468,9 +3521,12 @@ class AllSkyService:
     def _roi_method(self, frame: np.ndarray) -> str:
         fh, fw = frame.shape[:2]
         x0, y0, rw, rh = self.focus.roi_rect(fw, fh)
+        is_night = self._is_focus_night()
+        if is_night is False and self.focus.method in ("stars", "lights"):
+            return "contrast"
         if self.focus.method != "auto":
             return self.focus.method
-        return measure_focus(frame[y0:y0 + rh, x0:x0 + rw], "auto")["method"]
+        return measure_focus(frame[y0:y0 + rh, x0:x0 + rw], "auto", is_night=is_night)["method"]
 
     def _lens_camera_af(self) -> None:
         """libcamera's own AF scan, then checked with this app's score: the result is kept only if it is
@@ -3595,15 +3651,18 @@ class AllSkyService:
                 res = measure_focus(frame[y0:y0 + rh, x0:x0 + rw], method)
                 if res.get("score") is not None:
                     per[i].append(float(res["score"]))
+                    if i == 0 and not is_pytest:
+                        with self._focus_lock:
+                            self.focus.last_result = self.focus.record(res, time.time())
         return [float(np.median(v)) if v else None for v in per], since
 
     @staticmethod
     def _sweep_positions(lo: float, hi: float) -> List[float]:
-        """0.04 D steps to 1.2 D (where sky focus lies), 0.1 D to 3 D, then 0.25 D to the end of the lens."""
+        """0.04 D steps to 1.6 D (sky and daytime NIR/horizon focus), 0.1 D to 3 D, then 0.25 D to the end."""
         out, p = [], float(lo)
         while p <= hi + 1e-9:
             out.append(round(p, 4))
-            p += 0.04 if p < 1.2 - 1e-9 else 0.1 if p < 3.0 - 1e-9 else 0.25
+            p += 0.04 if p < 1.6 - 1e-9 else 0.1 if p < 3.0 - 1e-9 else 0.25
         return out
 
 
@@ -3624,9 +3683,12 @@ class AllSkyService:
                 frame, _, since = self._focus_new_frame(self.last_capture_time, timeout_s=15.0)
             fh, fw = frame.shape[:2]
             x0, y0, rw, rh = self.focus.roi_rect(fw, fh)
+            is_night = self._is_focus_night()
             method = self.focus.method
+            if is_night is False and method in ("stars", "lights"):
+                method = "contrast"
             if method == "auto":
-                method = measure_focus(frame[y0:y0 + rh, x0:x0 + rw], "auto")["method"]
+                method = measure_focus(frame[y0:y0 + rh, x0:x0 + rw], "auto", is_night=is_night)["method"]
                 if not is_pytest and method == "contrast":
                     try:
                         from src.calibration.auto_exposure import calculate_solar_elevation
@@ -3695,12 +3757,13 @@ class AllSkyService:
                     tiles.append({"cx": float(pt["cx"]), "cy": float(pt["cy"])})
             sw["tiles"] = [{"cx": round(t["cx"], 4), "cy": round(t["cy"], 4)} for t in tiles]
 
-            # One pass from infinity (0 D) outwards, continuing over the whole lens range until every
-            # measured region is clearly past its peak (30 % worse, or gone, for 3 steps)
-            sweep_hi = min(hi, 0.96 if method in ("stars", "lights") else 1.4) if not is_pytest else hi
+            # One pass from infinity (0 D) outwards, continuing over the lens range until every
+            # measured region is clearly past its peak (at least 4 steps down the right side of the parabola)
+            sweep_hi = min(hi, 1.4 if (method in ("stars", "lights") and self.focus.roi_mode != "manual") else 2.8) if not is_pytest else hi
             positions = self._sweep_positions(lo, sweep_hi)
             n_roi = 1 + len(tiles)
             curves: List[List[Optional[float]]] = [[] for _ in range(n_roi)]
+            min_q = [float("inf")] * n_roi
             best = [float("-inf")] * n_roi
             best_at = [None] * n_roi
             worse_run = [0] * n_roi
@@ -3716,20 +3779,27 @@ class AllSkyService:
                 for r, v in enumerate(scores):
                     curves[r].append(v)
                     q = quality(v)
+                    if np.isfinite(q) and q < min_q[r]:
+                        min_q[r] = q
                     if q > best[r]:
                         best[r], best_at[r], worse_run[r] = q, pos, 0
                     elif np.isfinite(best[r]):
-                        worse = (not np.isfinite(q)) or (abs(q) > abs(best[r]) * 1.3 if lower else q < best[r] * 0.7)
+                        rise = best[r] - min_q[r] if np.isfinite(min_q[r]) else 0.0
+                        worse = (
+                            (not np.isfinite(q))
+                            or (abs(q) > abs(best[r]) * 1.3 if lower else q < best[r] * 0.7)
+                            or (not lower and rise >= 0.06 * abs(best[r]) and (best[r] - q) >= 0.30 * rise and pos - (best_at[r] or 0.0) >= 0.16 - 1e-9)
+                        )
                         worse_run[r] = worse_run[r] + 1 if worse else 0
                 sw["progress"] = 0.95 * (i + 1) / len(positions)
 
                 # Once any region is past its peak, the others need not hold the sweep: a region that is
                 # flat (blank sky, cloud) or has not improved for 0.6 D since its best is not going to peak
-                any_peak = any(worse_run[r] >= 3 for r in range(n_roi))
+                any_peak = any(worse_run[r] >= 3 and (best_at[r] is None or pos - best_at[r] >= 0.16 - 1e-9) for r in range(n_roi))
 
                 def finished(r):
-                    if worse_run[r] >= 3:
-                        return True  # clearly past its peak
+                    if worse_run[r] >= 3 and (best_at[r] is None or pos - best_at[r] >= 0.16 - 1e-9):
+                        return True  # clearly past its peak (at least 4 steps down the right side of the parabola)
                     if pos < 1.0:
                         return False  # scan the entire sky focus range (0.0 to 1.0 D) before early exit
                     if not any_peak:
@@ -3742,13 +3812,14 @@ class AllSkyService:
                 if all(past) and i >= 12:
                     break
 
-            # Judge every region's curve; sky focus = the most decisive peak within 1 m (1 D) or farther
+            # Judge every region's curve; sky focus = the most decisive peak within max_accept_d
+            max_accept_d = hi if self.focus.roi_mode == "manual" else (1.65 if method == "contrast" else SKY_MAX_DIOPTRES)
             results = []
             for r in range(n_roi):
                 res = analyse_sweep(done_pos, curves[r], lower)
                 res["roi"] = 0 if r == 0 else r
                 results.append(res)
-            if not main_allowed and results[0]["ok"] and results[0]["vertex"] <= SKY_MAX_DIOPTRES:
+            if not main_allowed and results[0]["ok"] and results[0]["vertex"] <= max_accept_d:
                 results[0].update({"ok": False, "reason": "sky/cloud"})  # the zoom sits on sky or drifting cloud
             if not lower:
                 # A relative change means nothing on an almost featureless tile (contrast near 0: noise
@@ -3759,18 +3830,18 @@ class AllSkyService:
                 for x in results:
                     if x["ok"] and abs(float(x.get("peak_score") or 0.0)) < floor:
                         x.update({"ok": False, "reason": "weak"})
-            sky = [x for x in results if x["ok"] and x["vertex"] <= SKY_MAX_DIOPTRES]
-            near = [x for x in results if x["ok"] and x["vertex"] > SKY_MAX_DIOPTRES]
+            sky = [x for x in results if x["ok"] and x["vertex"] <= max_accept_d]
+            near = [x for x in results if x["ok"] and x["vertex"] > max_accept_d]
             if method == "contrast":
                 def where(x):
                     return ({"cx": self.focus.cx, "cy": self.focus.cy} if x["roi"] == 0 else
                             {"cx": tiles[x["roi"] - 1]["cx"], "cy": tiles[x["roi"] - 1]["cy"]})
                 good = [dict(where(x), vertex=x["vertex"], spread=x["spread"])
-                        for x in sorted(sky, key=lambda x: -x["spread"])]
+                        for x in sorted(sky, key=lambda x: -x["spread"]) if x["vertex"] <= SKY_MAX_DIOPTRES]
                 self._remember_day_targets(good, [dict(where(x), vertex=x["vertex"]) for x in near])
             sw["regions"] = [{k: x.get(k) for k in ("roi", "ok", "reason", "vertex", "spread")} for x in results]
             if not sky:
-                pos_back = start_pos if start_pos is not None and start_pos <= SKY_MAX_DIOPTRES else lo
+                pos_back = start_pos if start_pos is not None and start_pos <= max_accept_d else lo
                 self.camera.set_lens_position(float(pos_back))
                 sw["fit"] = results[0].get("fit")
                 if near:
@@ -3802,7 +3873,7 @@ class AllSkyService:
 
             # Come back over the peak: one pass downwards from 2 coarse steps above to 2 below in quarter
             # steps, on the winning region only (the zoom now shows it), and fit the parabola on those
-            coarse = 0.04 if final < 1.2 else 0.1 if final < 3.0 else 0.25
+            coarse = 0.04 if final < 1.6 else 0.1 if final < 3.0 else 0.25
             fine = max(0.02 if not is_pytest else 0.01, coarse / (2 if not is_pytest else 4))
             span = (1.5 if not is_pytest else 2.0) * coarse
             top, bottom = min(positions[-1], final + span), max(lo, final - span)
@@ -3928,13 +3999,7 @@ class AllSkyService:
         frame = self.last_frame
         if frame is None:
             frame, _ = self.capture_frame()
-        is_night = None
-        if not os.environ.get("PYTEST_CURRENT_TEST"):
-            try:
-                from src.calibration.auto_exposure import calculate_solar_elevation
-                is_night = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon) < -6.0
-            except Exception:
-                is_night = None
+        is_night = self._is_focus_night()
         point = find_focus_point(frame, sky_mask=self._focus_sky_mask(frame), is_night=is_night)
         if point is None or point["method"] == "contrast":
             # By day (or no star/light found): static detail outside the sky, not a known wall
@@ -3945,7 +4010,7 @@ class AllSkyService:
             state.update({"found": False, "message": "nothing to focus on in the frame (blank sky, cloud or fog)"})
             return state
         cfg_kw: Dict[str, Any] = {"cx": point["cx"], "cy": point["cy"], "roi_mode": "auto"}
-        if not os.environ.get("PYTEST_CURRENT_TEST") and point["method"] in ("stars", "lights"):
+        if not os.environ.get("PYTEST_CURRENT_TEST") and point["method"] in ("stars", "lights", "contrast"):
             cfg_kw["method"] = point["method"]
         state = self.configure_focus(**cfg_kw)
         state.update({"found": True, "point": {k: point[k] for k in ("cx", "cy", "method")},

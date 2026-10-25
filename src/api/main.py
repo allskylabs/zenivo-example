@@ -55,9 +55,6 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
             "Expires": "0",
         }
 
-        # Mount static directory
-        app.mount("/static", StaticFiles(directory=web_dir), name="static")
-
         index_path = os.path.join(web_dir, "index.html")
         viewport_tag = '<div class="viewport-wrapper" id="viewport-container">'
         shell_cache = {"mtime": None, "html": ""}
@@ -132,11 +129,17 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
 
         @app.get("/app.js")
         def serve_app_js():
-            return FileResponse(os.path.join(web_dir, "app.js"), media_type="application/javascript")
+            return FileResponse(os.path.join(web_dir, "app.js"), media_type="application/javascript", headers=no_cache)
 
         @app.get("/style.css")
         def serve_style_css():
-            return FileResponse(os.path.join(web_dir, "style.css"), media_type="text/css")
+            return FileResponse(os.path.join(web_dir, "style.css"), media_type="text/css", headers=no_cache)
+
+        @app.get("/static/focus.js")
+        def serve_focus_js():
+            return FileResponse(os.path.join(web_dir, "focus.js"), media_type="application/javascript", headers=no_cache)
+
+        app.mount("/static", StaticFiles(directory=web_dir), name="static")
 
     from contextlib import asynccontextmanager
 
