@@ -2300,6 +2300,11 @@ class AllSkyService:
         self._adsb_view_ts = time.time()  # someone is looking: keep the feed on, day or night
         sol = self.station_config.get("bright_star_solution") or {}
         sol = sol if sol.get("success") else None
+        acfg = self.station_config.get("adsb") or {}
+        if sol and (acfg.get("az_offset_deg") or acfg.get("alt_offset_deg")):
+            # Manual boresight correction when the camera has shifted since the last star solve
+            sol = dict(sol, pointing_az_deg=(sol["pointing_az_deg"] + float(acfg.get("az_offset_deg") or 0.0)) % 360.0,
+                       pointing_alt_deg=sol["pointing_alt_deg"] + float(acfg.get("alt_offset_deg") or 0.0))
         station = {"latitude_deg": self.auto_exposure.lat, "longitude_deg": self.auto_exposure.lon,
                    "elevation_m": float(self.station_config.get("elevation_m") or 0.0)}
         obstructions = [np.array(p, np.float32) for p in ((self.station_config.get("sky_mask") or {}).get("obstruction") or [])]
