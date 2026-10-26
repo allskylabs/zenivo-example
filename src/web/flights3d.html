@@ -52,13 +52,13 @@
         button:hover { border-color: var(--accent); }
         button.on { border-color: var(--accent); color: var(--accent); }
         button[hidden] { display: none; }
-        #list { top: 12px; right: 12px; width: 270px; max-height: calc(100% - 24px); display: flex; flex-direction: column; }
+        #list { top: 12px; right: 12px; width: 350px; max-width: calc(100% - 24px); max-height: calc(100% - 24px); display: flex; flex-direction: column; }
         #list h2 { font-size: 13px; font-weight: 600; padding: 9px 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; }
         #list ul { list-style: none; overflow-y: auto; }
-        #list li { padding: 6px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-mono); font-size: 12px; }
+        #list li { padding: 6px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; white-space: nowrap; font-family: var(--font-mono); font-size: 12px; }
         #list li:hover, #list li.selected { background: var(--bg-card-sub); }
         #list li.in-view .cs { color: var(--warning); }
-        #list li .meta { color: var(--text-secondary); }
+        #list li .meta { color: var(--text-secondary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
         #info { left: 12px; bottom: 28px; padding: 10px 12px; width: 260px; display: none; }
         #info.show { display: block; }
         #info h3 { font: 600 15px var(--font-mono); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -1585,7 +1585,7 @@
             $("ac-list").innerHTML = list.length ? list.map((a) =>
                 `<li data-icao="${esc(a.icao)}" class="${a.in_view ? "in-view" : ""}${a.icao === selected ? " selected" : ""}">
                     <span class="id">${flagImg(a)}${logoImg(a)}<span class="cs">${esc(a.callsign || a.icao)}</span></span>
-                    <span class="meta">${a.type ? esc(a.type) + " · " : ""}${(a.altitude_m / 1000).toFixed(1)} km · ${a.distance_km} km ${compass(a.az_deg)}</span></li>`).join("")
+                    <span class="meta">${a.type ? esc(a.type) + " " : ""}${(a.altitude_m / 1000).toFixed(1)}km · ${a.distance_km}km ${compass(a.az_deg)}</span></li>`).join("")
                 : `<li><span class="meta">No aircraft heard right now.</span></li>`;
         }
         $("ac-list").addEventListener("click", (e) => {
