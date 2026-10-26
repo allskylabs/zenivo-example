@@ -2304,19 +2304,25 @@ class AllSkyService:
         return {"latitude_deg": self.auto_exposure.lat, "longitude_deg": self.auto_exposure.lon,
                 "elevation_m": float(self.station_config.get("elevation_m") or 0.0)}
 
-    def get_satellites_now(self) -> Dict[str, Any]:
+    def get_satellites_now(self, track_min: float = 0.0, below: bool = False, limit: int = 60,
+                          track_ids: Optional[set] = None) -> Dict[str, Any]:
         """Large satellites above the horizon (stations + CelesTrak visual list) with their camera position."""
         from src.analytics.satellites import SatelliteTracker
 
         if getattr(self, "_sat_tracker", None) is None:
             self._sat_tracker = SatelliteTracker(os.path.join(self.output_dir, "cache", "sat_tle.json"))
-        res = self._sat_tracker.current(self._overlay_station(), self._overlay_solution())
+        res = self._sat_tracker.current(self._overlay_station(), self._overlay_solution(), track_min=track_min,
+                                        include_below=below, track_ids=track_ids)
         obstructions = [np.array(p, np.float32) for p in ((self.station_config.get("sky_mask") or {}).get("obstruction") or [])]
         for r in res["satellites"]:
             xy = r.get("frame_xy")
             r["in_view"] = bool(xy) and not any(
                 cv2.pointPolygonTest(p, (float(xy[0]), float(xy[1])), False) >= 0 for p in obstructions)
-        res["satellites"] = res["satellites"][:60]
+        res["satellites"] = res["satellites"][:limit]
+        res["station"] = {"lat": self.auto_exposure.lat, "lon": self.auto_exposure.lon}
+        sol = self._overlay_solution()
+        if sol:
+            res["camera"] = {k: sol.get(k) for k in ("pointing_az_deg", "pointing_alt_deg", "roll_deg", "fov_horizontal_deg", "fov_vertical_deg")}
         return res
 
     def get_aircraft_now(self, limit: int = 30, trail_s: float = 0.0) -> Dict[str, Any]:

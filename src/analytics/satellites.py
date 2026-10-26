@@ -13,7 +13,7 @@ import os
 import threading
 import time
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -24,6 +24,8 @@ GROUPS = ("stations", "visual")
 TLE_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=tle"
 REFRESH_S = 24 * 3600.0
 EARTH_R_KM = 6371.0
+WGS84_A_KM = 6378.137
+WGS84_E2 = 6.69437999014e-3
 MAX_SATS = 400
 
 
@@ -112,54 +114,93 @@ class SatelliteTracker:
     def status(self) -> Dict[str, Any]:
         return {"count": len(self._sats), "fetched_at": self._fetched_at or None}
 
-    def current(self, station: Dict[str, float], solution: Optional[Dict[str, Any]] = None,
-                when: Optional[datetime] = None) -> Dict[str, Any]:
-        """Satellites above the horizon now: az/alt, range, whether sunlit, and frame position."""
+    def _context(self, station: Dict[str, float], when: datetime) -> Dict[str, Any]:
+        """Earth rotation, observer and sun for one instant."""
         from sgp4.api import jday
 
-        self._maybe_refresh()
-        when = (when or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        when = when.astimezone(timezone.utc)
         jd, fr = jday(when.year, when.month, when.day, when.hour, when.minute, when.second + when.microsecond / 1e6)
         jd_full = jd + fr
         gmst = _gmst_rad(jd_full)
         cg, sg = math.cos(gmst), math.sin(gmst)
         lat0, lon0 = station["latitude_deg"], station["longitude_deg"]
-        obs = _ecef(lat0, lon0, float(station.get("elevation_m") or 0.0)) / 1000.0
         la, lo = math.radians(lat0), math.radians(lon0)
         sun = _sun_eci_dir(jd_full)
-        # sun altitude at the station: its ECI direction rotated to ECEF, then to the local up vector
         sun_ecef = np.array([cg * sun[0] + sg * sun[1], -sg * sun[0] + cg * sun[1], sun[2]])
         up = np.array([math.cos(la) * math.cos(lo), math.cos(la) * math.sin(lo), math.sin(la)])
-        sun_alt = math.degrees(math.asin(float(np.clip(sun_ecef @ up, -1, 1))))
+        return {"jd": jd, "fr": fr, "cg": cg, "sg": sg, "la": la, "lo": lo, "sun": sun,
+                "obs": _ecef(lat0, lon0, float(station.get("elevation_m") or 0.0)) / 1000.0,
+                "sun_alt": math.degrees(math.asin(float(np.clip(sun_ecef @ up, -1, 1))))}
+
+    @staticmethod
+    def _state(c: Dict[str, Any], sat: Any) -> Optional[Dict[str, Any]]:
+        err, r, _v = sat.sgp4(c["jd"], c["fr"])
+        if err != 0:
+            return None
+        r = np.array(r)
+        cg, sg, la, lo = c["cg"], c["sg"], c["la"], c["lo"]
+        ecef = np.array([cg * r[0] + sg * r[1], -sg * r[0] + cg * r[1], r[2]])  # TEME -> ECEF (no polar motion)
+        d = ecef - c["obs"]
+        e = -math.sin(lo) * d[0] + math.cos(lo) * d[1]
+        n = -math.sin(la) * math.cos(lo) * d[0] - math.sin(la) * math.sin(lo) * d[1] + math.cos(la) * d[2]
+        u = math.cos(la) * math.cos(lo) * d[0] + math.cos(la) * math.sin(lo) * d[1] + math.sin(la) * d[2]
+        rng = math.sqrt(e * e + n * n + u * u)
+        sun = c["sun"]
+        along = float(r @ sun)
+        sunlit = not (along < 0.0 and float(np.linalg.norm(r - along * sun)) < EARTH_R_KM)
+        # geodetic latitude / longitude / height (iterated, WGS84)
+        x, y, z = ecef
+        p = math.hypot(x, y)
+        lat = math.atan2(z, p * (1 - WGS84_E2))
+        for _ in range(4):
+            nn = WGS84_A_KM / math.sqrt(1 - WGS84_E2 * math.sin(lat) ** 2)
+            h = p / max(1e-9, math.cos(lat)) - nn
+            lat = math.atan2(z, p * (1 - WGS84_E2 * nn / (nn + h)))
+        return {"e": e, "n": n, "u": u, "rng": rng, "alt": math.degrees(math.asin(u / rng)), "sunlit": sunlit,
+                "lat": math.degrees(lat), "lon": math.degrees(math.atan2(y, x)), "h": h,
+                "az": math.degrees(math.atan2(e, n)) % 360.0}
+
+    def current(self, station: Dict[str, float], solution: Optional[Dict[str, Any]] = None,
+                when: Optional[datetime] = None, track_min: float = 0.0, track_for: int = 8,
+                include_below: bool = False, track_ids: Optional[set] = None) -> Dict[str, Any]:
+        """Satellites above the horizon now: az/alt, range, whether sunlit, and frame position. With
+        track_min, the first track_for of them (highest first) also get their path from 5 minutes ago to
+        track_min minutes ahead as [[lat, lon, height_km, seconds_from_now, alt_deg, visible], ...]."""
+        self._maybe_refresh()
+        when = (when or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        c = self._context(station, when)
+        sun_alt = c["sun_alt"]
         out = []
         with self._lock:
             sats = list(self._sats)
         for name, group, sat in sats:
-            err, r, _v = sat.sgp4(jd, fr)
-            if err != 0:
+            st = self._state(c, sat)
+            if st is None or (st["alt"] < 0.0 and not include_below):
                 continue
-            r = np.array(r)
-            ecef = np.array([cg * r[0] + sg * r[1], -sg * r[0] + cg * r[1], r[2]])  # TEME -> ECEF (no polar motion)
-            d = ecef - obs
-            e = -math.sin(lo) * d[0] + math.cos(lo) * d[1]
-            n = -math.sin(la) * math.cos(lo) * d[0] - math.sin(la) * math.sin(lo) * d[1] + math.cos(la) * d[2]
-            u = math.cos(la) * math.cos(lo) * d[0] + math.cos(la) * math.sin(lo) * d[1] + math.sin(la) * d[2]
-            rng = math.sqrt(e * e + n * n + u * u)
-            alt = math.degrees(math.asin(u / rng))
-            if alt < 0.0:
-                continue
-            along = float(r @ sun)
-            sunlit = not (along < 0.0 and float(np.linalg.norm(r - along * sun)) < EARTH_R_KM)
-            enu = np.array([e, n, u]) * 1000.0
             rec = {"name": name, "norad": int(sat.satnum), "group": group,
-                   "az_deg": round(math.degrees(math.atan2(e, n)) % 360.0, 1), "alt_deg": round(alt, 1),
-                   "range_km": round(rng), "height_km": round(float(np.linalg.norm(r)) - EARTH_R_KM),
-                   "sunlit": sunlit, "visible": bool(sunlit and sun_alt < -3.0)}
-            xy = frame_xy_from_enu(enu, solution)
+                   "az_deg": round(st["az"], 1), "alt_deg": round(st["alt"], 1),
+                   "range_km": round(st["rng"]), "height_km": round(st["h"]),
+                   "lat": round(st["lat"], 4), "lon": round(st["lon"], 4),
+                   "above_horizon": st["alt"] >= 0.0, "sunlit": st["sunlit"],
+                   "visible": bool(st["sunlit"] and sun_alt < -3.0 and st["alt"] >= 0.0)}
+            xy = frame_xy_from_enu(np.array([st["e"], st["n"], st["u"]]) * 1000.0, solution)
             if xy:
                 rec["frame_xy"] = xy
             out.append(rec)
         out.sort(key=lambda s: (not s.get("frame_xy"), not s["visible"], -s["alt_deg"]))
+        if track_min > 0:
+            by_norad = {int(sat.satnum): sat for _n, _g, sat in sats}
+            wanted = [r for i, r in enumerate(out) if i < track_for or r["norad"] in (track_ids or ())]
+            for rec in wanted:
+                sat = by_norad[rec["norad"]]
+                pts = []
+                for dt in range(-300, int(track_min * 60) + 1, 30):
+                    ci = self._context(station, when + timedelta(seconds=dt))
+                    st = self._state(ci, sat)
+                    if st is not None:
+                        pts.append([round(st["lat"], 3), round(st["lon"], 3), round(st["h"]), dt, round(st["alt"], 1),
+                                    int(st["sunlit"] and ci["sun_alt"] < -3.0 and st["alt"] >= 0.0)])
+                rec["track"] = pts
         return {"sun_alt_deg": round(sun_alt, 1), "tle_count": len(sats), "tle_age_h":
                 round((time.time() - self._fetched_at) / 3600.0, 1) if self._fetched_at else None,
                 "satellites": out}
