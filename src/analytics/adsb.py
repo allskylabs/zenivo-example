@@ -239,6 +239,8 @@ class AdsbFeed:
             for a in self._ac.values():
                 if a["pos"] and now - a["pos"][-1][0] <= max_age_s:
                     t, lat, lon, alt = a["pos"][-1]
+                    fix = (lat, lon, alt)
+                    lat, lon, alt = _dead_reckon(a, lat, lon, alt, now - t)
                     rec = {"icao": a["icao"], "callsign": a["callsign"], "lat": lat, "lon": lon,
                            "altitude_m": alt, "age_s": now - t,
                            **{k: a[k] for k in ("speed_kt", "track_deg", "vrate_fpm") if k in a}}
@@ -246,10 +248,28 @@ class AdsbFeed:
                         trail = [[round(plat, 5), round(plon, 5), round(palt), round(now - pt, 1)]
                                  for pt, plat, plon, palt in a["trail"]
                                  if now - pt <= trail_s and (pt < t or (pt - t <= 0.1 and (plat != lat or plon != lon)))]
-                        trail.append([round(lat, 5), round(lon, 5), round(alt), round(now - t, 1)])
+                        trail.append([round(fix[0], 5), round(fix[1], 5), round(fix[2]), round(now - t, 1)])
+                        if fix != (lat, lon, alt):
+                            trail.append([round(lat, 5), round(lon, 5), round(alt), 0.0])
                         rec["trail"] = trail
                     out.append(rec)
         return out
+
+
+def _dead_reckon(a: Dict[str, Any], lat: float, lon: float, alt: float, dt: float,
+                 max_dt: float = 30.0) -> Tuple[float, float, float]:
+    """Advance the last ADS-B fix by its age along track/speed/vertical rate (fixes are seconds old and a
+    jet covers ~250 m/s, which at a few km range is many degrees on the sky)."""
+    dt = min(max(dt, 0.0), max_dt)
+    spd, trk = a.get("speed_kt"), a.get("track_deg")
+    if dt <= 0.0 or spd is None or trk is None:
+        return lat, lon, alt
+    d = float(spd) * 0.514444 * dt
+    lat += d * math.cos(math.radians(trk)) / 111320.0
+    lon += d * math.sin(math.radians(trk)) / (111320.0 * max(0.05, math.cos(math.radians(lat))))
+    if a.get("vrate_fpm") is not None:
+        alt += float(a["vrate_fpm"]) * 0.00508 * dt
+    return lat, lon, alt
 
 
 def _project_cam_to_px(cam: np.ndarray, solution: Dict[str, Any]) -> Optional[Tuple[float, float]]:
