@@ -350,7 +350,14 @@ class DayNightAutoExposure:
                     if solar_elev >= -2.0 and p90 < 246.0 and p90 * factor > 246.0:
                         factor = 1.0
                 if self.lock_exposure_s is None:
-                    self.exposure_s *= factor
+                    if (self.lock_gain_db is not None and factor < 1.0 and self.exposure_s <= min_exp * 1.05
+                            and self.lock_gain_db > min_gain):
+                        # Exposure is already at its floor, so a gain lock can only blow out the frame
+                        # (e.g. a night gain lock left on at sunrise): let the gain lock follow the light down
+                        self.lock_gain_db = max(min_gain, self.lock_gain_db + 20.0 * math.log10(factor))
+                        self.gain_db = self.lock_gain_db
+                    else:
+                        self.exposure_s *= factor
                 elif self.lock_gain_db is None:
                     self.gain_db += 20.0 * math.log10(factor)
 
