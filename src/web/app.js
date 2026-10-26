@@ -33,6 +33,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const chkSkyOverlay = document.getElementById("chk-sky-overlay");
     const chkSkyLabels = document.getElementById("chk-sky-labels");
     const chkGridOverlay = document.getElementById("chk-grid-overlay");
+    const chkAircraft = document.getElementById("chk-aircraft-overlay");
+    const aircraftCanvas = document.getElementById("aircraft-canvas");
     const btnRefreshFrame = document.getElementById("btn-refresh-frame");
     const btnFullscreen = document.getElementById("btn-fullscreen");
     const viewportContainer = document.getElementById("viewport-container");
@@ -292,6 +294,14 @@ document.addEventListener("DOMContentLoaded", () => {
             }).catch(() => {});
         });
     });
+
+    if (chkAircraft) {
+        chkAircraft.checked = !!prefs.aircraftOverlay;
+        chkAircraft.addEventListener("change", () => {
+            savePrefs({ aircraftOverlay: chkAircraft.checked });
+            if (chkAircraft.checked) refreshAircraft(); else drawAircraft();
+        });
+    }
 
     // Initialize with synchronized OBS overlay state if available
     fetch("/api/obs/overlay")
@@ -1688,6 +1698,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const ctx = reticleCanvas.getContext("2d");
         ctx.setTransform(pxRatio, 0, 0, pxRatio, 0, 0);
         ctx.clearRect(0, 0, w, h);
+        if (typeof drawAircraft === "function") drawAircraft();
 
         const showSky = chkSkyOverlay ? chkSkyOverlay.checked : true;
         const showLabels = chkSkyLabels ? chkSkyLabels.checked : true;
@@ -2508,6 +2519,96 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.textAlign = "left";
         ctx.fillText(badgeText, bx + 8, by + 15);
         ctx.restore();
+    }
+
+
+    // ---- ADS-B aircraft overlay: marks planes that fall inside the camera's field of view ----
+    let aircraftList = [];
+    let aircraftFetchedAt = 0;
+    function refreshAircraft() {
+        if (!chkAircraft || !chkAircraft.checked || document.hidden) return;
+        fetch("/api/adsb/aircraft?limit=60")
+            .then((r) => r.json())
+            .then((d) => {
+                aircraftList = (d && d.aircraft) || [];
+                aircraftFetchedAt = Date.now();
+                drawAircraft();
+            })
+            .catch(() => {});
+    }
+
+    function drawAircraft() {
+        if (!aircraftCanvas || !viewportContainer) return;
+        const w = viewportContainer.clientWidth;
+        const h = viewportContainer.clientHeight;
+        if (w <= 10 || h <= 10) return;
+        const pxRatio = Math.min(4, (window.devicePixelRatio || 1) * view.zoom);
+        aircraftCanvas.width = Math.round(w * pxRatio);
+        aircraftCanvas.height = Math.round(h * pxRatio);
+        const ctx = aircraftCanvas.getContext("2d");
+        ctx.setTransform(pxRatio, 0, 0, pxRatio, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        if (!chkAircraft || !chkAircraft.checked) return;
+
+        const st = state.station || {};
+        const sensor = st.camera_sensor || {};
+        const sensorW = Number(sensor.width_px || 2592);
+        const sensorH = Number(sensor.height_px || 1944);
+        const containerAspect = w / Math.max(1, h);
+        const sensorAspect = sensorW / Math.max(1, sensorH);
+        let renderW = w, renderH = h, offsetX = 0, offsetY = 0;
+        if (containerAspect > sensorAspect) {
+            renderW = h * sensorAspect;
+            offsetX = (w - renderW) / 2.0;
+        } else {
+            renderH = w / sensorAspect;
+            offsetY = (h - renderH) / 2.0;
+        }
+        const tf = st.image_transform || {};
+        const rot180 = Number(tf.rotate_deg || 0) % 360 === 180;
+        const mirrorX = !!tf.flip_horizontal !== rot180;
+        const mirrorY = !!tf.flip_vertical !== rot180;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(offsetX, offsetY, renderW, renderH);
+        ctx.clip();
+        ctx.font = "11px monospace";
+        ctx.textBaseline = "middle";
+        const age = (Date.now() - aircraftFetchedAt) / 1000.0;
+        aircraftList.forEach((a) => {
+            if (!a.frame_xy) return;
+            let fx = a.frame_xy[0], fy = a.frame_xy[1];
+            if (mirrorX) fx = 1 - fx;
+            if (mirrorY) fy = 1 - fy;
+            const x = offsetX + fx * renderW;
+            const y = offsetY + fy * renderH;
+            ctx.strokeStyle = "rgba(251, 191, 36, 0.95)";
+            ctx.fillStyle = "rgba(251, 191, 36, 0.95)";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(x, y, 9, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+            ctx.fill();
+            const name = a.callsign || a.icao || "?";
+            const alt = a.altitude_m != null ? `FL${String(Math.round(a.altitude_m / 30.48)).padStart(3, "0")}` : "";
+            const dist = a.distance_km != null ? `${a.distance_km}km` : "";
+            const txt = [name, alt, dist].filter(Boolean).join(" ");
+            ctx.shadowColor = "rgba(2, 6, 23, 0.95)";
+            ctx.shadowBlur = 4;
+            ctx.textAlign = x > offsetX + renderW * 0.75 ? "right" : "left";
+            ctx.fillText(txt, x + (ctx.textAlign === "left" ? 14 : -14), y);
+            ctx.shadowBlur = 0;
+        });
+        ctx.restore();
+    }
+
+    if (chkAircraft) {
+        setInterval(refreshAircraft, 3000);
+        window.addEventListener("resize", drawAircraft);
+        setTimeout(refreshAircraft, 400);
     }
 
     if (chkSkyOverlay) chkSkyOverlay.addEventListener("change", drawReticle);

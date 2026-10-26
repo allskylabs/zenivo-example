@@ -105,6 +105,9 @@
                                 <label class="checkbox-label" title="Show horizon circle, altitude rings & N/E/S/W compass">
                                     <input type="checkbox" id="chk-grid-overlay"> Grid &amp; Compass
                                 </label>
+                                <label class="checkbox-label" title="Mark aircraft (ADS-B) passing through the field of view">
+                                    <input type="checkbox" id="chk-aircraft-overlay"> Aircraft
+                                </label>
                                 <button id="btn-refresh-frame" class="btn btn-sm btn-secondary" title="Fetch snapshot">Snapshot</button>
                                 <button id="btn-fullscreen" class="btn btn-sm btn-outline" title="Fullscreen view">Fullscreen</button>
                             </div>
@@ -114,6 +117,7 @@
                                 <img id="live-stream-img" alt="Live AllSky Stream" draggable="false" />
                                 <script>document.getElementById("live-stream-img").src = "/api/live/snapshot.jpg?t=" + Date.now();</script>
                                 <canvas id="reticle-canvas"></canvas>
+                                <canvas id="aircraft-canvas"></canvas>
                             </div>
                             <div class="zoom-controls" aria-label="Zoom">
                                 <button type="button" id="btn-zoom-out" class="zoom-btn" title="Zoom out (-)">−</button>
