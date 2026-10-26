@@ -11,443 +11,305 @@
     <link rel="stylesheet" href="/static/tokens.css?v=20261026ns1">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            user-select: none;
-            -webkit-user-select: none;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
         body {
-            background: var(--bg);
-            color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            font-size: 16px;
-            line-height: 1.35;
-            padding: 8px;
-            overflow-y: auto;
-            overflow-x: hidden;
+            background: var(--bg); color: var(--text);
+            font-family: var(--font-sans); font-size: 14px; line-height: 1.35;
+            padding: 8px; overflow-y: auto; overflow-x: hidden;
         }
-
-        /* Header */
-        .topbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-            background: var(--card);
-            border: 1.5px solid var(--border);
-            border-radius: 8px;
-            padding: 7px 10px;
-            margin-bottom: 8px;
-        }
-        .topbar-left {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            min-width: 0;
-        }
-        .dot {
-            width: 11px;
-            height: 11px;
-            border-radius: 50%;
-            background: var(--amber);
-            flex-shrink: 0;
-        }
-        .dot.online { background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .dock { width: 100%; max-width: 420px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px;
+            background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+        .mono, .val { font-family: var(--font-mono); }
+        .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .head-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .title { font-weight: 700; font-size: 16px; color: var(--text); white-space: nowrap; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); flex-shrink: 0; }
+        .dot.online { background: var(--green); }
         .dot.offline { background: var(--red); }
-        .title {
-            font-weight: 900;
-            font-size: 17px;
-            color: #fff;
-            white-space: nowrap;
-        }
-        .telem-mini {
-            color: #cbd5e1;
-            font-family: ui-monospace, monospace;
-            font-size: 14px;
-            font-weight: 700;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .topbar-actions {
-            display: flex;
-            gap: 5px;
-            flex-shrink: 0;
-        }
+        .pill { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px;
+            border: 1px solid var(--accent); color: var(--accent); font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .pill.off { border-color: var(--muted); color: var(--muted); }
+        a.link { color: var(--muted); font-size: 12px; text-decoration: none; }
+        a.link:hover { color: var(--accent); }
+        .preview { position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden;
+            border: 1px solid var(--border); background: #000; }
+        .preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .preview .chips { position: absolute; top: 8px; left: 8px; display: flex; gap: 6px; align-items: center; }
+        .telem-mini { font-family: var(--font-mono); font-size: 12px; color: var(--text); background: rgba(0,0,0,.55);
+            border-radius: 999px; padding: 3px 8px; white-space: nowrap; }
+        .section { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+            display: flex; flex-direction: column; gap: 10px; }
+        .sec-head { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+        .row { display: flex; align-items: center; gap: 6px; }
+        .lbl { font-size: 12px; font-weight: 600; color: var(--muted); min-width: 52px; flex-shrink: 0; }
+        .val { font-size: 12px; font-weight: 600; color: var(--accent); min-width: 44px; text-align: right; flex-shrink: 0; }
+        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 
-        /* Compact Card */
-        .box {
-            background: var(--card);
-            border: 1.5px solid var(--border);
-            border-radius: 8px;
-            padding: 8px 10px;
-            margin-bottom: 8px;
-        }
-        .box-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 14px;
-            font-weight: 900;
-            text-transform: uppercase;
-            color: var(--accent);
-            letter-spacing: 0.4px;
-            margin-bottom: 7px;
-        }
-
-        /* Buttons */
         button {
-            background: var(--input);
-            border: 1.5px solid var(--border);
-            color: #ffffff;
-            border-radius: 6px;
-            padding: 7px 9px;
-            font-size: 15px;
-            font-weight: 800;
-            cursor: pointer;
-            transition: background 0.1s, border-color 0.1s;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
-            white-space: nowrap;
+            background: var(--input); border: 1px solid var(--border); color: var(--text); border-radius: 8px;
+            height: 36px; padding: 0 12px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: background .1s, border-color .1s; display: inline-flex; align-items: center;
+            justify-content: center; gap: 4px; white-space: nowrap;
         }
-        button:hover {
-            background: var(--hover);
-            border-color: var(--accent);
-        }
-        button:active {
-            transform: translateY(1px);
-        }
-        button.active {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: #060911;
-            font-weight: 900;
-        }
-        button.btn-live {
-            background: rgba(239, 68, 68, 0.25);
-            border-color: var(--red);
-            color: #fecaca;
-        }
-        button.btn-live.active {
-            background: var(--red);
-            color: #fff;
-        }
-        button.btn-sm {
-            padding: 5px 8px;
-            font-size: 14px;
-            font-weight: 800;
-        }
+        button:hover { background: var(--hover); border-color: var(--accent); }
+        button:active { transform: translateY(1px); }
+        button.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+        button.btn-sm { padding: 0 10px; }
+        button.btn-live { border-color: var(--red); color: var(--red); background: transparent; }
+        button.btn-live.active { background: var(--red); color: #fff; }
+        button.btn-danger { background: transparent; border-color: var(--red); color: var(--red); }
+        button.btn-danger:hover { background: rgba(239,68,68,.15); }
+        button.btn-danger.stopped { border-color: var(--green); color: var(--green); }
+        button.btn-wide { flex: 1; }
 
-        /* Grids */
-        .grid-4 {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 5px;
-        }
-        .row {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-top: 6px;
-        }
-        .row:first-child { margin-top: 0; }
-        .lbl {
-            font-size: 14px;
-            font-weight: 800;
-            color: #e2e8f0;
-            min-width: 52px;
-            flex-shrink: 0;
-        }
-        .val {
-            font-family: ui-monospace, monospace;
-            font-size: 15px;
-            font-weight: 900;
-            color: var(--accent);
-            min-width: 46px;
-            text-align: right;
-            flex-shrink: 0;
-        }
+        .sw-row { display: flex; align-items: center; justify-content: space-between; min-height: 36px; }
+        .sw-row span { font-size: 14px; }
+        button.sw { width: 40px; height: 22px; padding: 0; border-radius: 11px; position: relative;
+            background: var(--input); border: 1px solid var(--border); }
+        button.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+            border-radius: 50%; background: var(--muted); transition: left .12s; }
+        button.sw.active { background: var(--accent); border-color: var(--accent); }
+        button.sw.active::after { left: 20px; background: var(--bg); }
 
-        input[type="range"] {
-            flex: 1;
-            height: 8px;
-            accent-color: var(--accent);
-            cursor: pointer;
-            min-width: 45px;
-        }
+        .stat { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+            display: flex; flex-direction: column; gap: 2px; }
+        .stat .k { font-size: 12px; color: var(--muted); }
+        .stat .v { font-family: var(--font-mono); font-size: 16px; font-weight: 600; color: var(--text); }
+        .stat .v small { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 2px; }
+
+        input[type="range"] { flex: 1; height: 8px; accent-color: var(--accent); cursor: pointer; min-width: 45px; }
         input[type="text"], input[type="number"], select {
-            background: var(--input);
-            border: 1.5px solid var(--border);
-            color: #ffffff;
-            border-radius: 6px;
-            padding: 6px 8px;
-            font-size: 15px;
-            font-weight: 700;
-            outline: none;
-            user-select: text;
-            -webkit-user-select: text;
+            background: var(--input); border: 1px solid var(--border); color: var(--text); border-radius: 8px;
+            height: 36px; padding: 0 8px; font-size: 14px; font-family: inherit; outline: none;
+            user-select: text; -webkit-user-select: text;
         }
-        input[type="text"]:focus, input[type="number"]:focus, select:focus {
-            border-color: var(--accent);
-        }
+        input[type="number"] { font-family: var(--font-mono); }
+        input[type="text"]:focus, input[type="number"]:focus, select:focus { border-color: var(--accent); }
 
-        /* Events & Replay List */
-        .ev-list {
-            max-height: 230px;
-            overflow-y: auto;
-            margin-top: 6px;
-            border: 1.5px solid var(--border);
-            border-radius: 6px;
-            background: #0d111a;
-        }
-        .ev-item {
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            padding: 6px 8px;
-            border-bottom: 1px solid rgba(255,255,255,0.08);
-            cursor: pointer;
-            font-size: 15px;
-        }
+        details.adv > summary { cursor: pointer; list-style: none; height: 36px; display: flex; align-items: center;
+            justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--muted);
+            text-transform: uppercase; letter-spacing: .4px; }
+        details.adv > summary::-webkit-details-marker { display: none; }
+        details.adv > summary::after { content: "+"; font-size: 16px; }
+        details.adv[open] > summary::after { content: "\2212"; }
+        details.adv .adv-body { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+
+        .ev-list { max-height: 230px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+        .ev-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--border);
+            cursor: pointer; font-size: 14px; }
         .ev-item:last-child { border-bottom: none; }
         .ev-item:hover { background: var(--hover); }
-        .ev-item.active {
-            background: var(--accent-bg);
-            border-left: 4px solid var(--accent);
-        }
-        .ev-thumb {
-            width: 46px;
-            height: 34px;
-            object-fit: cover;
-            border-radius: 4px;
-            background: #000;
-            flex-shrink: 0;
-        }
-        .ev-info {
-            flex: 1;
-            min-width: 0;
-        }
-        .ev-top {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 6px;
-            font-weight: 800;
-            font-size: 15px;
-            color: #fff;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .ev-sub {
-            font-size: 13px;
-            font-weight: 600;
-            color: #cbd5e1;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .ev-empty {
-            padding: 16px;
-            text-align: center;
-            color: var(--muted);
-            font-size: 14px;
-            font-weight: 700;
-        }
+        .ev-item.active { background: var(--accent-bg); border-left: 3px solid var(--accent); }
+        .ev-thumb { width: 46px; height: 34px; object-fit: cover; border-radius: 4px; background: #000; flex-shrink: 0; }
+        .ev-info { flex: 1; min-width: 0; }
+        .ev-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-weight: 600;
+            font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ev-sub { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap;
+            overflow: hidden; text-overflow: ellipsis; }
+        .ev-empty { padding: 16px; text-align: center; color: var(--muted); font-size: 12px; }
 
-        /* Toast */
-        .toast {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: var(--green);
-            color: #041f14;
-            font-size: 14px;
-            font-weight: 900;
-            padding: 6px 12px;
-            border-radius: 6px;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.15s;
-            z-index: 99;
-        }
+        .toast { position: fixed; bottom: 10px; right: 10px; background: var(--green); color: #041f14; font-size: 12px;
+            font-weight: 600; padding: 8px 12px; border-radius: 8px; opacity: 0; pointer-events: none;
+            transition: opacity .15s; z-index: 99; }
         .toast.show { opacity: 1; }
     </style>
 </head>
 <body>
-    <!-- 1. Top Bar -->
-    <div class="topbar">
-        <div class="topbar-left">
-            <span id="status-dot" class="dot" title="Connection status"></span>
-            <span class="title">AllSky OBS</span>
-            <a href="/live" class="btn-sm" title="Back to dashboard" style="text-decoration:none">← Dashboard</a>
-            <span id="telem-summary" class="telem-mini">--ms • --dB</span>
-        </div>
-        <div class="topbar-actions">
-            <button id="btn-go-live" class="btn-live active" title="Back to live camera feed">🔴 LIVE</button>
-            <button id="btn-snap" class="btn-sm" title="Refresh OBS Browser Source">🔄 Reload OBS</button>
-            <button id="btn-open-obs" class="btn-sm" title="Open /obs page">↗</button>
-        </div>
-    </div>
-
-    <!-- 2. Source & Overlays -->
-    <div class="box">
-        <div class="box-head">
-            <span>Display &amp; Source</span>
-            <span id="lbl-lst" style="font-family:monospace;font-size:14px;color:#fff">LST --:--:--</span>
-        </div>
-
-        <!-- Source mode -->
-        <div class="grid-4" style="margin-bottom: 6px;">
-            <button type="button" class="mode-btn active" data-mode="live">🔴 Live</button>
-            <button type="button" class="mode-btn" data-mode="timelapse">🎬 Timelapse</button>
-            <button type="button" class="mode-btn" data-mode="startrails">🌀 Startrails</button>
-            <button type="button" class="mode-btn" data-mode="keogram">📊 Keogram</button>
-        </div>
-
-        <!-- 8 quick toggles -->
-        <div class="grid-4" style="margin-bottom: 6px;">
-            <button type="button" id="tg-sky" title="Constellations & bright stars">🌟 Constellations</button>
-            <button type="button" id="tg-labels" title="Constellation & star names">🏷️ Star names</button>
-            <button type="button" id="tg-grid" title="Coordinate grid & compass">🧭 Grid/Compass</button>
-            <button type="button" id="tg-sunmoon" title="Sun & Moon position">☀️ Sun/Moon</button>
-            <button type="button" id="tg-adsb" title="Live ADS-B aircraft radar">✈️ ADS-B Radar</button>
-            <button type="button" id="tg-events" title="Recent meteor & aircraft trails">☄️ Event trails</button>
-            <button type="button" id="tg-badge" title="Left-corner info badge">📊 LST/FOV</button>
-            <button type="button" id="tg-night" title="Red tint to protect night vision">🔴 Red light</button>
-        </div>
-
-        <!-- Presets + Fit/Bg + Opacity -->
-        <div class="row">
-            <button type="button" id="pre-full" class="btn-sm" style="flex:1">🌌 Full</button>
-            <button type="button" id="pre-clean" class="btn-sm" style="flex:1">🔭 Clean</button>
-            <button type="button" id="pre-raw" class="btn-sm" style="flex:1">📷 Raw</button>
-            <button type="button" id="btn-fit" class="btn-sm" style="flex:1" title="Toggle 16:9 Cover / 4:3 Original">16:9 Cover</button>
-            <button type="button" id="btn-bg" class="btn-sm" title="Toggle Black / Transparent background">Black BG</button>
-        </div>
-        <div class="row">
-            <span class="lbl">Sharpness:</span>
-            <input type="range" id="rng-opacity" min="0.1" max="1.0" step="0.05" value="1.0">
-            <span id="val-opacity" class="val">100%</span>
-        </div>
-    </div>
-
-    <!-- 3. Zoom, Pan, Tilt/Rotate & Brightness -->
-    <div class="box">
-        <div class="box-head">
-            <span>Zoom • Pan • Tilt (Xoay)</span>
-            <button type="button" id="btn-reset-view" class="btn-sm">⟲ Reset khung</button>
-        </div>
-
-        <!-- Zoom -->
-        <div class="row">
-            <span class="lbl">Zoom:</span>
-            <input type="range" id="rng-zoom" min="1.0" max="6.0" step="0.1" value="1.0">
-            <span id="val-zoom" class="val">1.0x</span>
-            <button type="button" class="btn-sm z-quick" data-z="1">1x</button>
-            <button type="button" class="btn-sm z-quick" data-z="2">2x</button>
-            <button type="button" class="btn-sm z-quick" data-z="4">4x</button>
-        </div>
-
-        <!-- Pan X / Y + direction buttons -->
-        <div class="row">
-            <span class="lbl">Pan:</span>
-            <button type="button" class="btn-sm pan-step" data-dx="-8" data-dy="0" title="Left">◀</button>
-            <button type="button" class="btn-sm pan-step" data-dx="0" data-dy="-8" title="Up">▲</button>
-            <button type="button" class="btn-sm pan-step" data-dx="0" data-dy="8" title="Down">▼</button>
-            <button type="button" class="btn-sm pan-step" data-dx="8" data-dy="0" title="Right">▶</button>
-            <button type="button" class="btn-sm" id="btn-pan-center" title="Center">⏺</button>
-            <input type="range" id="rng-panx" min="-80" max="80" step="1" value="0" title="Pan ngang (X)">
-            <input type="range" id="rng-pany" min="-80" max="80" step="1" value="0" title="Pan vertical (Y)">
-        </div>
-
-        <!-- Tilt / Rotate + Flip -->
-        <div class="row">
-            <span class="lbl">Xoay:</span>
-            <input type="range" id="rng-rotate" min="-180" max="180" step="1" value="0">
-            <span id="val-rotate" class="val">0°</span>
-            <button type="button" class="btn-sm rot-quick" data-r="0">0°</button>
-            <button type="button" class="btn-sm rot-quick" data-r="90">90°</button>
-            <button type="button" class="btn-sm rot-quick" data-r="180">180°</button>
-            <button type="button" id="btn-fliph" class="btn-sm" title="Flip horizontal">⇄H</button>
-            <button type="button" id="btn-flipv" class="btn-sm" title="Flip vertical">⇅V</button>
-        </div>
-
-        <!-- Brightness & Contrast -->
-        <div class="row">
-            <span class="lbl">Bright:</span>
-            <input type="range" id="rng-bright" min="0.5" max="2.5" step="0.05" value="1.0">
-            <span id="val-bright" class="val" style="min-width:36px">1.0</span>
-            <span class="lbl" style="min-width:46px;margin-left:4px">Contrast:</span>
-            <input type="range" id="rng-contrast" min="0.5" max="2.5" step="0.05" value="1.0">
-            <span id="val-contrast" class="val" style="min-width:36px">1.0</span>
-        </div>
-    </div>
-
-    <!-- 4. OBS Title -->
-    <div class="box">
-        <div class="box-head">
-            <span>OBS Title</span>
-            <select id="sel-title-pos" style="padding:3px 6px;font-size:14px;">
-                <option value="bottom-left">Bottom left</option>
-                <option value="bottom-center">Bottom center</option>
-                <option value="top-left">Top left</option>
-                <option value="top-center">Top center</option>
-            </select>
-        </div>
-        <div class="row">
-            <input type="text" id="inp-title" placeholder="Main title..." style="flex:1.2;min-width:0;">
-            <input type="text" id="inp-sub" placeholder="Subtitle..." style="flex:1;min-width:0;">
-            <button type="button" id="btn-title-apply" class="btn-sm active">Show</button>
-            <button type="button" id="btn-title-clear" class="btn-sm">Clear</button>
-        </div>
-    </div>
-
-    <!-- 5. Replay Meteors, Aircraft, Satellites & ADS-B Radar -->
-    <div class="box">
-        <div class="box-head">
-            <span>Replay Meteors • Aircraft • Radar</span>
-            <div style="display:flex;gap:5px;">
-                <button type="button" id="btn-ev-prev" class="btn-sm" title="Previous event">◀</button>
-                <button type="button" id="btn-ev-next" class="btn-sm" title="Next event">▶</button>
-                <button type="button" id="btn-ev-reload" class="btn-sm" title="Reload list">🔄</button>
+    <div class="dock">
+        <!-- Header -->
+        <div class="head">
+            <div class="head-left">
+                <span id="status-dot" class="dot" title="Connection status"></span>
+                <span class="title">OBS Dock</span>
+                <span id="stream-pill" class="pill">Streaming</span>
+            </div>
+            <div class="row">
+                <button id="btn-snap" class="btn-sm" title="Refresh OBS Browser Source">Reload OBS</button>
+                <button id="btn-open-obs" class="btn-sm" title="Open /obs page">Open</button>
             </div>
         </div>
 
-        <div class="grid-4" id="ev-tabs">
-            <button type="button" class="ev-tab active" data-tab="all">All</button>
-            <button type="button" class="ev-tab" data-tab="meteor">☄️ Meteors</button>
-            <button type="button" class="ev-tab" data-tab="plane">✈️ Aircraft</button>
-            <button type="button" class="ev-tab" data-tab="adsb">📡 Radar Live</button>
+        <!-- Preview -->
+        <div class="preview">
+            <img id="pv-img" alt="Live preview" src="/api/live/snapshot.jpg">
+            <div class="chips">
+                <button id="btn-go-live" class="btn-live active btn-sm" style="height:24px;border-radius:999px" title="Back to live camera feed">LIVE</button>
+                <span id="telem-summary" class="telem-mini">-- ms · -- dB</span>
+            </div>
         </div>
 
-        <div id="ev-list" class="ev-list">
-            <div class="ev-empty">Loading data...</div>
+        <!-- Zoom -->
+        <div class="section">
+            <div class="sec-head">
+                <span>Zoom</span>
+                <button type="button" id="btn-reset-view" class="btn-sm">Reset view</button>
+            </div>
+            <div class="row">
+                <button type="button" id="btn-zoom-out" class="btn-sm" title="Zoom out">&minus;</button>
+                <input type="range" id="rng-zoom" min="1.0" max="6.0" step="0.1" value="1.0">
+                <button type="button" id="btn-zoom-in" class="btn-sm" title="Zoom in">+</button>
+                <span id="val-zoom" class="val">1.0x</span>
+            </div>
+            <div class="grid-3">
+                <button type="button" class="btn-sm z-quick" data-z="1">1x</button>
+                <button type="button" class="btn-sm z-quick" data-z="2">2x</button>
+                <button type="button" class="btn-sm z-quick" data-z="4">4x</button>
+            </div>
         </div>
-    </div>
 
-    <!-- 6. Quick Camera Controls -->
-    <div class="box" style="margin-bottom:0;">
-        <div class="box-head">
-            <span>Camera &amp; Exposure</span>
-            <span id="cam-sky-info" style="color:#fff;font-size:13px;font-weight:800">--</span>
+        <!-- Overlays -->
+        <div class="section">
+            <div class="sec-head"><span>Overlays</span><span id="lbl-lst" class="mono">LST --:--:--</span></div>
+            <div class="sw-row"><span>Clock</span><button type="button" id="tg-badge" class="sw" title="Info badge with LST clock"></button></div>
+            <div class="sw-row"><span>Meteor counter</span><button type="button" id="tg-events" class="sw" title="Recent meteor &amp; aircraft trails"></button></div>
+            <div class="sw-row"><span>Moon &amp; sky quality</span><button type="button" id="tg-sunmoon" class="sw" title="Sun &amp; Moon position"></button></div>
+            <div class="sw-row"><span>Station caption</span><button type="button" id="tg-caption" class="sw" title="Show station caption title"></button></div>
         </div>
-        <div class="row">
-            <button type="button" id="cam-auto" class="btn-sm" style="flex:1">Auto AE</button>
-            <button type="button" id="cam-manual" class="btn-sm" style="flex:1">Manual</button>
-            <button type="button" id="cam-boost" class="btn-sm" style="flex:1">✨ Star Boost</button>
+
+        <!-- Stream stats -->
+        <div class="section">
+            <div class="sec-head"><span>Stream</span></div>
+            <div class="grid-3">
+                <div class="stat"><span class="k">Uptime</span><span class="v" id="st-uptime">00:00:00</span></div>
+                <div class="stat"><span class="k">Bitrate</span><span class="v" id="st-bitrate">&mdash;</span></div>
+                <div class="stat"><span class="k">Dropped</span><span class="v" id="st-dropped">&mdash;</span></div>
+            </div>
         </div>
-        <div class="row">
-            <span class="lbl">Exp(s):</span>
-            <input type="number" id="inp-exp" step="any" min="0.0001" max="90" value="0.01" style="width:82px">
-            <span class="lbl" style="min-width:44px">Gain:</span>
-            <input type="number" id="inp-gain" step="1" min="0" max="72" value="0" style="width:66px">
-            <button type="button" id="btn-cam-set" class="btn-sm" style="flex:1">Apply</button>
+
+        <!-- Actions -->
+        <div class="grid-2">
+            <button type="button" id="btn-stop-stream" class="btn-danger" title="Pause the dock preview and uptime">Stop stream</button>
+            <button type="button" id="btn-take-snapshot" title="Open a full-resolution snapshot">Take snapshot</button>
         </div>
+
+        <!-- Advanced -->
+        <details class="adv section">
+            <summary>More controls</summary>
+            <div class="adv-body">
+                <div class="grid-2">
+                    <button type="button" class="mode-btn active" data-mode="live">Live</button>
+                    <button type="button" class="mode-btn" data-mode="timelapse">Timelapse</button>
+                    <button type="button" class="mode-btn" data-mode="startrails">Startrails</button>
+                    <button type="button" class="mode-btn" data-mode="keogram">Keogram</button>
+                </div>
+
+                <div class="grid-2">
+                    <button type="button" id="tg-sky" title="Constellations & bright stars">Constellations</button>
+                    <button type="button" id="tg-labels" title="Constellation & star names">Star names</button>
+                    <button type="button" id="tg-grid" title="Coordinate grid & compass">Grid / Compass</button>
+                    <button type="button" id="tg-adsb" title="Live ADS-B aircraft radar">ADS-B Radar</button>
+                    <button type="button" id="tg-night" title="Red tint to protect night vision">Red light</button>
+                </div>
+
+                <div class="row">
+                    <button type="button" id="pre-full" class="btn-sm btn-wide">Full</button>
+                    <button type="button" id="pre-clean" class="btn-sm btn-wide">Clean</button>
+                    <button type="button" id="pre-raw" class="btn-sm btn-wide">Raw</button>
+                </div>
+                <div class="row">
+                    <button type="button" id="btn-fit" class="btn-sm btn-wide" title="Toggle 16:9 Cover / 4:3 Original">16:9 Cover</button>
+                    <button type="button" id="btn-bg" class="btn-sm btn-wide" title="Toggle Black / Transparent background">Black BG</button>
+                </div>
+                <div class="row">
+                    <span class="lbl">Sharpness</span>
+                    <input type="range" id="rng-opacity" min="0.1" max="1.0" step="0.05" value="1.0">
+                    <span id="val-opacity" class="val">100%</span>
+                </div>
+
+                <div class="sec-head"><span>Pan &amp; rotate</span></div>
+                <div class="row">
+                    <span class="lbl">Pan</span>
+                    <button type="button" class="btn-sm pan-step" data-dx="-8" data-dy="0" title="Left">&larr;</button>
+                    <button type="button" class="btn-sm pan-step" data-dx="0" data-dy="-8" title="Up">&uarr;</button>
+                    <button type="button" class="btn-sm pan-step" data-dx="0" data-dy="8" title="Down">&darr;</button>
+                    <button type="button" class="btn-sm pan-step" data-dx="8" data-dy="0" title="Right">&rarr;</button>
+                    <button type="button" class="btn-sm" id="btn-pan-center" title="Center">Center</button>
+                </div>
+                <div class="row">
+                    <span class="lbl">Pan X</span>
+                    <input type="range" id="rng-panx" min="-80" max="80" step="1" value="0" title="Pan horizontal (X)">
+                </div>
+                <div class="row">
+                    <span class="lbl">Pan Y</span>
+                    <input type="range" id="rng-pany" min="-80" max="80" step="1" value="0" title="Pan vertical (Y)">
+                </div>
+                <div class="row">
+                    <span class="lbl">Rotate</span>
+                    <input type="range" id="rng-rotate" min="-180" max="180" step="1" value="0">
+                    <span id="val-rotate" class="val">0&deg;</span>
+                </div>
+                <div class="row">
+                    <button type="button" class="btn-sm rot-quick btn-wide" data-r="0">0&deg;</button>
+                    <button type="button" class="btn-sm rot-quick btn-wide" data-r="90">90&deg;</button>
+                    <button type="button" class="btn-sm rot-quick btn-wide" data-r="180">180&deg;</button>
+                    <button type="button" id="btn-fliph" class="btn-sm btn-wide" title="Flip horizontal">Flip H</button>
+                    <button type="button" id="btn-flipv" class="btn-sm btn-wide" title="Flip vertical">Flip V</button>
+                </div>
+                <div class="row">
+                    <span class="lbl">Bright</span>
+                    <input type="range" id="rng-bright" min="0.5" max="2.5" step="0.05" value="1.0">
+                    <span id="val-bright" class="val">1.0</span>
+                </div>
+                <div class="row">
+                    <span class="lbl">Contrast</span>
+                    <input type="range" id="rng-contrast" min="0.5" max="2.5" step="0.05" value="1.0">
+                    <span id="val-contrast" class="val">1.0</span>
+                </div>
+
+                <div class="sec-head">
+                    <span>OBS title</span>
+                    <select id="sel-title-pos">
+                        <option value="bottom-left">Bottom left</option>
+                        <option value="bottom-center">Bottom center</option>
+                        <option value="top-left">Top left</option>
+                        <option value="top-center">Top center</option>
+                    </select>
+                </div>
+                <div class="row">
+                    <input type="text" id="inp-title" placeholder="Main title..." style="flex:1.2;min-width:0;">
+                    <input type="text" id="inp-sub" placeholder="Subtitle..." style="flex:1;min-width:0;">
+                </div>
+                <div class="row">
+                    <button type="button" id="btn-title-apply" class="btn-sm active btn-wide">Show</button>
+                    <button type="button" id="btn-title-clear" class="btn-sm btn-wide">Clear</button>
+                </div>
+
+                <div class="sec-head">
+                    <span>Replay</span>
+                    <div class="row">
+                        <button type="button" id="btn-ev-prev" class="btn-sm" title="Previous event">&larr;</button>
+                        <button type="button" id="btn-ev-next" class="btn-sm" title="Next event">&rarr;</button>
+                        <button type="button" id="btn-ev-reload" class="btn-sm" title="Reload list">Reload</button>
+                    </div>
+                </div>
+                <div class="grid-2" id="ev-tabs">
+                    <button type="button" class="ev-tab active" data-tab="all">All</button>
+                    <button type="button" class="ev-tab" data-tab="meteor">Meteors</button>
+                    <button type="button" class="ev-tab" data-tab="plane">Aircraft</button>
+                    <button type="button" class="ev-tab" data-tab="adsb">Radar live</button>
+                </div>
+                <div id="ev-list" class="ev-list"><div class="ev-empty">Loading data...</div></div>
+
+                <div class="sec-head">
+                    <span>Camera &amp; exposure</span>
+                    <span id="cam-sky-info" class="mono" style="text-transform:none">--</span>
+                </div>
+                <div class="row">
+                    <button type="button" id="cam-auto" class="btn-sm btn-wide">Auto AE</button>
+                    <button type="button" id="cam-manual" class="btn-sm btn-wide">Manual</button>
+                    <button type="button" id="cam-boost" class="btn-sm btn-wide">Star boost</button>
+                </div>
+                <div class="row">
+                    <span class="lbl" style="min-width:40px">Exp (s)</span>
+                    <input type="number" id="inp-exp" step="any" min="0.0001" max="90" value="0.01" style="width:82px">
+                    <span class="lbl" style="min-width:32px">Gain</span>
+                    <input type="number" id="inp-gain" step="1" min="0" max="72" value="0" style="width:66px">
+                    <button type="button" id="btn-cam-set" class="btn-sm btn-wide">Apply</button>
+                </div>
+            </div>
+        </details>
     </div>
 
     <div id="toast" class="toast">Synced</div>
@@ -531,6 +393,7 @@
                 $("tg-events").classList.toggle("active", !!state.events_overlay);
                 $("tg-badge").classList.toggle("active", state.badge !== false);
                 $("tg-night").classList.toggle("active", !!state.night_vision);
+                $("tg-caption").classList.toggle("active", !!(state.title_text || state.title_sub));
 
                 $("btn-fit").textContent = state.fit === "contain" ? "4:3 Original" : "16:9 Cover";
                 $("btn-fit").classList.toggle("active", state.fit === "contain");
@@ -621,6 +484,44 @@
             });
             $("btn-open-obs").addEventListener("click", () => window.open("/obs", "_blank"));
 
+
+            // Zoom +/- buttons
+            const stepZoom = (d) => pushPatch({ zoom: Math.max(1, Math.min(6, Math.round(((state.zoom || 1) + d) * 10) / 10)) }, null, true);
+            $("btn-zoom-out").addEventListener("click", () => stepZoom(-0.5));
+            $("btn-zoom-in").addEventListener("click", () => stepZoom(0.5));
+
+            // Preview + stream stats (uptime is client-side; bitrate/dropped have no backend source)
+            const pvImg = $("pv-img");
+            let streaming = true;
+            let streamStart = Date.now();
+            let pvTimer = null;
+            const pad2 = (n) => String(n).padStart(2, "0");
+            function tickUptime() {
+                if (!streaming) return;
+                const t = Math.floor((Date.now() - streamStart) / 1000);
+                $("st-uptime").textContent = `${pad2(Math.floor(t / 3600))}:${pad2(Math.floor(t / 60) % 60)}:${pad2(t % 60)}`;
+            }
+            function refreshPreview() {
+                if (!streaming || document.hidden) return;
+                pvImg.src = "/api/live/snapshot.jpg?t=" + Date.now();
+            }
+            setInterval(tickUptime, 1000);
+            pvTimer = setInterval(refreshPreview, 1500);
+            $("btn-stop-stream").addEventListener("click", () => {
+                streaming = !streaming;
+                const btn = $("btn-stop-stream");
+                btn.textContent = streaming ? "Stop stream" : "Resume stream";
+                btn.classList.toggle("stopped", !streaming);
+                $("stream-pill").textContent = streaming ? "Streaming" : "Stopped";
+                $("stream-pill").classList.toggle("off", !streaming);
+                if (streaming) { streamStart = Date.now(); refreshPreview(); }
+                notify(streaming ? "Stream resumed" : "Stream stopped");
+            });
+            $("btn-take-snapshot").addEventListener("click", () => {
+                window.open("/api/live/snapshot.jpg?t=" + Date.now(), "_blank");
+                notify("Snapshot opened");
+            });
+
             // View Mode buttons
             document.querySelectorAll(".mode-btn").forEach((btn) => {
                 btn.addEventListener("click", () => {
@@ -651,6 +552,11 @@
             bindToggle("tg-events", "events_overlay");
             bindToggle("tg-badge", "badge");
             bindToggle("tg-night", "night_vision");
+            $("tg-caption").addEventListener("click", () => {
+                const on = !!(state.title_text || state.title_sub);
+                if (on) pushPatch({ title_text: "", title_sub: "" }, "Caption hidden");
+                else pushPatch({ title_text: $("inp-title").value.trim() || "AllSky Station", title_sub: $("inp-sub").value.trim(), title_pos: $("sel-title-pos").value }, "Caption shown");
+            });
 
             // Presets & Fit/Bg
             $("pre-full").addEventListener("click", () => pushPatch({
@@ -731,7 +637,7 @@
             function fmtTime(iso) {
                 try {
                     const d = new Date(iso);
-                    return d.toLocaleTimeString("vi-VN", { hour12: false }) + " " + d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+                    return d.toLocaleTimeString("en-GB", { hour12: false }) + " " + d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit" });
                 } catch (e) { return iso || ""; }
             }
 
@@ -741,7 +647,7 @@
                 const ev = eventsList[idx];
                 const isMeteor = ev.type === "meteor";
                 const fl = ev.flight || ev.nearest_flight;
-                const icon = isMeteor ? "☄️ Meteors" : ev.type === "satellite" ? "🛰️ Satellite" : `✈️ ${fl ? (fl.callsign || fl.icao) : "Aircraft"}`;
+                const icon = isMeteor ? "Meteor" : ev.type === "satellite" ? "🛰️ Satellite" : `✈️ ${fl ? (fl.callsign || fl.icao) : "Aircraft"}`;
                 const label = `${icon} • ${fmtTime(ev.timestamp)}${fl && fl.altitude_m ? ` • ${fl.altitude_m}m` : ""}`;
                 const skyUrl = ev.sky_url || ev.thumbnail_url || "";
                 const cropUrl = (ev.sky_url && ev.thumbnail_url && ev.thumbnail_url !== ev.sky_url) ? ev.thumbnail_url : "";
@@ -784,7 +690,7 @@
                         const pos = a.alt_deg !== undefined ? `Alt ${Math.round(a.alt_deg)}° • Az ${Math.round(a.az_deg || 0)}°` : "";
                         return `<div class="ev-item" data-adsb-idx="${i}">
                             <div class="ev-info">
-                                <div class="ev-top"><span>✈️ ${call} ${a.in_view ? "🟢(Trong khung)" : ""}</span><span>${alt} • ${dist}</span></div>
+                                <div class="ev-top"><span>✈️ ${call} ${a.in_view ? "(in view)" : ""}</span><span>${alt} • ${dist}</span></div>
                                 <div class="ev-sub">${pos} ${spd ? "• " + spd : ""}</div>
                             </div>
                             <button type="button" class="btn-sm adsb-pin" data-adsb-idx="${i}" title="Enable Radar & pin aircraft title">Pin to OBS</button>
@@ -822,7 +728,7 @@
                 container.innerHTML = eventsList.map((ev, i) => {
                     const isMeteor = ev.type === "meteor";
                     const fl = ev.flight || ev.nearest_flight;
-                    const badge = isMeteor ? "☄️ Meteors" : ev.type === "satellite" ? "🛰️ Satellite" : `✈️ ${fl ? (fl.callsign || fl.icao) : "Aircraft"}`;
+                    const badge = isMeteor ? "Meteor" : ev.type === "satellite" ? "🛰️ Satellite" : `✈️ ${fl ? (fl.callsign || fl.icao) : "Aircraft"}`;
                     const detail = fl
                         ? `Alt ${fl.altitude_m || "--"}m • Dist ${fl.distance_km || "--"}km`
                         : `Length ${Math.round(ev.length_px || 0)}px • ${ev.frames || 1} frames`;
@@ -869,8 +775,8 @@
                         eventsList = d.events || [];
                         const c = d.counts || {};
                         const tabs = document.querySelectorAll(".ev-tab");
-                        if (tabs[1] && c.meteor !== undefined) tabs[1].textContent = `☄️ Meteors (${c.meteor})`;
-                        if (tabs[2] && c.plane !== undefined) tabs[2].textContent = `✈️ Aircraft (${c.plane})`;
+                        if (tabs[1] && c.meteor !== undefined) tabs[1].textContent = `Meteors (${c.meteor})`;
+                        if (tabs[2] && c.plane !== undefined) tabs[2].textContent = `Aircraft (${c.plane})`;
                         renderEventRows();
                     }
                 } catch (e) {
@@ -963,7 +869,7 @@
                                 const exp = dv.getFloat32(16, true);
                                 const gain = dv.getFloat32(20, true);
                                 const stars = dv.getUint32(32, true);
-                                telemSummary.textContent = `${exp >= 1 ? exp.toFixed(1) + "s" : (exp * 1000).toFixed(0) + "ms"} • ${gain.toFixed(1)}dB • ${stars}★`;
+                                telemSummary.textContent = `${exp >= 1 ? exp.toFixed(1) + " s" : (exp * 1000).toFixed(0) + " ms"} · ${gain.toFixed(1)} dB · ${stars}★`;
                             }
                         } else if (typeof ev.data === "string") {
                             try {
