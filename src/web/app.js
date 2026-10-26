@@ -748,7 +748,14 @@ document.addEventListener("DOMContentLoaded", () => {
     let stationFormDirty = false;
     function setStationFormDirty(dirty) {
         stationFormDirty = dirty;
-        if (btnStationSave) btnStationSave.classList.toggle("hidden", !dirty);
+        if (btnStationSave) btnStationSave.disabled = !dirty;
+    }
+    const btnStationReset = document.getElementById("btn-station-reset");
+    if (btnStationReset) {
+        btnStationReset.addEventListener("click", async () => {
+            setStationFormDirty(false);
+            await loadStationConfig();
+        });
     }
     if (btnStationSave) {
         btnStationSave.closest(".card").querySelectorAll(".settings-grid input").forEach((el) =>
@@ -895,6 +902,21 @@ document.addEventListener("DOMContentLoaded", () => {
             const stars = st.matched_stars_count ? ` (${st.matched_stars_count} stars)` : "";
             stSolverMeta.textContent = `${src}${stars} • ${consts}`;
         }
+
+        const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+        let tz = "";
+        try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) {}
+        setVal("st-f-tz", tz || "--");
+        setVal("st-f-sensor", sensor.sensor_model || "Sony Starvis IMX335");
+        setVal("st-f-pixel", Number(sensor.pixel_pitch_um || 2.0).toFixed(1));
+        setVal("st-f-lens", optics.lens_model || "Fisheye AllSky");
+        setVal("st-f-circle", optics.horizon_radius_90_px ? `${Math.round(Number(optics.horizon_radius_90_px) * 2)} diameter` : "--");
+        const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+        const solvedAt = st.solved_at || st.last_solved_at;
+        const solvedDate = solvedAt ? new Date(solvedAt) : null;
+        setTxt("st-solve-last", solvedDate && !isNaN(solvedDate) ? solvedDate.toISOString().slice(11, 19) + " UTC" : "--");
+        setTxt("st-solve-stars", st.matched_stars_count ? String(st.matched_stars_count) : "--");
+        setTxt("st-solve-source", st.solve_source || "not solved yet");
 
         drawReticle();
     }
@@ -1343,7 +1365,7 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (err) {
                 showAlert(stationAlert, `❌ Network error: ${err.message}`, "error", true);
             } finally {
-                btnStationSave.disabled = false;
+                btnStationSave.disabled = !stationFormDirty;
             }
         });
     }

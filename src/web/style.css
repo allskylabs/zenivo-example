@@ -2309,3 +2309,18 @@ details.registers-box[open] > summary { margin-bottom: 0.3rem; }
 .tl-result { font-size: var(--font-size-min); color: var(--text-secondary); font-family: var(--font-mono); }
 .tl-result a { color: var(--accent); }
 .tl-result video { width: 100%; margin-top: var(--space-2); border-radius: var(--radius-md); }
+
+/* Station & Optics page header + solver card */
+.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.page-header h2 { margin: 0; font-size: 1.1rem; }
+.page-sub { margin: 0.25rem 0 0; font-size: 0.75rem; color: var(--text-secondary); }
+.page-header-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.page-header-actions .btn { min-height: 36px; border-radius: 8px; }
+.page-header-actions .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.field input.mono, .field input[readonly] { font-family: var(--font-mono); font-size: 0.8125rem; border-radius: 8px; }
+.field input[readonly] { opacity: 0.85; cursor: default; }
+.badge-auto { font-size: 0.75rem; margin-left: 0.35rem; vertical-align: middle; }
+.solver-card { margin-top: 1rem; background: var(--bg-card-sub); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.85rem 1rem; }
+.solver-card h3 { margin: 0 0 0.6rem; font-size: 0.75rem; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; }
+.solver-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; }
+.solver-card .telem-value { font-family: var(--font-mono); }

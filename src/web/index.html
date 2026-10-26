@@ -653,15 +653,22 @@
 
             <!-- Station & Camera Settings Card -->
             <div class="card settings-card" data-sgroup="station">
-                <div class="card-header">
-                    <h2>Station &amp; Optics</h2>
-                    <span class="badge badge-accent" id="station-solve-badge">NOT SOLVED YET</span>
+                <div class="page-header">
+                    <div class="page-header-text">
+                        <h2>Station &amp; Optics</h2>
+                        <p class="page-sub">Location and lens model used for sky solving, labels and flight overlay.</p>
+                    </div>
+                    <div class="page-header-actions">
+                        <span class="badge badge-accent" id="station-solve-badge">NOT SOLVED YET</span>
+                        <button id="btn-station-reset" class="btn btn-outline" type="button">Reset</button>
+                        <button id="btn-station-save" class="btn btn-primary" type="button" disabled>Save changes</button>
+                    </div>
                 </div>
                 <p class="description">
                     <a href="https://hoan.uk/astronomy/plate-solving" target="_blank" rel="noopener">Plate-solving</a>
                     on a starry night measures the lens and mounting parameters and saves them automatically, as does
-                    <strong>Locate via GPS / IP</strong> for the coordinates. <strong>Save configuration</strong> appears
-                    only after you edit a field by hand.
+                    <strong>Locate via GPS / IP</strong> for the coordinates. <strong>Save changes</strong> is enabled
+                    after you edit a field by hand; <strong>Reset</strong> reloads the saved values.
                 </p>
 
                 <div class="settings-grid">
@@ -687,6 +694,33 @@
                             </div>
                             <div class="field field-end">
                                 <button id="btn-station-auto-gps" class="btn btn-sm btn-outline" type="button">📍 Locate via GPS / IP</button>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <!-- Sensor & lens identity (read-only, reported by the camera) -->
+                    <fieldset class="settings-group">
+                        <legend>Sensor &amp; Lens</legend>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="st-f-tz">Timezone (browser)</label>
+                                <input type="text" id="st-f-tz" class="mono" readonly />
+                            </div>
+                            <div class="field">
+                                <label for="st-f-sensor">Sensor</label>
+                                <input type="text" id="st-f-sensor" class="mono" readonly />
+                            </div>
+                            <div class="field">
+                                <label for="st-f-pixel">Pixel size (&micro;m)</label>
+                                <input type="text" id="st-f-pixel" class="mono" readonly />
+                            </div>
+                            <div class="field">
+                                <label for="st-f-lens">Lens type</label>
+                                <input type="text" id="st-f-lens" class="mono" readonly />
+                            </div>
+                            <div class="field">
+                                <label for="st-f-circle">Image circle (px)</label>
+                                <input type="text" id="st-f-circle" class="mono" readonly />
                             </div>
                         </div>
                     </fieldset>
@@ -739,7 +773,7 @@
                                 <input type="number" id="ori-tilt" min="0" max="90" step="0.1" value="0.0" />
                             </div>
                             <div class="field">
-                                <label for="ori-az">Tilt azimuth (°)</label>
+                                <label for="ori-az">Azimuth offset (°) <span class="badge badge-accent badge-auto" title="Refined from star matches by plate-solving">AUTO</span></label>
                                 <input type="number" id="ori-az" min="0" max="360" step="0.1" value="180.0" />
                             </div>
                         </div>
@@ -748,11 +782,20 @@
                 </div>
 
                 <div class="settings-actions">
-                    <button id="btn-station-save" class="btn btn-primary hidden" type="button">💾 Save configuration</button>
                     <button id="btn-station-solve" class="btn btn-outline" type="button">🔭 Capture &amp; Auto Plate-Solve</button>
                     <label class="checkbox-label" title="Ignore the saved lens: re-read the sensor and re-measure focal length, distortion and optical centre from a 90 s star-tracking series (clear night). The old values are kept if the solve fails.">
                         <input type="checkbox" id="chk-station-deep"> Deep solve (re-measure lens &amp; sensor)
                     </label>
+                </div>
+
+
+                <div class="solver-card">
+                    <h3>Solver status</h3>
+                    <div class="solver-grid">
+                        <div class="telem-box"><span class="telem-label">Last solve</span><span class="telem-value mono" id="st-solve-last">--</span></div>
+                        <div class="telem-box"><span class="telem-label">Matched stars</span><span class="telem-value mono" id="st-solve-stars">--</span></div>
+                        <div class="telem-box"><span class="telem-label">Source</span><span class="telem-value mono" id="st-solve-source">--</span></div>
+                    </div>
                 </div>
 
                 <div id="station-alert" class="alert-box hidden mt-3"></div>
