@@ -1480,6 +1480,16 @@ document.addEventListener("DOMContentLoaded", () => {
     // Live View Controls
     // ------------------------------------------------------------------
     btnRefreshFrame.addEventListener("click", () => {
+        const label = btnRefreshFrame.textContent;
+        const done = () => {
+            btnRefreshFrame.disabled = false;
+            btnRefreshFrame.textContent = label;
+        };
+        btnRefreshFrame.disabled = true;
+        btnRefreshFrame.textContent = "Loading…";
+        liveImg.addEventListener("load", done, { once: true });
+        liveImg.addEventListener("error", done, { once: true });
+        setTimeout(done, 8000);
         liveImg.src = `/api/live/snapshot.jpg?t=${Date.now()}`;
     });
 
