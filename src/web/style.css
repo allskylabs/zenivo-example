@@ -1599,7 +1599,7 @@ html, .focus-side, .log-list {
 .btn-success:hover { filter: brightness(1.1); }
 .focus-side .card { padding: 1rem; }
 .focus-side .card-header { margin-bottom: 0.6rem; }
-.focus-lens-nudge { display: grid !important; grid-template-columns: repeat(6, 1fr); gap: 0.3rem; }
+.focus-lens-nudge { display: grid !important; grid-template-columns: repeat(4, 1fr); gap: 0.3rem; }
 .focus-lens-nudge .btn { padding: 0.2rem 0; }
 .focus-details { padding: 0.75rem 1rem; }
 .focus-details > summary { cursor: pointer; font-weight: 600; font-size: 0.95rem; list-style: none; }
@@ -2324,3 +2324,12 @@ details.registers-box[open] > summary { margin-bottom: 0.3rem; }
 .solver-card h3 { margin: 0 0 0.6rem; font-size: 0.75rem; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; }
 .solver-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; }
 .solver-card .telem-value { font-family: var(--font-mono); }
+
+/* Focus page: lens steps and parameters */
+.focus-lens-step { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--text-secondary); margin: 0.2rem 0 0.5rem; }
+.focus-lens-step b { color: var(--text-primary); }
+.focus-lens-run { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+.focus-lens-run .btn { flex: 1; min-height: 36px; border-radius: 8px; }
+.focus-lens-nudge .btn { min-height: 36px; border-radius: 8px; font-size: 0.8125rem; }
+.focus-afmf button { min-height: 36px; font-size: 0.8125rem; }
+.focus-params-title { margin: 0.9rem 0 0.5rem; font-size: 0.75rem; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; }

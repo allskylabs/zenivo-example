@@ -1034,7 +1034,7 @@
                 <div class="focus-side">
                     <div class="card">
                         <div class="card-header">
-                            <h2>Focus Mode</h2>
+                            <h2>Live focus</h2>
                             <span class="focus-badge" id="focus-badge">OFF</span>
                         </div>
                         <div class="focus-actions-row">
@@ -1056,6 +1056,7 @@
                             </div>
                             <div class="focus-statline" id="focus-statline">—</div>
                         </div>
+                        <h3 class="focus-params-title">Parameters</h3>
                         <div class="focus-field">
                             <span class="focus-field-label">Measure</span>
                             <div class="focus-seg" id="focus-method">
@@ -1101,15 +1102,20 @@
                     </div>
                     <div class="card" id="focus-lens-card">
                         <div class="card-header">
-                            <h2>Lens &amp; Focus <span class="focus-badge" id="focus-lens-type-badge">MANUAL</span></h2>
+                            <h2>Focus mode <span class="focus-badge" id="focus-lens-type-badge">MANUAL</span></h2>
                             <div class="focus-seg focus-afmf" id="focus-lens-mode">
-                                <button data-lens-mode="auto" id="focus-lens-mode-af" title="AF: the app finds focus by itself (sweep on stars, lights or detail) and keeps it (temperature, periodic checks). Click again to refocus now.">AF</button>
-                                <button data-lens-mode="manual" id="focus-lens-mode-mf" title="MF: manual focus with the slider or dial; points are plotted on the curve">MF</button>
+                                <button data-lens-mode="auto" id="focus-lens-mode-af" title="Autofocus: the app finds focus by itself (sweep on stars, lights or detail) and keeps it (temperature, periodic checks). Click again to refocus now.">Autofocus</button>
+                                <button data-lens-mode="manual" id="focus-lens-mode-mf" title="MF: manual focus with the slider or dial; points are plotted on the curve">Manual</button>
                             </div>
                         </div>
                         <div class="focus-lens-pos"><b id="focus-lens-pos">—</b> <span class="text-muted" id="focus-lens-dist"></span></div>
+                        <div class="focus-lens-step">Lens step <b id="focus-lens-step">—</b> <span class="text-muted">/ <span id="focus-lens-step-max">1023</span></span></div>
+                        <div class="btn-group focus-btns focus-lens-run">
+                            <button class="btn btn-primary" id="focus-run-af" title="Run an autofocus sweep now">Run autofocus</button>
+                            <button class="btn btn-outline" id="focus-lens-cancel" hidden>Abort</button>
+                        </div>
                         <div class="focus-meter" id="focus-lens-progress-wrap" hidden><div class="focus-meter-fill good" id="focus-lens-progress"></div></div>
-                        <div class="focus-hint focus-lens-status"><span id="focus-lens-msg">&nbsp;</span> <button class="btn btn-sm btn-outline" id="focus-lens-cancel" hidden>Cancel</button></div>
+                        <div class="focus-hint focus-lens-status"><span id="focus-lens-msg">&nbsp;</span></div>
                         <div class="focus-field focus-af-row" id="focus-af-row" hidden>
                             <span class="focus-field-label">Refocus every</span>
                             <select id="focus-refocus-every" title="AF runs a full sweep this often (when there is something to focus on)">
@@ -1125,12 +1131,10 @@
                         <div class="focus-hint text-muted" id="focus-lens-saved">&nbsp;</div>
                         <input type="range" id="focus-lens-slider" min="0" max="3" step="0.005" value="0" aria-label="Lens position (dioptres)">
                         <div class="btn-group focus-btns focus-lens-nudge">
-                            <button class="btn btn-sm btn-outline" data-lens-delta="-0.1">−0.1</button>
-                            <button class="btn btn-sm btn-outline" data-lens-delta="-0.02">−0.02</button>
-                            <button class="btn btn-sm btn-outline" data-lens-delta="-0.005">−0.005</button>
-                            <button class="btn btn-sm btn-outline" data-lens-delta="0.005">+0.005</button>
-                            <button class="btn btn-sm btn-outline" data-lens-delta="0.02">+0.02</button>
-                            <button class="btn btn-sm btn-outline" data-lens-delta="0.1">+0.1</button>
+                            <button class="btn btn-outline" data-lens-step="-10">−10</button>
+                            <button class="btn btn-outline" data-lens-step="-1">−1</button>
+                            <button class="btn btn-outline" data-lens-step="1">+1</button>
+                            <button class="btn btn-outline" data-lens-step="10">+10</button>
                         </div>
                         <div class="focus-hint text-muted" id="focus-lens-comp"></div>
                         <div class="focus-hint text-muted" id="focus-lens-track-msg"></div>

@@ -1441,6 +1441,20 @@
         return d > 1 ? `≈ ${(1 / d).toFixed(2)} m (near)` : `≈ ${(1 / d).toFixed(1)} m`;
     }
 
+    // Integer lens steps: the dioptre range of the lens mapped onto 0..LENS_STEPS (UI-only conversion)
+    const LENS_STEPS = 1023;
+    function lensStepSize() {
+        const span = parseFloat(lensSlider.max) - parseFloat(lensSlider.min);
+        return span > 0 ? span / LENS_STEPS : 0;
+    }
+    function updateLensStep(pos) {
+        const el = $("focus-lens-step");
+        if (!el) return;
+        const size = lensStepSize();
+        el.textContent = pos === null || pos === undefined || !size
+            ? "—" : String(Math.round((pos - parseFloat(lensSlider.min)) / size));
+    }
+
     function applyLens(L) {
         lensCard.hidden = !L.available;
         if (!L.available) return;
@@ -1456,8 +1470,8 @@
         if (afBtn) {
             afBtn.classList.toggle("disabled", !motorized);
             afBtn.title = motorized
-                ? "AF: the app finds focus by itself (sweep on stars, lights or detail) and keeps it (temperature, periodic checks). Click again to refocus now."
-                : "Camera uses a manual-focus lens (no motor). Use MF mode.";
+                ? "Autofocus: the app finds focus by itself (sweep on stars, lights or detail) and keeps it (temperature, periodic checks). Click again to refocus now."
+                : "Camera uses a manual-focus lens (no motor). Use Manual mode.";
         }
         // The commanded position updates at once; the position frames report lags a frame or two behind
         const pos = L.held ?? L.position;
@@ -1477,6 +1491,7 @@
         lensSlider.max = Math.min(L.max, 3);
         lensSlider.min = L.min;
         if (!sliderDragging && pos !== null && pos !== undefined) lensSlider.value = pos;
+        if (!sliderDragging) updateLensStep(pos);
         // MF: slider and nudges set the lens. AF: they only show where the app put it (moving one = MF)
         const mf = L.mode !== "auto" || !motorized;
         lensCard.classList.toggle("lens-af", !mf);
@@ -1568,6 +1583,11 @@
     }
     document.querySelectorAll("[data-lens-delta]").forEach((b) =>
         b.addEventListener("click", () => lensCmd("/api/focus/lens", { delta: parseFloat(b.dataset.lensDelta) })));
+    document.querySelectorAll("[data-lens-step]").forEach((b) =>
+        b.addEventListener("click", () => {
+            const size = lensStepSize();
+            if (size) lensCmd("/api/focus/lens", { delta: parseFloat(b.dataset.lensStep) * size });
+        }));
     // Skip server updates only while the slider is being dragged (it keeps focus afterwards, so focus is no test)
     let sliderDragging = false;
     lensSlider.addEventListener("pointerdown", () => { sliderDragging = true; });
@@ -1580,6 +1600,7 @@
             const distStr = fmtDist(val);
             $("focus-lens-dist").textContent = distStr ? `(${distStr})` : "";
             $("focus-lens-dist").classList.toggle("text-warning", val > 1);
+            updateLensStep(val);
             updateCurveSummary();
             drawLensChart();
         }
@@ -1619,6 +1640,7 @@
     $("focus-refocus-every").addEventListener("change", (e) =>
         lensCmd("/api/focus/lens", { refocus_every_h: parseFloat(e.target.value) }));
     $("focus-refocus-now").addEventListener("click", triggerAfSweep);
+    $("focus-run-af").addEventListener("click", triggerAfSweep);
     $("focus-lens-reset-learning").addEventListener("click", () => {
         if (confirm("Forget all focus-vs-temperature samples?")) lensCmd("/api/focus/lens", { reset_learning: true });
     });
