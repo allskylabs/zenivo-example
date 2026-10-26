@@ -39,7 +39,9 @@
             position: absolute; background: color-mix(in srgb, var(--bg-card) 92%, transparent); border: 1px solid var(--border-color);
             border-radius: var(--radius-md, 8px); backdrop-filter: blur(6px); font-size: 13px;
         }
-        #top { top: 12px; left: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; max-width: calc(100% - 24px); }
+        #left-col { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: calc(100% - 24px); }
+        #left-col .panel { position: static; }
+        #top { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
         #top .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
                 #top h1 { font-size: 15px; font-weight: 600; }
         #btn-night-vision.btn-primary { border-color: var(--accent); color: var(--accent); }
@@ -59,7 +61,20 @@
         #list li:hover, #list li.selected { background: var(--bg-card-sub); }
         #list li.in-view .cs { color: var(--warning); }
         #list li .meta { color: var(--text-secondary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
-        #info { left: 12px; bottom: 28px; padding: 10px 12px; width: 260px; display: none; }
+        #layers { padding: 10px 12px; width: 200px; display: flex; flex-direction: column; gap: 4px; }
+        #layers h2 { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+        #layers label { display: flex; justify-content: space-between; align-items: center; min-height: 28px; font-size: 13px; cursor: pointer; }
+        #layers input { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+        #cam-foot { position: absolute; left: 12px; bottom: 12px; height: 28px; padding: 0 12px; border-radius: 999px; display: none; align-items: center; gap: 8px;
+            font: 12px var(--font-mono); color: var(--text-secondary); white-space: nowrap; }
+        #cam-foot.show { display: flex; }
+        #cam-foot .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success, #10b981); }
+        #info-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+        #info-stats div { background: var(--bg-card-sub); border-radius: 6px; padding: 6px 8px; }
+        #info-stats small { display: block; font-size: 12px; color: var(--text-secondary); }
+        #info-stats b { font: 600 15px var(--font-mono); }
+        #info-sub { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+        #info { left: 12px; bottom: 48px; padding: 10px 12px; width: 260px; display: none; }
         #info.show { display: block; }
         #info h3 { font: 600 15px var(--font-mono); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
         #info-logo { display: block; max-width: 100%; max-height: 34px; margin: 2px 0 6px; background: #f8fafc; border-radius: 4px; padding: 3px 6px; }
@@ -82,7 +97,8 @@
         @keyframes blink { 50% { opacity: 0.3; } }
         #list-toggle { display: none; }
         @media (max-width: 700px) {
-            #top { right: 12px; }
+            #left-col { right: 12px; }
+            #cam-foot { display: none !important; }
             #list { top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 40vh; }
             #list.collapsed ul { display: none; }
             #list-toggle { display: inline-block; }
@@ -152,6 +168,7 @@
     <div id="map"></div>
     <div id="labels"></div>
 
+    <div id="left-col">
     <div id="top" class="panel">
         <div class="row">
             <h1>Flights 3D</h1>
@@ -171,15 +188,29 @@
         </div>
     </div>
 
+    <div id="layers" class="panel">
+        <h2>Layers</h2>
+        <label>Aircraft <input type="checkbox" id="lay-aircraft" checked></label>
+        <label>Trails <input type="checkbox" id="lay-trails" checked></label>
+        <label>Camera frustum <input type="checkbox" id="lay-frustum" checked></label>
+        <label>Airports <input type="checkbox" id="lay-airports" checked></label>
+        <label>Terrain <input type="checkbox" id="lay-terrain" checked></label>
+    </div>
+    </div><!-- #left-col -->
+
     <div id="list" class="panel">
         <h2><span>Aircraft</span><span><span id="count">--</span> <button id="list-toggle">▾</button></span></h2>
         <ul id="ac-list"></ul>
     </div>
 
+    <div id="cam-foot" class="panel"><span class="dot"></span><span id="cam-foot-text"></span></div>
+
     <div id="cam-badge" class="panel"><span class="dot"></span><span id="cam-text"></span><button id="cam-stop" title="Stop (Esc)">Stop</button></div>
 
     <div id="info" class="panel">
         <h3><span id="info-cs"></span><button id="info-close" title="Close">✕</button></h3>
+        <div id="info-sub"></div>
+        <div id="info-stats"></div>
         <canvas id="info-model" title="Drag to turn"></canvas>
         <img id="info-logo" alt="" hidden>
         <dl id="info-dl"></dl>
@@ -280,6 +311,14 @@
         let selected = null, centering = false;
         let camMode = null, camZoom = null, camPitch = null, camPending = false;   // camera tracking the selected aircraft
         let trailIdx = 0, trailSpan = TRAIL_CHOICES[0], showLabels = true;
+        const layerOn = { aircraft: true, trails: true, frustum: true, airports: true, terrain: true };
+        let frustumGroup = null;
+        const airportMarkers = [];
+        const AIRPORT_LAYERS = ["rwy-glow", "rwy", "rwy-centre", "rwy-edge", "rwy-thresh", "rwy-appr"];
+        function applyAirports() {
+            for (const id of AIRPORT_LAYERS) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", layerOn.airports ? "visible" : "none");
+            for (const m of airportMarkers) m.getElement().style.display = layerOn.airports ? "" : "none";
+        }
         let lastFetch = 0, haveTrails = false;
 
         // ---------------------------------------------------------------- map: dark 3D terrain from elevation only
@@ -411,8 +450,9 @@
             for (const a of d.airports) {
                 if (a.type === "small" && !VN_AIRPORT_NAMES[a.ident]) continue;
                 const name = VN_AIRPORT_NAMES[a.ident] || a.name.replace(/\s*(International\s*)?(Airport|Air Base|Airfield)\s*$/i, "");
-                addText(`✈ ${name} ${a.iata || a.ident}`, a.lon, a.lat, "place airport");
+                airportMarkers.push(addText(`✈ ${name} ${a.iata || a.ident}`, a.lon, a.lat, "place airport"));
             }
+            applyAirports();
         }
         poll();
         setInterval(() => { if (!document.hidden) poll(); }, POLL_MS);
@@ -1189,6 +1229,8 @@
                 group.add(new THREE.Mesh(face, new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.07,
                     side: THREE.DoubleSide, depthWrite: false })));
             }
+            group.visible = layerOn.frustum;
+            frustumGroup = group;
             world.add(group);
         }
 
@@ -1226,6 +1268,7 @@
             $("status").textContent = d.connected ? `${d.in_view || 0} in view · ${d.total || 0} heard` : "Receiver not connected";
             if (d.station && !origin) {
                 station = d.station; camera = d.camera || null;
+                updateCamFoot();
                 origin = maplibregl.MercatorCoordinate.fromLngLat([station.lon, station.lat], 0);
                 mPerUnit = origin.meterInMercatorCoordinateUnits();
                 map.jumpTo({ center: [station.lon, station.lat] });
@@ -1399,10 +1442,12 @@
                     for (const b of ud.beacons) b.visible = bOn;
                     for (const sp of ud.strobes) sp.visible = sOn;
                     for (const pr of ud.props) pr.rotation.y = ph * 25;
+                    mesh.visible = layerOn.aircraft;
                     const kd = kind(a);
-                    ud.halo.visible = kd !== "heard";
+                    ud.halo.visible = layerOn.aircraft && kd !== "heard";
                     if (ud.halo.visible) ud.halo.material = HALO[kd];
 
+                    if (s.trail) s.trail.visible = layerOn.trails;
                     if (s.trail) {   // the path ends at the tail, not inside the fuselage
                         const back = mesh.userData.L * 0.5 * k;
                         moveTrailHead(s, [p[0] - Math.sin(h) * back, p[1] + Math.cos(h) * back, p[2]], now);
@@ -1412,6 +1457,7 @@
                         s.drop.frustumCulled = false;
                         world.add(s.drop);
                     }
+                    s.drop.visible = layerOn.aircraft;
                     const dp = s.drop.geometry.attributes.position;
                     dp.setXYZ(0, p[0], p[1], p[2]); dp.setXYZ(1, p[0], p[1], groundZ); dp.needsUpdate = true;
 
@@ -1425,7 +1471,7 @@
                     if (v4.w > 0) {
                         const x = (v4.x / v4.w + 1) / 2 * W, y = (1 - v4.y / v4.w) / 2 * H;
                         const onScreen = x > -50 && x < W + 50 && y > -50 && y < H + 50;
-                        s.label.style.display = showLabels && onScreen ? "" : "none";
+                        s.label.style.display = showLabels && layerOn.aircraft && onScreen ? "" : "none";
                         if (onScreen) { s.label.style.left = `${x}px`; s.label.style.top = `${y}px`; screen.push([icao, x, y]); }
                     } else {
                         s.label.style.display = "none";
@@ -1620,6 +1666,11 @@
                 ["From camera", a.above_horizon ? `${compass(a.az_deg)} ${a.az_deg}°, ${a.alt_deg}° up` : "below horizon"],
                 ["In camera view", a.in_view ? "yes" : "no"],
             ].filter(Boolean);
+            $("info-sub").textContent = [a.airline, a.model || a.type].filter(Boolean).join(" · ");
+            const alt = Number(a.altitude_m).toLocaleString();
+            $("info-stats").innerHTML = [["Altitude", `${alt} m`], ["Speed", a.speed_kmh != null ? `${a.speed_kmh} km/h` : "--"],
+                ["Distance", `${a.distance_km} km`], ["Elevation", a.above_horizon ? `${a.alt_deg}°` : "below"]]
+                .map(([k, v]) => `<div><small>${k}</small><b>${esc(v)}</b></div>`).join("");
             $("info-dl").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
             $("info-link").href = `https://globe.adsbexchange.com/?icao=${encodeURIComponent(String(a.icao).toLowerCase())}`;
             showCamera();
@@ -1643,7 +1694,21 @@
             map.triggerRepaint();
         }
 
+        function updateCamFoot() {
+            const el = $("cam-foot");
+            if (!station || !camera) { el.classList.remove("show"); return; }
+            const f = (v) => (v == null ? "--" : Math.round(v));
+            const fov = camera.hfov_deg != null ? ` · FOV ${f(camera.hfov_deg)}°${camera.vfov_deg != null ? `×${f(camera.vfov_deg)}°` : ""}` : "";
+            $("cam-foot-text").textContent = `Camera ${Math.abs(station.lat).toFixed(2)}${station.lat >= 0 ? "N" : "S"} ${Math.abs(station.lon).toFixed(2)}${station.lon >= 0 ? "E" : "W"} · az ${f(camera.az_deg)}° · alt ${f(camera.alt_deg)}°${fov}`;
+            el.classList.add("show");
+        }
+
         // ---------------------------------------------------------------- controls
+        $("lay-aircraft").onchange = (e) => { layerOn.aircraft = e.target.checked; map.triggerRepaint(); };
+        $("lay-trails").onchange = (e) => { layerOn.trails = e.target.checked; map.triggerRepaint(); };
+        $("lay-frustum").onchange = (e) => { layerOn.frustum = e.target.checked; if (frustumGroup) frustumGroup.visible = e.target.checked; map.triggerRepaint(); };
+        $("lay-airports").onchange = (e) => { layerOn.airports = e.target.checked; applyAirports(); map.triggerRepaint(); };
+        $("lay-terrain").onchange = (e) => { layerOn.terrain = e.target.checked; map.setTerrain(e.target.checked ? { source: "dem", exaggeration: 1 } : null); map.triggerRepaint(); };
         $("info-close").onclick = () => select(null);
         $("btn-track").onclick = () => setCamMode("track");
         $("btn-chase").onclick = () => setCamMode("chase");
