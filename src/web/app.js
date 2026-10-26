@@ -2600,11 +2600,12 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.fillStyle = "rgba(251, 191, 36, 0.95)";
             ctx.lineWidth = 1.5;
             ctx.beginPath();
-            ctx.arc(x, y, 9, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+            ctx.arc(x, y, 12, 0, Math.PI * 2);
+            ctx.save();
+            ctx.globalAlpha = 0.18;
             ctx.fill();
+            ctx.restore();
+            ctx.stroke();
             const name = a.callsign || a.icao || "?";
             const alt = a.altitude_m != null ? `FL${String(Math.round(a.altitude_m / 30.48)).padStart(3, "0")}` : "";
             const dist = a.distance_km != null ? `${a.distance_km}km` : "";
