@@ -256,7 +256,7 @@ body {
 .card {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
-    border-radius: 10px;
+    border-radius: var(--radius-md, 8px);
     padding: 1.25rem;
     margin-bottom: 1.5rem;
 }
@@ -1961,11 +1961,9 @@ body.no-scroll { overflow: hidden; }
 
 @media (max-width: 600px) {
     html, body { overflow-x: hidden; max-width: 100%; }
-    .navbar { padding: 0.6rem 0.75rem; gap: 0.5rem; }
-    .nav-brand { gap: 0.5rem; min-width: 0; }
+    .nav-brand { min-width: 0; }
     .nav-brand h1 { font-size: 1.05rem; }
-    .sensor-subtitle { display: block; font-size: 0.75rem; overflow-wrap: anywhere; }
-    .nav-metrics { gap: 0.35rem; width: 100%; }
+    .sensor-subtitle { display: none; }
     .nav-pill { padding: 0.15rem 0.4rem; font-size: 0.75rem; gap: 0.25rem; }
     .checkbox-label { font-size: 0.85rem; }
     .nav-metrics .btn { padding: 0.25rem 0.5rem; font-size: 0.75rem; min-height: 40px; margin-left: auto; white-space: nowrap; }
@@ -2008,7 +2006,7 @@ body.no-scroll { overflow: hidden; }
    Night Sky shell: sidebar (>=1024px) / bottom tab bar (phones),
    settings sub-sections, Live right rail
    =================================================================== */
-.app-shell { display: flex; flex: 1; min-height: 100vh; width: 100%; }
+.app-shell { display: flex; flex: 1; min-height: calc(100vh - 56px); width: 100%; }
 .app-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .app-main > .container { width: 100%; }
 
@@ -2017,15 +2015,15 @@ body.no-scroll { overflow: hidden; }
     width: var(--sidebar-w, 240px);
     background: var(--bg-card);
     border-right: 1px solid var(--border-color);
-    position: sticky; top: 0; align-self: flex-start;
-    height: 100vh; overflow-y: auto;
+    position: sticky; top: 56px; align-self: flex-start;
+    height: calc(100vh - 56px); overflow-y: auto;
     padding: var(--space-4, 16px) var(--space-3, 12px);
 }
 .sidebar .tab-bar { display: block; background: none; border: 0; padding: 0; overflow: visible; }
 .side-group { margin-bottom: var(--space-4, 16px); }
 .side-group-title {
     font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-    color: var(--text-muted); padding: 0 var(--space-2, 8px) var(--space-1, 4px);
+    color: var(--text-muted); padding: 0 var(--space-2, 8px) var(--space-1, 4px); letter-spacing: 1px;
 }
 .sidebar .side-item {
     display: flex; align-items: center; gap: var(--space-2, 8px);
@@ -2035,19 +2033,44 @@ body.no-scroll { overflow: hidden; }
 }
 .sidebar .side-item:hover { background: var(--bg-card-sub); color: var(--text-primary); }
 .sidebar .side-item.active {
-    background: var(--bg-card-sub); color: var(--accent); border-left-color: var(--accent); border-bottom-color: transparent;
+    background: var(--bg-card-sub); color: #fff; border-left-color: var(--accent); border-bottom-color: transparent;
 }
 .side-ic { width: 1.25rem; text-align: center; flex: 0 0 1.25rem; font-size: 1rem; }
-.side-sub-list { display: flex; flex-direction: column; margin: 2px 0 0 calc(var(--space-2, 8px) + 1.25rem); border-left: 1px solid var(--border-color); }
+.side-sub-list { display: flex; flex-direction: column; margin: 0; }
+.side-group-settings > .tab-btn { display: none; }
 .side-sub {
-    padding: 0.35rem var(--space-3, 12px); font-size: 0.8125rem; color: var(--text-muted);
-    text-decoration: none; border-left: 2px solid transparent; margin-left: -1px;
+    display: flex; align-items: center; min-height: 36px; padding: 0 var(--space-2, 8px) 0 calc(var(--space-2, 8px) + 1.25rem + var(--space-2, 8px));
+    font-size: 14px; font-weight: 500; color: var(--text-secondary); text-decoration: none; border-left: 3px solid transparent; border-radius: var(--radius-sm, 6px);
 }
-.side-sub:hover { color: var(--text-primary); }
-.side-sub.active { color: var(--accent); border-left-color: var(--accent); }
+.side-sub:hover { background: var(--bg-card-sub); color: var(--text-primary); }
+.side-sub.active { background: var(--bg-card-sub); color: #fff; border-left-color: var(--accent); }
 
 /* Top bar */
-.app-main > .navbar { position: sticky; top: 0; z-index: 20; padding: 0.75rem var(--space-5, 24px); }
+.navbar {
+    position: sticky; top: 0; z-index: 40; height: 56px; padding: 0 24px; flex-wrap: nowrap; gap: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+.nav-brand { gap: 10px; min-width: 0; }
+.nav-brand h1 { font-size: 16px; font-weight: 700; }
+.brand-ring { color: var(--accent); flex: 0 0 28px; }
+.nav-brand .sensor-subtitle { font-family: var(--font-sans); font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.nav-metrics { flex-wrap: nowrap; gap: 14px; }
+.status-pill {
+    display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: var(--radius-pill, 999px);
+    border: 1px solid var(--border-color); background: transparent; color: var(--text-primary); font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.status-pill .pulse-indicator { width: 8px; height: 8px; animation: none; box-shadow: none; }
+.status-pill .sp-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.nav-div { width: 1px; height: 24px; background: var(--border-color); }
+.nav-clock { font-family: var(--font-mono); font-size: 14px; font-weight: 500; white-space: nowrap; }
+.nav-clock .clock-label { color: var(--text-muted); font-size: 12px; }
+.rv-toggle { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; padding: 0; color: var(--text-secondary); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.rv-track { width: 36px; height: 20px; border-radius: 10px; background: var(--bg-card-sub); border: 1px solid var(--border-color); position: relative; transition: background 0.15s; }
+.rv-knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--text-secondary); transition: transform 0.15s; }
+.rv-toggle.btn-primary .rv-track { background: var(--danger); border-color: var(--danger); }
+.rv-toggle.btn-primary .rv-knob { transform: translateX(16px); background: #fff; }
+.rv-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+@media (max-width: 1100px) { .nav-clock .clock-label, .nav-brand .sensor-subtitle { display: none; } }
 .nav-pill .pill-label { text-transform: uppercase; letter-spacing: 0.04em; }
 #nav-local-label { text-transform: none; }
 
@@ -2095,7 +2118,10 @@ body.no-scroll { overflow: hidden; }
     .sidebar .side-item.active { border-top-color: var(--accent); border-left-color: transparent; }
     .side-ic { font-size: 1.1rem; }
     .app-main { padding-bottom: 64px; }
-    .app-main > .navbar { position: static; padding: 0.6rem 0.75rem; }
+    .side-group-settings > .tab-btn { display: flex; }
+    .navbar { padding: 0 12px; gap: 8px; }
+    .nav-metrics { gap: 8px; }
+    .nav-metrics .nav-div, .nav-metrics .status-pill:nth-of-type(2), .nav-clock:nth-of-type(2), .rv-label { display: none; }
     #tab-settings::before {
         content: "Section: " attr(data-sub); display: block; font-size: 0.75rem; color: var(--text-muted);
         text-transform: capitalize; margin-bottom: var(--space-2, 8px);

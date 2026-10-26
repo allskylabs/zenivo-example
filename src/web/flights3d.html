@@ -37,7 +37,7 @@
         .place.ring { color: #38bdf8; opacity: 0.75; font-size: 10px; }
         .panel {
             position: absolute; background: color-mix(in srgb, var(--bg-card) 92%, transparent); border: 1px solid var(--border-color);
-            border-radius: 10px; backdrop-filter: blur(6px); font-size: 13px;
+            border-radius: var(--radius-md, 8px); backdrop-filter: blur(6px); font-size: 13px;
         }
         #top { top: 12px; left: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; max-width: calc(100% - 24px); }
         #top .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

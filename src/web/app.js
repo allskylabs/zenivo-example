@@ -269,6 +269,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (on) document.documentElement.setAttribute("data-theme", "red");
         else document.documentElement.removeAttribute("data-theme");
         btnNightVision.classList.toggle("btn-primary", on);
+        btnNightVision.setAttribute("aria-checked", on ? "true" : "false");
     }
     applyNightVision(!!prefs.nightVision);
 
@@ -705,6 +706,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const lonVal = st.longitude_deg !== undefined ? st.longitude_deg : st.longitude;
         const nameVal = st.location_name || st.station_name || "Hanoi, Vietnam";
         const sensor = st.camera_sensor || {};
+        const subtitle = document.getElementById("sensor-subtitle");
+        if (subtitle) subtitle.textContent = `IMX335 · ${String(nameVal).split(",")[0].trim()}`;
         const optics = st.optics || st.camera || {};
         const ori = st.orientation || {};
 
@@ -2807,6 +2810,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (data.fps !== undefined) {
             telemFps.textContent = data.fps.toFixed(1) + " FPS";
+            const nf = document.getElementById("nav-fps");
+            if (nf) nf.textContent = ` · ${data.fps.toFixed(1)} fps`;
         }
         if (data.hw_frame_delta_ms !== undefined) {
             hudHwDelta.textContent = data.hw_frame_delta_ms.toFixed(1) + " ms";
@@ -2831,7 +2836,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function updateStatusUI(data) {
         if (!data) return;
 
-        navStatus.textContent = (data.status || "online").toUpperCase();
+        { const s = String(data.status || "online"); navStatus.textContent = s.charAt(0).toUpperCase() + s.slice(1).toLowerCase(); }
         if (data.uptime_s !== undefined) {
             const h = Math.floor(data.uptime_s / 3600);
             const m = Math.floor((data.uptime_s % 3600) / 60);
@@ -2841,10 +2846,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (data.hardware) {
             const hw = data.hardware;
-            const subtitle = document.getElementById("sensor-subtitle");
-            if (subtitle && hw.sensor) {
-                subtitle.textContent = `${hw.sensor} • ${hw.resolution || ""}${hw.vid_pid ? ` (${hw.vid_pid})` : ""}`;
-            }
             const dayRotRow = document.getElementById("orient-rot180-day-row");
             if (dayRotRow && hw.backend) dayRotRow.style.display = hw.backend === "rts5869" ? "" : "none";
             const regBox = document.getElementById("registers-box");
@@ -3140,7 +3141,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const res = await fetch("/api/status");
                 if (res.ok) updateStatusUI(await res.json());
             } catch (e) {
-                navStatus.textContent = "OFFLINE";
+                navStatus.textContent = "Offline";
             }
         };
         refreshStatus();

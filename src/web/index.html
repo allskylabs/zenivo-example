@@ -12,6 +12,28 @@
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
+    <!-- Top bar -->
+    <header class="navbar">
+        <div class="nav-brand">
+            <svg class="brand-ring" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="14" cy="14" r="6" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.6"/><circle cx="14" cy="14" r="2" fill="currentColor"/></svg>
+            <h1>AllSky</h1>
+            <span class="sensor-subtitle" id="sensor-subtitle">IMX335 · Hanoi</span>
+        </div>
+
+        <div class="nav-metrics">
+            <span class="status-pill" title="System status"><i class="pulse-indicator online" id="status-pulse"></i><span id="nav-system-status">Online</span><span id="nav-fps"></span></span>
+            <span class="status-pill" title="Camera mode"><i class="sp-dot"></i><span id="nav-camera-mode">AUTO</span></span>
+            <span class="nav-div" aria-hidden="true"></span>
+            <span class="nav-clock"><span class="clock-label">UTC</span> <span id="nav-utc-clock">00:00:00</span></span>
+            <span class="nav-div" aria-hidden="true"></span>
+            <span class="nav-clock"><span class="clock-label" id="nav-local-label">Local</span> <span id="nav-local-clock">00:00</span></span>
+            <span class="nav-div" aria-hidden="true"></span>
+            <button id="btn-night-vision" class="rv-toggle" type="button" role="switch" aria-checked="false" title="Preserve night vision adaptation (red palette)">
+                <span class="rv-label">Red Vision</span><span class="rv-track"><span class="rv-knob"></span></span>
+            </button>
+        </div>
+    </header>
+
     <div class="app-shell">
     <!-- Sidebar (bottom tab bar on phones). Items keep .tab-btn / data-tab: app.js marks the active page. -->
     <aside class="sidebar" id="sidebar">
@@ -51,38 +73,6 @@
     </aside>
 
     <div class="app-main">
-    <!-- Top bar -->
-    <header class="navbar">
-        <div class="nav-brand">
-            <div class="pulse-indicator online" id="status-pulse" title="System Online"></div>
-            <div>
-                <h1>AllSky Observatory</h1>
-                <span class="sensor-subtitle" id="sensor-subtitle">Realtek RTS5869 • Sony Starvis IMX335 (0bda:5869)</span>
-            </div>
-        </div>
-
-        <div class="nav-metrics">
-            <div class="nav-pill">
-                <span class="pill-label">STATUS</span>
-                <span class="pill-value text-success" id="nav-system-status">ONLINE</span>
-            </div>
-            <div class="nav-pill">
-                <span class="pill-label">MODE</span>
-                <span class="pill-value text-accent" id="nav-camera-mode">AUTO</span>
-            </div>
-            <div class="nav-pill">
-                <span class="pill-label">UTC</span>
-                <span class="pill-value" id="nav-utc-clock">00:00:00</span>
-            </div>
-            <div class="nav-pill">
-                <span class="pill-label" id="nav-local-label">Local</span>
-                <span class="pill-value" id="nav-local-clock">00:00</span>
-            </div>
-            <button id="btn-night-vision" class="btn btn-outline" title="Preserve night vision adaptation (red palette)">
-                <span class="icon">●</span> Red Vision
-            </button>
-        </div>
-    </header>
 
     <!-- Main Container -->
     <main class="container">
