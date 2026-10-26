@@ -385,6 +385,29 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    // Exposure scenario chips: Moonless / Twilight / Full moon set shutter + gain and lock both; Custom leaves the sliders alone
+    const presetChips = document.querySelectorAll(".chip-preset");
+    const markPreset = (name) => presetChips.forEach((c) => c.classList.toggle("active", c.dataset.preset === name));
+    presetChips.forEach((chip) => {
+        chip.addEventListener("click", () => {
+            markPreset(chip.dataset.preset);
+            if (chip.dataset.preset === "custom") return;
+            const clamp = (v, el) => Math.min(parseFloat(el.max), Math.max(parseFloat(el.min), v));
+            rangeExposure.value = clamp(parseFloat(chip.dataset.exp), rangeExposure);
+            rangeGain.value = clamp(parseFloat(chip.dataset.gain), rangeGain);
+            rangeExposure.dispatchEvent(new Event("input"));
+            rangeGain.dispatchEvent(new Event("input"));
+            setAeLock("both");
+            markPreset(chip.dataset.preset);
+        });
+    });
+    [rangeExposure, rangeGain].forEach((el) => el.addEventListener("pointerdown", () => markPreset("custom")));
+    // Collapsed exposure card on phones: the summary line (shutter and gain) stays visible
+    try {
+        const expCard = document.getElementById("exposure-card");
+        if (expCard && window.matchMedia("(max-width: 768px)").matches) expCard.removeAttribute("open");
+    } catch (e) { /* matchMedia unavailable */ }
+
     // Exposure / gain locks replace the Auto/Manual switch: nothing locked = Auto computes both,
     // one locked = Auto adjusts only the other, both locked = fixed (manual) exposure and gain
     const isLocked = (knob) => state.aeLock === knob || state.aeLock === "both";
@@ -411,7 +434,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Grabbing a slider locks it at once (telemetry stops moving it); releasing it, or picking a preset,
     // sends the lock with the chosen value
     const paintLocks = () => syncModeButtons(state.aeLock === "both" ? "manual" : "auto");
-    // While a slider is held, the lock poll must not undo its local 🔒 before the value is sent
+    // While a slider is held, the lock poll must not undo its local lock before the value is sent
     [rangeExposure, rangeGain, rangeTarget].forEach((el) => {
         el.addEventListener("pointerdown", () => (state.dragging = true));
         ["change", "pointerup", "pointercancel"].forEach((ev) => el.addEventListener(ev, () => (state.dragging = false)));
@@ -429,7 +452,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const paintTarget = () => {
         valTarget.textContent = rangeTarget.value;
         btnLockTarget.classList.toggle("locked", !!state.targetLocked);
-        btnLockTarget.textContent = state.targetLocked ? "🔒" : "🔓";
+        btnLockTarget.textContent = state.targetLocked ? "Locked" : "Auto";
+        btnLockTarget.setAttribute("aria-pressed", state.targetLocked ? "true" : "false");
     };
     async function setTargetBrightness(value) {
         try {
@@ -1677,6 +1701,27 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 
+    // Moon illumination and Sun altitude tiles (computed locally from the station position; no backend field exists)
+    function updateAstroTiles() {
+        const moonEl = document.getElementById("telem-moon");
+        const sunEl = document.getElementById("telem-sun-alt");
+        if (!moonEl && !sunEl) return;
+        const d2r = Math.PI / 180.0;
+        const lat = stationLatInput && !isNaN(parseFloat(stationLatInput.value)) ? parseFloat(stationLatInput.value) : 21.0285;
+        const lon = stationLonInput && !isNaN(parseFloat(stationLonInput.value)) ? parseFloat(stationLonInput.value) : 105.8542;
+        const now = new Date();
+        const sm = sunMoonEquatorial(now);
+        if (moonEl) moonEl.textContent = `${Math.round(sm.moon.illum * 100)}%`;
+        if (sunEl) {
+            const ha = (computeLmstDeg(lon, now) - sm.sun.ra) * d2r;
+            const sinAlt = Math.sin(lat * d2r) * Math.sin(sm.sun.dec * d2r) + Math.cos(lat * d2r) * Math.cos(sm.sun.dec * d2r) * Math.cos(ha);
+            const alt = Math.asin(Math.max(-1, Math.min(1, sinAlt))) / d2r;
+            sunEl.textContent = `${alt >= 0 ? "+" : "\u2212"}${Math.abs(alt).toFixed(1)}\u00b0`;
+        }
+    }
+    setInterval(updateAstroTiles, 30000);
+    setTimeout(updateAstroTiles, 0);
+
     function computeLmstDeg(lonDeg, dateObj) {
         const jd = dateObj.getTime() / 86400000.0 + 2440587.5;
         const d = jd - 2451545.0;
@@ -2746,8 +2791,10 @@ document.addEventListener("DOMContentLoaded", () => {
         activeProfileBadge.textContent = state.aeLock ? `${label} • ${state.aeLock === "both" ? "BOTH" : state.aeLock.toUpperCase()} LOCKED` : "AUTO EPHEMERIS";
         btnLockExposure.classList.toggle("locked", isLocked("exposure"));
         btnLockGain.classList.toggle("locked", isLocked("gain"));
-        btnLockExposure.textContent = isLocked("exposure") ? "🔒" : "🔓";
-        btnLockGain.textContent = isLocked("gain") ? "🔒" : "🔓";
+        btnLockExposure.textContent = isLocked("exposure") ? "Locked" : "Auto";
+        btnLockGain.textContent = isLocked("gain") ? "Locked" : "Auto";
+        btnLockExposure.setAttribute("aria-pressed", isLocked("exposure") ? "true" : "false");
+        btnLockGain.setAttribute("aria-pressed", isLocked("gain") ? "true" : "false");
     }
 
     function syncAeLock(info) {
@@ -2805,12 +2852,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (data.cloud_cover_pct !== undefined) {
             telemClouds.textContent = data.cloud_cover_pct.toFixed(1) + "%";
+            const cn = document.getElementById("cloud-now");
+            if (cn) cn.textContent = data.cloud_cover_pct.toFixed(0) + "%";
         }
         if (data.sky_status) {
             telemSkyStatus.textContent = data.sky_status.toUpperCase();
         }
         if (data.fps !== undefined) {
-            telemFps.textContent = data.fps.toFixed(1) + " FPS";
+            telemFps.textContent = data.fps.toFixed(1) + " fps";
             const nf = document.getElementById("nav-fps");
             if (nf) nf.textContent = ` · ${data.fps.toFixed(1)} fps`;
         }
@@ -3318,6 +3367,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.getElementById("cloud-clear").textContent = pct(sm.clear_pct);
                 document.getElementById("cloud-range").textContent = sm.min === null || sm.min === undefined ? "--" : `${pct(sm.min)} – ${pct(sm.max)}`;
                 document.getElementById("cloud-samples").textContent = sm.samples ?? "--";
+                const avgEl = document.getElementById("cloud-avg");
+                if (avgEl) avgEl.textContent = pct(sm.mean);
+                const avgLbl = document.getElementById("cloud-avg-label");
+                if (avgLbl) { const act = document.querySelector(".cloud-ranges .btn-range.active"); avgLbl.textContent = act ? act.textContent.trim() : "24h"; }
                 renderCloudChart();
             } catch (e) {
                 /* keep the previous chart */

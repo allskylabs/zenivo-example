@@ -2183,3 +2183,55 @@ body.no-scroll { overflow: hidden; }
     .vp-chips { max-width: 100%; bottom: 56px; }
     .vp-meta { display: none; }
 }
+
+/* ===== Live right rail: telemetry tiles, exposure presets, cloud/histogram pair ===== */
+#tab-live .live-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4, 16px); align-items: stretch; }
+#tab-live .live-pair > .card { margin: 0; display: flex; flex-direction: column; min-width: 0; }
+#tab-live .live-pair .cloud-chart-wrap { flex: 1 1 auto; }
+#tab-live .live-pair .histogram-wrapper { flex: 1 1 auto; min-height: 140px; }
+.card-foot {
+    display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: var(--space-3, 12px); padding-top: var(--space-2, 8px);
+    border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-muted);
+}
+.card-foot strong { font-family: var(--font-mono); color: var(--text-primary); font-weight: 600; }
+.card-foot strong.text-warning { color: var(--warning); }
+.card-foot strong.text-danger { color: var(--danger); }
+/* Cloud range pills */
+.cloud-ranges .btn-range {
+    height: 28px; min-width: 40px; padding: 0 12px; border-radius: var(--radius-pill, 999px); font-size: 12px; font-weight: 600;
+}
+.cloud-ranges .btn-range.active { background: var(--accent); border-color: var(--accent); color: var(--bg-primary); }
+[data-theme="red"] .cloud-ranges .btn-range.active { color: #1a0000; }
+/* Telemetry tiles */
+.telemetry-card .gauge-grid { gap: var(--space-2, 8px); }
+.telemetry-card .gauge-box { padding: 10px 12px; min-width: 0; }
+.telemetry-card .gauge-label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.telemetry-card .gauge-number { font-size: 18px; line-height: 1.2; font-family: var(--font-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+details.registers-box { margin-top: var(--space-3, 12px); }
+details.registers-box > summary { cursor: pointer; list-style: none; margin-bottom: 0; min-height: 28px; display: flex; align-items: center; }
+details.registers-box > summary::-webkit-details-marker { display: none; }
+details.registers-box > summary::before { content: "\25B8\00a0"; }
+details.registers-box[open] > summary::before { content: "\25BE\00a0"; }
+details.registers-box[open] > summary { margin-bottom: 0.3rem; }
+/* Exposure card */
+#exposure-card > summary.card-header { gap: var(--space-2, 8px); flex-wrap: wrap; }
+#exposure-card .exp-summary { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.exp-preset-chips { display: flex; flex-wrap: wrap; gap: var(--space-2, 8px); margin-bottom: var(--space-3, 12px); }
+.chip-preset {
+    height: 28px; padding: 0 12px; border-radius: var(--radius-pill, 999px); cursor: pointer;
+    background: var(--bg-card-sub); border: 1px solid var(--border-color); color: var(--text-secondary);
+    font-size: 12px; font-weight: 600; font-family: inherit;
+}
+.chip-preset:hover { color: var(--text-primary); border-color: var(--accent); }
+.chip-preset.active { background: var(--accent); border-color: var(--accent); color: var(--bg-primary); }
+[data-theme="red"] .chip-preset.active { color: #1a0000; }
+.btn-lock {
+    opacity: 1; height: 28px; min-width: 56px; padding: 0 10px; border-radius: var(--radius-pill, 999px);
+    font-size: 12px; font-weight: 600; font-family: var(--font-mono); color: var(--text-secondary); line-height: 1;
+}
+.btn-lock.locked { color: var(--bg-primary); background: var(--accent); border-color: var(--accent); }
+[data-theme="red"] .btn-lock.locked { color: #1a0000; }
+.btn-preset, .btn-preset-gain { font-size: 12px; min-height: 28px; padding: 0 10px; }
+@media (max-width: 760px) {
+    #tab-live .live-pair { grid-template-columns: minmax(0, 1fr); }
+}

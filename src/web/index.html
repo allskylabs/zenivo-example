@@ -115,16 +115,17 @@
                         </div>
                     </div>
 
-                <!-- Cloud cover over time -->
+                <!-- Cloud cover + histogram, side by side under the viewport -->
+                <div class="live-pair">
                 <div class="card cloud-card">
                     <div class="card-header">
-                        <h2>Cloud Cover History</h2>
+                        <h2>Cloud cover</h2>
                         <div class="cloud-ranges" role="group" aria-label="Time range">
-                            <button class="btn-range" data-hours="6">6 h</button>
-                            <button class="btn-range active" data-hours="24">24 h</button>
-                            <button class="btn-range" data-hours="72">3 d</button>
-                            <button class="btn-range" data-hours="168">7 d</button>
-                            <button class="btn-range" data-hours="720">30 d</button>
+                            <button class="btn-range" data-hours="6">6h</button>
+                            <button class="btn-range active" data-hours="24">24h</button>
+                            <button class="btn-range" data-hours="72">72h</button>
+                            <button class="btn-range" data-hours="168">7d</button>
+                            <button class="btn-range" data-hours="720">30d</button>
                         </div>
                     </div>
                     <div class="cloud-summary" id="cloud-summary">
@@ -139,6 +140,25 @@
                         <div class="cloud-tooltip hidden" id="cloud-tooltip"></div>
                         <div class="cloud-empty hidden" id="cloud-empty">No cloud samples in this range yet. One is taken every analysis interval (Settings → Performance).</div>
                     </div>
+                    <div class="card-foot cloud-caption" id="cloud-caption">Now <strong id="cloud-now">--</strong> / Avg <span id="cloud-avg-label">24h</span> <strong id="cloud-avg">--</strong></div>
+                </div>
+
+                <div class="card histogram-card">
+                    <div class="card-header">
+                        <h2>Histogram</h2>
+                        <div class="header-actions">
+                            <span class="badge" id="hist-calc-badge">&lt; 5 ms</span>
+                        </div>
+                    </div>
+                    <div class="histogram-wrapper">
+                        <canvas id="histogram-canvas" width="600" height="160"></canvas>
+                    </div>
+                    <div class="card-foot hist-foot">
+                        <span>Mean <strong id="hist-mean">0.0</strong></span>
+                        <span>Clip <strong class="text-warning" id="hist-clip-low">0.00%</strong> / <strong class="text-danger" id="hist-clip-high">0.00%</strong></span>
+                        <span hidden>&sigma; <b id="hist-stddev">0.0</b> median <b id="hist-median">0</b></span>
+                    </div>
+                </div>
                 </div>
                 </div>
 
@@ -151,63 +171,70 @@
                             <span class="text-muted" id="telemetry-timestamp">--</span>
                         </div>
                         <div class="gauge-grid">
-                            <div class="gauge-box">
-                                <span class="gauge-label">EXPOSURE</span>
-                                <span class="gauge-number" id="telem-exp">2.000s</span>
+                            <div class="gauge-box gauge-key">
+                                <span class="gauge-label">Sensor temp</span>
+                                <span class="gauge-number" id="telem-temp">--</span>
                             </div>
-                            <div class="gauge-box">
-                                <span class="gauge-label">GAIN</span>
-                                <span class="gauge-number" id="telem-gain">24.0 dB</span>
+                            <div class="gauge-box gauge-key">
+                                <span class="gauge-label">Sky</span>
+                                <span class="gauge-number" id="telem-sky-status">--</span>
                             </div>
-                            <div class="gauge-box">
-                                <span class="gauge-label">STAR COUNT</span>
+                            <div class="gauge-box gauge-key">
+                                <span class="gauge-label">Stars seen</span>
                                 <span class="gauge-number text-accent" id="telem-stars">--</span>
                             </div>
                             <div class="gauge-box">
-                                <span class="gauge-label">CLOUD COVER</span>
+                                <span class="gauge-label">Cloud cover</span>
                                 <span class="gauge-number text-warning" id="telem-clouds">--%</span>
                             </div>
                             <div class="gauge-box">
-                                <span class="gauge-label">SKY CONDITION</span>
-                                <span class="gauge-number" id="telem-sky-status">CLEAR</span>
+                                <span class="gauge-label">Moon</span>
+                                <span class="gauge-number" id="telem-moon">--</span>
                             </div>
                             <div class="gauge-box">
-                                <span class="gauge-label">FRAME RATE</span>
-                                <span class="gauge-number" id="telem-fps">0.5 FPS</span>
+                                <span class="gauge-label">Sun alt</span>
+                                <span class="gauge-number" id="telem-sun-alt">--</span>
                             </div>
                             <div class="gauge-box">
-                                <span class="gauge-label">SENSOR TEMP</span>
-                                <span class="gauge-number" id="telem-temp">24.5 °C</span>
+                                <span class="gauge-label">Frame rate</span>
+                                <span class="gauge-number" id="telem-fps">--</span>
                             </div>
                             <div class="gauge-box">
-                                <span class="gauge-label">SYSTEM UPTIME</span>
+                                <span class="gauge-label">Uptime</span>
                                 <span class="gauge-number" id="telem-uptime">--</span>
                             </div>
                         </div>
 
-                        <!-- Hardware Register Readout -->
-                        <div class="registers-box" id="registers-box">
-                            <span class="reg-title">Sony IMX335 I2C Registers</span>
+                        <!-- Hardware Register Readout (collapsed) -->
+                        <details class="registers-box" id="registers-box">
+                            <summary class="reg-title">Sony IMX335 I2C registers</summary>
                             <div class="registers-row">
                                 <span>VMAX: <strong id="reg-vmax">--</strong></span>
                                 <span>HMAX: <strong id="reg-hmax">--</strong></span>
                                 <span>SHR0: <strong id="reg-shr0">--</strong></span>
                                 <span>PGC: <strong id="reg-pgc">--</strong></span>
                             </div>
-                        </div>
+                        </details>
                     </div>
 
-                    <!-- Hardware Control Panel -->
+                    <!-- Exposure (collapsible) -->
                     <details class="card control-card collapsible-card" id="exposure-card" open>
-                        <summary class="card-header"><h2>Exposure &amp; Gain</h2><span class="badge badge-accent" id="active-profile-badge">AUTO EPHEMERIS</span></summary>
+                        <summary class="card-header"><h2>Exposure</h2><span class="exp-summary mono" id="exp-summary"><span id="telem-exp">--</span> &middot; <span id="telem-gain">--</span></span><span class="badge badge-accent" id="active-profile-badge">AUTO EPHEMERIS</span></summary>
 
-                        <!-- Exposure Slider -->
+                        <div class="exp-preset-chips" role="group" aria-label="Exposure presets">
+                            <button type="button" class="chip-preset" data-preset="moonless" data-exp="15" data-gain="36" title="15 s, 36 dB">Moonless</button>
+                            <button type="button" class="chip-preset" data-preset="twilight" data-exp="2" data-gain="18" title="2 s, 18 dB">Twilight</button>
+                            <button type="button" class="chip-preset" data-preset="fullmoon" data-exp="0.5" data-gain="0" title="0.5 s, 0 dB">Full moon</button>
+                            <button type="button" class="chip-preset active" data-preset="custom" title="Keep the sliders as they are">Custom</button>
+                        </div>
+
+                        <!-- Shutter Slider -->
                         <div class="control-group">
                             <div class="control-label-row">
-                                <label for="range-exposure">Exposure Duration (s)</label>
+                                <label for="range-exposure">Shutter</label>
                                 <span class="range-value-row">
                                     <span class="range-value" id="val-exposure">2.000 s</span>
-                                    <button id="lock-exposure" class="btn-lock" type="button" title="Lock exposure: Auto then adjusts only gain">🔓</button>
+                                    <button id="lock-exposure" class="btn-lock" type="button" aria-pressed="false" title="Lock shutter: Auto then adjusts only gain">Auto</button>
                                 </span>
                             </div>
                             <input type="range" id="range-exposure" min="0.00015" max="60.0" step="0.00015" value="2.0" />
@@ -224,10 +251,10 @@
                         <!-- Gain Slider -->
                         <div class="control-group">
                             <div class="control-label-row">
-                                <label for="range-gain">Sensor Gain (dB)</label>
+                                <label for="range-gain">Gain</label>
                                 <span class="range-value-row">
                                     <span class="range-value" id="val-gain">24.0 dB</span>
-                                    <button id="lock-gain" class="btn-lock" type="button" title="Lock gain: Auto then adjusts only exposure">🔓</button>
+                                    <button id="lock-gain" class="btn-lock" type="button" aria-pressed="false" title="Lock gain: Auto then adjusts only shutter">Auto</button>
                                 </span>
                             </div>
                             <input type="range" id="range-gain" min="0" max="72" step="0.5" value="24" />
@@ -245,57 +272,22 @@
                                 <label for="range-target">Target brightness (0-255)</label>
                                 <span class="range-value-row">
                                     <span class="range-value" id="val-target">--</span>
-                                    <button id="lock-target" class="btn-lock" type="button" title="Lock the brightness Auto aims for">🔓</button>
+                                    <button id="lock-target" class="btn-lock" type="button" aria-pressed="false" title="Lock the brightness Auto aims for">Auto</button>
                                 </span>
                             </div>
                             <input type="range" id="range-target" min="5" max="250" step="1" value="85" />
                         </div>
 
-                        <p class="field-note">Touching a slider locks it at the chosen value; 🔒 unlocks. Nothing locked: the system computes both exposure and gain from the sky.
-                            Lock one (🔒) and it computes only the other.
-                            Exposure goes up to 60 s. Both locked holds the values fixed.</p>
+                        <p class="field-note">Touching a slider locks it at the chosen value; press Locked to hand it back to Auto. Nothing locked: the system computes both shutter and gain from the sky.
+                            Lock one and it computes only the other.
+                            Shutter goes up to 60 s. Both locked holds the values fixed.</p>
                         <div id="control-alert" class="alert-box hidden"></div>
                     </details>
-
-                    <!-- Histogram Card -->
-                    <div class="card histogram-card">
-                        <div class="card-header">
-                            <h2>Histogram (256 bins)</h2>
-                            <div class="header-actions">
-                                <span class="badge" id="hist-calc-badge">< 5 ms</span>
-                            </div>
-                        </div>
-                        <div class="histogram-wrapper">
-                            <canvas id="histogram-canvas" width="600" height="160"></canvas>
-                        </div>
-                        <div class="histogram-stats-grid">
-                            <div class="stat-chip">
-                                <span class="chip-title">Mean Luma</span>
-                                <span class="chip-val" id="hist-mean">0.0</span>
-                            </div>
-                            <div class="stat-chip">
-                                <span class="chip-title">StdDev</span>
-                                <span class="chip-val" id="hist-stddev">0.0</span>
-                            </div>
-                            <div class="stat-chip">
-                                <span class="chip-title">Median</span>
-                                <span class="chip-val" id="hist-median">0</span>
-                            </div>
-                            <div class="stat-chip">
-                                <span class="chip-title">Black Clip</span>
-                                <span class="chip-val text-warning" id="hist-clip-low">0.00%</span>
-                            </div>
-                            <div class="stat-chip">
-                                <span class="chip-title">White Clip</span>
-                                <span class="chip-val text-danger" id="hist-clip-high">0.00%</span>
-                            </div>
-                        </div>
-                    </div>
 
                     <!-- Live feed of sky events -->
                     <div class="card live-events-card">
                         <div class="card-header">
-                            <h2>Live Events</h2>
+                            <h2>Recent events</h2>
                             <span class="badge" id="live-events-count">0 tonight</span>
                         </div>
                         <div class="live-events-status" id="live-events-status">Loading…</div>
