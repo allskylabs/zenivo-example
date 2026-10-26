@@ -77,7 +77,7 @@
         bar.className = "focus-banner";
         bar.hidden = true;
         bar.innerHTML = 'Focus mode is on: auto-exposure and archiving are paused. <a href="/focus">Open focus</a> <button class="btn btn-sm btn-outline">Stop focus mode</button>';
-        const nav = document.querySelector(".tab-bar");
+        const nav = document.querySelector(".app-main > .navbar") || document.querySelector(".tab-bar");
         if (nav) nav.after(bar);
         bar.querySelector("button").addEventListener("click", async () => {
             const btn = bar.querySelector("button");
@@ -126,9 +126,9 @@
     const crossChk = $("focus-crosshair");
 
     const METHOD_LABEL = {
-        stars: "Stars · Kích thước sao HFR",
-        lights: "Lights · Kích thước điểm sáng HFR",
-        contrast: "Day · Độ tương phản cạnh",
+        stars: "Stars · Star size HFR",
+        lights: "Lights · Light-spot size HFR",
+        contrast: "Day · Edge contrast",
     };
     const HISTORY_MAX = 240;
 
@@ -356,7 +356,7 @@
             if (distEl) {
                 const lag = res.lens_target != null && res.lens_position != null && Math.abs(res.lens_target - res.lens_position) > 0.003;
                 const distStr = fmtDist(livePos);
-                const lagStr = lag ? ` · đang chỉnh ${Number(res.lens_position).toFixed(3)} D` : "";
+                const lagStr = lag ? ` · adjusting ${Number(res.lens_position).toFixed(3)} D` : "";
                 distEl.textContent = distStr ? `(${distStr}${lagStr})` : lagStr;
                 distEl.classList.toggle("text-warning", livePos > 1);
             }
@@ -689,8 +689,8 @@
         const titleEl = $("focus-lens-chart-title");
         if (titleEl) {
             titleEl.textContent = isStarSize
-                ? "Vị trí lens vs Kích thước sao (HFR)"
-                : "Vị trí lens vs Độ nét (Sharpness)";
+                ? "Lens position vs Star size (HFR)"
+                : "Lens position vs Sharpness";
         }
         drawLensPositionChart(c, w, h);
     }
@@ -850,13 +850,13 @@
                 c.fillStyle = "#10b981";
                 c.font = "bold 11px ui-monospace, monospace";
                 const valLabel = useHfr ? `${bestVal.toFixed(2)} px` : bestVal.toFixed(1);
-                c.fillText(`★ Đỉnh nét nhất: ${valLabel} (hiện tại: ${ useHfr ? hVals[n - 1].toFixed(2) + " px" : hVals[n - 1].toFixed(1) })`, pad.l + 6, pad.t + 12);
+                c.fillText(`★ Sharpest peak: ${valLabel} (current: ${ useHfr ? hVals[n - 1].toFixed(2) + " px" : hVals[n - 1].toFixed(1) })`, pad.l + 6, pad.t + 12);
 
                 c.fillStyle = "#64748b";
                 c.font = "10px sans-serif";
-                c.fillText(useHfr ? "Kích thước sao (HFR px) ↓ nét hơn" : "Độ nét (Sharpness) ↑ nét hơn", pad.l + 4, pad.t - 8);
+                c.fillText(useHfr ? "Star size (HFR px) ↓ sharper" : "Sharpness ↑ sharper", pad.l + 4, pad.t - 8);
                 c.textAlign = "center";
-                c.fillText("Chuỗi frame đang chỉnh nét (kéo thanh vị trí lens D để vẽ theo Dioptres) →", pad.l + (w - pad.l - pad.r) / 2, h - 5);
+                c.fillText("Focus-sweep frames (drag the lens position D slider to plot by Dioptres) →", pad.l + (w - pad.l - pad.r) / 2, h - 5);
                 c.textAlign = "left";
                 return;
             }
@@ -881,19 +881,19 @@
             c.beginPath(); c.moveTo(curX, pad.t); c.lineTo(curX, h - pad.b); c.stroke();
             c.setLineDash([]);
             c.fillStyle = "#38bdf8";
-            c.fillText(`Hiện tại ${curPos.toFixed(3)} D`, Math.min(curX + 6, w - pad.r - 95), pad.t + 16);
+            c.fillText(`Current ${curPos.toFixed(3)} D`, Math.min(curX + 6, w - pad.r - 95), pad.t + 16);
 
             c.fillStyle = "#64748b";
             c.font = "10px sans-serif";
             c.textAlign = "center";
-            c.fillText("Vị trí lens (Dioptres) →", pad.l + (w - pad.l - pad.r) / 2, h - 5);
+            c.fillText("Lens position (Dioptres) →", pad.l + (w - pad.l - pad.r) / 2, h - 5);
 
             c.fillStyle = "#94a3b8";
             c.font = "13px sans-serif";
-            c.fillText("Biểu đồ V-Curve: Vị trí Lens vs Kích thước sao (HFR) / Độ nét", w / 2, h / 2 - 10);
+            c.fillText("V-Curve chart: Lens position vs Star size (HFR) / Sharpness", w / 2, h / 2 - 10);
             c.font = "11px sans-serif";
             c.fillStyle = "#64748b";
-            c.fillText("Xoay vòng nét hoặc kéo thanh trượt vị trí lens (MF) để vẽ đường cong độ nét.", w / 2, h / 2 + 12);
+            c.fillText("Turn the focus ring or drag the lens position slider (MF) to plot the sharpness curve.", w / 2, h / 2 + 12);
             c.textAlign = "left";
             return;
         }
@@ -1047,7 +1047,7 @@
             c.fillStyle = "#10b981";
             c.font = "bold 11px ui-monospace, monospace";
             const valLabel = bestVal != null ? (useHfr ? `${bestVal.toFixed(2)} px` : bestVal.toFixed(1)) : "";
-            c.fillText(`★ Nét nhất ${bestPos.toFixed(3)} D${valLabel ? " (" + valLabel + ")" : ""}`, Math.min(bx + 6, w - pad.r - 140), pad.t + 12);
+            c.fillText(`★ Sharpest ${bestPos.toFixed(3)} D${valLabel ? " (" + valLabel + ")" : ""}`, Math.min(bx + 6, w - pad.r - 140), pad.t + 12);
         }
 
         const curX = X(Math.min(x1, Math.max(x0, curPos)));
@@ -1058,13 +1058,13 @@
         c.setLineDash([]);
         c.fillStyle = "#38bdf8";
         c.font = "11px ui-monospace, monospace";
-        c.fillText(`Hiện tại ${curPos.toFixed(3)} D`, Math.min(curX + 6, w - pad.r - 110), pad.t + 26);
+        c.fillText(`Current ${curPos.toFixed(3)} D`, Math.min(curX + 6, w - pad.r - 110), pad.t + 26);
 
         c.fillStyle = "#64748b";
         c.font = "10px sans-serif";
-        c.fillText(useHfr ? "Kích thước sao (HFR px) ↓ nét hơn" : "Độ nét (Sharpness) ↑ nét hơn", pad.l + 4, pad.t - 8);
+        c.fillText(useHfr ? "Star size (HFR px) ↓ sharper" : "Sharpness ↑ sharper", pad.l + 4, pad.t - 8);
         c.textAlign = "center";
-        c.fillText("Vị trí lens (Dioptres) →", pad.l + (w - pad.l - pad.r) / 2, h - 5);
+        c.fillText("Lens position (Dioptres) →", pad.l + (w - pad.l - pad.r) / 2, h - 5);
         c.textAlign = "left";
 
         if (st.hoverPoint && st.hoverPoint.point) {
@@ -1086,7 +1086,7 @@
 
             c.fillStyle = "#f8fafc";
             c.font = "bold 11px ui-monospace, monospace";
-            c.fillText(`Vị trí: ${p.pos.toFixed(3)} D`, tx + 8, ty + 15);
+            c.fillText(`Position: ${p.pos.toFixed(3)} D`, tx + 8, ty + 15);
             c.fillStyle = "#94a3b8";
             c.font = "10px ui-monospace, monospace";
             const hfrStr = p.hfr != null ? `HFR: ${p.hfr.toFixed(2)} px` : (p.score ? `Score: ${p.score.toFixed(2)}` : "");
@@ -1365,8 +1365,8 @@
             drawChart();
             const recBtn = $("focus-record-point");
             if (recBtn) {
-                recBtn.textContent = "Đã ghi ✓";
-                setTimeout(() => { recBtn.textContent = "Ghi điểm"; }, 1000);
+                recBtn.textContent = "Recorded ✓";
+                setTimeout(() => { recBtn.textContent = "Record point"; }, 1000);
             }
             return;
         }
@@ -1437,8 +1437,8 @@
 
     function fmtDist(d) {
         if (d === null || d === undefined) return "";
-        if (d < 0.02) return "≈ ∞ (vô cực)";
-        return d > 1 ? `≈ ${(1 / d).toFixed(2)} m (gần)` : `≈ ${(1 / d).toFixed(1)} m`;
+        if (d < 0.02) return "≈ ∞ (infinity)";
+        return d > 1 ? `≈ ${(1 / d).toFixed(2)} m (near)` : `≈ ${(1 / d).toFixed(1)} m`;
     }
 
     function applyLens(L) {
@@ -1457,7 +1457,7 @@
             afBtn.classList.toggle("disabled", !motorized);
             afBtn.title = motorized
                 ? "AF: the app finds focus by itself (sweep on stars, lights or detail) and keeps it (temperature, periodic checks). Click again to refocus now."
-                : "Camera sử dụng ống kính xoay tay (không có motor). Hãy dùng chế độ MF.";
+                : "Camera uses a manual-focus lens (no motor). Use MF mode.";
         }
         // The commanded position updates at once; the position frames report lags a frame or two behind
         const pos = L.held ?? L.position;
@@ -1470,7 +1470,7 @@
         if (!sliderDragging) {
             $("focus-lens-pos").textContent = pos === null || pos === undefined ? "—" : `${pos.toFixed(3)} D`;
             const distStr = fmtDist(pos);
-            const lagStr = lag ? ` · đang chỉnh ${L.position.toFixed(3)} D` : "";
+            const lagStr = lag ? ` · adjusting ${L.position.toFixed(3)} D` : "";
             $("focus-lens-dist").textContent = distStr ? `(${distStr}${lagStr})` : lagStr;
             $("focus-lens-dist").classList.toggle("text-warning", pos > 1);
         }
@@ -1493,7 +1493,7 @@
         document.querySelectorAll("#focus-lens-mode button").forEach((b) => b.classList.toggle("active", b.dataset.lensMode === (auto ? "auto" : "manual")));
         const cp = L.compensation || {};
         $("focus-lens-comp").textContent = !motorized
-            ? "MF: Xoay vòng nét trên ống kính và điều chỉnh thanh trượt vị trí tương ứng để vẽ biểu đồ V-curve."
+            ? "MF: Turn the focus ring on the lens and set the position slider to match to plot the V-curve."
             : !auto
             ? "MF: drag the slider or use the nudges; the lens stays exactly there."
             : cp.n_rejected && !cp.learned && cp.rms_d
@@ -1652,10 +1652,10 @@
             if (st.lastResult) {
                 recordLensMeasurement(st.lastResult);
                 drawChart();
-                recordPointBtn.textContent = "Đã ghi ✓";
-                setTimeout(() => { recordPointBtn.textContent = "Ghi điểm"; }, 1200);
+                recordPointBtn.textContent = "Recorded ✓";
+                setTimeout(() => { recordPointBtn.textContent = "Record point"; }, 1200);
             } else {
-                alert("Bật Focus Mode để nhận frame và ghi điểm đo.");
+                alert("Enable Focus Mode to receive frames and record measurement points.");
             }
         });
     }

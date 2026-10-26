@@ -4,10 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllSky Observatory — Edge Dashboard</title>
-    <link rel="stylesheet" href="/style.css?v=20261022parabola2">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
+    <link rel="stylesheet" href="/static/tokens.css?v=20261026ns1">
+    <link rel="stylesheet" href="/style.css?v=20261026ns1">
+    <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
-    <!-- Top Navigation Header -->
+    <div class="app-shell">
+    <!-- Sidebar (bottom tab bar on phones). Items keep .tab-btn / data-tab: app.js marks the active page. -->
+    <aside class="sidebar" id="sidebar">
+        <nav class="tab-bar side-nav" aria-label="Main navigation">
+            <div class="side-group">
+                <div class="side-group-title">Observe</div>
+                <a class="tab-btn side-item" href="/live" data-tab="tab-live"><span class="side-ic">&#9673;</span><span class="side-txt">Live</span></a>
+                <a class="side-item side-link" href="/flights3d"><span class="side-ic">&#9992;</span><span class="side-txt">Flights 3D</span></a>
+            </div>
+            <div class="side-group">
+                <div class="side-group-title">Library</div>
+                <a class="tab-btn side-item" href="/gallery" data-tab="tab-gallery"><span class="side-ic">&#9638;</span><span class="side-txt">Gallery &amp; Events</span></a>
+                <a class="tab-btn side-item" href="/logs" data-tab="tab-logs"><span class="side-ic">&#8801;</span><span class="side-txt">Activity Log <span class="log-badge" id="log-error-badge" hidden>0</span></span></a>
+            </div>
+            <div class="side-group">
+                <div class="side-group-title">Camera</div>
+                <a class="tab-btn side-item" href="/focus" data-tab="tab-focus"><span class="side-ic">&#9678;</span><span class="side-txt">Focus</span></a>
+                <a class="tab-btn side-item" href="/calibration" data-tab="tab-calibration"><span class="side-ic">&#9680;</span><span class="side-txt">Master Dark</span></a>
+            </div>
+            <div class="side-group side-group-stream">
+                <div class="side-group-title">Stream</div>
+                <a class="side-item side-link" href="/obs/dock"><span class="side-ic">&#9635;</span><span class="side-txt">OBS Dock</span></a>
+                <a class="side-item side-link" href="/obs" target="_blank" rel="noopener"><span class="side-ic">&#8599;</span><span class="side-txt">OBS Preview</span></a>
+            </div>
+            <div class="side-group side-group-settings">
+                <div class="side-group-title">Settings</div>
+                <a class="tab-btn side-item" href="/settings" data-tab="tab-settings"><span class="side-ic">&#9881;</span><span class="side-txt">Settings</span></a>
+                <div class="side-sub-list" id="settings-subnav">
+                    <a class="side-sub" href="/settings#image" data-sub="image">Image Output</a>
+                    <a class="side-sub" href="/settings#detection" data-sub="detection">Detection</a>
+                    <a class="side-sub" href="/settings#station" data-sub="station">Station &amp; Optics</a>
+                    <a class="side-sub" href="/settings#skymask" data-sub="skymask">Sky Mask</a>
+                    <a class="side-sub" href="/settings#integrations" data-sub="integrations">Integrations</a>
+                </div>
+            </div>
+        </nav>
+    </aside>
+
+    <div class="app-main">
+    <!-- Top bar -->
     <header class="navbar">
         <div class="nav-brand">
             <div class="pulse-indicator online" id="status-pulse" title="System Online"></div>
@@ -27,24 +71,18 @@
                 <span class="pill-value text-accent" id="nav-camera-mode">AUTO</span>
             </div>
             <div class="nav-pill">
-                <span class="pill-label">Local</span>
+                <span class="pill-label">UTC</span>
                 <span class="pill-value" id="nav-utc-clock">00:00:00</span>
             </div>
-            <button id="btn-night-vision" class="btn btn-outline" title="Preserve night vision adaptation (>650nm red light filter)">
-                <span class="icon">●</span> Red Vision Mode
+            <div class="nav-pill">
+                <span class="pill-label" id="nav-local-label">Local</span>
+                <span class="pill-value" id="nav-local-clock">00:00</span>
+            </div>
+            <button id="btn-night-vision" class="btn btn-outline" title="Preserve night vision adaptation (red palette)">
+                <span class="icon">●</span> Red Vision
             </button>
         </div>
     </header>
-
-    <!-- Navigation Tabs -->
-    <nav class="tab-bar">
-        <a class="tab-btn" href="/live" data-tab="tab-live">Live Observatory</a>
-        <a class="tab-btn" href="/gallery" data-tab="tab-gallery">Gallery &amp; Events</a>
-        <a class="tab-btn" href="/settings" data-tab="tab-settings">Settings</a>
-        <a class="tab-btn" href="/focus" data-tab="tab-focus">Focus</a>
-        <a class="tab-btn" href="/calibration" data-tab="tab-calibration">Master Dark</a>
-        <a class="tab-btn" href="/logs" data-tab="tab-logs">Activity Log <span class="log-badge" id="log-error-badge" hidden>0</span></a>
-    </nav>
 
     <!-- Main Container -->
     <main class="container">
@@ -90,71 +128,91 @@
                         </div>
                     </div>
 
-                    <!-- Histogram Card -->
-                    <div class="card histogram-card">
-                        <div class="card-header">
-                            <h2>Real-Time Exposure Histogram (256 Bins)</h2>
-                            <div class="header-actions">
-                                <span class="badge" id="hist-calc-badge">< 5 ms</span>
-                            </div>
+                <!-- Cloud cover over time -->
+                <div class="card cloud-card">
+                    <div class="card-header">
+                        <h2>Cloud Cover History</h2>
+                        <div class="cloud-ranges" role="group" aria-label="Time range">
+                            <button class="btn-range" data-hours="6">6 h</button>
+                            <button class="btn-range active" data-hours="24">24 h</button>
+                            <button class="btn-range" data-hours="72">3 d</button>
+                            <button class="btn-range" data-hours="168">7 d</button>
+                            <button class="btn-range" data-hours="720">30 d</button>
                         </div>
-                        <div class="histogram-wrapper">
-                            <canvas id="histogram-canvas" width="600" height="160"></canvas>
-                        </div>
-                        <div class="histogram-stats-grid">
-                            <div class="stat-chip">
-                                <span class="chip-title">Mean Luma</span>
-                                <span class="chip-val" id="hist-mean">0.0</span>
-                            </div>
-                            <div class="stat-chip">
-                                <span class="chip-title">StdDev</span>
-                                <span class="chip-val" id="hist-stddev">0.0</span>
-                            </div>
-                            <div class="stat-chip">
-                                <span class="chip-title">Median</span>
-                                <span class="chip-val" id="hist-median">0</span>
-                            </div>
-                            <div class="stat-chip">
-                                <span class="chip-title">Black Clip</span>
-                                <span class="chip-val text-warning" id="hist-clip-low">0.00%</span>
-                            </div>
-                            <div class="stat-chip">
-                                <span class="chip-title">White Clip</span>
-                                <span class="chip-val text-danger" id="hist-clip-high">0.00%</span>
-                            </div>
-                        </div>
+                    </div>
+                    <div class="cloud-summary" id="cloud-summary">
+                        <span>Mean <strong id="cloud-mean">--</strong></span>
+                        <span>Clear time <strong id="cloud-clear">--</strong></span>
+                        <span>Range <strong id="cloud-range">--</strong></span>
+                        <span>Samples <strong id="cloud-samples">--</strong></span>
+                        <span class="cloud-legend"><i class="lg-night"></i>Night <i class="lg-low"></i>Low confidence</span>
+                    </div>
+                    <div class="cloud-chart-wrap" id="cloud-chart-wrap">
+                        <svg id="cloud-chart" role="img" aria-label="Cloud cover percentage over time"></svg>
+                        <div class="cloud-tooltip hidden" id="cloud-tooltip"></div>
+                        <div class="cloud-empty hidden" id="cloud-empty">No cloud samples in this range yet. One is taken every analysis interval (Settings → Performance).</div>
                     </div>
                 </div>
+                </div>
 
-                <!-- Right Column: live sky events, Hardware Controls, Telemetry HUD -->
+                <!-- Right rail: telemetry, exposure (collapsible), histogram, events, flights -->
                 <div class="controls-col">
-                    <!-- Live feed of sky events -->
-                    <div class="card live-events-card">
+                    <!-- Telemetry HUD Gauges -->
+                    <div class="card telemetry-card">
                         <div class="card-header">
-                            <h2>Live Events</h2>
-                            <span class="badge" id="live-events-count">0 tonight</span>
+                            <h2>Telemetry</h2>
+                            <span class="text-muted" id="telemetry-timestamp">--</span>
                         </div>
-                        <div class="live-events-status" id="live-events-status">Loading…</div>
-                        <ul class="live-events-list" id="live-events-list"></ul>
-                        <a class="live-events-more" href="/gallery">All events →</a>
+                        <div class="gauge-grid">
+                            <div class="gauge-box">
+                                <span class="gauge-label">EXPOSURE</span>
+                                <span class="gauge-number" id="telem-exp">2.000s</span>
+                            </div>
+                            <div class="gauge-box">
+                                <span class="gauge-label">GAIN</span>
+                                <span class="gauge-number" id="telem-gain">24.0 dB</span>
+                            </div>
+                            <div class="gauge-box">
+                                <span class="gauge-label">STAR COUNT</span>
+                                <span class="gauge-number text-accent" id="telem-stars">--</span>
+                            </div>
+                            <div class="gauge-box">
+                                <span class="gauge-label">CLOUD COVER</span>
+                                <span class="gauge-number text-warning" id="telem-clouds">--%</span>
+                            </div>
+                            <div class="gauge-box">
+                                <span class="gauge-label">SKY CONDITION</span>
+                                <span class="gauge-number" id="telem-sky-status">CLEAR</span>
+                            </div>
+                            <div class="gauge-box">
+                                <span class="gauge-label">FRAME RATE</span>
+                                <span class="gauge-number" id="telem-fps">0.5 FPS</span>
+                            </div>
+                            <div class="gauge-box">
+                                <span class="gauge-label">SENSOR TEMP</span>
+                                <span class="gauge-number" id="telem-temp">24.5 °C</span>
+                            </div>
+                            <div class="gauge-box">
+                                <span class="gauge-label">SYSTEM UPTIME</span>
+                                <span class="gauge-number" id="telem-uptime">--</span>
+                            </div>
+                        </div>
+
+                        <!-- Hardware Register Readout -->
+                        <div class="registers-box" id="registers-box">
+                            <span class="reg-title">Sony IMX335 I2C Registers</span>
+                            <div class="registers-row">
+                                <span>VMAX: <strong id="reg-vmax">--</strong></span>
+                                <span>HMAX: <strong id="reg-hmax">--</strong></span>
+                                <span>SHR0: <strong id="reg-shr0">--</strong></span>
+                                <span>PGC: <strong id="reg-pgc">--</strong></span>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Aircraft heard by the ADS-B receiver -->
-                    <div class="card flights-card" id="flights-card" hidden>
-                        <div class="card-header">
-                            <h2>Flights Overhead</h2>
-                            <span class="badge" id="flights-count">--</span>
-                        </div>
-                        <div class="flights-status" id="flights-status">Loading…</div>
-                        <ul class="flights-list" id="flights-list"></ul>
-                        <a class="live-events-more" href="/flights3d">3D map →</a>
-                    </div>
                     <!-- Hardware Control Panel -->
-                    <div class="card control-card">
-                        <div class="card-header">
-                            <h2>Hardware Controls</h2>
-                            <span class="badge badge-accent" id="active-profile-badge">AUTO EPHEMERIS</span>
-                        </div>
+                    <details class="card control-card collapsible-card" id="exposure-card" open>
+                        <summary class="card-header"><h2>Exposure &amp; Gain</h2><span class="badge badge-accent" id="active-profile-badge">AUTO EPHEMERIS</span></summary>
 
                         <!-- Exposure Slider -->
                         <div class="control-group">
@@ -210,88 +268,67 @@
                             Lock one (🔒) and it computes only the other.
                             Exposure goes up to 60 s. Both locked holds the values fixed.</p>
                         <div id="control-alert" class="alert-box hidden"></div>
-                    </div>
+                    </details>
 
-                    <!-- Telemetry HUD Gauges -->
-                    <div class="card telemetry-card">
+                    <!-- Histogram Card -->
+                    <div class="card histogram-card">
                         <div class="card-header">
-                            <h2>Telemetry HUD</h2>
-                            <span class="text-muted" id="telemetry-timestamp">--</span>
-                        </div>
-                        <div class="gauge-grid">
-                            <div class="gauge-box">
-                                <span class="gauge-label">EXPOSURE</span>
-                                <span class="gauge-number" id="telem-exp">2.000s</span>
-                            </div>
-                            <div class="gauge-box">
-                                <span class="gauge-label">GAIN</span>
-                                <span class="gauge-number" id="telem-gain">24.0 dB</span>
-                            </div>
-                            <div class="gauge-box">
-                                <span class="gauge-label">STAR COUNT</span>
-                                <span class="gauge-number text-accent" id="telem-stars">--</span>
-                            </div>
-                            <div class="gauge-box">
-                                <span class="gauge-label">CLOUD COVER</span>
-                                <span class="gauge-number text-warning" id="telem-clouds">--%</span>
-                            </div>
-                            <div class="gauge-box">
-                                <span class="gauge-label">SKY CONDITION</span>
-                                <span class="gauge-number" id="telem-sky-status">CLEAR</span>
-                            </div>
-                            <div class="gauge-box">
-                                <span class="gauge-label">FRAME RATE</span>
-                                <span class="gauge-number" id="telem-fps">0.5 FPS</span>
-                            </div>
-                            <div class="gauge-box">
-                                <span class="gauge-label">SENSOR TEMP</span>
-                                <span class="gauge-number" id="telem-temp">24.5 °C</span>
-                            </div>
-                            <div class="gauge-box">
-                                <span class="gauge-label">SYSTEM UPTIME</span>
-                                <span class="gauge-number" id="telem-uptime">--</span>
+                            <h2>Histogram (256 bins)</h2>
+                            <div class="header-actions">
+                                <span class="badge" id="hist-calc-badge">< 5 ms</span>
                             </div>
                         </div>
+                        <div class="histogram-wrapper">
+                            <canvas id="histogram-canvas" width="600" height="160"></canvas>
+                        </div>
+                        <div class="histogram-stats-grid">
+                            <div class="stat-chip">
+                                <span class="chip-title">Mean Luma</span>
+                                <span class="chip-val" id="hist-mean">0.0</span>
+                            </div>
+                            <div class="stat-chip">
+                                <span class="chip-title">StdDev</span>
+                                <span class="chip-val" id="hist-stddev">0.0</span>
+                            </div>
+                            <div class="stat-chip">
+                                <span class="chip-title">Median</span>
+                                <span class="chip-val" id="hist-median">0</span>
+                            </div>
+                            <div class="stat-chip">
+                                <span class="chip-title">Black Clip</span>
+                                <span class="chip-val text-warning" id="hist-clip-low">0.00%</span>
+                            </div>
+                            <div class="stat-chip">
+                                <span class="chip-title">White Clip</span>
+                                <span class="chip-val text-danger" id="hist-clip-high">0.00%</span>
+                            </div>
+                        </div>
+                    </div>
 
-                        <!-- Hardware Register Readout -->
-                        <div class="registers-box" id="registers-box">
-                            <span class="reg-title">Sony IMX335 I2C Registers</span>
-                            <div class="registers-row">
-                                <span>VMAX: <strong id="reg-vmax">--</strong></span>
-                                <span>HMAX: <strong id="reg-hmax">--</strong></span>
-                                <span>SHR0: <strong id="reg-shr0">--</strong></span>
-                                <span>PGC: <strong id="reg-pgc">--</strong></span>
-                            </div>
+                    <!-- Live feed of sky events -->
+                    <div class="card live-events-card">
+                        <div class="card-header">
+                            <h2>Live Events</h2>
+                            <span class="badge" id="live-events-count">0 tonight</span>
                         </div>
+                        <div class="live-events-status" id="live-events-status">Loading…</div>
+                        <ul class="live-events-list" id="live-events-list"></ul>
+                        <a class="live-events-more" href="/gallery">All events →</a>
+                    </div>
+
+                    <!-- Aircraft heard by the ADS-B receiver -->
+                    <div class="card flights-card" id="flights-card" hidden>
+                        <div class="card-header">
+                            <h2>Flights Overhead</h2>
+                            <span class="badge" id="flights-count">--</span>
+                        </div>
+                        <div class="flights-status" id="flights-status">Loading…</div>
+                        <ul class="flights-list" id="flights-list"></ul>
+                        <a class="live-events-more" href="/flights3d">3D map →</a>
                     </div>
                 </div>
             </div>
 
-            <!-- Cloud cover over time -->
-            <div class="card cloud-card">
-                <div class="card-header">
-                    <h2>Cloud Cover History</h2>
-                    <div class="cloud-ranges" role="group" aria-label="Time range">
-                        <button class="btn-range" data-hours="6">6 h</button>
-                        <button class="btn-range active" data-hours="24">24 h</button>
-                        <button class="btn-range" data-hours="72">3 d</button>
-                        <button class="btn-range" data-hours="168">7 d</button>
-                        <button class="btn-range" data-hours="720">30 d</button>
-                    </div>
-                </div>
-                <div class="cloud-summary" id="cloud-summary">
-                    <span>Mean <strong id="cloud-mean">--</strong></span>
-                    <span>Clear time <strong id="cloud-clear">--</strong></span>
-                    <span>Range <strong id="cloud-range">--</strong></span>
-                    <span>Samples <strong id="cloud-samples">--</strong></span>
-                    <span class="cloud-legend"><i class="lg-night"></i>Night <i class="lg-low"></i>Low confidence</span>
-                </div>
-                <div class="cloud-chart-wrap" id="cloud-chart-wrap">
-                    <svg id="cloud-chart" role="img" aria-label="Cloud cover percentage over time"></svg>
-                    <div class="cloud-tooltip hidden" id="cloud-tooltip"></div>
-                    <div class="cloud-empty hidden" id="cloud-empty">No cloud samples in this range yet. One is taken every analysis interval (Settings → Performance).</div>
-                </div>
-            </div>
         </section>
 
         <!-- TAB 2: Gallery & Events -->
@@ -341,8 +378,15 @@
         </section>
 
         <!-- PAGE: Settings (/settings) -->
-        <section id="tab-settings" class="tab-content">
-            <div class="card settings-card" id="settings-focus-card">
+        <section id="tab-settings" class="tab-content" data-sub="image">
+            <nav class="mobile-subnav" aria-label="Settings sections">
+                <a href="/settings#image" data-sub="image">Image Output</a>
+                <a href="/settings#detection" data-sub="detection">Detection</a>
+                <a href="/settings#station" data-sub="station">Station &amp; Optics</a>
+                <a href="/settings#skymask" data-sub="skymask">Sky Mask</a>
+                <a href="/settings#integrations" data-sub="integrations">Integrations</a>
+            </nav>
+            <div class="card settings-card" id="settings-focus-card" data-sgroup="station">
                 <div class="card-header">
                     <h2>Focus</h2>
                     <a class="btn btn-sm btn-outline" href="/focus">Open focus assistant</a>
@@ -350,7 +394,7 @@
                 <div class="focus-history" id="settings-focus-history"><span class="text-muted">No focus saved yet.</span></div>
             </div>
             <!-- Image Output Card: resolution + orientation -->
-            <div class="card settings-card">
+            <div class="card settings-card" data-sgroup="image">
                 <div class="card-header">
                     <h2>Image Output</h2>
                     <span class="badge badge-accent" id="output-res-badge">2592 × 1944</span>
@@ -439,82 +483,6 @@
                             <span id="perf-bin-note"></span>
                         </p>
                     </fieldset>
-                    <!-- Sky event detection -->
-                    <fieldset class="settings-group">
-                        <legend>Event detection</legend>
-                        <div class="field-grid">
-                            <div class="field">
-                                <label class="checkbox-label"><input type="checkbox" id="evt-meteor" data-event="meteor" checked /> ☄️ Meteors</label>
-                            </div>
-                            <div class="field">
-                                <label class="checkbox-label"><input type="checkbox" id="evt-plane" data-event="plane" checked /> ✈️ Aircraft</label>
-                            </div>
-                            <div class="field">
-                                <label class="checkbox-label"><input type="checkbox" id="evt-satellite" data-event="satellite" /> 🛰️ Satellites</label>
-                            </div>
-                            <div class="field">
-                                <label class="checkbox-label"><input type="checkbox" id="evt-flash" data-event="flash" /> ⚡ Flashes / lightning</label>
-                            </div>
-                            <div class="field">
-                                <label class="checkbox-label"><input type="checkbox" id="evt-clouds" data-event="clouds" /> ☁️ Clouds arriving / clearing</label>
-                            </div>
-                        </div>
-                        <p class="field-note">
-                            Streaks and flashes are looked for at night only (sun below −8°), on a 640 px gray copy of each new frame compared with the previous one: a few ms per frame.
-                            A streak in a single frame is a meteor; a dashed one or one that continues along the same line in the next frame is an aircraft (faint and steady: a satellite).
-                            Cloud changes reuse the cloud cover samples, so they need “Star count &amp; cloud cover” on. Set a sky mask (plate solving) to ignore roads and windows.
-                            Events are listed under Gallery &amp; Events.
-                            <span id="evt-status"></span>
-                        </p>
-                        <div class="field-grid adsb-grid">
-                            <div class="field">
-                                <label for="adsb-host">ADS-B receiver (SBS-1 feed)</label>
-                                <input type="text" id="adsb-host" placeholder="e.g. 192.168.2.48" maxlength="253" />
-                            </div>
-                            <div class="field">
-                                <label for="adsb-port">Port</label>
-                                <input type="number" id="adsb-port" min="1" max="65535" value="30003" />
-                            </div>
-                            <div class="field">
-                                <label class="checkbox-label"><input type="checkbox" id="adsb-enabled" /> Name the flight</label>
-                                <button type="button" class="btn btn-sm btn-outline" id="btn-adsb-save">Save</button>
-                            </div>
-                        </div>
-                        <p class="field-note">
-                            With a local ADS-B receiver (dump1090, readsb or a Flightradar24 feeder: BaseStation port 30003), each aircraft event is matched
-                            to the flight whose position, projected with the star-solved camera pointing, lies on the streak. A “meteor” that matches a flight becomes an aircraft.
-                            The feed is only read at night while aircraft detection is on.
-                            <span id="adsb-status"></span>
-                        </p>
-                    </fieldset>
-                    <!-- Cloud cover analysis -->
-                    <fieldset class="settings-group">
-                        <legend>Cloud Cover</legend>
-                        <div class="field-grid">
-                            <div class="field">
-                                <label for="roi-left">Sky region left (%)</label>
-                                <input type="number" id="roi-left" data-roi="0" min="0" max="95" step="1" value="0" />
-                            </div>
-                            <div class="field">
-                                <label for="roi-top">Sky region top (%)</label>
-                                <input type="number" id="roi-top" data-roi="1" min="0" max="95" step="1" value="0" />
-                            </div>
-                            <div class="field">
-                                <label for="roi-right">Sky region right (%)</label>
-                                <input type="number" id="roi-right" data-roi="2" min="5" max="100" step="1" value="100" />
-                            </div>
-                            <div class="field">
-                                <label for="roi-bottom">Sky region bottom (%)</label>
-                                <input type="number" id="roi-bottom" data-roi="3" min="5" max="100" step="1" value="100" />
-                            </div>
-                        </div>
-                        <p class="field-note">
-                            Only this part of the frame is analysed: exclude buildings, trees and the horizon (e.g. bottom 40% if the lower part shows rooftops).
-                            The clear-sky reference is learned automatically; reset it after moving or re-aiming the camera.
-                            <span id="cloud-ref-note" class="text-muted"></span>
-                        </p>
-                        <button type="button" class="btn btn-sm btn-outline" id="btn-cloud-ref-reset">Reset learned clear-sky reference</button>
-                    </fieldset>
                     <!-- White balance (RAW10 night mode) -->
                     <fieldset class="settings-group">
                         <legend>White Balance</legend>
@@ -583,8 +551,72 @@
                 </div>
             </div>
 
+            <!-- Detection Card: sky events + cloud cover -->
+            <div class="card settings-card" data-sgroup="detection">
+                <div class="card-header">
+                    <h2>Detection</h2>
+                </div>
+                <p class="description">Meteor, aircraft, satellite, flash and cloud detection, and the cloud cover analysis.</p>
+                <div class="settings-grid">
+                    <fieldset class="settings-group">
+                        <legend>Event detection</legend>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="evt-meteor" data-event="meteor" checked /> ☄️ Meteors</label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="evt-plane" data-event="plane" checked /> ✈️ Aircraft</label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="evt-satellite" data-event="satellite" /> 🛰️ Satellites</label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="evt-flash" data-event="flash" /> ⚡ Flashes / lightning</label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="evt-clouds" data-event="clouds" /> ☁️ Clouds arriving / clearing</label>
+                            </div>
+                        </div>
+                        <p class="field-note">
+                            Streaks and flashes are looked for at night only (sun below −8°), on a 640 px gray copy of each new frame compared with the previous one: a few ms per frame.
+                            A streak in a single frame is a meteor; a dashed one or one that continues along the same line in the next frame is an aircraft (faint and steady: a satellite).
+                            Cloud changes reuse the cloud cover samples, so they need “Star count &amp; cloud cover” on. Set a sky mask (plate solving) to ignore roads and windows.
+                            Events are listed under Gallery &amp; Events.
+                            <span id="evt-status"></span>
+                        </p>
+                    </fieldset>
+                    <fieldset class="settings-group">
+                        <legend>Cloud Cover</legend>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="roi-left">Sky region left (%)</label>
+                                <input type="number" id="roi-left" data-roi="0" min="0" max="95" step="1" value="0" />
+                            </div>
+                            <div class="field">
+                                <label for="roi-top">Sky region top (%)</label>
+                                <input type="number" id="roi-top" data-roi="1" min="0" max="95" step="1" value="0" />
+                            </div>
+                            <div class="field">
+                                <label for="roi-right">Sky region right (%)</label>
+                                <input type="number" id="roi-right" data-roi="2" min="5" max="100" step="1" value="100" />
+                            </div>
+                            <div class="field">
+                                <label for="roi-bottom">Sky region bottom (%)</label>
+                                <input type="number" id="roi-bottom" data-roi="3" min="5" max="100" step="1" value="100" />
+                            </div>
+                        </div>
+                        <p class="field-note">
+                            Only this part of the frame is analysed: exclude buildings, trees and the horizon (e.g. bottom 40% if the lower part shows rooftops).
+                            The clear-sky reference is learned automatically; reset it after moving or re-aiming the camera.
+                            <span id="cloud-ref-note" class="text-muted"></span>
+                        </p>
+                        <button type="button" class="btn btn-sm btn-outline" id="btn-cloud-ref-reset">Reset learned clear-sky reference</button>
+                    </fieldset>
+                </div>
+            </div>
+
             <!-- Station & Camera Settings Card -->
-            <div class="card settings-card">
+            <div class="card settings-card" data-sgroup="station">
                 <div class="card-header">
                     <h2>Station &amp; Optics</h2>
                     <span class="badge badge-accent" id="station-solve-badge">NOT SOLVED YET</span>
@@ -689,24 +721,6 @@
 
                 <div id="station-alert" class="alert-box hidden mt-3"></div>
 
-                <details class="params-summary" id="sky-mask-editor">
-                    <summary>Plate-solve sky mask (outline the open sky)</summary>
-                    <p class="field-note">Click on the frame to outline open sky (green) and lit buildings, trees or
-                        poles to ignore (red). The plate solver only uses stars inside the sky and outside obstructions,
-                        on top of its own automatic sky detection.</p>
-                    <div class="settings-actions">
-                        <button id="mask-new-sky" class="btn btn-sm btn-outline" type="button">＋ Sky polygon</button>
-                        <button id="mask-new-obs" class="btn btn-sm btn-outline" type="button">＋ Obstruction</button>
-                        <button id="mask-undo" class="btn btn-sm btn-outline" type="button">↶ Undo point</button>
-                        <button id="mask-clear" class="btn btn-sm btn-outline" type="button">🗑 Clear all</button>
-                        <button id="mask-save" class="btn btn-sm btn-primary" type="button">💾 Save mask</button>
-                    </div>
-                    <div class="mask-canvas-wrap">
-                        <img id="mask-img" alt="Live frame for drawing the sky mask">
-                        <canvas id="mask-canvas"></canvas>
-                    </div>
-                    <div id="mask-alert" class="alert-box hidden mt-3"></div>
-                </details>
 
                 <details class="params-summary">
                     <summary>Camera, lens &amp; station parameter summary</summary>
@@ -729,6 +743,62 @@
                 </details>
             </div>
 
+            <!-- Sky Mask Card -->
+            <div class="card settings-card" data-sgroup="skymask">
+                <div class="card-header">
+                    <h2>Sky Mask</h2>
+                </div>
+                <details class="params-summary" id="sky-mask-editor" open>
+                    <summary>Plate-solve sky mask (outline the open sky)</summary>
+                    <p class="field-note">Click on the frame to outline open sky (green) and lit buildings, trees or
+                        poles to ignore (red). The plate solver only uses stars inside the sky and outside obstructions,
+                        on top of its own automatic sky detection.</p>
+                    <div class="settings-actions">
+                        <button id="mask-new-sky" class="btn btn-sm btn-outline" type="button">＋ Sky polygon</button>
+                        <button id="mask-new-obs" class="btn btn-sm btn-outline" type="button">＋ Obstruction</button>
+                        <button id="mask-undo" class="btn btn-sm btn-outline" type="button">↶ Undo point</button>
+                        <button id="mask-clear" class="btn btn-sm btn-outline" type="button">🗑 Clear all</button>
+                        <button id="mask-save" class="btn btn-sm btn-primary" type="button">💾 Save mask</button>
+                    </div>
+                    <div class="mask-canvas-wrap">
+                        <img id="mask-img" alt="Live frame for drawing the sky mask">
+                        <canvas id="mask-canvas"></canvas>
+                    </div>
+                    <div id="mask-alert" class="alert-box hidden mt-3"></div>
+                </details>
+            </div>
+
+            <!-- Integrations Card -->
+            <div class="card settings-card" data-sgroup="integrations">
+                <div class="card-header">
+                    <h2>Integrations</h2>
+                </div>
+                <div class="settings-grid">
+                    <fieldset class="settings-group">
+                        <legend>ADS-B receiver</legend>
+                        <div class="field-grid adsb-grid">
+                            <div class="field">
+                                <label for="adsb-host">ADS-B receiver (SBS-1 feed)</label>
+                                <input type="text" id="adsb-host" placeholder="e.g. 192.168.2.48" maxlength="253" />
+                            </div>
+                            <div class="field">
+                                <label for="adsb-port">Port</label>
+                                <input type="number" id="adsb-port" min="1" max="65535" value="30003" />
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="adsb-enabled" /> Name the flight</label>
+                                <button type="button" class="btn btn-sm btn-outline" id="btn-adsb-save">Save</button>
+                            </div>
+                        </div>
+                        <p class="field-note">
+                            With a local ADS-B receiver (dump1090, readsb or a Flightradar24 feeder: BaseStation port 30003), each aircraft event is matched
+                            to the flight whose position, projected with the star-solved camera pointing, lies on the streak. A “meteor” that matches a flight becomes an aircraft.
+                            The feed is only read at night while aircraft detection is on.
+                            <span id="adsb-status"></span>
+                        </p>
+                    </fieldset>
+                </div>
+            </div>
         </section>
 
         <!-- PAGE: Master Dark Calibration (/calibration) -->
@@ -837,7 +907,7 @@
                         </aside>
                     </div>
                     <div class="focus-charts-grid">
-                        <!-- Chart 1: Lens V-Curve (Vị trí lens vs Kích thước sao HFR / Độ nét) -->
+                        <!-- Chart 1: Lens V-Curve (lens position vs star size HFR / sharpness) -->
                         <div class="focus-chart-card">
                             <div class="focus-chart-head">
                                 <div class="focus-chart-title-wrap">
@@ -845,39 +915,39 @@
                                     <span class="focus-badge" id="focus-chart-fit-badge">V-CURVE</span>
                                 </div>
                                 <div class="focus-seg" id="focus-chart-metric">
-                                    <button data-chart-metric="starsize" class="active" title="Kích thước sao: HFR / FWHM (px) - Càng nhỏ càng nét">Kích thước sao (HFR)</button>
-                                    <button data-chart-metric="sharpness" title="Độ nét: Edge contrast / Sharpness - Càng lớn càng nét">Độ nét (Sharpness)</button>
+                                    <button data-chart-metric="starsize" class="active" title="Star size: HFR / FWHM (px), smaller is sharper">Star size (HFR)</button>
+                                    <button data-chart-metric="sharpness" title="Sharpness: edge contrast, higher is sharper">Sharpness</button>
                                 </div>
                                 <div class="header-actions focus-chart-actions">
-                                    <button class="btn btn-sm btn-success" id="focus-go-best" hidden title="Quay lại vị trí lens nét nhất tìm được trên biểu đồ">★ Tốt nhất (<span id="focus-best-pos-val">—</span>)</button>
-                                    <button class="btn btn-sm btn-outline" id="focus-record-point" title="Ghi nhận điểm đo tại vị trí lens hiện tại vào biểu đồ">Ghi điểm</button>
-                                    <button class="btn btn-sm btn-outline" id="focus-reset" title="Xóa dữ liệu biểu đồ và làm mới (R)">Reset (R)</button>
+                                    <button class="btn btn-sm btn-success" id="focus-go-best" hidden title="Return to the sharpest lens position found on the chart">★ Best (<span id="focus-best-pos-val">—</span>)</button>
+                                    <button class="btn btn-sm btn-outline" id="focus-record-point" title="Record a measurement at the current lens position">Record point</button>
+                                    <button class="btn btn-sm btn-outline" id="focus-reset" title="Clear the chart data and start over (R)">Reset (R)</button>
                                 </div>
                             </div>
                             <canvas id="focus-lens-chart" class="focus-chart"></canvas>
                             <div class="focus-chart-summary" id="focus-chart-summary">
-                                <span>Vị trí lens: <b id="focus-curve-cur-pos">—</b></span>
-                                <span id="focus-curve-best-wrap">· Điểm nét nhất: <b id="focus-curve-best-info" class="text-success">—</b></span>
-                                <span id="focus-curve-n-wrap">· Đã đo: <b id="focus-curve-points-count">0</b> vị trí</span>
-                                <span id="focus-curve-hint" class="text-muted">· Bấm biểu đồ để chọn vị trí</span>
+                                <span>Lens position: <b id="focus-curve-cur-pos">—</b></span>
+                                <span id="focus-curve-best-wrap">· Sharpest point: <b id="focus-curve-best-info" class="text-success">—</b></span>
+                                <span id="focus-curve-n-wrap">· Measured: <b id="focus-curve-points-count">0</b> positions</span>
+                                <span id="focus-curve-hint" class="text-muted">· Click the chart to pick a position</span>
                             </div>
                         </div>
 
-                        <!-- Chart 2: Live Time History (Độ nét & Kích thước sao theo chuỗi frame) -->
+                        <!-- Chart 2: Live Time History (sharpness and star size over consecutive frames) -->
                         <div class="focus-chart-card">
                             <div class="focus-chart-head">
                                 <div class="focus-chart-title-wrap">
-                                    <strong id="focus-time-chart-title">Live Time History (Theo thời gian thực)</strong>
+                                    <strong id="focus-time-chart-title">Live Time History</strong>
                                     <span class="focus-badge">TIME STREAM</span>
                                 </div>
                                 <div class="focus-chart-subtext text-muted">
-                                    Độ nét &amp; HFR theo chuỗi frame liên tục
+                                    Sharpness &amp; HFR over consecutive frames
                                 </div>
                             </div>
                             <canvas id="focus-time-chart" class="focus-chart"></canvas>
                             <div class="focus-chart-summary">
-                                <span>Dải đo: <b id="focus-time-range-info">60 frame gần nhất</b></span>
-                                <span id="focus-time-status-info" class="text-muted">· Dải mờ: mức nhiễu nền (noise band)</span>
+                                <span>Range: <b id="focus-time-range-info">last 60 frames</b></span>
+                                <span id="focus-time-status-info" class="text-muted">· Shaded band: background noise level</span>
                             </div>
                         </div>
                     </div>
@@ -910,17 +980,17 @@
                         <div class="focus-field">
                             <span class="focus-field-label">Measure</span>
                             <div class="focus-seg" id="focus-method">
-                                <button data-method="auto" class="active" title="Tự động: ban đêm đo kích thước sao (HFR/FWHM px), ban ngày đo tương phản cạnh">Auto</button>
-                                <button data-method="stars" title="Đo kích thước sao HFR / FWHM (px) — sao càng nhỏ càng nét">Stars (HFR)</button>
-                                <button data-method="lights" title="Đo kích thước điểm sáng HFR (px) — càng nhỏ càng nét">Lights</button>
-                                <button data-method="contrast" title="Đo độ tương phản cạnh (ban ngày: nhà cửa, cây cối, đường chân trời)">Day</button>
+                                <button data-method="auto" class="active" title="Auto: star size (HFR/FWHM px) at night, edge contrast by day">Auto</button>
+                                <button data-method="stars" title="Measure star size HFR / FWHM (px): smaller stars are sharper">Stars (HFR)</button>
+                                <button data-method="lights" title="Measure light-spot size HFR (px): smaller is sharper">Lights</button>
+                                <button data-method="contrast" title="Measure edge contrast (daytime: buildings, trees, horizon)">Day</button>
                             </div>
                         </div>
                         <div class="focus-field">
-                            <span class="focus-field-label" title="Chế độ chọn vị trí vùng lấy nét (ROI): Tự động chọn ngôi sao/chi tiết tốt nhất hoặc Thủ công giữ cố định nơi bạn bấm chọn">Vị trí Focus</span>
+                            <span class="focus-field-label" title="Focus region (ROI) mode: Auto picks the best star or detail, Manual keeps the spot you click">Focus position</span>
                             <div class="focus-seg" id="focus-roi-mode">
-                                <button data-roi-mode="auto" class="active" title="Tự động tìm ngôi sao sáng nhất (ban đêm) hoặc vùng chi tiết nhất (ban ngày)">Tự động (Auto)</button>
-                                <button data-roi-mode="manual" title="Thủ công: giữ cố định khung lấy nét tại vị trí bạn bấm chọn trên ảnh">Thủ công (Manual)</button>
+                                <button data-roi-mode="auto" class="active" title="Automatically find the brightest star (night) or the most detailed area (day)">Auto</button>
+                                <button data-roi-mode="manual" title="Manual: keep the focus box where you click on the image">Manual</button>
                             </div>
                         </div>
                         <div class="focus-field">
@@ -945,9 +1015,9 @@
                             </select>
                         </div>
                         <div class="btn-group focus-btns">
-                            <button class="btn btn-sm btn-outline" id="focus-pick-star" title="Tìm và khóa vào ngôi sao sáng chưa bão hòa tốt nhất">Find star</button>
-                            <button class="btn btn-sm btn-outline" id="focus-pick-light" title="Tìm và khóa vào điểm sáng rõ nhất">Find light</button>
-                            <button class="btn btn-sm btn-primary" id="focus-auto-point" title="Tự động đặt vùng lấy nét vào ngôi sao (ban đêm) hoặc vùng chi tiết (ban ngày)">Auto point</button>
+                            <button class="btn btn-sm btn-outline" id="focus-pick-star" title="Find and lock onto the best unsaturated bright star">Find star</button>
+                            <button class="btn btn-sm btn-outline" id="focus-pick-light" title="Find and lock onto the clearest light spot">Find light</button>
+                            <button class="btn btn-sm btn-primary" id="focus-auto-point" title="Automatically place the focus region on a star (night) or detail (day)">Auto point</button>
                         </div>
                     </div>
                     <div class="card" id="focus-lens-card">
@@ -1044,6 +1114,8 @@
             </div>
         </section>
     </main>
+    </div><!-- /app-main -->
+    </div><!-- /app-shell -->
     <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
 
     <!-- Footer -->
@@ -1054,8 +1126,26 @@
 
     <!-- App JavaScript -->
     <script src="/static/sky_catalog.js"></script>
-    <script src="/app.js?v=20261021lg2"></script>
-    <script src="/static/activity.js?v=20261021lg1"></script>
-    <script src="/static/focus.js?v=20261022parabola2"></script>
+    <script src="/app.js?v=20261026ns1"></script>
+    <script src="/static/activity.js?v=20261026ns1"></script>
+    <script src="/static/focus.js?v=20261026ns1"></script>
+    <script>
+    // Settings sub-navigation: one section at a time, driven by the URL hash (/settings#detection)
+    (function () {
+        var sec = document.getElementById("tab-settings");
+        var subs = ["image", "detection", "station", "skymask", "integrations"];
+        function apply() {
+            var h = (location.hash || "").replace("#", "");
+            var sub = subs.indexOf(h) >= 0 ? h : "image";
+            sec.setAttribute("data-sub", sub);
+            document.querySelectorAll("#settings-subnav .side-sub, .mobile-subnav a").forEach(function (a) {
+                a.classList.toggle("active", a.getAttribute("data-sub") === sub && location.pathname === "/settings");
+            });
+            if (sub === "skymask") window.dispatchEvent(new Event("resize"));
+        }
+        window.addEventListener("hashchange", apply);
+        apply();
+    })();
+    </script>
 </body>
 </html>

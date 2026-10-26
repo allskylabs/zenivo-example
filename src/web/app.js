@@ -20,6 +20,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // DOM Elements
     const navClock = document.getElementById("nav-utc-clock");
+    const navLocalClock = document.getElementById("nav-local-clock");
+    const navLocalLabel = document.getElementById("nav-local-label");
     const navStatus = document.getElementById("nav-system-status");
     const navMode = document.getElementById("nav-camera-mode");
     const btnNightVision = document.getElementById("btn-night-vision");
@@ -231,7 +233,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function updateClock() {
-        navClock.textContent = `${fmtLocalIso(new Date().toISOString(), true)} ${tzLabel}`;
+        const nowIso = new Date().toISOString();
+        navClock.textContent = nowIso.slice(11, 19);
+        if (navLocalClock) navLocalClock.textContent = fmtLocalIso(nowIso, true).slice(0, 5);
+        if (navLocalLabel) navLocalLabel.textContent = `Local (${tzLabel.replace("UTC", "GMT")})`;
     }
     setInterval(updateClock, 1000);
     updateClock();
@@ -259,6 +264,8 @@ document.addEventListener("DOMContentLoaded", () => {
     function applyNightVision(on) {
         state.nightVision = on;
         document.body.classList.toggle("night-mode", on);
+        if (on) document.documentElement.setAttribute("data-theme", "red");
+        else document.documentElement.removeAttribute("data-theme");
         btnNightVision.classList.toggle("btn-primary", on);
     }
     applyNightVision(!!prefs.nightVision);
