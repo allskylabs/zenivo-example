@@ -26,15 +26,15 @@
         #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
         .ac-label {
             position: absolute; transform: translate(-50%, -100%); white-space: nowrap; pointer-events: auto; cursor: pointer;
-            font: 600 11px/1.25 var(--font-mono); color: var(--text-primary); text-shadow: 0 1px 3px #000, 0 0 2px #000;
+            font: 600 12px/1.25 var(--font-mono); color: var(--text-primary); text-shadow: 0 1px 3px #000, 0 0 2px #000;
             padding: 1px 4px; border-radius: 4px; user-select: none;
         }
         .ac-label small { display: block; font-weight: 400; color: var(--text-secondary); }
         .ac-label.in-view { color: var(--warning); }
         .ac-label.selected { background: color-mix(in srgb, var(--accent) 30%, transparent); }
-        .place { font: 500 11px var(--font-sans); color: #8ea3c0; text-shadow: 0 1px 3px #000, 0 0 2px #000; white-space: nowrap; pointer-events: none; }
+        .place { font: 500 12px var(--font-sans); color: #8ea3c0; text-shadow: 0 1px 3px #000, 0 0 2px #000; white-space: nowrap; pointer-events: none; }
         .place.airport { color: #c4b5fd; }
-        .place.ring { color: #38bdf8; opacity: 0.75; font-size: 10px; }
+        .place.ring { color: #38bdf8; opacity: 0.75; font-size: 12px; }
         .panel {
             position: absolute; background: color-mix(in srgb, var(--bg-card) 92%, transparent); border: 1px solid var(--border-color);
             border-radius: var(--radius-md, 8px); backdrop-filter: blur(6px); font-size: 13px;
@@ -49,7 +49,7 @@
         .btns { display: flex; gap: 6px; flex-wrap: wrap; }
         button {
             background: var(--bg-card-sub); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px;
-            padding: 4px 9px; font: inherit; font-size: 12px; cursor: pointer;
+            padding: 4px 9px; min-height: 36px; font: inherit; font-size: 12px; cursor: pointer;
         }
         button:hover { border-color: var(--accent); }
         button.on { border-color: var(--accent); color: var(--accent); }
@@ -60,7 +60,7 @@
         #list li { padding: 6px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; white-space: nowrap; font-family: var(--font-mono); font-size: 12px; }
         #list li:hover, #list li.selected { background: var(--bg-card-sub); }
         #list li.in-view .cs { color: var(--warning); }
-        #list li .meta { color: var(--text-secondary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+        #list li .meta { color: var(--text-secondary); font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
         #layers { padding: 10px 12px; width: 200px; display: flex; flex-direction: column; gap: 4px; }
         #layers h2 { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
         #layers label { display: flex; justify-content: space-between; align-items: center; min-height: 28px; font-size: 13px; cursor: pointer; }
@@ -86,7 +86,7 @@
         #info dd { font-family: var(--font-mono); text-align: right; }
         #info .links { margin-top: 8px; display: flex; gap: 6px; align-items: center; }
         #info a { color: var(--accent); font-size: 12px; }
-        .legend { display: flex; gap: 10px; font-size: 11px; color: var(--text-secondary); align-items: center; flex-wrap: wrap; }
+        .legend { display: flex; gap: 10px; font-size: 12px; color: var(--text-secondary); align-items: center; flex-wrap: wrap; }
         .legend .ramp { width: 120px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #ffd166, #06d6a0, #38bdf8, #8b5cf6, #f472b6); }
         .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
         .station-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; box-shadow: 0 0 10px var(--accent); }

@@ -3689,7 +3689,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                     <div class="product-meta">
                         <span>${framesBadge}${framesBadge && tsFormatted ? " • " : ""}${tsFormatted}</span>
-                        <a href="${escapeHtml(mediaUrl)}" download class="btn btn-sm btn-outline" style="padding: 0.15rem 0.5rem; font-size: 0.72rem; text-decoration: none;">⬇️ Download</a>
+                        <a href="${escapeHtml(mediaUrl)}" download class="btn btn-sm btn-outline" style="padding: 0.15rem 0.5rem; font-size: 0.75rem; text-decoration: none;">⬇️ Download</a>
                     </div>
                 </div>
             `;
