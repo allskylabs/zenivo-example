@@ -31,6 +31,8 @@
         }
         .ac-label small { display: block; font-weight: 400; color: var(--text-secondary); }
         .ac-label.in-view { color: var(--warning); }
+        .ph { font-size: 12px; font-weight: 600; margin-left: 6px; }
+        .ph.to, .ph.up { color: #34d399; } .ph.ldg, .ph.down { color: #fbbf24; }
         .ac-label.selected { background: color-mix(in srgb, var(--accent) 30%, transparent); }
         .place { font: 500 12px var(--font-sans); color: #8ea3c0; text-shadow: 0 1px 3px #000, 0 0 2px #000; white-space: nowrap; pointer-events: none; }
         .place.airport { color: #c4b5fd; }
@@ -1253,6 +1255,18 @@
         }
 
         // ---------------------------------------------------------------- state from the API
+        // Flight phase from vertical rate + height: takeoff/landing are the low ones
+        function phase(a) {
+            const v = a.climb_m_min, h = a.altitude_m;
+            if (v == null || h == null) return null;
+            if (v > 200) return h < 3000 ? { cls: "to", sym: "▲", txt: "Takeoff" } : { cls: "up", sym: "▲", txt: "Climbing" };
+            if (v < -200) return h < 3000 ? { cls: "ldg", sym: "▼", txt: "Landing" } : { cls: "down", sym: "▼", txt: "Descending" };
+            return null;
+        }
+        function phaseTag(a, long) {
+            const p = phase(a);
+            return p ? `<span class="ph ${p.cls}" title="${p.txt} ${a.climb_m_min} m/min">${p.sym}${long ? " " + p.txt : ""}</span>` : "";
+        }
         function kind(a) { return a.icao === selected ? "selected" : a.in_view ? "inView" : "heard"; }
 
         function poll() {
@@ -1303,7 +1317,7 @@
                 mergeTrail(s, a.trail || [], now);
                 buildTrail(s);
                 s.label.className = `ac-label${a.in_view ? " in-view" : ""}${a.icao === selected ? " selected" : ""}`;
-                s.label.innerHTML = `${esc(a.callsign || a.icao)}${a.type ? ` <span style="opacity:.65">${esc(a.type)}</span>` : ""}<small>${(a.altitude_m / 1000).toFixed(1)} km</small>`;
+                s.label.innerHTML = `${esc(a.callsign || a.icao)}${phaseTag(a, false)}${a.type ? ` <span style="opacity:.65">${esc(a.type)}</span>` : ""}<small>${(a.altitude_m / 1000).toFixed(1)} km</small>`;
             }
             for (const [icao, s] of aircraft) {
                 if (seen.has(icao)) continue;
@@ -1562,7 +1576,7 @@
         map.on("click", (e) => {
             const hit = (planesLayer.screen || []).map(([icao, x, y]) => [icao, Math.hypot(x - e.point.x, y + 8 - e.point.y)])
                 .sort((a, b) => a[1] - b[1])[0];
-            select(hit && hit[1] < 45 ? hit[0] : null);
+            select(hit && hit[1] < 45 ? hit[0] : null, true);   // a click on empty map deselects
         });
 
         // ---------------------------------------------------------------- rotating model of the selected aircraft
@@ -1630,7 +1644,7 @@
             $("count").textContent = list.length;
             $("ac-list").innerHTML = list.length ? list.map((a) =>
                 `<li data-icao="${esc(a.icao)}" class="${a.in_view ? "in-view" : ""}${a.icao === selected ? " selected" : ""}">
-                    <span class="id">${flagImg(a)}${logoImg(a)}<span class="cs">${esc(a.callsign || a.icao)}</span></span>
+                    <span class="id">${flagImg(a)}${logoImg(a)}<span class="cs">${esc(a.callsign || a.icao)}</span>${phaseTag(a, true)}</span>
                     <span class="meta">${a.type ? esc(a.type) + " " : ""}${(a.altitude_m / 1000).toFixed(1)}km · ${a.distance_km}km ${compass(a.az_deg)}</span></li>`).join("")
                 : `<li><span class="meta">No aircraft heard right now.</span></li>`;
         }
@@ -1661,7 +1675,7 @@
                 ["Altitude", `${Number(a.altitude_m).toLocaleString()} m`],
                 ["Speed", a.speed_kmh != null ? `${a.speed_kmh} km/h` : "--"],
                 ["Heading", a.heading_deg != null ? `${a.heading_deg}° ${compass(a.heading_deg)}` : "--"],
-                ["Climb", a.climb_m_min != null ? `${a.climb_m_min} m/min` : "--"],
+                ["Climb", a.climb_m_min != null ? `${a.climb_m_min} m/min${phase(a) ? " · " + phase(a).txt : ""}` : "--"],
                 ["Distance", `${a.distance_km} km`],
                 ["From camera", a.above_horizon ? `${compass(a.az_deg)} ${a.az_deg}°, ${a.alt_deg}° up` : "below horizon"],
                 ["In camera view", a.in_view ? "yes" : "no"],
@@ -1687,8 +1701,8 @@
                 s.label.classList.toggle("selected", id === selected);
             }
             planesLayer.sel = null;
-            centering = !!(fly && icao && aircraft.get(icao));
-            if (centering && map.getZoom() < 10.5) map.easeTo({ zoom: 10.5, duration: 800 });
+            centering = false;
+            if (fly && icao && aircraft.get(icao) && !camMode) setCamMode("track");   // selecting an aircraft follows it
             renderList();
             renderInfo();
             map.triggerRepaint();
