@@ -1652,7 +1652,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Click toggles zoom (3× at the clicked point / back to fit); a drag or pinch is not a click
         let tapStart = null;
         viewportContainer.addEventListener("click", (e) => {
-            if (e.target.closest(".zoom-controls") || !tapStart) return;
+            if (e.target.closest(".zoom-controls, .vp-chips, .vp-actions, button, label, input") || !tapStart) return;
             const moved = Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y);
             const wasMulti = tapStart.multi;
             tapStart = null;
@@ -1665,7 +1665,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const pointers = new Map();
         let pinchStart = null;
         viewportContainer.addEventListener("pointerdown", (e) => {
-            if (e.target.closest(".zoom-controls")) return;
+            if (e.target.closest(".zoom-controls, .vp-chips, .vp-actions, button, label, input")) return;
             if (pointers.size === 0) tapStart = { x: e.clientX, y: e.clientY, multi: false };
             else if (tapStart) tapStart.multi = true;
             pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -2703,10 +2703,9 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.beginPath();
             ctx.arc(x, y, 12, 0, Math.PI * 2);
             ctx.save();
-            ctx.globalAlpha = 0.18;
-            ctx.fill();
-            ctx.restore();
+            ctx.globalAlpha = 0.6;
             ctx.stroke();
+            ctx.restore();
             const name = a.callsign || a.icao || "?";
             const alt = a.altitude_m != null ? `FL${String(Math.round(a.altitude_m / 30.48)).padStart(3, "0")}` : "";
             const dist = a.distance_km != null ? `${a.distance_km}km` : "";
