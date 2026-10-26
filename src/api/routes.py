@@ -629,6 +629,12 @@ def get_adsb_aircraft(limit: int = Query(default=30, ge=1, le=400),
     return service.get_aircraft_now(limit=limit, trail_s=trail)
 
 
+@router.get("/api/satellites")
+def get_satellites(service: AllSkyService = Depends(get_service)):
+    """Large satellites above the horizon now: az/alt, range, sunlit, and position in the camera frame."""
+    return service.get_satellites_now()
+
+
 @router.get("/api/map/config")
 def get_map_config(service: AllSkyService = Depends(get_service)):
     """Basemap settings for the 3D flights map (Google Maps key, if configured)."""

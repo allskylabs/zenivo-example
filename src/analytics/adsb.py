@@ -338,6 +338,16 @@ def sky_position(station: Dict[str, float], lat: float, lon: float, alt_m: float
         "distance_km": round(dist / 1000.0, 1),
         "ground_km": round(math.hypot(enu[0], enu[1]) / 1000.0, 1),
     }
+    xy = frame_xy_from_enu(enu, solution)
+    if xy:
+        out["frame_xy"] = xy
+    return out
+
+
+def frame_xy_from_enu(enu: np.ndarray, solution: Optional[Dict[str, Any]]) -> Optional[List[float]]:
+    """Frame fractions of a direction (East/North/Up) through the solved camera pointing, or None when it
+    falls behind or outside the frame."""
+    dist = float(np.linalg.norm(enu))
     if solution and solution.get("projection", "rectilinear") in ("rectilinear", "equidistant") and dist > 0:
         cx, cy = solution["optical_center_px"]
         R = pointing_rotation(solution["pointing_az_deg"], solution["pointing_alt_deg"], solution.get("roll_deg", 0.0))
@@ -346,8 +356,8 @@ def sky_position(station: Dict[str, float], lat: float, lon: float, alt_m: float
         if px_py is not None:
             x, y = px_py
             if 0 <= x < 2 * cx and 0 <= y < 2 * cy:
-                out["frame_xy"] = [round(x / (2 * cx), 4), round(y / (2 * cy), 4)]
-    return out
+                return [round(x / (2 * cx), 4), round(y / (2 * cy), 4)]
+    return None
 
 
 def _interp(pos: List[Tuple[float, float, float, float]], t: float, max_extrap_s: float = 15.0) -> Optional[Tuple[float, float, float]]:

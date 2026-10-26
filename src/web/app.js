@@ -34,6 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const chkSkyLabels = document.getElementById("chk-sky-labels");
     const chkGridOverlay = document.getElementById("chk-grid-overlay");
     const chkAircraft = document.getElementById("chk-aircraft-overlay");
+    const chkSatellite = document.getElementById("chk-satellite-overlay");
     const aircraftCanvas = document.getElementById("aircraft-canvas");
     const btnRefreshFrame = document.getElementById("btn-refresh-frame");
     const btnFullscreen = document.getElementById("btn-fullscreen");
@@ -329,6 +330,14 @@ document.addEventListener("DOMContentLoaded", () => {
             }).catch(() => {});
         });
     });
+
+    if (chkSatellite) {
+        chkSatellite.checked = !!prefs.satelliteOverlay;
+        chkSatellite.addEventListener("change", () => {
+            savePrefs({ satelliteOverlay: chkSatellite.checked });
+            if (chkSatellite.checked) refreshSatellites(); else drawAircraft();
+        });
+    }
 
     if (chkAircraft) {
         chkAircraft.checked = !!prefs.aircraftOverlay;
@@ -2651,6 +2660,19 @@ document.addEventListener("DOMContentLoaded", () => {
             .catch(() => {});
     }
 
+    // Large satellites (space stations, bright satellites): only those lit by the sun under a dark sky are drawn
+    let satelliteList = [];
+    function refreshSatellites() {
+        if (!chkSatellite || !chkSatellite.checked || document.hidden) return;
+        fetch("/api/satellites")
+            .then((r) => r.json())
+            .then((d) => {
+                satelliteList = (d && d.satellites) || [];
+                drawAircraft();
+            })
+            .catch(() => {});
+    }
+
     function drawAircraft() {
         if (!aircraftCanvas || !viewportContainer) return;
         const w = viewportContainer.clientWidth;
@@ -2662,7 +2684,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const ctx = aircraftCanvas.getContext("2d");
         ctx.setTransform(pxRatio, 0, 0, pxRatio, 0, 0);
         ctx.clearRect(0, 0, w, h);
-        if (!chkAircraft || !chkAircraft.checked) return;
+        const showAircraft = !!(chkAircraft && chkAircraft.checked);
+        const showSat = !!(chkSatellite && chkSatellite.checked);
+        if (!showAircraft && !showSat) return;
 
         const st = state.station || {};
         const sensor = st.camera_sensor || {};
@@ -2690,7 +2714,32 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.font = "11px monospace";
         ctx.textBaseline = "middle";
         const age = (Date.now() - aircraftFetchedAt) / 1000.0;
-        aircraftList.forEach((a) => {
+        if (showSat) {
+            satelliteList.forEach((sat) => {
+                if (!sat.frame_xy || !sat.in_view || !sat.visible) return;
+                let fx = sat.frame_xy[0], fy = sat.frame_xy[1];
+                if (mirrorX) fx = 1 - fx;
+                if (mirrorY) fy = 1 - fy;
+                const x = offsetX + fx * renderW;
+                const y = offsetY + fy * renderH;
+                ctx.strokeStyle = "rgba(34, 211, 238, 0.95)";
+                ctx.fillStyle = "rgba(34, 211, 238, 0.95)";
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x, y - 12); ctx.lineTo(x + 12, y); ctx.lineTo(x, y + 12); ctx.lineTo(x - 12, y); ctx.closePath();
+                ctx.save();
+                ctx.globalAlpha = 0.6;
+                ctx.stroke();
+                ctx.restore();
+                const txt = `${sat.name} ${sat.height_km}km`;
+                ctx.shadowColor = "rgba(2, 6, 23, 0.95)";
+                ctx.shadowBlur = 4;
+                ctx.textAlign = x > offsetX + renderW * 0.75 ? "right" : "left";
+                ctx.fillText(txt, x + (ctx.textAlign === "left" ? 16 : -16), y);
+                ctx.shadowBlur = 0;
+            });
+        }
+        if (showAircraft) aircraftList.forEach((a) => {
             if (!a.frame_xy) return;
             let fx = a.frame_xy[0], fy = a.frame_xy[1];
             if (mirrorX) fx = 1 - fx;
@@ -2723,6 +2772,10 @@ document.addEventListener("DOMContentLoaded", () => {
         setInterval(refreshAircraft, 3000);
         window.addEventListener("resize", drawAircraft);
         setTimeout(refreshAircraft, 400);
+    }
+    if (chkSatellite) {
+        setInterval(refreshSatellites, 1500)  /* LEO satellites move up to ~1 deg/s */;
+        setTimeout(refreshSatellites, 600);
     }
 
     if (chkSkyOverlay) chkSkyOverlay.addEventListener("change", drawReticle);

@@ -2289,6 +2289,36 @@ class AllSkyService:
         self.activity.info("events", f"ADS-B flight matching: {c['host']}:{c['port']}" if c["enabled"] else "ADS-B flight matching off")
         return {"success": True, **c}
 
+    def _overlay_solution(self) -> Optional[Dict[str, Any]]:
+        """Star-solved camera pointing for sky overlays, with the manual boresight correction applied."""
+        sol = self.station_config.get("bright_star_solution") or {}
+        sol = sol if sol.get("success") else None
+        acfg = self.station_config.get("adsb") or {}
+        if sol and (acfg.get("az_offset_deg") or acfg.get("alt_offset_deg")):
+            # Manual boresight correction when the camera has shifted since the last star solve
+            sol = dict(sol, pointing_az_deg=(sol["pointing_az_deg"] + float(acfg.get("az_offset_deg") or 0.0)) % 360.0,
+                       pointing_alt_deg=sol["pointing_alt_deg"] + float(acfg.get("alt_offset_deg") or 0.0))
+        return sol
+
+    def _overlay_station(self) -> Dict[str, float]:
+        return {"latitude_deg": self.auto_exposure.lat, "longitude_deg": self.auto_exposure.lon,
+                "elevation_m": float(self.station_config.get("elevation_m") or 0.0)}
+
+    def get_satellites_now(self) -> Dict[str, Any]:
+        """Large satellites above the horizon (stations + CelesTrak visual list) with their camera position."""
+        from src.analytics.satellites import SatelliteTracker
+
+        if getattr(self, "_sat_tracker", None) is None:
+            self._sat_tracker = SatelliteTracker(os.path.join(self.output_dir, "cache", "sat_tle.json"))
+        res = self._sat_tracker.current(self._overlay_station(), self._overlay_solution())
+        obstructions = [np.array(p, np.float32) for p in ((self.station_config.get("sky_mask") or {}).get("obstruction") or [])]
+        for r in res["satellites"]:
+            xy = r.get("frame_xy")
+            r["in_view"] = bool(xy) and not any(
+                cv2.pointPolygonTest(p, (float(xy[0]), float(xy[1])), False) >= 0 for p in obstructions)
+        res["satellites"] = res["satellites"][:60]
+        return res
+
     def get_aircraft_now(self, limit: int = 30, trail_s: float = 0.0) -> Dict[str, Any]:
         """Aircraft the ADS-B receiver hears right now: flight, altitude, speed, distance, direction, and
         whether it is inside the camera's open sky (frame_xy in frame fractions). With trail_s (3D map),
@@ -2298,15 +2328,8 @@ class AllSkyService:
         if self.adsb is None:
             return {"enabled": False, "connected": False, "aircraft": []}
         self._adsb_view_ts = time.time()  # someone is looking: keep the feed on, day or night
-        sol = self.station_config.get("bright_star_solution") or {}
-        sol = sol if sol.get("success") else None
-        acfg = self.station_config.get("adsb") or {}
-        if sol and (acfg.get("az_offset_deg") or acfg.get("alt_offset_deg")):
-            # Manual boresight correction when the camera has shifted since the last star solve
-            sol = dict(sol, pointing_az_deg=(sol["pointing_az_deg"] + float(acfg.get("az_offset_deg") or 0.0)) % 360.0,
-                       pointing_alt_deg=sol["pointing_alt_deg"] + float(acfg.get("alt_offset_deg") or 0.0))
-        station = {"latitude_deg": self.auto_exposure.lat, "longitude_deg": self.auto_exposure.lon,
-                   "elevation_m": float(self.station_config.get("elevation_m") or 0.0)}
+        sol = self._overlay_solution()
+        station = self._overlay_station()
         obstructions = [np.array(p, np.float32) for p in ((self.station_config.get("sky_mask") or {}).get("obstruction") or [])]
         out = []
         for a in self.adsb.current(trail_s=trail_s):
