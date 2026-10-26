@@ -22,9 +22,9 @@
 
         <div class="nav-metrics">
             <span class="status-pill" title="System status"><i class="pulse-indicator online" id="status-pulse"></i><span id="nav-system-status">Online</span><span id="nav-fps"></span></span>
-            <span class="status-pill" title="Camera mode"><i class="sp-dot"></i><span id="nav-camera-mode">AUTO</span></span>
+            <span class="status-pill nav-mode" title="Camera mode"><i class="sp-dot"></i><span id="nav-camera-mode">AUTO</span></span>
             <span class="nav-div" aria-hidden="true"></span>
-            <span class="nav-clock"><span class="clock-label">UTC</span> <span id="nav-utc-clock">00:00:00</span></span>
+            <span class="nav-clock nav-utc"><span class="clock-label">UTC</span> <span id="nav-utc-clock">00:00:00</span></span>
             <span class="nav-div" aria-hidden="true"></span>
             <span class="nav-clock"><span class="clock-label" id="nav-local-label">Local</span> <span id="nav-local-clock">00:00</span></span>
             <span class="nav-div" aria-hidden="true"></span>
@@ -71,6 +71,31 @@
             </div>
         </nav>
     </aside>
+
+    <!-- Phone navigation (<=768px): 5-tab bar + More sheet. Reuses the same routes as the sidebar. -->
+    <nav class="m-tabbar" id="m-tabbar" aria-label="Mobile navigation">
+        <a class="m-tab" href="/live" data-mpath="/live,/,/index.html"><span class="m-ic">&#9673;</span><span class="m-txt">Live</span></a>
+        <a class="m-tab" href="/flights3d" data-mpath="/flights3d"><span class="m-ic">&#9992;</span><span class="m-txt">Flights</span></a>
+        <a class="m-tab" href="/gallery" data-mpath="/gallery"><span class="m-ic">&#9638;</span><span class="m-txt">Library</span></a>
+        <a class="m-tab" href="/focus" data-mpath="/focus"><span class="m-ic">&#9678;</span><span class="m-txt">Camera</span></a>
+        <button class="m-tab" type="button" id="m-more-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="m-more-sheet" data-mpath="/logs,/calibration,/settings,/obs"><span class="m-ic">&#8943;</span><span class="m-txt">More</span></button>
+    </nav>
+    <div class="m-sheet-backdrop" id="m-sheet-backdrop" hidden></div>
+    <div class="m-sheet" id="m-more-sheet" role="dialog" aria-label="More" hidden>
+        <div class="m-sheet-grip" aria-hidden="true"></div>
+        <a class="m-sheet-item" href="/logs" data-mpath="/logs">Activity Log</a>
+        <a class="m-sheet-item" href="/calibration" data-mpath="/calibration">Master Dark</a>
+        <div class="m-sheet-title">Settings</div>
+        <a class="m-sheet-item" href="/settings#image">Image Output</a>
+        <a class="m-sheet-item" href="/settings#detection">Detection</a>
+        <a class="m-sheet-item" href="/settings#station">Station &amp; Optics</a>
+        <a class="m-sheet-item" href="/settings#skymask">Sky Mask</a>
+        <a class="m-sheet-item" href="/settings#integrations">Integrations</a>
+        <div class="m-sheet-title">Stream / OBS</div>
+        <a class="m-sheet-item" href="/obs/dock">OBS Dock</a>
+        <a class="m-sheet-item" href="/obs" target="_blank" rel="noopener">OBS Preview</a>
+        <button class="m-sheet-item m-sheet-rv" type="button" id="m-rv-toggle" role="switch" aria-checked="false"><span>Red Vision</span><span class="rv-track"><span class="rv-knob"></span></span></button>
+    </div>
 
     <div class="app-main">
 

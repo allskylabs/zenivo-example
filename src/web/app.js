@@ -278,6 +278,40 @@ document.addEventListener("DOMContentLoaded", () => {
         savePrefs({ nightVision: state.nightVision });
     });
 
+    // Mobile (<=768px) 5-tab bar + More sheet
+    (function initMobileNav() {
+        const bar = document.getElementById("m-tabbar");
+        const moreBtn = document.getElementById("m-more-btn");
+        const sheet = document.getElementById("m-more-sheet");
+        const backdrop = document.getElementById("m-sheet-backdrop");
+        const rvProxy = document.getElementById("m-rv-toggle");
+        if (!bar || !moreBtn || !sheet || !backdrop) return;
+        const path = window.location.pathname.replace(/\/+$/, "") || "/";
+        document.querySelectorAll("[data-mpath]").forEach((el) => {
+            const hit = el.getAttribute("data-mpath").split(",").includes(path);
+            el.classList.toggle("active", hit);
+            if (hit && el.tagName === "A") el.setAttribute("aria-current", "page");
+        });
+        const setOpen = (open) => {
+            sheet.hidden = !open;
+            backdrop.hidden = !open;
+            moreBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        };
+        moreBtn.addEventListener("click", () => setOpen(sheet.hidden));
+        backdrop.addEventListener("click", () => setOpen(false));
+        sheet.querySelectorAll("a.m-sheet-item").forEach((a) => a.addEventListener("click", () => setOpen(false)));
+        document.addEventListener("keydown", (e) => { if (e.key === "Escape") setOpen(false); });
+        if (rvProxy) {
+            const sync = () => {
+                rvProxy.classList.toggle("btn-primary", !!state.nightVision);
+                rvProxy.setAttribute("aria-checked", state.nightVision ? "true" : "false");
+            };
+            rvProxy.addEventListener("click", () => { btnNightVision.click(); sync(); });
+            btnNightVision.addEventListener("click", sync);
+            sync();
+        }
+    })();
+
     // Overlays default to hidden; restore the viewer's last choice and sync with OBS/server
     [
         [chkSkyOverlay, "skyOverlay", "sky_overlay"],
