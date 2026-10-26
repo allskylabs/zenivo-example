@@ -559,7 +559,8 @@
         const cam3 = new THREE.Camera();
         const world = new THREE.Group();
         scene.add(world);
-        const DROP_MAT = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.3 });
+        const DROP_MAT = new THREE.LineBasicMaterial({ color: 0xcbd5e1, transparent: true, opacity: 0.75 });
+        const DROP_SEL = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 });
 
         // ================================================================ aircraft models
         // Dimensions in metres (length, fuselage radius, span, wing chords/sweep, engines...), nose along +Y, up +Z.
@@ -1472,6 +1473,7 @@
                         world.add(s.drop);
                     }
                     s.drop.visible = layerOn.aircraft;
+                    s.drop.material = icao === selected ? DROP_SEL : DROP_MAT;
                     const dp = s.drop.geometry.attributes.position;
                     dp.setXYZ(0, p[0], p[1], p[2]); dp.setXYZ(1, p[0], p[1], groundZ); dp.needsUpdate = true;
 
