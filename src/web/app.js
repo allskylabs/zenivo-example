@@ -2789,6 +2789,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 valGain.textContent = data.gain_db.toFixed(1) + " dB";
             }
         }
+        if (data.exposure_s !== undefined && data.gain_db !== undefined) {
+            const vp = document.getElementById("vp-exp-gain");
+            if (vp) {
+                const e = data.exposure_s;
+                vp.textContent = `${e < 0.1 ? (e * 1000).toFixed(e < 0.01 ? 2 : 1) : (e * 1000).toFixed(0)} ms · ${data.gain_db.toFixed(1)} dB`;
+            }
+        }
         if (data.star_count !== undefined) {
             telemStars.textContent = data.star_count;
         }

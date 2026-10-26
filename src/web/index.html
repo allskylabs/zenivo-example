@@ -93,25 +93,6 @@
                 <div class="main-viewport-col">
                     <!-- Live View Card -->
                     <div class="card viewport-card">
-                        <div class="card-header">
-                            <h2>Live View Port</h2>
-                            <div class="header-actions" style="flex-wrap: wrap; gap: 0.65rem;">
-                                <label class="checkbox-label" title="Show IAU constellation stick figures, bright stars & Messier DSOs">
-                                    <input type="checkbox" id="chk-sky-overlay"> Stars &amp; Constellations
-                                </label>
-                                <label class="checkbox-label" title="Show star & constellation name labels">
-                                    <input type="checkbox" id="chk-sky-labels"> Labels
-                                </label>
-                                <label class="checkbox-label" title="Show horizon circle, altitude rings & N/E/S/W compass">
-                                    <input type="checkbox" id="chk-grid-overlay"> Grid &amp; Compass
-                                </label>
-                                <label class="checkbox-label" title="Mark aircraft (ADS-B) passing through the field of view">
-                                    <input type="checkbox" id="chk-aircraft-overlay"> Aircraft
-                                </label>
-                                <button id="btn-refresh-frame" class="btn btn-sm btn-outline" title="Fetch a fresh snapshot now">Snapshot</button>
-                                <button id="btn-fullscreen" class="btn btn-sm btn-outline" title="Fullscreen view">Fullscreen</button>
-                            </div>
-                        </div>
                         <div class="viewport-wrapper" id="viewport-container">
                             <div class="zoom-stage" id="zoom-stage">
                                 <img id="live-stream-img" alt="Live AllSky Stream" draggable="false" />
@@ -119,16 +100,28 @@
                                 <canvas id="reticle-canvas"></canvas>
                                 <canvas id="aircraft-canvas"></canvas>
                             </div>
+                            <div class="vp-status">
+                                <span class="vp-pill vp-live"><i class="vp-dot"></i>LIVE</span>
+                                <span class="vp-pill vp-exp" id="vp-exp-gain" title="Current exposure and gain">-- ms · -- dB</span>
+                            </div>
+                            <div class="vp-meta" title="Resolution, stream transport and hardware frame delta">
+                                <span id="hud-resolution">2592 × 1944</span> · <span id="hud-stream-mode">Binary WebSocket</span> · <span id="hud-hw-delta">40.0 ms</span>
+                            </div>
+                            <div class="vp-chips" role="group" aria-label="Overlays">
+                                <label class="vp-chip" title="Show IAU constellation stick figures, bright stars &amp; Messier DSOs"><input type="checkbox" id="chk-sky-overlay"><i class="vp-dot"></i>Stars</label>
+                                <label class="vp-chip" title="Show star &amp; constellation name labels"><input type="checkbox" id="chk-sky-labels"><i class="vp-dot"></i>Labels</label>
+                                <label class="vp-chip" title="Show horizon circle, altitude rings &amp; N/E/S/W compass"><input type="checkbox" id="chk-grid-overlay"><i class="vp-dot"></i>Grid</label>
+                                <label class="vp-chip" title="Mark aircraft (ADS-B) passing through the field of view"><input type="checkbox" id="chk-aircraft-overlay"><i class="vp-dot"></i>Aircraft</label>
+                            </div>
+                            <div class="vp-actions">
+                                <button id="btn-refresh-frame" class="vp-btn" title="Fetch a fresh snapshot now">Snapshot</button>
+                                <button id="btn-fullscreen" class="vp-btn" title="Fullscreen view">Fullscreen</button>
+                            </div>
                             <div class="zoom-controls" aria-label="Zoom">
                                 <button type="button" id="btn-zoom-out" class="zoom-btn" title="Zoom out (-)">−</button>
                                 <button type="button" id="btn-zoom-reset" class="zoom-btn zoom-level" title="Fit to view (0)">100%</button>
                                 <button type="button" id="btn-zoom-in" class="zoom-btn" title="Zoom in (+)">+</button>
                             </div>
-                        </div>
-                        <div class="viewport-footer">
-                            <span>Resolution: <strong id="hud-resolution">2592 × 1944</strong></span>
-                            <span>Stream: <strong id="hud-stream-mode">Binary WebSocket</strong></span>
-                            <span>Frame Delta: <strong id="hud-hw-delta">40.0 ms</strong></span>
                         </div>
                     </div>
 
