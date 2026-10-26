@@ -571,6 +571,24 @@ def generate_gallery_products(
 
 
 
+@router.post("/api/timelapse/build")
+def build_range_timelapse(
+    date_from: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    date_to: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    fps: float = Query(default=24.0, ge=1.0, le=60.0),
+    width: int = Query(default=0, ge=0, le=1920),
+    overlay: bool = Query(default=False),
+    service: AllSkyService = Depends(get_service),
+):
+    """Build a custom timelapse (custom.mp4) from archived frames of an observing-day range."""
+    try:
+        return service.build_range_timelapse(date_from, date_to, fps=fps, width=width, overlay=overlay)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to build timelapse: {exc}")
+
+
 @router.get("/api/events")
 @router.get("/api/events/meteors")
 def get_meteor_events(

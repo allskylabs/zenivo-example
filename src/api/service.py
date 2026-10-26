@@ -2008,6 +2008,63 @@ class AllSkyService:
             finally:
                 self._timelapse_compiling = False
 
+    def build_range_timelapse(
+        self, date_from: str, date_to: str, fps: float = 24.0, width: int = 0, overlay: bool = False
+    ) -> Dict[str, Any]:
+        """Compile archived frames of observing days date_from..date_to (YYYY-MM-DD, inclusive) into
+        timelapses/custom.mp4. width=0 keeps the archived frame size; otherwise frames are scaled to that
+        width at the same aspect ratio."""
+        d0 = datetime.strptime(date_from, "%Y-%m-%d").date()
+        d1 = datetime.strptime(date_to, "%Y-%m-%d").date()
+        if d1 < d0 or (d1 - d0).days > 30:
+            raise ValueError("Date range must be 1 to 31 days, From before To")
+        paths: List[str] = []
+        telem_map: Dict[str, Dict[str, Any]] = {}
+        d = d0
+        while d <= d1:
+            ds = d.strftime("%Y-%m-%d")
+            if os.path.isdir(os.path.join(self.frames_archive_root, ds)):
+                paths += self._list_today_frame_paths(ds)
+                for fname, rec in self._load_today_telemetry_records(ds).items():
+                    telem_map[f"{ds}/{fname}"] = rec
+            d += timedelta(days=1)
+        if not paths:
+            raise RuntimeError("No archived frames in the selected range")
+        keep = frame_quality_mask(paths[-3000:])
+        sel = [p for p, ok in zip(paths[-3000:], keep) if ok][-1500:]
+        if not sel:
+            raise RuntimeError("No frames passed the quality check for the timelapse")
+        stamps: List[datetime] = []
+        telem: List[Dict[str, Any]] = []
+        for p in sel:
+            rec = telem_map.get(f"{os.path.basename(os.path.dirname(p))}/{os.path.basename(p)}", {})
+            try:
+                ts = datetime.fromisoformat(rec["timestamp"]) if rec.get("timestamp") else datetime.fromtimestamp(os.path.getmtime(p)).astimezone()
+            except Exception:
+                ts = datetime.now().astimezone()
+            stamps.append(ts)
+            telem.append(rec)
+        size = None
+        if width:
+            import cv2
+            img = cv2.imread(sel[0])
+            if img is not None:
+                h0, w0 = img.shape[:2]
+                size = (int(width) // 2 * 2, int(round(int(width) * h0 / w0 / 2)) * 2)
+        out = os.path.join(self.timelapses_dir, "custom.mp4")
+        with self._timelapse_lock:
+            compile_timelapse(
+                sel, output_path=out, fps=float(fps), fourcc_str="avc1", add_overlay=bool(overlay),
+                telemetry_list=telem, timestamps=stamps,
+                station_name=str(self.station_config.get("location_name", "AllSky Hanoi")),
+                target_size=size,
+            )
+        return {
+            "success": True, "date_from": date_from, "date_to": date_to, "fps": float(fps),
+            "video_frames_count": len(sel), "duration_s": round(len(sel) / max(1.0, float(fps)), 1),
+            "size_kb": round(os.path.getsize(out) / 1024.0, 1), "timelapse_url": "/uploads/allsky/timelapses/custom.mp4",
+        }
+
     def _write_timelapse_info(self, today_str: str, fps: float, stamps: List[datetime],
                               telem: List[Dict[str, Any]]) -> None:
         """Per-video-frame capture info (latest.json + <date>.json) for the web player's HTML overlay."""

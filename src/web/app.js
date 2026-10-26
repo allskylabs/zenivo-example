@@ -3537,6 +3537,70 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (currentPage === "tab-gallery") setTimeout(() => loadGalleryAndEvents(), 0);
 
+    // Gallery top tabs: Products | By day | Events (same data, different views)
+    const galleryContainer = document.getElementById("gallery-container");
+    const galleryTabs = document.getElementById("gallery-tabs");
+    const galleryDayTitle = document.getElementById("gallery-day-title");
+    function setGalleryMode(mode) {
+        if (!galleryContainer || !galleryTabs) return;
+        galleryContainer.classList.remove("gal-mode-products", "gal-mode-day", "gal-mode-events");
+        galleryContainer.classList.add(`gal-mode-${mode}`);
+        galleryTabs.querySelectorAll(".gal-tab").forEach((b) => {
+            b.classList.toggle("active", b.dataset.gmode === mode);
+            b.setAttribute("aria-selected", b.dataset.gmode === mode ? "true" : "false");
+        });
+        if (galleryDayTitle) galleryDayTitle.textContent = mode === "events" ? "Events" : "By Day";
+        try { localStorage.setItem("galleryMode", mode); } catch (e) { /* ignore */ }
+    }
+    if (galleryTabs) {
+        galleryTabs.addEventListener("click", (e) => {
+            const b = e.target.closest(".gal-tab");
+            if (b) setGalleryMode(b.dataset.gmode);
+        });
+        let savedMode = "products";
+        try { savedMode = localStorage.getItem("galleryMode") || "products"; } catch (e) { /* ignore */ }
+        setGalleryMode(["products", "day", "events"].includes(savedMode) ? savedMode : "products");
+    }
+
+    // Timelapse builder: custom date range -> POST /api/timelapse/build
+    const tlBuild = document.getElementById("tl-build");
+    if (tlBuild) {
+        const tlFrom = document.getElementById("tl-from");
+        const tlTo = document.getElementById("tl-to");
+        const tlResult = document.getElementById("tl-result");
+        const todayKey = dayKeyOf(new Date());
+        tlTo.value = todayKey;
+        tlFrom.value = dayKeyOf(new Date(Date.now() - 86400000));
+        tlBuild.addEventListener("click", async () => {
+            const q = new URLSearchParams({
+                date_from: tlFrom.value,
+                date_to: tlTo.value,
+                fps: document.getElementById("tl-fps").value || "24",
+                width: document.getElementById("tl-res").value,
+                overlay: document.getElementById("tl-overlay").checked ? "true" : "false",
+            });
+            tlBuild.disabled = true;
+            tlBuild.textContent = "Building...";
+            tlResult.classList.remove("hidden");
+            tlResult.textContent = "Encoding frames, this can take a minute.";
+            try {
+                const res = await fetch(`/api/timelapse/build?${q}`, { method: "POST" });
+                const d = await res.json();
+                if (res.ok) {
+                    const url = `${d.timelapse_url}?t=${Date.now()}`;
+                    tlResult.innerHTML = `${d.video_frames_count} frames, ${d.duration_s}s @ ${d.fps} fps, ${formatSize(d.size_kb)} · <a href="${escapeHtml(url)}" download>Download</a><video controls loop muted playsinline src="${escapeHtml(url)}"></video>`;
+                } else {
+                    tlResult.textContent = `Build failed: ${d.detail || "unknown error"}`;
+                }
+            } catch (err) {
+                tlResult.textContent = `Connection error: ${err.message}`;
+            } finally {
+                tlBuild.disabled = false;
+                tlBuild.textContent = "Build timelapse";
+            }
+        });
+    }
+
     async function loadGalleryAndEvents() {
         try {
             const resGal = await fetch("/api/gallery");

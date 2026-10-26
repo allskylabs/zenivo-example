@@ -134,6 +134,7 @@ def compile_timelapse(
     timestamps: Optional[List[datetime]] = None,
     station_name: str = "AllSky Hanoi",
     crf: int = 23,
+    target_size: Optional[tuple] = None,
 ) -> str:
     """
     Compile a sequence of frames or image paths into an MP4 video file.
@@ -150,6 +151,7 @@ def compile_timelapse(
         timestamps: Optional list of timestamps matching each frame.
         station_name: Station identifier for banner.
         crf: Constant Rate Factor for FFmpeg encoding (default: 23).
+        target_size: Optional (width, height) to scale every frame to (default: first frame size).
 
     Returns:
         Path to generated video file.
@@ -186,6 +188,8 @@ def compile_timelapse(
     if first_frame is None:
         raise ValueError("Cannot compile timelapse: none of the frames could be read")
     h, w = first_frame.shape[:2]
+    if target_size:
+        w, h = int(target_size[0]), int(target_size[1])
 
     def prepared_frames():
         for i, item in enumerate(frames_or_paths):
