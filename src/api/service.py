@@ -13,7 +13,7 @@ import time
 import threading
 from collections import OrderedDict
 from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import cv2
 
@@ -272,7 +272,7 @@ class AllSkyService:
         self._last_timelapse_compile_ts: float = os.path.getmtime(_tl_latest) if os.path.isfile(_tl_latest) else 0.0
         self._timelapse_compiling: bool = False
         self._timelapse_lock = threading.Lock()
-        self._archived_date_str: str = datetime.now().astimezone().strftime("%Y-%m-%d")
+        self._archived_date_str: str = self._obs_day_str()
 
         self.calibration_status: Dict[str, Any] = {
             "state": "idle",
@@ -1592,9 +1592,23 @@ class AllSkyService:
         )
         return info
 
+    def _obs_day_str(self, dt: Optional[datetime] = None) -> str:
+        """Observing-day key for frames / keogram / startrails / timelapse.
+
+        The day rolls over at dawn (civil twilight, sun above -6 deg in the morning) instead of midnight,
+        so one whole night, evening to sunrise, lands in a single uninterrupted product set."""
+        dt = dt or datetime.now().astimezone()
+        day = dt.date()
+        try:
+            if dt.hour < 12 and self._startrails_sun_elev(dt) < -6.0:
+                day = day - timedelta(days=1)
+        except Exception:
+            pass
+        return day.strftime("%Y-%m-%d")
+
     def _get_today_frames_dir(self, date_str: Optional[str] = None) -> str:
         """Return directory path for today's archived timelapse frames."""
-        d_str = date_str or datetime.now().astimezone().strftime("%Y-%m-%d")
+        d_str = date_str or self._obs_day_str()
         day_dir = os.path.join(self.frames_archive_root, d_str)
         os.makedirs(day_dir, exist_ok=True)
         return day_dir
@@ -1644,7 +1658,7 @@ class AllSkyService:
         those two files (two decodes) instead of re-decoding up to 600 archived frames; the frame
         decode path is only the fallback when a dated product is missing or does not line up."""
         try:
-            today_str = datetime.now().astimezone().strftime("%Y-%m-%d")
+            today_str = self._obs_day_str()
             self._archived_date_str = today_str
             paths = self._list_today_frame_paths(today_str)
             if not paths:
@@ -1767,7 +1781,7 @@ class AllSkyService:
             return None
 
         now = time.time()
-        today_str = datetime.now().astimezone().strftime("%Y-%m-%d")
+        today_str = self._obs_day_str()
         if today_str != self._archived_date_str:
             prev_day = self._archived_date_str
             n_prev = len(self._list_today_frame_paths(prev_day))
@@ -1890,7 +1904,7 @@ class AllSkyService:
         archived frames. If fewer than 4 frames exist and ensure_min_frames=True, captures/archives
         initial frames immediately so the user gets a playable video right away.
         """
-        today_str = datetime.now().astimezone().strftime("%Y-%m-%d")
+        today_str = self._obs_day_str()
         paths = self._list_today_frame_paths(today_str)
 
         if ensure_min_frames and len(paths) < 4:
@@ -2014,7 +2028,7 @@ class AllSkyService:
 
     def get_gallery(self) -> Dict[str, Any]:
         """List astronomical observational products with live file status and frame counts."""
-        today_str = datetime.now().astimezone().strftime("%Y-%m-%d")
+        today_str = self._obs_day_str()
         is_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST"))
 
         latest_mp4 = os.path.join(self.timelapses_dir, "latest.mp4")
