@@ -118,6 +118,9 @@
             #left-toggle { display: inline-block; min-height: 28px; margin-left: auto; }
             #left-col.collapsed #top > :not(:first-child), #left-col.collapsed #layers { display: none; }
             #top h1 { font-size: 14px; }
+            .navbar h1 { font-size: 14px; white-space: nowrap; }
+            .navbar .pill-label { display: none; }
+            .navbar .nav-metrics { gap: 6px; }
             #cam-foot { display: none !important; }
             #list { top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 50vh; }
             #list.collapsed ul, #list.collapsed #list-tools { display: none; }
@@ -173,6 +176,32 @@
         </nav>
     </aside>
 
+    <!-- Phone navigation (<=768px): same 5-tab bar + More sheet as index.html (style.css hides the sidebar on phones) -->
+    <nav class="m-tabbar" id="m-tabbar" aria-label="Mobile navigation">
+        <a class="m-tab" href="/live" data-mpath="/live,/,/index.html"><span class="m-ic">&#9673;</span><span class="m-txt">Live</span></a>
+        <a class="m-tab" href="/flights3d" data-mpath="/flights3d"><span class="m-ic">&#9992;</span><span class="m-txt">Flights</span></a>
+        <a class="m-tab" href="/gallery" data-mpath="/gallery"><span class="m-ic">&#9638;</span><span class="m-txt">Library</span></a>
+        <a class="m-tab" href="/focus" data-mpath="/focus"><span class="m-ic">&#9678;</span><span class="m-txt">Camera</span></a>
+        <button class="m-tab" type="button" id="m-more-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="m-more-sheet" data-mpath="/satellites3d,/logs,/calibration,/settings,/obs"><span class="m-ic">&#8943;</span><span class="m-txt">More</span></button>
+    </nav>
+    <div class="m-sheet-backdrop" id="m-sheet-backdrop" hidden></div>
+    <div class="m-sheet" id="m-more-sheet" role="dialog" aria-label="More" hidden>
+        <div class="m-sheet-grip" aria-hidden="true"></div>
+        <a class="m-sheet-item" href="/satellites3d" data-mpath="/satellites3d">Satellites 3D</a>
+        <a class="m-sheet-item" href="/logs" data-mpath="/logs">Activity Log</a>
+        <a class="m-sheet-item" href="/calibration" data-mpath="/calibration">Master Dark</a>
+        <div class="m-sheet-title">Settings</div>
+        <a class="m-sheet-item" href="/settings#image">Image Output</a>
+        <a class="m-sheet-item" href="/settings#detection">Detection</a>
+        <a class="m-sheet-item" href="/settings#station">Station &amp; Optics</a>
+        <a class="m-sheet-item" href="/settings#skymask">Sky Mask</a>
+        <a class="m-sheet-item" href="/settings#integrations">Integrations</a>
+        <div class="m-sheet-title">Stream / OBS</div>
+        <a class="m-sheet-item" href="/obs/dock">OBS Dock</a>
+        <a class="m-sheet-item" href="/obs" target="_blank" rel="noopener">OBS Preview</a>
+        <button class="m-sheet-item m-sheet-rv" type="button" id="m-rv-toggle" role="switch" aria-checked="false"><span>Red Vision</span><span class="rv-track"><span class="rv-knob"></span></span></button>
+    </div>
+
     <div class="app-main">
     <header class="navbar">
         <div class="nav-brand">
@@ -189,7 +218,7 @@
     <canvas id="globe"></canvas>
     <div id="labels"></div>
 
-    <div id="left-col">
+    <div id="left-col" class="collapsed">
     <div id="top" class="panel">
         <div class="row">
             <h1>Satellites 3D</h1>
@@ -216,7 +245,7 @@
     </div>
     </div><!-- #left-col -->
 
-    <div id="list" class="panel">
+    <div id="list" class="panel collapsed">
         <h2><span>Satellites</span><span><span id="count">--</span> <button id="list-toggle">▾</button></span></h2>
         <div id="list-tools">
             <div class="btns" id="filters">
@@ -255,6 +284,24 @@
     </div><!-- #stage -->
     </div><!-- .app-main -->
     </div><!-- .app-shell -->
+
+    <script>
+        // Phone More sheet + active tab (same behaviour as app.js initMobileNav)
+        (function () {
+            const moreBtn = document.getElementById("m-more-btn"), sheet = document.getElementById("m-more-sheet");
+            const backdrop = document.getElementById("m-sheet-backdrop"), rv = document.getElementById("m-rv-toggle");
+            const nv = document.getElementById("btn-night-vision");
+            const path = location.pathname.replace(/\/+$/, "") || "/";
+            document.querySelectorAll("[data-mpath]").forEach((el) => el.classList.toggle("active", el.getAttribute("data-mpath").split(",").includes(path)));
+            const setOpen = (o) => { sheet.hidden = !o; backdrop.hidden = !o; moreBtn.setAttribute("aria-expanded", o ? "true" : "false"); };
+            moreBtn.addEventListener("click", () => setOpen(sheet.hidden));
+            backdrop.addEventListener("click", () => setOpen(false));
+            document.addEventListener("keydown", (e) => { if (e.key === "Escape") setOpen(false); });
+            const sync = () => { const on = nv.classList.contains("btn-primary"); rv.classList.toggle("btn-primary", on); rv.setAttribute("aria-checked", on ? "true" : "false"); };
+            rv.addEventListener("click", () => { nv.click(); sync(); });
+            sync(); setTimeout(sync, 0);
+        })();
+    </script>
 
 
     <script>

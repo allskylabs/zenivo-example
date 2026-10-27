@@ -97,14 +97,20 @@
         #cam-badge.show { display: flex; }
         #cam-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444; animation: blink 1.2s infinite; }
         @keyframes blink { 50% { opacity: 0.3; } }
-        #list-toggle { display: none; }
+        #list-toggle, #left-toggle { display: none; }
         @media (max-width: 700px) {
             #left-col { right: 12px; }
+            #left-toggle { display: inline-block; min-height: 28px; margin-left: auto; }
+            #left-col.collapsed #top > :not(:first-child), #left-col.collapsed #layers { display: none; }
+            #top h1 { font-size: 14px; }
+            .navbar h1 { font-size: 14px; white-space: nowrap; }
+            .navbar .pill-label { display: none; }
+            .navbar .nav-metrics { gap: 6px; }
             #cam-foot { display: none !important; }
             #list { top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 40vh; }
             #list.collapsed ul { display: none; }
             #list-toggle { display: inline-block; }
-            #info { bottom: auto; top: 150px; right: 12px; width: auto; }
+            #info { bottom: 70px; top: auto; right: 12px; width: auto; max-height: 40vh; overflow-y: auto; }
             #cam-badge { top: auto; bottom: 12px; }
         }
     </style>
@@ -155,6 +161,32 @@
         </nav>
     </aside>
 
+    <!-- Phone navigation (<=768px): same 5-tab bar + More sheet as index.html (style.css hides the sidebar on phones) -->
+    <nav class="m-tabbar" id="m-tabbar" aria-label="Mobile navigation">
+        <a class="m-tab" href="/live" data-mpath="/live,/,/index.html"><span class="m-ic">&#9673;</span><span class="m-txt">Live</span></a>
+        <a class="m-tab" href="/flights3d" data-mpath="/flights3d"><span class="m-ic">&#9992;</span><span class="m-txt">Flights</span></a>
+        <a class="m-tab" href="/gallery" data-mpath="/gallery"><span class="m-ic">&#9638;</span><span class="m-txt">Library</span></a>
+        <a class="m-tab" href="/focus" data-mpath="/focus"><span class="m-ic">&#9678;</span><span class="m-txt">Camera</span></a>
+        <button class="m-tab" type="button" id="m-more-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="m-more-sheet" data-mpath="/satellites3d,/logs,/calibration,/settings,/obs"><span class="m-ic">&#8943;</span><span class="m-txt">More</span></button>
+    </nav>
+    <div class="m-sheet-backdrop" id="m-sheet-backdrop" hidden></div>
+    <div class="m-sheet" id="m-more-sheet" role="dialog" aria-label="More" hidden>
+        <div class="m-sheet-grip" aria-hidden="true"></div>
+        <a class="m-sheet-item" href="/satellites3d" data-mpath="/satellites3d">Satellites 3D</a>
+        <a class="m-sheet-item" href="/logs" data-mpath="/logs">Activity Log</a>
+        <a class="m-sheet-item" href="/calibration" data-mpath="/calibration">Master Dark</a>
+        <div class="m-sheet-title">Settings</div>
+        <a class="m-sheet-item" href="/settings#image">Image Output</a>
+        <a class="m-sheet-item" href="/settings#detection">Detection</a>
+        <a class="m-sheet-item" href="/settings#station">Station &amp; Optics</a>
+        <a class="m-sheet-item" href="/settings#skymask">Sky Mask</a>
+        <a class="m-sheet-item" href="/settings#integrations">Integrations</a>
+        <div class="m-sheet-title">Stream / OBS</div>
+        <a class="m-sheet-item" href="/obs/dock">OBS Dock</a>
+        <a class="m-sheet-item" href="/obs" target="_blank" rel="noopener">OBS Preview</a>
+        <button class="m-sheet-item m-sheet-rv" type="button" id="m-rv-toggle" role="switch" aria-checked="false"><span>Red Vision</span><span class="rv-track"><span class="rv-knob"></span></span></button>
+    </div>
+
     <div class="app-main">
     <header class="navbar">
         <div class="nav-brand">
@@ -171,11 +203,12 @@
     <div id="map"></div>
     <div id="labels"></div>
 
-    <div id="left-col">
+    <div id="left-col" class="collapsed">
     <div id="top" class="panel">
         <div class="row">
             <h1>Flights 3D</h1>
             <span id="status">Loading…</span>
+            <button id="left-toggle" title="Show / hide panels">▾</button>
         </div>
         <div class="btns">
             <button id="btn-base-terrain" class="on" title="Dark 3D terrain">Terrain</button>
@@ -201,7 +234,7 @@
     </div>
     </div><!-- #left-col -->
 
-    <div id="list" class="panel">
+    <div id="list" class="panel collapsed">
         <h2><span>Aircraft</span><span><span id="count">--</span> <button id="list-toggle">▾</button></span></h2>
         <ul id="ac-list"></ul>
     </div>
@@ -226,6 +259,24 @@
     </div><!-- #stage -->
     </div><!-- .app-main -->
     </div><!-- .app-shell -->
+
+    <script>
+        // Phone More sheet + active tab (same behaviour as app.js initMobileNav)
+        (function () {
+            const moreBtn = document.getElementById("m-more-btn"), sheet = document.getElementById("m-more-sheet");
+            const backdrop = document.getElementById("m-sheet-backdrop"), rv = document.getElementById("m-rv-toggle");
+            const nv = document.getElementById("btn-night-vision");
+            const path = location.pathname.replace(/\/+$/, "") || "/";
+            document.querySelectorAll("[data-mpath]").forEach((el) => el.classList.toggle("active", el.getAttribute("data-mpath").split(",").includes(path)));
+            const setOpen = (o) => { sheet.hidden = !o; backdrop.hidden = !o; moreBtn.setAttribute("aria-expanded", o ? "true" : "false"); };
+            moreBtn.addEventListener("click", () => setOpen(sheet.hidden));
+            backdrop.addEventListener("click", () => setOpen(false));
+            document.addEventListener("keydown", (e) => { if (e.key === "Escape") setOpen(false); });
+            const sync = () => { const on = nv.classList.contains("btn-primary"); rv.classList.toggle("btn-primary", on); rv.setAttribute("aria-checked", on ? "true" : "false"); };
+            rv.addEventListener("click", () => { nv.click(); sync(); });
+            sync(); setTimeout(sync, 0);
+        })();
+    </script>
 
     <script>
         // Shell behaviour shared with app.js: UTC clock and the Red Vision toggle (same localStorage prefs)
@@ -1744,6 +1795,7 @@
         $("btn-track").onclick = () => setCamMode("track");
         $("btn-chase").onclick = () => setCamMode("chase");
         $("cam-stop").onclick = () => stopCamera();
+        $("left-toggle").onclick = () => $("left-col").classList.toggle("collapsed");
         $("list-toggle").onclick = () => $("list").classList.toggle("collapsed");
         $("btn-base-terrain").classList.remove("on");   // setBase() marks the active one once the style is ready
         $("btn-base-terrain").onclick = () => setBase("terrain");
@@ -1762,7 +1814,7 @@
             stopCamera();
             if (station) map.easeTo({ center: [station.lon, station.lat], zoom: 9, pitch: 64, bearing: -20, duration: 1200 });
         };
-        if (window.innerWidth <= 700) $("list").classList.add("collapsed");
+        if (window.innerWidth <= 700) { $("list").classList.add("collapsed"); $("left-col").classList.add("collapsed"); }
         // The map lives in #stage (beside the sidebar), not the window: resize it with its container
         if (window.ResizeObserver) new ResizeObserver(() => map.resize()).observe($("stage"));
         window.flights3d = { map, aircraft, preview, layer: planesLayer };   // for inspection from the console
