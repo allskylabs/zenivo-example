@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Satellites 3D — AllSky Observatory</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -15,14 +14,11 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { height: 100%; }
         body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-sans); overflow: hidden; }
-        /* Shared shell (style.css "Night Sky shell"): fix it to the viewport; the map fills #stage, the area beside the sidebar */
+        /* Shared shell (style.css "Night Sky shell"): fix it to the viewport; the globe fills #stage, the area beside the sidebar */
         .app-shell { height: 100vh; min-height: 0; }
         .app-main { height: 100%; min-height: 0; }
         #stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
-        #map { position: absolute; inset: 0; background: var(--bg-primary); }
-        #globe { position: absolute; inset: 0; width: 100%; height: 100%; display: none; background: #02030a; touch-action: none; }
-        #stage.globe #map, #stage.globe .map-only { display: none; }
-        #stage.globe #globe { display: block; }
+        #globe { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: #02030a; touch-action: none; }
         #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
         .sat-label {
             position: absolute; transform: translate(-50%, -100%); white-space: nowrap; pointer-events: auto; cursor: pointer;
@@ -111,7 +107,6 @@
         #timeline .tl-note { color: var(--text-secondary); margin-top: 4px; }
         .legend { display: flex; gap: 10px; font-size: 12px; color: var(--text-secondary); align-items: center; flex-wrap: wrap; }
         .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
-        .station-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; box-shadow: 0 0 10px var(--accent); }
         #cam-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 6px 8px 6px 12px; display: none;
             align-items: center; gap: 10px; font-size: 12px; white-space: nowrap; }
         #cam-badge.show { display: flex; }
@@ -188,7 +183,6 @@
     </header>
 
     <div id="stage">
-    <div id="map"></div>
     <canvas id="globe"></canvas>
     <div id="labels"></div>
 
@@ -200,12 +194,8 @@
         </div>
         <div class="row"><span id="sky"></span><span id="tle"></span></div>
         <div class="btns">
-            <button id="btn-base-terrain" class="map-only on" title="Dark 3D terrain">Terrain</button>
-            <button id="btn-base-sat" class="map-only" title="Satellite imagery (no labels or borders)">Satellite</button>
-            <button id="btn-base-google" class="map-only" hidden title="Google Maps, dark">Google</button>
             <button id="btn-labels" class="on" title="Satellite name labels">Labels</button>
             <button id="btn-home" title="Back to the station">Station</button>
-            <button id="btn-globe" title="Switch between the flat map and a spherical Earth">Globe</button>
         </div>
         <div class="legend">
             <span><i style="background:#22d3ee"></i>Visible now</span>
@@ -218,7 +208,6 @@
         <h2>Layers</h2>
         <label>Satellites <input type="checkbox" id="lay-sats" checked></label>
         <label>Tracks <input type="checkbox" id="lay-tracks" checked></label>
-        <label class="map-only">Terrain <input type="checkbox" id="lay-terrain" checked></label>
         <label>Atmosphere <input type="checkbox" id="lay-atmos" checked></label>
     </div>
     </div><!-- #left-col -->
@@ -286,22 +275,17 @@
         })();
     </script>
 
-    <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
     <script type="module">
         import * as THREE from "three";
         import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-        // Basemap rule: no OpenStreetMap-derived data. The base is elevation only (no borders, no labels); the
-        // satellite layer is imagery only (no labels, no borders); Google Maps (Map Tiles API, region VN) is
-        // offered when a key is configured. Orbits come from /api/satellites (CelesTrak TLEs, SGP4 on the server).
+        // Globe-only view: a spherical Earth (day/night textures, optional atmosphere) with every satellite, its recent
+        // trail and the selected one's track drawn in 3D. Orbits come from /api/satellites (CelesTrak TLEs, SGP4 on the server).
         const POLL_MS = 2000;
         const TRACK_MIN = 90;         // minutes of future track requested for the selected satellite
         const TRAIL_S = 600;          // seconds of recent path requested for every satellite (shows its direction of travel)
         const TRACK_STEP_S = 30;      // sample spacing of the server's track
         const MAX_EXTRAP_S = 6;       // dead-reckoning limit between polls
-        const HOME_VIEW = { zoom: 2.5, pitch: 45, bearing: 0 };
-        const DEM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
-        const SAT = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
         const PREF = "allsky.satellites3d.";
         const MARKER = {   // colour, on-screen size (px) and brightness per lighting state
             visible: { rgb: [0.13, 0.83, 0.93], px: 26, dim: 1.0 },
@@ -309,7 +293,7 @@
             shadow: { rgb: [0.55, 0.58, 0.64], px: 16, dim: 0.5 },
         };
         const MAX_POINTS = 512;
-        const R_EARTH = 6.371;        // globe view: 1 unit = 1000 km
+        const R_EARTH = 6.371;        // globe: 1 unit = 1000 km
         const GLOBE_DIST = 20, GLOBE_MIN = 6.8, GLOBE_MAX = 40;   // camera distance from the Earth's centre
         const TEX = "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/";
 
@@ -326,153 +310,24 @@
         const stateOf = (a) => (a.visible ? "visible" : a.sunlit ? "sunlit" : "shadow");
 
         let station = null, camera = null, sunAlt = null;
-        let origin = null, mPerUnit = 1;    // scene origin (mercator) at the station; mercator units per metre there
         const sats = new Map();             // norad -> state
         let selected = null;
-        let camMode = null, camZoom = null, camPending = false;   // camera following the selected satellite
+        let camMode = null;   // camera following the selected satellite
         let showLabels = pref("labels", "1") === "1";
         let filter = pref("filter", "above"), sortBy = pref("sort", "alt"), query = "";
-        const layerOn = { sats: true, tracks: true, terrain: true, atmos: pref("atmos", "1") === "1" };
-        let view = pref("view", "map") === "globe" ? "globe" : "map";   // flat map or spherical Earth
-        let globe = null;                   // the globe view's three.js state, built on first use
+        const layerOn = { sats: true, tracks: true, atmos: pref("atmos", "1") === "1" };
+        let globe = null;                   // the globe's three.js state, built at startup
         let lastFetch = 0, inflight = false, again = false;
 
-        // ---------------------------------------------------------------- map: dark 3D terrain from elevation only
-        const RELIEF = ["interpolate", ["linear"], ["elevation"],   // near-grey: saturation close to 0
-            -200, "#050506", 0, "#08090b", 30, "#0a0b0d", 150, "#0d0e11", 400, "#111316",
-            800, "#16181c", 1300, "#1c1f23", 2000, "#24272c", 3000, "#2f3237"];
-        const map = new maplibregl.Map({
-            container: "map",
-            style: {
-                version: 8,
-                sources: {
-                    dem: { type: "raster-dem", tiles: [DEM], encoding: "terrarium", tileSize: 256, maxzoom: 11,
-                        attribution: "Terrain: Mapzen / AWS Terrain Tiles" },
-                    "dem-shade": { type: "raster-dem", tiles: [DEM], encoding: "terrarium", tileSize: 256, maxzoom: 14 },
-                },
-                layers: [
-                    { id: "bg", type: "background", paint: { "background-color": "#070809" } },
-                    { id: "relief", type: "color-relief", source: "dem-shade", paint: { "color-relief-color": RELIEF } },
-                    { id: "hillshade", type: "hillshade", source: "dem-shade",
-                        paint: { "hillshade-exaggeration": 0.75, "hillshade-shadow-color": "#000000",
-                            "hillshade-highlight-color": "#5d636c", "hillshade-accent-color": "#0c0d10" } },
-                ],
-                terrain: { source: "dem", exaggeration: 1 },
-                sky: { "sky-color": "#070809", "horizon-color": "#17191d", "fog-color": "#070809",
-                    "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.5, "fog-ground-blend": 0.35, "atmosphere-blend": 0 },
-            },
-            center: [105.9095, 21.0538], zoom: HOME_VIEW.zoom, pitch: HOME_VIEW.pitch, bearing: HOME_VIEW.bearing, maxPitch: 82,
-            attributionControl: { compact: true },
-        });
-        map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
-        map.on("error", (e) => console.error("map:", e.error?.message || e));
-
-        // Start as soon as the (inline) style is ready rather than on "load", which waits for every terrain tile
-        // (an inline style can finish loading inside the constructor, before a "style.load" listener exists)
-        let styleReady = false;
-        const styleQueue = [];
-        const whenStyle = (fn) => (styleReady ? fn() : styleQueue.push(fn));
-        const markStyleReady = () => {
-            if (styleReady || !map.style || !map.style._loaded) return;
-            styleReady = true;
-            styleQueue.splice(0).forEach((fn) => fn());
-        };
-        for (const ev of ["style.load", "styledata", "load", "idle"]) map.on(ev, markStyleReady);
-        setTimeout(markStyleReady, 0);
-        whenStyle(() => {
-            map.addLayer(satsLayer);
-            setBase(pref("base", "") === "terrain" ? "terrain" : "sat");   // satellite unless the viewer chose terrain before
-        });
-
-        poll();
-        setInterval(() => { if (!document.hidden) poll(); }, POLL_MS);
-        document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastFetch > POLL_MS) poll(); });
-
-        // ---------------------------------------------------------------- Google Maps basemap (optional)
-        const GOOGLE_DARK = [
-            { elementType: "geometry", stylers: [{ color: "#0b1220" }] },
-            { elementType: "labels.text.fill", stylers: [{ color: "#8ea3c0" }] },
-            { elementType: "labels.text.stroke", stylers: [{ color: "#070a13" }] },
-            { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#0d1626" }] },
-            { featureType: "water", elementType: "geometry", stylers: [{ color: "#040914" }] },
-            { featureType: "road", elementType: "geometry", stylers: [{ color: "#1a2740" }] },
-            { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#24375a" }] },
-            { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-            { featureType: "poi", stylers: [{ visibility: "off" }] },
-            { featureType: "transit", stylers: [{ visibility: "off" }] },
-            { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#3a5a86" }] },
-        ];
-        let googleKey = "";
-        const googleSessions = {};
-        fetch("/api/map/config").then((r) => r.json()).then((c) => {
-            googleKey = c.google_maps_key || "";
-            $("btn-base-google").hidden = !googleKey;
-            if (googleKey && pref("base", "") === "google") whenStyle(() => setBase("google"));
-        }).catch(() => {});
-
-        async function googleSource(kind) {
-            if (googleSessions[kind]) return googleSessions[kind];
-            const body = { mapType: "roadmap", language: "vi-VN", region: "VN", styles: GOOGLE_DARK };
-            const r = await fetch(`https://tile.googleapis.com/v1/createSession?key=${encodeURIComponent(googleKey)}`, {
-                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-            if (!r.ok) throw new Error(`Google Maps: ${r.status}`);
-            const s = await r.json();
-            googleSessions[kind] = s.session;
-            return s.session;
-        }
-
-        async function setBase(kind) {
-            setPref("base", kind);
-            for (const k of ["terrain", "google", "sat"]) $(`btn-base-${k}`).classList.toggle("on", k === kind);
-            for (const k of ["google", "sat"]) if (map.getLayer(`g-${k}`)) map.setLayoutProperty(`g-${k}`, "visibility", k === kind ? "visible" : "none");
-            if (map.getLayer("sat-night")) map.setLayoutProperty("sat-night", "visibility", kind === "sat" ? "visible" : "none");
-            map.setLayoutProperty("relief", "visibility", kind === "terrain" ? "visible" : "none");
-            map.setPaintProperty("hillshade", "hillshade-exaggeration", kind === "terrain" ? 0.75 : 0.35);
-            if (kind === "terrain" || map.getLayer(`g-${kind}`)) return;
-            if (kind === "sat") {   // imagery only, in a night look: dark and grey
-                map.addSource("g-sat", { type: "raster", tiles: [SAT], tileSize: 256, maxzoom: 19,
-                    attribution: "Imagery © Esri, Maxar, Earthstar Geographics" });
-                map.addLayer({ id: "g-sat", type: "raster", source: "g-sat",
-                    paint: { "raster-brightness-max": 0.42, "raster-saturation": -1, "raster-contrast": 0.15 } }, "hillshade");
-                map.addSource("sat-night", { type: "geojson", data: { type: "Feature", properties: {},
-                    geometry: { type: "Polygon", coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]]] } } });
-                map.addLayer({ id: "sat-night", type: "fill", source: "sat-night",
-                    paint: { "fill-color": "#000000", "fill-opacity": 0.35 } }, "hillshade");
-                return;
-            }
-            try {
-                const session = await googleSource(kind);
-                map.addSource(`g-${kind}`, { type: "raster", tileSize: 256, maxzoom: 20,
-                    tiles: [`https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${session}&key=${encodeURIComponent(googleKey)}`],
-                    attribution: `Map data ©${new Date().getFullYear()} Google` });
-                map.addLayer({ id: `g-${kind}`, type: "raster", source: `g-${kind}` }, "hillshade");
-            } catch (err) {
-                $("status").textContent = err.message;
-                setBase("terrain");
-            }
-        }
-
-        // ---------------------------------------------------------------- geometry helpers
-        // lon/lat in degrees, alt in metres -> scene units (mercator, relative to the station in x/y)
-        function merc(lon, lat, alt) {
-            const m = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], alt);
-            return [m.x - origin.x, m.y - origin.y, m.z];
-        }
-
-        // ---------------------------------------------------------------- three.js scene
-        const scene = new THREE.Scene();
-        const cam3 = new THREE.Camera();
-        const world = new THREE.Group();
-        scene.add(world);
+        // ---------------------------------------------------------------- three.js shared materials
         const LOS_MAT = new THREE.LineBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.8, depthTest: false });
         const DROP_MAT = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthTest: false });
-        const line2 = (mat, parent = world) => {
+        const line2 = (mat, parent) => {
             const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), mat);
             l.frustumCulled = false; l.visible = false;
             parent.add(l);
             return l;
         };
-        const losLine = line2(LOS_MAT), dropLine = line2(DROP_MAT);
 
         // ---------------------------------------------------------------- satellites: one Points object, constant pixel size
         const POINTS_VS = `
@@ -504,14 +359,10 @@
             g.setDrawRange(0, 0);
             return g;
         }
-        const pointGeo = pointGeometry(MAX_POINTS);
         const POINTS_MAT = new THREE.ShaderMaterial({
             vertexShader: POINTS_VS, fragmentShader: POINTS_FS, transparent: true, depthWrite: false, depthTest: false,
             blending: THREE.AdditiveBlending, uniforms: { uDpr: { value: window.devicePixelRatio || 1 } },
         });
-        const points = new THREE.Points(pointGeo, POINTS_MAT);
-        points.frustumCulled = false;
-        world.add(points);
 
         // Marker i of a Points object at p (x, y, z): colour, size and ring by lighting state / selection
         function setMarker(at, i, p, a, isSel) {
@@ -560,8 +411,6 @@
                 uniforms: { uRes: { value: new THREE.Vector2(1, 1) }, uWidth: { value: width }, uNow: { value: 0 }, uBright: { value: bright } },
             });
         }
-        const TRACK_MATS = { orbit: trackMaterial(5, 1.0), ground: trackMaterial(3, 0.5) };
-        let trackMeshes = [];
 
         // Ribbon through points P with absolute times T (s, same clock as nowS) and visible flags V
         function buildRibbon(P, T, V, mat) {
@@ -592,73 +441,7 @@
             return mesh;
         }
 
-        function clearTrack() {
-            for (const mesh of trackMeshes) { world.remove(mesh); mesh.geometry.dispose(); }
-            trackMeshes = [];
-            for (const s of sats.values()) s.trackPts = null;
-        }
-
-        // The selected satellite's path at orbit height, plus its footprint on the ground
-        function rebuildTrack() {
-            clearTrack();
-            rebuildGlobeTrack();
-            const s = selected != null && sats.get(selected);
-            if (!s || !s.track || s.track.length < 2) return;
-            const tr = s.track, lons = [tr[0][1]];
-            let off = 0;
-            for (let i = 1; i < tr.length; i++) {   // unwrap across the antimeridian
-                const d = tr[i][1] - tr[i - 1][1];
-                if (d > 180) off -= 360; else if (d < -180) off += 360;
-                lons.push(tr[i][1] + off);
-            }
-            let i0 = 0;
-            for (let i = 1; i < tr.length; i++) if (Math.abs(tr[i][3]) < Math.abs(tr[i0][3])) i0 = i;
-            const shift = 360 * Math.round((s.fix.lon - lons[i0]) / 360);   // keep the path on the satellite's copy of the world
-            const T = tr.map((q) => s.trackT + q[3]), V = tr.map((q) => (q[5] ? 1 : 0));
-            const orbit = tr.map((q, i) => new THREE.Vector3(...merc(lons[i] + shift, q[0], q[2] * 1000)));
-            const ground = tr.map((q, i) => new THREE.Vector3(...merc(lons[i] + shift, q[0], 0)));
-            trackMeshes = [buildRibbon(orbit, T, V, TRACK_MATS.orbit), buildRibbon(ground, T, V, TRACK_MATS.ground)];
-            for (const mesh of trackMeshes) world.add(mesh);
-            s.trackPts = orbit;
-        }
-
-        // Every satellite's recent path as a fading line ending at the satellite, so the direction of travel reads at a glance
-        const trailsGeo = new THREE.BufferGeometry();
-        const trailsMesh = new THREE.LineSegments(trailsGeo, new THREE.LineBasicMaterial({
-            vertexColors: true, transparent: true, depthTest: false, blending: THREE.AdditiveBlending }));
-        trailsMesh.frustumCulled = false;
-        world.add(trailsMesh);
         const trailStyle = (s) => { const mk = MARKER[stateOf(s.a)]; return [mk, (s.a.above_horizon ? 1 : 0.35) * mk.dim]; };
-        function rebuildTrails() {
-            const pos = [], col = [];
-            for (const s of sats.values()) {
-                const tr = s.a && s.a.trail;
-                if (!tr || tr.length < 2) continue;
-                const [mk, gain] = trailStyle(s);
-                let off = 0, prev = tr[0][1];
-                const lons = tr.map((q) => { const d = q[1] - prev; prev = q[1]; if (d > 180) off -= 360; else if (d < -180) off += 360; return q[1] + off; });
-                const shift = 360 * Math.round((s.fix.lon - lons[lons.length - 1]) / 360);
-                for (let i = 0; i + 1 < tr.length; i++) {
-                    for (const j of [i, i + 1]) {
-                        pos.push(...merc(lons[j] + shift, tr[j][0], tr[j][2] * 1000));
-                        const f = (j / (tr.length - 1)) ** 1.5 * gain;
-                        col.push(mk.rgb[0] * f, mk.rgb[1] * f, mk.rgb[2] * f);
-                    }
-                }
-            }
-            trailsGeo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-            trailsGeo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-            trailsGeo.computeBoundingSphere();
-        }
-
-        // ---------------------------------------------------------------- station
-        function addStationOnMap() {
-            const el = document.createElement("div");
-            el.className = "station-dot";
-            el.title = "AllSky camera";
-            new maplibregl.Marker({ element: el }).setLngLat([station.lon, station.lat]).addTo(map);
-        }
-
         // ---------------------------------------------------------------- state from the API
         function poll() {
             if (inflight) { again = true; return; }
@@ -673,19 +456,15 @@
         function update(d) {
             const now = nowS();
             sunAlt = d.sun_alt_deg;
-            if (d.station && !origin) {
+            if (d.station && !station) {
                 station = d.station; camera = d.camera || null;
                 updateCamFoot();
-                origin = maplibregl.MercatorCoordinate.fromLngLat([station.lon, station.lat], 0);
-                mPerUnit = origin.meterInMercatorCoordinateUnits();
-                map.jumpTo({ center: [station.lon, station.lat] });
-                whenStyle(addStationOnMap);
             }
-            if (!origin) return;
+            if (!station) return;
             const list = d.satellites || [];
             const dark = sunAlt != null && sunAlt < -3;
             const nVis = list.filter((a) => a.visible).length, nUp = list.filter((a) => a.above_horizon).length;
-            $("status").textContent = `${nVis} visible now · ${nUp} above horizon · ${list.length} tracked`;
+            $("status").textContent = !globe ? "Globe view unavailable" : `${nVis} visible now · ${nUp} above horizon · ${list.length} tracked`;
             $("sky").className = dark ? "dark" : "day";
             $("sky").textContent = `${dark ? "Dark sky" : "Daylight - satellites can't be seen"} · sun ${sunAlt != null ? sunAlt.toFixed(1) : "--"}°`;
             $("tle").textContent = `TLE ${d.tle_count ?? "--"} sets${d.tle_age_h != null ? ` · ${d.tle_age_h.toFixed(1)} h old` : ""}`;
@@ -694,7 +473,7 @@
                 seen.add(a.norad);
                 let s = sats.get(a.norad);
                 if (!s) {
-                    s = { label: null, fix: null, vel: null, track: null, trackT: 0, trackPts: null };
+                    s = { label: null, fix: null, vel: null, track: null, trackT: 0 };
                     sats.set(a.norad, s);
                 }
                 s.a = a;
@@ -719,10 +498,8 @@
             }
             rebuildTrails();
             if (selected != null) rebuildTrack();
-            if (view === "globe") rebuildGlobeTrails();
             renderList();
             renderInfo();
-            if (view === "map") map.triggerRepaint();
         }
 
         // ---------------------------------------------------------------- motion
@@ -756,71 +533,6 @@
             return { lat: f.lat + v.lat * dt, lon: wrapLon(f.lon + v.lon * dt), h: f.h + v.h * dt };
         }
 
-        // ---------------------------------------------------------------- custom layer
-        const satsLayer = {
-            id: "sats-3d", type: "custom", renderingMode: "3d",
-            onAdd(m, gl) {
-                this.renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true });
-                this.renderer.autoClear = false;
-            },
-            render(gl, args) {
-                if (!origin || view !== "map") return;
-                const matrix = args.defaultProjectionData?.mainMatrix || args;   // v5: mercator world -> clip
-                const now = nowS();
-                const M = new THREE.Matrix4().fromArray(matrix).multiply(new THREE.Matrix4().makeTranslation(origin.x, origin.y, 0));
-                cam3.projectionMatrix = M;
-                const canvas = map.getCanvas();
-                const W = canvas.clientWidth, H = canvas.clientHeight;
-                POINTS_MAT.uniforms.uDpr.value = window.devicePixelRatio || 1;
-                for (const mt of Object.values(TRACK_MATS)) { mt.uniforms.uRes.value.set(W, H); mt.uniforms.uNow.value = now; }
-                const v4 = new THREE.Vector4();
-                const project = (p) => {
-                    v4.set(p[0], p[1], p[2], 1).applyMatrix4(M);
-                    return v4.w > 0 ? [(v4.x / v4.w + 1) / 2 * W, (1 - v4.y / v4.w) / 2 * H] : null;
-                };
-
-                const at = pointGeo.attributes;
-                const screen = [];
-                const labelCands = [];
-                let n = 0;
-                for (const [id, s] of sats) {
-                    if (!s.fix || n >= MAX_POINTS) continue;
-                    const ps = positionAt(s, now), p = merc(ps.lon, ps.lat, ps.h), a = s.a;
-                    const isSel = id === selected;
-                    s.p = p;
-                    if (layerOn.sats) setMarker(at, n++, p, a, isSel);
-                    const sc = layerOn.sats ? project(p) : null;
-                    if (sc) screen.push([id, sc[0], sc[1]]);
-                    queueLabel(labelCands, s, sc, W, H);
-                    if (isSel) {
-                        this.selPos = { x: p[0], y: p[1], h: ps.h };
-                        losLine.visible = layerOn.sats && !!a.above_horizon;
-                        dropLine.visible = layerOn.sats;
-                        const lp = losLine.geometry.attributes.position, dp = dropLine.geometry.attributes.position;
-                        lp.setXYZ(0, 0, 0, 0); lp.setXYZ(1, p[0], p[1], p[2]); lp.needsUpdate = true;
-                        dp.setXYZ(0, p[0], p[1], p[2]); dp.setXYZ(1, p[0], p[1], 0); dp.needsUpdate = true;
-                        this.selTrack = layerOn.tracks && s.trackPts ? s.trackPts.map((q) => project([q.x, q.y, q.z])) : [];   // for click hit-testing
-                    }
-                }
-                placeLabels(labelCands);
-                if (selected == null || !sats.has(selected)) { losLine.visible = dropLine.visible = false; this.selTrack = []; }
-                for (const k of Object.keys(at)) at[k].needsUpdate = true;
-                pointGeo.setDrawRange(0, n);
-                for (const mesh of trackMeshes) mesh.visible = layerOn.tracks;
-                trailsMesh.visible = layerOn.tracks;
-                this.screen = screen;
-                // Track: the map centre sits on the satellite itself, at its height
-                if (camMode && selected != null && this.selPos && !camPending) {
-                    camPending = true;
-                    const pos = this.selPos;
-                    requestAnimationFrame(() => { camPending = false; steerCamera(pos); });
-                }
-
-                this.renderer.resetState();
-                this.renderer.render(scene, cam3);
-                if (sats.size && !document.hidden) map.triggerRepaint();
-            },
-        };
 
         // A label is shown only when its marker is on screen; the rest hide
         function queueLabel(cands, s, sc, W, H) {
@@ -844,48 +556,17 @@
         }
 
         // ---------------------------------------------------------------- camera tracking
-        // While the user is rotating, tilting or zooming, steering is paused so the gesture is not overridden every
-        // frame; it resumes (keeping the chosen bearing, pitch and zoom) a moment after they let go
-        let gestureUntil = 0, pointerDown = false;
-        const pauseSteering = (ms = 700) => { gestureUntil = Math.max(gestureUntil, performance.now() + ms); };
-        function steerCamera(p) {
-            if (!camMode || pointerDown || performance.now() < gestureUntil) return;
-            const mc = new maplibregl.MercatorCoordinate(origin.x + p.x, origin.y + p.y, 0);
-            const o = { center: mc.toLngLat(), elevation: p.h };
-            if (camZoom != null) {
-                const z = map.getZoom();
-                o.zoom = z + (camZoom - z) * 0.08;
-                if (Math.abs(camZoom - o.zoom) < 0.02) camZoom = null;
-            }
-            map.jumpTo(o);
-        }
-
+        // Track turns the globe to the selected satellite's sub-point (see globeFrame); the viewer's own
+        // rotate / zoom gestures (OrbitControls) keep working, and dragging ends tracking
         function setCamMode(mode) {
             if (selected == null || !sats.has(selected) || camMode === mode) { stopCamera(); return; }
             camMode = mode;
-            if (view === "map") {
-                map.setCenterClampedToGround(false);
-                camZoom = Math.max(map.getZoom(), 4);
-            }
             showCamera();
-            map.triggerRepaint();
         }
 
         function stopCamera() {
             if (!camMode) return;
-            camMode = camZoom = null;
-            if (view === "globe") { showCamera(); return; }
-            // Same viewpoint, but aimed at the ground under the screen centre, so the next pan doesn't jump
-            try {
-                const camLL = map.transform.getCameraLngLat(), camAlt = map.transform.getCameraAltitude();
-                const c = map.getCanvas();
-                const ground = map.unproject([c.clientWidth / 2, c.clientHeight / 2]);
-                const gAlt = map.queryTerrainElevation(ground) || 0;
-                map.setCenterClampedToGround(true);
-                map.jumpTo(map.calculateCameraOptionsFromTo(camLL, camAlt, ground, gAlt));
-            } catch (e) {
-                map.setCenterClampedToGround(true);
-            }
+            camMode = null;
             showCamera();
         }
 
@@ -896,34 +577,13 @@
             $("btn-track").classList.toggle("on", camMode === "track");
         }
 
-        map.on("dragstart", stopCamera);   // panning away ends tracking
-        map.on("wheel", () => { camZoom = null; pauseSteering(); });
-        map.on("mousedown", () => { pointerDown = true; });
-        map.on("touchstart", () => { pointerDown = true; });
-        window.addEventListener("mouseup", () => { pointerDown = false; pauseSteering(250); });
-        window.addEventListener("touchend", () => { pointerDown = false; pauseSteering(250); });
         document.addEventListener("keydown", (e) => {
             if (e.key !== "Escape") return;
-            if (view === "globe" && !camMode) select(null);   // globe: a second Esc deselects
+            if (!camMode) select(null);   // a second Esc deselects
             stopCamera();
         });
-        map.on("click", (e) => {
-            const hit = (satsLayer.screen || []).map(([id, x, y]) => [id, Math.hypot(x - e.point.x, y - e.point.y)])
-                .sort((a, b) => a[1] - b[1])[0];
-            let id = hit && hit[1] < 22 ? hit[0] : null;
-            if (id === selected) id = null;   // clicking the selected satellite again deselects it
-            if (!id && selected != null) {    // ...as does clicking its track
-                const t = satsLayer.selTrack || [];
-                for (let i = 1; i < t.length && t[i] && t[i - 1]; i++) {
-                    const [x1, y1] = t[i - 1], [x2, y2] = t[i], dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy;
-                    const u = l2 ? Math.max(0, Math.min(1, ((e.point.x - x1) * dx + (e.point.y - y1) * dy) / l2)) : 0;
-                    if (Math.hypot(x1 + u * dx - e.point.x, y1 + u * dy - e.point.y) < 14) { select(null); return; }
-                }
-            }
-            select(id, true);
-        });
 
-        // ---------------------------------------------------------------- globe view: a separate three.js scene of the spherical Earth
+        // ---------------------------------------------------------------- globe: a three.js scene of the spherical Earth
         // Axes: y = north pole, lon 0 on +x, lon 90E on -z; SphereGeometry's u = 0 is lon -180, so the texture lines up as is
         function ecef(lat, lon, hKm) {
             const r = R_EARTH + hKm / 1000, la = lat * D2R, lo = lon * D2R;
@@ -1018,7 +678,7 @@
             gscene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({
                 color: 0x8a97b8, size: 1.3, sizeAttenuation: false, transparent: true, opacity: 0.7, depthWrite: false })));
 
-            // Same markers as the map, but depth-tested so the Earth hides what is behind it
+            // Depth-tested markers so the Earth hides what is behind it
             const solid = (m) => { const c = m.clone(); c.depthTest = true; return c; };
             const pointsMat = solid(POINTS_MAT);
             pointsMat.uniforms.uDpr.value = renderer.getPixelRatio();
@@ -1078,7 +738,7 @@
         }
 
         // Fading recent path of every satellite, in 3D (no antimeridian unwrapping needed on a sphere)
-        function rebuildGlobeTrails() {
+        function rebuildTrails() {
             if (!globe) return;
             const pos = [], col = [];
             for (const s of sats.values()) {
@@ -1099,12 +759,12 @@
         }
 
         // Selected satellite's path at orbit height and just above the ground (called from rebuildTrack)
-        function rebuildGlobeTrack() {
+        function rebuildTrack() {
             if (!globe) return;
             for (const mesh of globe.trackMeshes) { globe.scene.remove(mesh); mesh.geometry.dispose(); }
             globe.trackMeshes = [];
             const s = selected != null && sats.get(selected);
-            if (view !== "globe" || !s || !s.track || s.track.length < 2) return;
+            if (!s || !s.track || s.track.length < 2) return;
             const tr = s.track, T = tr.map((q) => s.trackT + q[3]), V = tr.map((q) => (q[5] ? 1 : 0));
             const orbit = tr.map((q) => new THREE.Vector3(...ecef(q[0], q[1], q[2])));
             const ground = tr.map((q) => new THREE.Vector3(...ecef(q[0], q[1], 8)));
@@ -1122,7 +782,7 @@
 
         function globeFrame() {
             const G = globe;
-            if (view !== "globe" || document.hidden) { G.raf = 0; return; }
+            if (document.hidden) { G.raf = 0; return; }
             G.raf = requestAnimationFrame(globeFrame);
             const now = nowS(), dt = Math.min(now - G.t, 0.1);
             G.t = now;
@@ -1178,33 +838,9 @@
             G.renderer.render(G.scene, G.cam);
         }
 
-        // The render loop runs only while the globe is showing and the tab is visible
+        // The render loop runs only while the tab is visible
         function startGlobe() {
-            if (globe && view === "globe" && !document.hidden && !globe.raf) { globe.t = nowS(); globe.raf = requestAnimationFrame(globeFrame); }
-        }
-
-        // Show the current view (map or globe); the map-only controls hide with the globe
-        function applyView() {
-            let g = view === "globe";
-            $("stage").classList.toggle("globe", g);
-            if (g && !globe) {
-                try { buildGlobe(); } catch (err) {   // no WebGL: stay on the map
-                    console.error("globe:", err);
-                    $("status").textContent = "Globe view unavailable";
-                    view = "map"; setPref("view", view); g = false;
-                    $("stage").classList.remove("globe");
-                }
-            }
-            $("btn-globe").classList.toggle("on", g);
-            if (g) {
-                resizeGlobe();
-                rebuildGlobeTrails();
-                rebuildGlobeTrack();
-                startGlobe();
-            } else {
-                map.resize();
-                map.triggerRepaint();
-            }
+            if (globe && !document.hidden && !globe.raf) { globe.t = nowS(); globe.raf = requestAnimationFrame(globeFrame); }
         }
 
         // ---------------------------------------------------------------- list + info
@@ -1309,7 +945,6 @@
             if (fly && id != null && sats.get(id) && !camMode) setCamMode("track");   // selecting a satellite follows it
             renderList();
             renderInfo();
-            map.triggerRepaint();
         }
 
         function updateCamFoot() {
@@ -1322,11 +957,10 @@
         }
 
         // ---------------------------------------------------------------- controls
-        $("lay-sats").onchange = (e) => { layerOn.sats = e.target.checked; map.triggerRepaint(); };
-        $("lay-tracks").onchange = (e) => { layerOn.tracks = e.target.checked; map.triggerRepaint(); };
+        $("lay-sats").onchange = (e) => { layerOn.sats = e.target.checked; };
+        $("lay-tracks").onchange = (e) => { layerOn.tracks = e.target.checked; };
         $("lay-atmos").checked = layerOn.atmos;
         $("lay-atmos").onchange = (e) => { layerOn.atmos = e.target.checked; setPref("atmos", layerOn.atmos ? "1" : "0"); };
-        $("lay-terrain").onchange = (e) => { layerOn.terrain = e.target.checked; map.setTerrain(e.target.checked ? { source: "dem", exaggeration: 1 } : null); map.triggerRepaint(); };
         $("info-close").onclick = () => select(null);
         $("btn-track").onclick = () => setCamMode("track");
         $("cam-stop").onclick = () => stopCamera();
@@ -1339,23 +973,25 @@
         $("search").oninput = (e) => { query = e.target.value; renderList(); };
         $("sort").value = sortBy;
         $("sort").onchange = (e) => { sortBy = e.target.value; setPref("sort", sortBy); renderList(); };
-        $("btn-base-terrain").classList.remove("on");   // setBase() marks the active one once the style is ready
-        $("btn-base-terrain").onclick = () => setBase("terrain");
-        $("btn-base-google").onclick = () => setBase("google");
-        $("btn-base-sat").onclick = () => setBase("sat");
         $("btn-labels").classList.toggle("on", showLabels);
-        $("btn-labels").onclick = (e) => { showLabels = e.target.classList.toggle("on"); setPref("labels", showLabels ? "1" : "0"); map.triggerRepaint(); };
+        $("btn-labels").onclick = (e) => { showLabels = e.target.classList.toggle("on"); setPref("labels", showLabels ? "1" : "0"); };
         $("btn-home").onclick = () => {
             stopCamera();
-            if (view === "globe") aimGlobe();
-            else if (station) map.easeTo({ center: [station.lon, station.lat], ...HOME_VIEW, duration: 1200 });
+            aimGlobe();
         };
-        $("btn-globe").onclick = () => { stopCamera(); view = view === "globe" ? "map" : "globe"; setPref("view", view); applyView(); };
         if (window.innerWidth <= 700) $("list").classList.add("collapsed");
-        // The map lives in #stage (beside the sidebar), not the window: resize it with its container
-        if (window.ResizeObserver) new ResizeObserver(() => { map.resize(); resizeGlobe(); }).observe($("stage"));
-        document.addEventListener("visibilitychange", startGlobe);
-        applyView();
-        window.satellites3d = { map, sats, layer: satsLayer };   // for inspection from the console
+        // The globe fills #stage (beside the sidebar), not the window: resize it with its container
+        if (window.ResizeObserver) new ResizeObserver(() => resizeGlobe()).observe($("stage"));
+        document.addEventListener("visibilitychange", () => { startGlobe(); if (!document.hidden && Date.now() - lastFetch > POLL_MS) poll(); });
+        try {
+            buildGlobe();
+        } catch (err) {   // no WebGL
+            console.error("globe:", err);
+            $("status").textContent = "Globe view unavailable";
+        }
+        startGlobe();
+        poll();
+        setInterval(() => { if (!document.hidden) poll(); }, POLL_MS);
+        window.satellites3d = { sats, get globe() { return globe; } };   // for inspection from the console
     </script>
 </body>
