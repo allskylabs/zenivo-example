@@ -739,7 +739,7 @@
                 canvas, renderer, scene: gscene, cam: gcam, controls, earthMat, atmos, pointsMat, aimed: false, t: nowS(), raf: 0,
                 pointGeo: pointGeometry(MAX_POINTS), stationGeo: pointGeometry(1), screen: [], trackMeshes: [],
                 trackMats: { orbit: trackMaterial(5, 1.0, true), ground: trackMaterial(3, 0.5, true) },
-                trailsGeo: new THREE.BufferGeometry(), sun: new THREE.Vector3(), pan: new THREE.Vector3(),
+                trailsGeo: new THREE.BufferGeometry(), sun: new THREE.Vector3(), pan: new THREE.Vector3(), lastTarget: new THREE.Vector3(),
             };
             for (const geo of [g.pointGeo, g.stationGeo]) {
                 const pts = new THREE.Points(geo, pointsMat);
@@ -780,6 +780,7 @@
         function aimGlobe() {
             if (!globe || !station) return;
             globe.pan.set(0, 0, 0);
+            globe.controls.target.set(0, 0, 0); globe.lastTarget.set(0, 0, 0);
             globe.cam.position.set(...ecef(station.lat, station.lon, 0)).setLength(GLOBE_DIST);
             globe.controls.update();
             const at = globe.stationGeo.attributes;
@@ -847,6 +848,7 @@
             // Orbit: the selected satellite becomes the centre of rotation, so the viewer can swing around it and
             // look at it from any side; the camera moves with it and the offset the viewer chose is kept
             const orbiting = !!(camMode && sel && sel.fix);
+            G.pan.add(_pd.subVectors(G.controls.target, G.lastTarget));   // a pan the viewer made since the last frame (applied by the controls' own handlers)
             const goal = _goal.copy(G.pan);
             if (orbiting) { const ps = positionAt(sel, now); goal.add(_prev.set(...ecef(ps.lat, ps.lon, ps.h / 1000))); }
             const prevT = _prev.copy(G.controls.target);
@@ -860,9 +862,8 @@
             }
             G.controls.minDistance = orbiting ? SAT_MIN : GLOBE_MIN;
             G.controls.rotateSpeed = Math.max(0.15, Math.min(1, (G.cam.position.length() - R_EARTH) / 14));   // slower close to the ground
-            const tBefore = _prev.copy(G.controls.target);
             G.controls.update();
-            G.pan.add(_pd.subVectors(G.controls.target, tBefore));   // whatever the viewer panned this frame
+            G.lastTarget.copy(G.controls.target);
             G.cam.updateMatrixWorld();
 
             const at = G.pointGeo.attributes, cp = G.cam.position, v = new THREE.Vector3();
