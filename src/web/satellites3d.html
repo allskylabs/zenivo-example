@@ -79,6 +79,7 @@
         #layers { padding: 10px 12px; width: 200px; display: flex; flex-direction: column; gap: 4px; }
         #layers h2 { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
         #layers label { display: flex; justify-content: space-between; align-items: center; min-height: 28px; font-size: 13px; cursor: pointer; }
+        #layers select { background: var(--bg-card-sub); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 2px 6px; font: inherit; font-size: 12px; }
         #layers input { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
         #cam-foot { position: absolute; left: 12px; bottom: 12px; height: 28px; padding: 0 12px; border-radius: 999px; display: none; align-items: center; gap: 8px;
             font: 12px var(--font-mono); color: var(--text-secondary); white-space: nowrap; }
@@ -242,6 +243,9 @@
         <label>Satellites <input type="checkbox" id="lay-sats" checked></label>
         <label>Tracks <input type="checkbox" id="lay-tracks" checked></label>
         <label>Atmosphere <input type="checkbox" id="lay-atmos" checked></label>
+        <label>Coverage <input type="checkbox" id="lay-foot" checked></label>
+        <label title="Lowest elevation at which the satellite counts as seen from the ground">Seen above
+            <select id="foot-el"><option value="0">0°</option><option value="10">10°</option><option value="20">20°</option><option value="30">30°</option></select></label>
     </div>
     </div><!-- #left-col -->
 
@@ -366,7 +370,8 @@
         let camMode = null;   // camera following the selected satellite
         let showLabels = pref("labels", "1") === "1";
         let filter = pref("filter", "above"), sortBy = pref("sort", "alt"), query = "";
-        const layerOn = { sats: true, tracks: true, atmos: pref("atmos", "1") === "1" };
+        const layerOn = { sats: true, tracks: true, atmos: pref("atmos", "1") === "1", foot: pref("foot", "1") === "1" };
+        let footEl = Math.max(0, Math.min(60, Number(pref("footel", "0")) || 0));   // degrees above the horizon
         let globe = null;                   // the globe's three.js state, built at startup
         let lastFetch = 0, inflight = false, again = false;
 
@@ -740,11 +745,11 @@
             pointsMat.uniforms.uDpr.value = renderer.getPixelRatio();
             const g = {
                 canvas, renderer, scene: gscene, cam: gcam, controls, earthMat, atmos, pointsMat, aimed: false, t: nowS(), raf: 0,
-                pointGeo: pointGeometry(MAX_POINTS), stationGeo: pointGeometry(1), screen: [], trackMeshes: [],
+                pointGeo: pointGeometry(MAX_POINTS), stationGeo: pointGeometry(1), shadowGeo: pointGeometry(1), screen: [], trackMeshes: [],
                 trackMats: { orbit: trackMaterial(5, 1.0, true), ground: trackMaterial(3, 0.5, true) },
                 trailsGeo: new THREE.BufferGeometry(), sun: new THREE.Vector3(), pan: new THREE.Vector3(), lastTarget: new THREE.Vector3(),
             };
-            for (const geo of [g.pointGeo, g.stationGeo]) {
+            for (const geo of [g.pointGeo, g.stationGeo, g.shadowGeo]) {
                 const pts = new THREE.Points(geo, pointsMat);
                 pts.frustumCulled = false;
                 gscene.add(pts);
@@ -947,7 +952,7 @@
         const _fa = new THREE.Vector3(), _fb = new THREE.Vector3(), _fs = new THREE.Vector3();
         function setFootprint(G, p) {
             _fs.set(p[0], p[1], p[2]);
-            const rad = _fs.length(), lam = Math.acos(Math.min(1, R_EARTH / rad));
+            const rad = _fs.length(), el = footEl * D2R, lam = Math.max(0.002, Math.acos(Math.min(1, R_EARTH * Math.cos(el) / rad)) - el);   // ground angle out to where it sits `el` above the horizon
             _fs.divideScalar(rad);
             _fa.crossVectors(_fs, Math.abs(_fs.y) > 0.99 ? _fb.set(1, 0, 0) : _fb.set(0, 1, 0)).normalize();
             _fb.crossVectors(_fs, _fa);
@@ -1086,8 +1091,13 @@
                 if (isSel) {
                     G.los.visible = layerOn.sats && !!a.above_horizon && !!station;
                     G.drop.visible = layerOn.sats;
-                    G.footLine.visible = G.footFill.visible = layerOn.sats;
-                    if (layerOn.sats) setFootprint(G, p);
+                    G.footLine.visible = G.footFill.visible = layerOn.sats && layerOn.foot;
+                    if (G.footLine.visible) setFootprint(G, p);
+                    const sh = G.shadowGeo.attributes, sp = ecef(ps.lat, ps.lon, 0.3);   // the satellite's shadow point on the ground
+                    sh.position.setXYZ(0, sp[0], sp[1], sp[2]); sh.aColor.setXYZ(0, 1, 1, 1);
+                    sh.aSize.setX(0, 7); sh.aDim.setX(0, 1); sh.aRing.setX(0, 0);
+                    for (const k of Object.keys(sh)) sh[k].needsUpdate = true;
+                    G.shadowGeo.setDrawRange(0, layerOn.sats ? 1 : 0);
                     const lp = G.los.geometry.attributes.position, dp = G.drop.geometry.attributes.position;
                     if (station) lp.setXYZ(0, ...ecef(station.lat, station.lon, 0.05));
                     lp.setXYZ(1, p[0], p[1], p[2]); lp.needsUpdate = true;
@@ -1095,7 +1105,7 @@
                 }
             }
             placeLabels(cands);
-            if (!sel) G.los.visible = G.drop.visible = G.footLine.visible = G.footFill.visible = false;
+            if (!sel) { G.los.visible = G.drop.visible = G.footLine.visible = G.footFill.visible = false; G.shadowGeo.setDrawRange(0, 0); }
             for (const k of Object.keys(at)) at[k].needsUpdate = true;
             G.pointGeo.setDrawRange(0, n);
             G.screen = screen;
@@ -1231,6 +1241,10 @@
         // ---------------------------------------------------------------- controls
         $("lay-sats").onchange = (e) => { layerOn.sats = e.target.checked; };
         $("lay-tracks").onchange = (e) => { layerOn.tracks = e.target.checked; };
+        $("lay-foot").checked = layerOn.foot;
+        $("lay-foot").onchange = (e) => { layerOn.foot = e.target.checked; setPref("foot", layerOn.foot ? "1" : "0"); };
+        $("foot-el").value = String(footEl);
+        $("foot-el").onchange = (e) => { footEl = Number(e.target.value) || 0; setPref("footel", String(footEl)); };
         $("lay-atmos").checked = layerOn.atmos;
         $("lay-atmos").onchange = (e) => { layerOn.atmos = e.target.checked; setPref("atmos", layerOn.atmos ? "1" : "0"); };
         $("info-close").onclick = () => select(null);
