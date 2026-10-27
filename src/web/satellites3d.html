@@ -112,14 +112,17 @@
         #cam-badge.show { display: flex; }
         #cam-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444; animation: blink 1.2s infinite; }
         @keyframes blink { 50% { opacity: 0.3; } }
-        #list-toggle { display: none; }
+        #list-toggle, #left-toggle { display: none; }
         @media (max-width: 700px) {
             #left-col { right: 12px; }
+            #left-toggle { display: inline-block; min-height: 28px; margin-left: auto; }
+            #left-col.collapsed #top > :not(:first-child), #left-col.collapsed #layers { display: none; }
+            #top h1 { font-size: 14px; }
             #cam-foot { display: none !important; }
             #list { top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 50vh; }
             #list.collapsed ul, #list.collapsed #list-tools { display: none; }
             #list-toggle { display: inline-block; }
-            #info { bottom: auto; top: 150px; right: 12px; width: auto; max-height: 40vh; }
+            #info { bottom: 70px; top: auto; right: 12px; width: auto; max-height: 40vh; }
             #cam-badge { top: auto; bottom: 12px; }
         }
     </style>
@@ -191,6 +194,7 @@
         <div class="row">
             <h1>Satellites 3D</h1>
             <span id="status">Loading…</span>
+            <button id="left-toggle" title="Show / hide panels">▾</button>
         </div>
         <div class="row"><span id="sky"></span><span id="tle"></span></div>
         <div class="btns">
@@ -976,6 +980,7 @@
         $("info-close").onclick = () => select(null);
         $("btn-track").onclick = () => setCamMode("track");
         $("cam-stop").onclick = () => stopCamera();
+        $("left-toggle").onclick = () => $("left-col").classList.toggle("collapsed");
         $("list-toggle").onclick = () => $("list").classList.toggle("collapsed");
         $("filters").onclick = (e) => {
             const b = e.target.closest("button[data-filter]");
@@ -991,7 +996,7 @@
             stopCamera();
             aimGlobe();
         };
-        if (window.innerWidth <= 700) $("list").classList.add("collapsed");
+        if (window.innerWidth <= 700) { $("list").classList.add("collapsed"); $("left-col").classList.add("collapsed"); }
         // The globe fills #stage (beside the sidebar), not the window: resize it with its container
         if (window.ResizeObserver) new ResizeObserver(() => resizeGlobe()).observe($("stage"));
         document.addEventListener("visibilitychange", () => { startGlobe(); if (!document.hidden && Date.now() - lastFetch > POLL_MS) poll(); });
