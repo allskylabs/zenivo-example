@@ -25,6 +25,13 @@
             font: 600 12px/1.25 var(--font-mono); color: var(--text-primary); text-shadow: 0 1px 3px #000, 0 0 2px #000;
             padding: 1px 4px; border-radius: 4px; user-select: none;
         }
+        #me { position: absolute; width: 0; height: 0; display: none; pointer-events: none; }
+        #me i { position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%; background: #a3e635;
+            border: 2px solid #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.5), 0 0 10px #a3e635; box-sizing: border-box; }
+        #me i::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; border: 2px solid #a3e635; opacity: 0; animation: me-ping 2s ease-out infinite; }
+        #me b { position: absolute; left: 0; top: -12px; transform: translate(-50%, -100%); white-space: nowrap; font: 700 12px/1 var(--font-mono);
+            color: #d9f99d; text-shadow: 0 1px 3px #000, 0 0 2px #000; }
+        @keyframes me-ping { from { transform: scale(0.5); opacity: 0.9; } to { transform: scale(1.8); opacity: 0; } }
         .sat-label small { display: block; font-weight: 400; color: var(--text-secondary); }
         .sat-label.below { opacity: 0.55; }
         .sat-label.visible { color: #22d3ee; }
@@ -217,7 +224,7 @@
 
     <div id="stage">
     <canvas id="globe"></canvas>
-    <div id="labels"></div>
+    <div id="labels"><div id="me"><i></i><b>You</b></div></div>
 
     <div id="left-col" class="collapsed">
     <div id="top" class="panel">
@@ -364,7 +371,7 @@
         const km = (v) => `${Math.round(v).toLocaleString()} km`;
         const stateOf = (a) => (a.visible ? "visible" : a.sunlit ? "sunlit" : "shadow");
 
-        let station = null, camera = null, sunAlt = null;
+        let station = null, camera = null, sunAlt = null, me = null;   // me: the viewer's own position [lat, lon], from the browser
         const sats = new Map();             // norad -> state
         let selected = null;
         let camMode = null;   // camera following the selected satellite
@@ -867,9 +874,13 @@
             bindGlobeInput(g);
             g.aimed = !!home;
             globe = g;
-            if (!home && navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition((pos) => { if (globe && !globe.aimed) aimAt(pos.coords.latitude, pos.coords.longitude); },
-                    () => { /* refused or unavailable: the station is used */ }, { timeout: 6000, maximumAge: 3600000 });
+            try { const m = JSON.parse(pref("me", "null")); if (Array.isArray(m) && isFinite(m[0]) && isFinite(m[1])) me = m; } catch (e) { /* none */ }
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    me = [pos.coords.latitude, pos.coords.longitude];
+                    setPref("me", JSON.stringify([+me[0].toFixed(3), +me[1].toFixed(3)]));
+                    if (globe && !globe.aimed) aimAt(me[0], me[1]);
+                }, () => { /* refused or unavailable: the station is used */ }, { timeout: 6000, maximumAge: 3600000 });
             }
             resizeGlobe();
         }
@@ -1196,6 +1207,16 @@
                 }
             }
             placeLabels(cands);
+            const mp = me || (station ? [station.lat, station.lon] : null), meEl = $("me");   // the viewer's own spot, else the station
+            let meShown = false;
+            if (mp) {
+                v.set(...ecef(mp[0], mp[1], 0.05));
+                if (!occluded(v, cp)) {
+                    v.project(G.cam);
+                    if (v.z < 1) { meEl.style.left = (v.x + 1) / 2 * W + "px"; meEl.style.top = (1 - v.y) / 2 * H + "px"; meShown = true; }
+                }
+            }
+            meEl.style.display = meShown ? "block" : "none";
             if (!sel) { G.los.visible = G.drop.visible = G.footLine.visible = G.footFill.visible = false; G.shadowGeo.setDrawRange(0, 0); }
             for (const k of Object.keys(at)) at[k].needsUpdate = true;
             G.pointGeo.setDrawRange(0, n);
