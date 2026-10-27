@@ -33,9 +33,11 @@ from typing import Any, Dict, Optional, Sequence, Tuple
 import cv2
 import numpy as np
 
+from src.analytics.star_clarity import star_clarity
 from src.analytics.stars_clouds import detect_stars_blob
 from src.pipeline.star_boost import sky_polygon_mask
 
+CLEAR_STAR_FRACTION = 0.75       # share of expected catalogue stars still seen on the clearest nights here
 WORK_WIDTH = 160                  # clouds are large; more pixels add noise and CPU, not information
 STAMP_BOX = (0.0, 0.0, 0.2, 0.1)  # info stamp in the top-left corner of archived / viewer frames
 COLOUR_MARGIN_NIGHT = 0.04        # log(B/R) drop below the clear-sky surface that counts as cloud
@@ -269,6 +271,7 @@ def analyze_cloud_cover(
     reference: Optional[CloudReference] = None,
     sky_polygons: Optional[dict] = None,
     count_stars: bool = True,
+    star_ref: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Estimate cloud cover of one frame.
@@ -281,6 +284,9 @@ def analyze_cloud_cover(
         reference: learned clear-sky template, updated in place on dark nights (None: no template).
         sky_polygons: station sky mask ({"sky": [...], "obstruction": [...]} in frame fractions).
         count_stars: at night also count the stars in the sky (reported only).
+        star_ref: {"solution", "lat", "lon", "when"} (star-solved pointing, station, aware datetime). At night
+            the catalogue stars that should be visible are looked for; a sky showing far fewer than expected
+            (thin cloud, haze, a uniform overcast the colour map cannot see) raises the cloud cover.
 
     Returns:
         dict with cloud_cover_pct (None when the frame cannot be judged), status, method
@@ -321,6 +327,16 @@ def analyze_cloud_cover(
         mh, mw = valid.shape
         result["star_count"] = sum(
             1 for s in stars if valid[min(mh - 1, int(s["y"] * mh / fh)), min(mw - 1, int(s["x"] * mw / fw))])
+
+    if star_ref is not None and sun_elev < -12.0:
+        try:
+            sc = star_clarity(frame, star_ref["solution"], star_ref["lat"], star_ref["lon"], star_ref["when"], valid)
+            result.update(stars_expected=sc["expected"], stars_seen=sc["seen"], star_clarity=sc["clarity"])
+            if sc["clarity"] is not None:
+                # A clear sky shows about CLEAR_STAR_FRACTION of the catalogue stars above the glow
+                cc = max(cc, max(0.0, 1.0 - sc["clarity"] / CLEAR_STAR_FRACTION))
+        except Exception:
+            pass
 
     confidence = 0.85 if night else 0.75
     if not learned:

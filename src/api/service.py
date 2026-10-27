@@ -828,7 +828,7 @@ class AllSkyService:
             analysis_frame = cv2.resize(frame, (aw, max(1, round(h * aw / w))), interpolation=cv2.INTER_AREA) if w > aw else frame
             stats = analyze_cloud_cover(
                 analysis_frame, exposure_s, gain_db, sun_elev, roi=self.sky_roi, reference=self.cloud_reference,
-                sky_polygons=self.station_config.get("sky_mask"),
+                sky_polygons=self.station_config.get("sky_mask"), star_ref=self._star_ref(),
             )
         except Exception:
             stats = {"star_count": 0, "cloud_cover_pct": None, "status": "unknown", "method": "", "confidence": 0.0}
@@ -2288,6 +2288,14 @@ class AllSkyService:
         c = self.get_adsb_config()
         self.activity.info("events", f"ADS-B flight matching: {c['host']}:{c['port']}" if c["enabled"] else "ADS-B flight matching off")
         return {"success": True, **c}
+
+    def _star_ref(self) -> Optional[Dict[str, Any]]:
+        """Solved pointing + station + now, for the star-visibility part of the cloud estimate."""
+        sol = self.station_config.get("bright_star_solution") or {}
+        if not sol.get("success"):
+            return None
+        return {"solution": sol, "lat": self.auto_exposure.lat, "lon": self.auto_exposure.lon,
+                "when": datetime.now().astimezone()}
 
     def _overlay_solution(self) -> Optional[Dict[str, Any]]:
         """Star-solved camera pointing for sky overlays, with the manual boresight correction applied."""
