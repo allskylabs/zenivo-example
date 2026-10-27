@@ -631,6 +631,7 @@
 
         document.addEventListener("keydown", (e) => {
             if (e.key !== "Escape") return;
+            if (globe && globe.walk) { exitWalk(globe); return; }
             if (!camMode) select(null);   // a second Esc deselects
             stopCamera();
         });
@@ -704,7 +705,8 @@
             gcam.position.set(GLOBE_DIST, 0, 0);
             const controls = new OrbitControls(gcam, canvas);
             Object.assign(controls, { enablePan: true, screenSpacePanning: true, minDistance: GLOBE_MIN, maxDistance: GLOBE_MAX, zoomSpeed: 0.8 });
-            controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;   // right-drag (or Ctrl/Shift + left-drag) pans; the pan offset is kept in G.pan
+            controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;   // right-drag (or Shift + left-drag) pans; the pan offset is kept in G.pan
+            canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
             // Earth: day / night-lights textures blended by the sun; a plain dark-blue sphere until (or unless) they load
             const blank = (r, g, b) => { const t = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1); t.needsUpdate = true; return t; };
@@ -762,8 +764,101 @@
                 if (id === selected) id = null;   // clicking the selected satellite again deselects it
                 select(id, true);
             });
+            bindGlobeInput(g);
             globe = g;
             resizeGlobe();
+        }
+
+        // Ctrl + left-drag turns the camera on the spot (the view target swings round the camera). Scrolling in past
+        // the closest orbit lowers the camera towards the ground (ground view: look with left-drag, walk with right-drag,
+        // scroll out or Esc to leave)
+        const WALK_H0 = GLOBE_MIN - R_EARTH, WALK_HMIN = 0.0005;   // altitudes, 1 unit = 1000 km
+        const _wn = new THREE.Vector3(), _we = new THREE.Vector3(), _wf = new THREE.Vector3(), _wt = new THREE.Vector3();
+        function walkBasis(w) {   // _wn = north, _we = east at the camera's spot
+            _wn.set(0, 1, 0).addScaledVector(w.u, -w.u.y);
+            if (_wn.lengthSq() < 1e-8) _wn.set(1, 0, 0).addScaledVector(w.u, -w.u.x);   // at a pole
+            _wn.normalize();
+            _we.crossVectors(_wn, w.u);
+        }
+        function walkPitch(w) {   // looking straight down at the top, near the horizon at the bottom
+            const t = Math.min(1, Math.max(0, Math.log(w.h / WALK_H0) / Math.log(WALK_HMIN / WALK_H0)));
+            return Math.max(-1.5, Math.min(1.5, -Math.PI / 2 + t * 1.3 + w.dp));
+        }
+        function enterWalk(g) {
+            const p = g.cam.position, w = { u: p.clone().normalize(), h: Math.max(WALK_HMIN, p.length() - R_EARTH), yaw: 0, dp: 0 };
+            walkBasis(w);
+            _wf.set(0, 1, 0).applyQuaternion(g.cam.quaternion);   // the screen's up direction keeps pointing the same way
+            w.yaw = Math.atan2(_wf.dot(_we), _wf.dot(_wn));
+            g.walk = w;
+            g.controls.enabled = false;
+        }
+        function exitWalk(g) {
+            if (!g.walk) return;
+            g.cam.position.copy(g.walk.u).multiplyScalar(R_EARTH + WALK_H0);
+            g.walk = null;
+            g.cam.up.set(0, 1, 0);
+            g.cam.near = 0.1; g.cam.updateProjectionMatrix();
+            g.pan.set(0, 0, 0); g.controls.target.set(0, 0, 0); g.lastTarget.set(0, 0, 0);
+            g.controls.enabled = true;
+            g.controls.update();
+        }
+        function walkFrame(G) {
+            const w = G.walk, pitch = walkPitch(w), cp = Math.cos(pitch);
+            walkBasis(w);
+            _wf.set(0, 0, 0).addScaledVector(_wn, cp * Math.cos(w.yaw)).addScaledVector(_we, cp * Math.sin(w.yaw)).addScaledVector(w.u, Math.sin(pitch));
+            G.cam.position.copy(w.u).multiplyScalar(R_EARTH + w.h);
+            G.cam.up.copy(w.u);
+            G.cam.lookAt(_wt.copy(G.cam.position).add(_wf));
+            const near = Math.max(1e-4, w.h * 0.1);
+            if (Math.abs(near - G.cam.near) > 1e-9) { G.cam.near = near; G.cam.updateProjectionMatrix(); }
+            G.cam.updateMatrixWorld();
+        }
+        function bindGlobeInput(g) {
+            const el = g.canvas.parentElement || g.canvas, LOOK = 0.003;
+            let drag = null;
+            el.addEventListener("wheel", (e) => {
+                if (!g.walk) {
+                    const closest = g.controls.target.lengthSq() < 0.25 && g.cam.position.distanceTo(g.controls.target) <= GLOBE_MIN * 1.03;
+                    if (e.deltaY >= 0 || !closest || (camMode && selected != null)) return;
+                    enterWalk(g);
+                }
+                e.preventDefault(); e.stopImmediatePropagation();
+                const w = g.walk;
+                w.h *= Math.exp(e.deltaY * 0.0025);
+                if (w.h >= WALK_H0) { exitWalk(g); return; }
+                w.h = Math.max(WALK_HMIN, w.h);
+            }, { passive: false, capture: true });
+            el.addEventListener("pointerdown", (e) => {
+                const look = e.button === 0 && (g.walk || e.ctrlKey), move = !!g.walk && e.button === 2;
+                if (!look && !move) return;
+                e.stopImmediatePropagation();
+                drag = { x: e.clientX, y: e.clientY, move };
+                g.down = [e.clientX, e.clientY]; g.zoomTo = null;
+                try { e.target.setPointerCapture(e.pointerId); } catch (_) { /* not capturable */ }
+            }, true);
+            window.addEventListener("pointermove", (e) => {
+                if (!drag) return;
+                const dx = e.clientX - drag.x, dy = e.clientY - drag.y, w = g.walk;
+                drag.x = e.clientX; drag.y = e.clientY;
+                if (w && drag.move) {   // walk over the ground: drag up = forward, sideways = strafe
+                    walkBasis(w);
+                    _wf.set(0, 0, 0).addScaledVector(_wn, Math.cos(w.yaw)).addScaledVector(_we, Math.sin(w.yaw));
+                    _wt.crossVectors(_wf, w.u);
+                    const step = Math.max(w.h, 0.002) * 0.004 / R_EARTH;
+                    w.u.addScaledVector(_wf, -dy * step).addScaledVector(_wt, dx * step).normalize();
+                } else if (w) {
+                    w.yaw -= dx * LOOK; w.dp += dy * LOOK;
+                } else {   // turn on the spot: the view target swings round the camera
+                    _wf.copy(g.controls.target).sub(g.cam.position);
+                    _wn.set(0, 1, 0).applyQuaternion(g.cam.quaternion);
+                    _we.set(1, 0, 0).applyQuaternion(g.cam.quaternion);
+                    _wf.applyAxisAngle(_wn, dx * LOOK).applyAxisAngle(_we, dy * LOOK);
+                    g.controls.target.copy(g.cam.position).add(_wf);
+                }
+            });
+            const end = () => { drag = null; };
+            window.addEventListener("pointerup", end);
+            window.addEventListener("pointercancel", end);
         }
 
         function resizeGlobe() {
@@ -779,6 +874,7 @@
         // Swing the camera over the station, at the default distance
         function aimGlobe() {
             if (!globe || !station) return;
+            exitWalk(globe);
             globe.pan.set(0, 0, 0);
             globe.controls.target.set(0, 0, 0); globe.lastTarget.set(0, 0, 0);
             globe.cam.position.set(...ecef(station.lat, station.lon, 0)).setLength(GLOBE_DIST);
@@ -848,6 +944,7 @@
             // Orbit: the selected satellite becomes the centre of rotation, so the viewer can swing around it and
             // look at it from any side; the camera moves with it and the offset the viewer chose is kept
             const orbiting = !!(camMode && sel && sel.fix);
+            if (G.walk) walkFrame(G); else {
             G.pan.add(_pd.subVectors(G.controls.target, G.lastTarget));   // a pan the viewer made since the last frame (applied by the controls' own handlers)
             const goal = _goal.copy(G.pan);
             if (orbiting) { const ps = positionAt(sel, now); goal.add(_prev.set(...ecef(ps.lat, ps.lon, ps.h / 1000))); }
@@ -865,6 +962,7 @@
             G.controls.update();
             G.lastTarget.copy(G.controls.target);
             G.cam.updateMatrixWorld();
+            }
 
             const at = G.pointGeo.attributes, cp = G.cam.position, v = new THREE.Vector3();
             const screen = [], cands = [];
@@ -1004,7 +1102,7 @@
         function select(id, fly = false) {
             const prev = selected;
             selected = id;
-            if (id !== prev) { if (globe) globe.pan.set(0, 0, 0); stopCamera(); rebuildTrack(); poll(); }   // the next poll brings the new selection's track
+            if (id !== prev) { if (globe) { exitWalk(globe); globe.pan.set(0, 0, 0); } stopCamera(); rebuildTrack(); poll(); }   // the next poll brings the new selection's track
             for (const k of [prev, id]) {
                 const s = k != null && sats.get(k);
                 if (!s) continue;
