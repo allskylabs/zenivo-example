@@ -345,7 +345,7 @@
         // trail and the selected one's track drawn in 3D. Orbits come from /api/satellites (CelesTrak TLEs, SGP4 on the server).
         const POLL_MS = 2000;
         const TRACK_MIN = 90;         // minutes of future track requested for the selected satellite
-        const TRAIL_S = 600;          // seconds of recent path requested for every satellite (shows its direction of travel)
+        const TRAIL_S = 1800;         // seconds of recent path requested for every satellite (shows its direction of travel)
         const TRACK_STEP_S = 30;      // sample spacing of the server's track
         const MAX_EXTRAP_S = 6;       // dead-reckoning limit between polls
         const PREF = "allsky.satellites3d.";
