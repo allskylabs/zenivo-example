@@ -480,18 +480,18 @@
                 gl_Position = c;
             }`;
         const TRACK_FS = `
-            uniform float uNow; uniform float uT0; uniform float uTail; uniform float uBright; varying float vT; varying float vSide; varying float vVis;
+            uniform float uNow; uniform float uT0; uniform float uTail; uniform float uAhead; uniform float uBright; varying float vT; varying float vSide; varying float vVis;
             void main() {
                 bool ahead = vT > uNow;
                 float tail = clamp((vT - uT0) / max(uTail * (uNow - uT0), 1.0), 0.0, 1.0);
                 if (ahead && mod(vT, 36.0) > 13.0) discard;   // short dashes where the satellite has yet to go: a prediction, not an observation
                 float edge = 1.0 - abs(vSide);
                 vec3 col = vVis > 0.5 ? vec3(0.13, 0.83, 0.93) : vec3(0.52, 0.6, 0.74);
-                float far = 1.0 - 0.75 * smoothstep(600.0, 4800.0, vT - uNow);   // the further ahead, the less certain: fainter
+                float far = 1.0 - uAhead * smoothstep(300.0, 4800.0, vT - uNow);   // the further ahead, the less certain: fainter
                 float a = (ahead ? 0.7 * far : 0.6) * (vVis > 0.5 ? 1.0 : 0.7) * smoothstep(0.0, 0.7, edge) * uBright * smoothstep(0.0, 1.0, tail);
                 gl_FragColor = vec4(col * (0.75 + 0.5 * edge), a);
             }`;
-        function trackMaterial(width, bright, depthTest = false, tail = 0.45, ahead = 1.0) {   // tail: share of the flown path over which its old end tapers
+        function trackMaterial(width, bright, depthTest = false, tail = 0.45, ahead = 0.75) {   // tail: share of the flown path over which its old end tapers; ahead: how much the forecast fades towards its end
             return new THREE.ShaderMaterial({
                 vertexShader: TRACK_VS, fragmentShader: TRACK_FS, transparent: true, depthWrite: false, depthTest,
                 side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
@@ -872,7 +872,7 @@
             const g = {
                 canvas, renderer, scene: gscene, cam: gcam, controls, earthMat, atmos, pointsMat, aimed: false, t: nowS(), raf: 0,
                 pointGeo: pointGeometry(MAX_POINTS), stationGeo: pointGeometry(1), shadowGeo: pointGeometry(1), screen: [], trackMeshes: [],
-                trackMats: { orbit: trackMaterial(7, 1.7, true), ground: trackMaterial(4.5, 1.4, true, 0.15) },
+                trackMats: { orbit: trackMaterial(7, 1.7, true), ground: trackMaterial(3.5, 0.75, true, 0.15, 0.9) },
                 trailsGeo: new THREE.BufferGeometry(), sun: new THREE.Vector3(), pan: new THREE.Vector3(), lastTarget: new THREE.Vector3(),
             };
             for (const geo of [g.pointGeo, g.stationGeo, g.shadowGeo]) {
