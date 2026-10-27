@@ -371,6 +371,7 @@
         let lastFetch = 0, inflight = false, again = false;
 
         // ---------------------------------------------------------------- three.js shared materials
+        const FOOT_N = 128, FOOT_RINGS = 10;
         const LOS_MAT = new THREE.LineBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.8, depthTest: false });
         const DROP_MAT = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthTest: false });
         const line2 = (mat, parent) => {
@@ -754,6 +755,20 @@
             gscene.add(g.trails);
             g.los = line2(solid(LOS_MAT), gscene);
             g.drop = line2(solid(DROP_MAT), gscene);
+            // Footprint of the selected satellite: the ground it can see (down to the horizon), as an outline and a faint fill
+            const ring = (n) => new THREE.BufferAttribute(new Float32Array(n * 3), 3);
+            g.footLine = new THREE.LineLoop(new THREE.BufferGeometry().setAttribute("position", ring(FOOT_N)),
+                new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.95 }));
+            const fillIdx = [];
+            for (let r = 0; r < FOOT_RINGS; r++) for (let i = 0; i < FOOT_N; i++) {
+                const a0 = 1 + r * FOOT_N + i, a1 = 1 + r * FOOT_N + (i + 1) % FOOT_N;
+                if (r === 0) fillIdx.push(0, a0, a1);
+                else { const b0 = a0 - FOOT_N, b1 = a1 - FOOT_N; fillIdx.push(b0, a0, a1, b0, a1, b1); }
+            }
+            g.footFill = new THREE.Mesh(new THREE.BufferGeometry().setAttribute("position", ring(1 + FOOT_RINGS * FOOT_N)).setIndex(fillIdx),
+                new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide,
+                    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+            for (const m of [g.footLine, g.footFill]) { m.frustumCulled = false; m.visible = false; gscene.add(m); }
 
             canvas.addEventListener("pointerdown", (e) => { g.down = [e.clientX, e.clientY]; g.zoomTo = null; });   // the viewer takes over the zoom
             canvas.addEventListener("click", (e) => {
@@ -928,6 +943,28 @@
             window.addEventListener("pointercancel", end);
         }
 
+        // Ground a satellite at position p (scene units) can see: a spherical cap around its sub-point out to the horizon
+        const _fa = new THREE.Vector3(), _fb = new THREE.Vector3(), _fs = new THREE.Vector3();
+        function setFootprint(G, p) {
+            _fs.set(p[0], p[1], p[2]);
+            const rad = _fs.length(), lam = Math.acos(Math.min(1, R_EARTH / rad));
+            _fs.divideScalar(rad);
+            _fa.crossVectors(_fs, Math.abs(_fs.y) > 0.99 ? _fb.set(1, 0, 0) : _fb.set(0, 1, 0)).normalize();
+            _fb.crossVectors(_fs, _fa);
+            const R = R_EARTH * 1.0012, lp = G.footLine.geometry.attributes.position, fp = G.footFill.geometry.attributes.position;
+            fp.setXYZ(0, _fs.x * R, _fs.y * R, _fs.z * R);
+            for (let r = 0; r < FOOT_RINGS; r++) {
+                const ang = lam * (r + 1) / FOOT_RINGS, c = Math.cos(ang) * R, sn = Math.sin(ang) * R;
+                for (let i = 0; i < FOOT_N; i++) {
+                    const ph = i / FOOT_N * 2 * Math.PI, ca = Math.cos(ph), sa = Math.sin(ph);
+                    const x = _fs.x * c + (_fa.x * ca + _fb.x * sa) * sn, y = _fs.y * c + (_fa.y * ca + _fb.y * sa) * sn, z = _fs.z * c + (_fa.z * ca + _fb.z * sa) * sn;
+                    fp.setXYZ(1 + r * FOOT_N + i, x, y, z);
+                    if (r === FOOT_RINGS - 1) lp.setXYZ(i, x, y, z);
+                }
+            }
+            lp.needsUpdate = fp.needsUpdate = true;
+        }
+
         function resizeGlobe() {
             if (!globe) return;
             const W = $("stage").clientWidth, H = $("stage").clientHeight;
@@ -1049,6 +1086,8 @@
                 if (isSel) {
                     G.los.visible = layerOn.sats && !!a.above_horizon && !!station;
                     G.drop.visible = layerOn.sats;
+                    G.footLine.visible = G.footFill.visible = layerOn.sats;
+                    if (layerOn.sats) setFootprint(G, p);
                     const lp = G.los.geometry.attributes.position, dp = G.drop.geometry.attributes.position;
                     if (station) lp.setXYZ(0, ...ecef(station.lat, station.lon, 0.05));
                     lp.setXYZ(1, p[0], p[1], p[2]); lp.needsUpdate = true;
@@ -1056,7 +1095,7 @@
                 }
             }
             placeLabels(cands);
-            if (!sel) G.los.visible = G.drop.visible = false;
+            if (!sel) G.los.visible = G.drop.visible = G.footLine.visible = G.footFill.visible = false;
             for (const k of Object.keys(at)) at[k].needsUpdate = true;
             G.pointGeo.setDrawRange(0, n);
             G.screen = screen;
