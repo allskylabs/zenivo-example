@@ -265,9 +265,11 @@
         <label>Coverage <input type="checkbox" id="lay-foot" checked></label>
         <label title="Lowest elevation at which the satellite counts as seen from the ground">Seen above
             <select id="foot-el"><option value="0">0°</option><option value="10">10°</option><option value="20">20°</option><option value="30">30°</option></select></label>
+        <label title="Earth: the path as seen from the ground (what you observe). Space: the true orbit, a fixed ellipse">Sky lines
+            <select id="frame-sel"><option value="earth">Seen from Earth</option><option value="space">In space</option></select></label>
         <details>
             <summary>Why are there two lines?</summary>
-            <p><b>Orbit</b> (bright, in the sky): a satellite flies one ellipse that stays fixed in space, so each lap lies exactly on the last.</p>
+            <p><b>Sky lines</b> choose how the bright line is drawn. <i>In space</i> is the true orbit: one ellipse fixed in space, each lap lying exactly on the last. <i>Seen from Earth</i> is the path an observer on the ground sees, which is what a pass looks like from here: the Earth keeps turning, so it never repeats.</p>
             <p><b>Ground track</b> (thin, on the Earth): the Earth turns under that ellipse, 15° an hour, so one lap (~93 min for the ISS) later the satellite passes about 23° further west. Laps never overlap and the lines look as if they cross, yet nothing ever crosses its own orbit. The two lines show different moments: the dots tell how many minutes ahead each point is.</p>
         </details>
     </div>
@@ -768,6 +770,10 @@
         // in it drifts west by this much per second; an orbit shown "as it is in space" is the path with that drift taken out
         const EARTH_RATE = 360.9856 / 86400 * D2R;   // rad/s, one sidereal turn
         const inertialLon = (lon, tSample, tNow) => lon + EARTH_RATE / D2R * (tSample - tNow);   // where a point seen at tSample sits now, if it stayed fixed in space
+        // Which frame the sky lines are drawn in. "earth": the path as an observer on the ground sees it (what a pass looks like from
+        // here, laps drift west); "space": the orbit as it truly is (a fixed ellipse, laps lie on each other)
+        let inSpace = pref("frame", "earth") === "space";
+        const frameLon = (lon, tSample, tNow) => (inSpace ? inertialLon(lon, tSample, tNow) : lon);
         function ecef(lat, lon, hKm) {
             const r = R_EARTH + hKm / 1000, la = lat * D2R, lo = lon * D2R;
             return [r * Math.cos(la) * Math.cos(lo), r * Math.sin(la), -r * Math.cos(la) * Math.sin(lo)];
@@ -1153,7 +1159,7 @@
             const chains = [];
             for (const s of sats.values()) {
                 const tn = nowS();
-                const tr = s.trailBase && s.a && [...s.trailBase.map((q) => [q[0], inertialLon(q[1], s.trailT + q[3], tn), q[2]]), [s.a.lat, s.a.lon, s.a.height_km, 0]];
+                const tr = s.trailBase && s.a && [...s.trailBase.map((q) => [q[0], frameLon(q[1], s.trailT + q[3], tn), q[2]]), [s.a.lat, s.a.lon, s.a.height_km, 0]];
                 if (!tr || tr.length < 3) continue;
                 const [mk, gain] = trailStyle(s);
                 chains.push({ pts: smoothPath(tr.map((q) => new THREE.Vector3(...ecef(q[0], q[1], q[2]))), 4), rgb: [mk.rgb[0] * gain, mk.rgb[1] * gain, mk.rgb[2] * gain] });
@@ -1179,7 +1185,7 @@
             for (const mt of Object.values(globe.trackMats)) mt.uniforms.uT0.value = T[0];
             const tb = nowS();   // the orbit is drawn as the ellipse it is in space (a closed loop), turned with the Earth each frame
             const oi = tr.map((q, i) => i).filter((i) => tr[i][3] <= SKY_AHEAD_S);
-            const orbit = oi.map((i) => new THREE.Vector3(...ecef(tr[i][0], inertialLon(tr[i][1], T[i], tb), tr[i][2])));
+            const orbit = oi.map((i) => new THREE.Vector3(...ecef(tr[i][0], frameLon(tr[i][1], T[i], tb), tr[i][2])));
             globe.orbitT = tb;
             // How much of the path ahead is drawn on the Earth
             const gi = tr.map((q, i) => i).filter((i) => tr[i][3] <= GROUND_AHEAD_S);
@@ -1289,8 +1295,8 @@
             G.pointGeo.setDrawRange(0, n);
             G.screen = screen;
             for (const mesh of G.trackMeshes) mesh.visible = layerOn.tracks;
-            if (G.trackMeshes[0]) G.trackMeshes[0].rotation.y = -EARTH_RATE * (now - G.orbitT);   // the sky path stays fixed in space
-            G.trails.rotation.y = -EARTH_RATE * (now - (G.trailsT || now));
+            if (G.trackMeshes[0]) G.trackMeshes[0].rotation.y = inSpace ? -EARTH_RATE * (now - G.orbitT) : 0;   // in space: the sky path stays fixed while the Earth turns
+            G.trails.rotation.y = inSpace ? -EARTH_RATE * (now - (G.trailsT || now)) : 0;
             for (const t of G.ticks || []) {
                 const m = G.trackMeshes[t.mesh];
                 let on = false;
@@ -1440,6 +1446,8 @@
         $("lay-tracks").onchange = (e) => { layerOn.tracks = e.target.checked; };
         $("lay-foot").checked = layerOn.foot;
         $("lay-foot").onchange = (e) => { layerOn.foot = e.target.checked; setPref("foot", layerOn.foot ? "1" : "0"); };
+        $("frame-sel").value = inSpace ? "space" : "earth";
+        $("frame-sel").onchange = (e) => { inSpace = e.target.value === "space"; setPref("frame", e.target.value); rebuildTrack(); rebuildTrails(); };
         $("foot-el").value = String(footEl);
         $("foot-el").onchange = (e) => { footEl = Number(e.target.value) || 0; setPref("footel", String(footEl)); };
         $("lay-atmos").checked = layerOn.atmos;
