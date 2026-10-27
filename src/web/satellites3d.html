@@ -346,7 +346,7 @@
         const POLL_MS = 2000;
         const TRAIL_EVERY_MS = 30000;
         const TRACK_MIN = 90;         // minutes of future track requested for the selected satellite
-        const TRAIL_S = 1800;         // seconds of recent path requested for every satellite (shows its direction of travel)
+        const TRAIL_S = 1200;         // seconds of recent path requested for every satellite (shows its direction of travel)
         const TRACK_STEP_S = 30;      // sample spacing of the server's track
         const MAX_EXTRAP_S = 6;       // dead-reckoning limit between polls
         const PREF = "allsky.satellites3d.";
@@ -594,12 +594,21 @@
             inflight = true; again = false;
             lastFetch = Date.now();
             const ids = selected != null ? `&ids=${selected}` : "";
-            // The long recent paths are costly to compute: ask for them now and then, the head is kept current from the fast polls
-            const withTrail = Date.now() - lastTrailFetch > TRAIL_EVERY_MS;
-            if (withTrail) lastTrailFetch = Date.now();
-            fetch(`/api/satellites?track=${TRACK_MIN}&below=true&limit=400&trail=${withTrail ? TRAIL_S : 0}${ids}`).then((r) => r.json()).then(update).catch(() => {
+            fetch(`/api/satellites?track=${TRACK_MIN}&below=true&limit=400${ids}`).then((r) => r.json()).then(update).catch(() => {
                 $("status").textContent = "Satellite data unavailable";
             }).finally(() => { inflight = false; if (again) poll(); });
+        }
+
+        // The long recent paths are slow for the server: a request of their own, now and then, that never holds the fast polls up;
+        // each path's head is kept current from those polls
+        let trailsBusy = false;
+        function pollTrails() {
+            if (trailsBusy || document.hidden || !sats.size || Date.now() - lastTrailFetch < TRAIL_EVERY_MS) return;
+            trailsBusy = true; lastTrailFetch = Date.now();
+            fetch(`/api/satellites?below=true&limit=400&trail=${TRAIL_S}`).then((r) => r.json()).then((d) => {
+                for (const a of d.satellites || []) { const s = sats.get(a.norad); if (s && a.trail) s.trailBase = a.trail.slice(0, -1); }
+                rebuildTrails();
+            }).catch(() => { /* the next try */ }).finally(() => { trailsBusy = false; });
         }
 
         function update(d) {
@@ -627,7 +636,6 @@
                 }
                 s.a = a;
                 setFix(s, a, now);
-                if (a.trail) s.trailBase = a.trail.slice(0, -1);   // the server's last point is 'now'; the head comes from this poll's position
                 s.track = a.track || null;
                 s.trackT = now;
                 // Every satellite gets a label; the render loop hides the ones that would overlap a more important one
@@ -1403,7 +1411,7 @@
         }
         startGlobe();
         poll();
-        setInterval(() => { if (!document.hidden) poll(); }, POLL_MS);
+        setInterval(() => { if (!document.hidden) { poll(); pollTrails(); } }, POLL_MS);
         window.satellites3d = { sats, get globe() { return globe; } };   // for inspection from the console
     </script>
 </body>
