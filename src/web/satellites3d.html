@@ -140,7 +140,6 @@
                 <a class="tab-btn side-item" href="/live" data-tab="tab-live"><span class="side-ic">&#9673;</span><span class="side-txt">Live</span></a>
                 <a class="side-item side-link" href="/flights3d"><span class="side-ic">&#9992;</span><span class="side-txt">Flights 3D</span></a>
                 <a class="side-item side-link active" href="/satellites3d" aria-current="page"><span class="side-ic">&#128752;</span><span class="side-txt">Satellites 3D</span></a>
-                <a class="side-item side-link" href="/satellites3d"><span class="side-ic">&#128752;</span><span class="side-txt">Satellites 3D</span></a>
             </div>
             <div class="side-group">
                 <div class="side-group-title">Library</div>
@@ -288,6 +287,7 @@
         // offered when a key is configured. Orbits come from /api/satellites (CelesTrak TLEs, SGP4 on the server).
         const POLL_MS = 2000;
         const TRACK_MIN = 90;         // minutes of future track requested for the selected satellite
+        const TRAIL_S = 600;          // seconds of recent path requested for every satellite (shows its direction of travel)
         const TRACK_STEP_S = 30;      // sample spacing of the server's track
         const MAX_EXTRAP_S = 6;       // dead-reckoning limit between polls
         const HOME_VIEW = { zoom: 2.5, pitch: 45, bearing: 0 };
@@ -593,6 +593,34 @@
             s.trackPts = orbit;
         }
 
+        // Every satellite's recent path as a fading line ending at the satellite, so the direction of travel reads at a glance
+        const trailsGeo = new THREE.BufferGeometry();
+        const trailsMesh = new THREE.LineSegments(trailsGeo, new THREE.LineBasicMaterial({
+            vertexColors: true, transparent: true, depthTest: false, blending: THREE.AdditiveBlending }));
+        trailsMesh.frustumCulled = false;
+        world.add(trailsMesh);
+        function rebuildTrails() {
+            const pos = [], col = [];
+            for (const s of sats.values()) {
+                const tr = s.a && s.a.trail;
+                if (!tr || tr.length < 2) continue;
+                const mk = MARKER[stateOf(s.a)], gain = (s.a.above_horizon ? 1 : 0.35) * mk.dim;
+                let off = 0, prev = tr[0][1];
+                const lons = tr.map((q) => { const d = q[1] - prev; prev = q[1]; if (d > 180) off -= 360; else if (d < -180) off += 360; return q[1] + off; });
+                const shift = 360 * Math.round((s.fix.lon - lons[lons.length - 1]) / 360);
+                for (let i = 0; i + 1 < tr.length; i++) {
+                    for (const j of [i, i + 1]) {
+                        pos.push(...merc(lons[j] + shift, tr[j][0], tr[j][2] * 1000));
+                        const f = (j / (tr.length - 1)) ** 1.5 * gain;
+                        col.push(mk.rgb[0] * f, mk.rgb[1] * f, mk.rgb[2] * f);
+                    }
+                }
+            }
+            trailsGeo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+            trailsGeo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+            trailsGeo.computeBoundingSphere();
+        }
+
         // ---------------------------------------------------------------- station
         function addStationOnMap() {
             const el = document.createElement("div");
@@ -607,7 +635,7 @@
             inflight = true; again = false;
             lastFetch = Date.now();
             const ids = selected != null ? `&ids=${selected}` : "";
-            fetch(`/api/satellites?track=${TRACK_MIN}&below=true&limit=400${ids}`).then((r) => r.json()).then(update).catch(() => {
+            fetch(`/api/satellites?track=${TRACK_MIN}&below=true&limit=400&trail=${TRAIL_S}${ids}`).then((r) => r.json()).then(update).catch(() => {
                 $("status").textContent = "Satellite data unavailable";
             }).finally(() => { inflight = false; if (again) poll(); });
         }
@@ -661,6 +689,7 @@
                 sats.delete(id);
                 if (selected === id) select(null);
             }
+            rebuildTrails();
             if (selected != null) rebuildTrack();
             renderList();
             renderInfo();
@@ -759,6 +788,7 @@
                 for (const k of Object.keys(at)) at[k].needsUpdate = true;
                 pointGeo.setDrawRange(0, n);
                 for (const mesh of trackMeshes) mesh.visible = layerOn.tracks;
+                trailsMesh.visible = layerOn.tracks;
                 this.screen = screen;
                 // Track: the map centre sits on the satellite itself, at its height
                 if (camMode && selected != null && this.selPos && !camPending) {

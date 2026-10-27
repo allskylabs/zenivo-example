@@ -162,7 +162,7 @@ class SatelliteTracker:
 
     def current(self, station: Dict[str, float], solution: Optional[Dict[str, Any]] = None,
                 when: Optional[datetime] = None, track_min: float = 0.0, track_for: int = 8,
-                include_below: bool = False, track_ids: Optional[set] = None) -> Dict[str, Any]:
+                include_below: bool = False, track_ids: Optional[set] = None, trail_s: float = 0.0) -> Dict[str, Any]:
         """Satellites above the horizon now: az/alt, range, whether sunlit, and frame position. With
         track_min, the first track_for of them (highest first) also get their path from 5 minutes ago to
         track_min minutes ahead as [[lat, lon, height_km, seconds_from_now, alt_deg, visible], ...]."""
@@ -188,6 +188,18 @@ class SatelliteTracker:
                 rec["frame_xy"] = xy
             out.append(rec)
         out.sort(key=lambda s: (not s.get("frame_xy"), not s["visible"], -s["alt_deg"]))
+        if trail_s > 0:
+            # Recent path of every listed satellite as [[lat, lon, height_km, seconds_from_now], ...], oldest first
+            by_norad = {int(sat.satnum): sat for _n, _g, sat in sats}
+            trails: Dict[int, List[List[float]]] = {r["norad"]: [] for r in out}
+            for dt in range(-int(trail_s) // 30 * 30, 0, 30):
+                ci = self._context(station, when + timedelta(seconds=dt))
+                for r in out:
+                    st = self._state(ci, by_norad[r["norad"]])
+                    if st is not None:
+                        trails[r["norad"]].append([round(st["lat"], 3), round(st["lon"], 3), round(st["h"]), dt])
+            for r in out:
+                r["trail"] = trails[r["norad"]] + [[r["lat"], r["lon"], r["height_km"], 0]]
         if track_min > 0:
             by_norad = {int(sat.satnum): sat for _n, _g, sat in sats}
             wanted = [r for i, r in enumerate(out) if i < track_for or r["norad"] in (track_ids or ())]

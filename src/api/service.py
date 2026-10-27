@@ -2305,14 +2305,14 @@ class AllSkyService:
                 "elevation_m": float(self.station_config.get("elevation_m") or 0.0)}
 
     def get_satellites_now(self, track_min: float = 0.0, below: bool = False, limit: int = 60,
-                          track_ids: Optional[set] = None) -> Dict[str, Any]:
+                          track_ids: Optional[set] = None, trail_s: float = 0.0) -> Dict[str, Any]:
         """Large satellites above the horizon (stations + CelesTrak visual list) with their camera position."""
         from src.analytics.satellites import SatelliteTracker
 
         if getattr(self, "_sat_tracker", None) is None:
             self._sat_tracker = SatelliteTracker(os.path.join(self.output_dir, "cache", "sat_tle.json"))
         res = self._sat_tracker.current(self._overlay_station(), self._overlay_solution(), track_min=track_min,
-                                        include_below=below, track_ids=track_ids)
+                                        include_below=below, track_ids=track_ids, trail_s=trail_s)
         obstructions = [np.array(p, np.float32) for p in ((self.station_config.get("sky_mask") or {}).get("obstruction") or [])]
         for r in res["satellites"]:
             xy = r.get("frame_xy")

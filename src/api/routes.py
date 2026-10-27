@@ -634,11 +634,12 @@ def get_satellites(track: float = Query(default=0.0, ge=0.0, le=120.0),
                    below: bool = Query(default=False),
                    limit: int = Query(default=60, ge=1, le=400),
                    ids: str = Query(default=""),
+                   trail: float = Query(default=0.0, ge=0.0, le=1800.0),
                    service: AllSkyService = Depends(get_service)):
     """Large satellites above the horizon now: az/alt, range, sunlit, lat/lon/height and position in the camera
     frame. track=<minutes> adds each of the highest ones' path (5 min back, <minutes> ahead); below=true also
     lists those under the horizon (3D map); ids=<norad,...> also tracks those."""
-    return service.get_satellites_now(track_min=track, below=below, limit=limit,
+    return service.get_satellites_now(track_min=track, below=below, limit=limit, trail_s=trail,
                                        track_ids={int(i) for i in ids.split(",") if i.strip().isdigit()})
 
 
