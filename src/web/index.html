@@ -7,8 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
-    <link rel="stylesheet" href="/static/tokens.css?v=20261028ev1">
-    <link rel="stylesheet" href="/style.css?v=20261028ev1">
+    <link rel="stylesheet" href="/static/tokens.css?v=20261028ev2">
+    <link rel="stylesheet" href="/style.css?v=20261028ev2">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -177,11 +177,14 @@
                             </div>
                             <div class="fv-img-wrap"><img id="fv-img" alt="Archived frame"><div class="fv-msg hidden" id="fv-msg"></div></div>
                             <div class="fv-meta" id="fv-meta"></div>
+                            <div class="fv-chart-wrap"><svg id="fv-chart" class="fv-chart" preserveAspectRatio="none"></svg><div class="cloud-tooltip hidden" id="fv-tooltip"></div></div>
                             <div class="fv-nav">
-                                <button type="button" class="btn btn-sm btn-outline" data-step="-600">&laquo; 10 min</button>
-                                <button type="button" class="btn btn-sm btn-outline" data-step="-60">&lsaquo; 1 min</button>
-                                <button type="button" class="btn btn-sm btn-outline" data-step="60">1 min &rsaquo;</button>
-                                <button type="button" class="btn btn-sm btn-outline" data-step="600">10 min &raquo;</button>
+                                <button type="button" class="btn btn-sm btn-outline" id="fv-prev-ev" title="Previous event">&#9198; Event</button>
+                                <button type="button" class="btn btn-sm btn-outline" id="fv-prev" title="Previous frame (&larr;)">&lsaquo; Prev</button>
+                                <button type="button" class="btn btn-sm btn-primary" id="fv-play" title="Play / pause (space)">&#9654; Play</button>
+                                <button type="button" class="btn btn-sm btn-outline" id="fv-next" title="Next frame (&rarr;)">Next &rsaquo;</button>
+                                <button type="button" class="btn btn-sm btn-outline" id="fv-next-ev" title="Next event">Event &#9197;</button>
+                                <select id="fv-speed" class="fv-speed" title="Playback speed"><option value="2">2 fps</option><option value="5" selected>5 fps</option><option value="10">10 fps</option><option value="20">20 fps</option></select>
                                 <a class="btn btn-sm btn-outline" id="fv-open" target="_blank" rel="noopener">Full size &#8599;</a>
                                 <a class="btn btn-sm btn-outline hidden" id="fv-crop" target="_blank" rel="noopener">Event crop &#8599;</a>
                             </div>
@@ -1230,9 +1233,9 @@
 
     <!-- App JavaScript -->
     <script src="/static/sky_catalog.js"></script>
-    <script src="/app.js?v=20261028ev1"></script>
-    <script src="/static/activity.js?v=20261028ev1"></script>
-    <script src="/static/focus.js?v=20261028ev1"></script>
+    <script src="/app.js?v=20261028ev2"></script>
+    <script src="/static/activity.js?v=20261028ev2"></script>
+    <script src="/static/focus.js?v=20261028ev2"></script>
     <script>
     // Settings sub-navigation: one section at a time, driven by the URL hash (/settings#detection)
     (function () {

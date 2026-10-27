@@ -2593,6 +2593,32 @@ class AllSkyService:
         t, day, name = best
         return {"ts": t, "delta_s": round(t - ts, 1), "day": day, "name": name, "url": f"/api/frames/img/{day}/{name}"}
 
+    def frames_span(self, start: float, end: float, max_n: int = 600) -> List[Dict[str, Any]]:
+        """Archived frames between two moments (epoch seconds), oldest first, thinned evenly to max_n."""
+        import bisect
+
+        d0, d1 = datetime.fromtimestamp(start).astimezone(), datetime.fromtimestamp(end).astimezone()
+        k0, k1 = f"frame_{d0:%Y%m%d_%H%M%S}", f"frame_{d1:%Y%m%d_%H%M%S}~"
+        out: List[Dict[str, Any]] = []
+        day = d0.date() - timedelta(days=1)
+        while day <= d1.date():
+            ds = day.strftime("%Y-%m-%d")
+            day_dir = os.path.join(self.frames_archive_root, ds)
+            if os.path.isdir(day_dir):
+                names = sorted(f for f in os.listdir(day_dir) if f.startswith("frame_") and f.endswith(".jpg"))
+                for name in names[bisect.bisect_left(names, k0):bisect.bisect_right(names, k1)]:
+                    try:
+                        t = datetime.strptime(name[6:21], "%Y%m%d_%H%M%S").astimezone().timestamp()
+                    except ValueError:
+                        continue
+                    out.append({"ts": t, "url": f"/api/frames/img/{ds}/{name}"})
+            day += timedelta(days=1)
+        out.sort(key=lambda f: f["ts"])
+        if len(out) > max_n:
+            step = len(out) / max_n
+            out = [out[int(i * step)] for i in range(max_n)]
+        return out
+
     def frame_image_path(self, day: str, name: str) -> Optional[str]:
         import re
 

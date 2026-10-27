@@ -614,6 +614,15 @@ def get_frame_near(ts: float = Query(..., description="epoch seconds"), service:
     return res
 
 
+@router.get("/api/frames/span")
+def get_frames_span(start: float = Query(...), end: float = Query(...), max: int = Query(default=600, ge=1, le=1500),
+                    service: AllSkyService = Depends(get_service)):
+    """Archived frames between two moments (epoch seconds), for playback."""
+    if end < start or end - start > 12 * 3600:
+        raise HTTPException(status_code=400, detail="end must follow start by at most 12 hours")
+    return {"frames": service.frames_span(start, end, max_n=max)}
+
+
 @router.get("/api/frames/img/{day}/{name}")
 def get_frame_image(day: str, name: str, service: AllSkyService = Depends(get_service)):
     """An archived frame JPEG."""

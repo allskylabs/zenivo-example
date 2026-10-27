@@ -3368,7 +3368,8 @@ document.addEventListener("DOMContentLoaded", () => {
             /* storage unavailable */
         }
         let cloudData = null;
-        let cloudGeom = null;
+        const mainStore = { geom: null };
+        const fvStore = { geom: null };
         let cloudEvents = [];   // brief sky events inside the charted range
         let viewTs = null;      // moment shown in the frame viewer (marked on the chart)
 
@@ -3386,9 +3387,9 @@ document.addEventListener("DOMContentLoaded", () => {
             return withDate ? `${p(d.getUTCDate())} ${mon} ${hm}` : hm;
         };
 
-        function renderCloudChart() {
+        function renderChart(svg, store) {
             if (!cloudData) return;
-            const box = cloudChart.getBoundingClientRect();
+            const box = svg.getBoundingClientRect();
             const W = Math.max(280, Math.round(box.width));
             const H = Math.round(box.height) || 260;
             const LANE = 16;   // event ticks sit in a strip under the plot, above the time labels
@@ -3399,9 +3400,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const pts = cloudData.points.filter((p) => p.cc !== null && p.cc !== undefined);
             const x = (t) => m.l + ((t - start) / (end - start)) * pw;
             const y = (v) => m.t + (1 - v / 100) * ph;
-            cloudChart.setAttribute("viewBox", `0 0 ${W} ${H}`);
-            cloudChart.replaceChildren();
-            cloudEmpty.classList.toggle("hidden", pts.length > 0);
+            svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+            svg.replaceChildren();
+            if (svg === cloudChart) cloudEmpty.classList.toggle("hidden", pts.length > 0);
 
             // Night bands from consecutive night samples
             const all = cloudData.points;
@@ -3415,15 +3416,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (endsHere) {
                     const x0 = Math.max(m.l, x(runStart));
                     const x1 = Math.min(m.l + pw, x(p.t + step / 2));
-                    if (x1 > x0) svgEl("rect", { class: "night-band", x: x0, y: m.t, width: x1 - x0, height: ph }, cloudChart);
+                    if (x1 > x0) svgEl("rect", { class: "night-band", x: x0, y: m.t, width: x1 - x0, height: ph }, svg);
                     runStart = null;
                 }
             });
 
             // Grid + y labels
             [0, 25, 50, 75, 100].forEach((v) => {
-                svgEl("line", { class: "grid", x1: m.l, x2: m.l + pw, y1: y(v), y2: y(v) }, cloudChart);
-                const tx = svgEl("text", { class: "axis-label", x: m.l - 6, y: y(v) + 4, "text-anchor": "end" }, cloudChart);
+                svgEl("line", { class: "grid", x1: m.l, x2: m.l + pw, y1: y(v), y2: y(v) }, svg);
+                const tx = svgEl("text", { class: "axis-label", x: m.l - 6, y: y(v) + 4, "text-anchor": "end" }, svg);
                 tx.textContent = `${v}%`;
             });
             // X ticks at round local hours / days
@@ -3436,7 +3437,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const stride = Math.max(1, Math.ceil(span / tickS / maxTicks));
             for (let t = t0, k = 0; t <= end; t += tickS, k++) {
                 if (k % stride) continue;
-                const tx = svgEl("text", { class: "axis-label", x: x(t), y: H - 6, "text-anchor": "middle" }, cloudChart);
+                const tx = svgEl("text", { class: "axis-label", x: x(t), y: H - 6, "text-anchor": "middle" }, svg);
                 tx.textContent = tickH >= 24 ? fmtTime(t, true).split(" ").slice(0, 2).join(" ") : fmtTime(t, false);
             }
 
@@ -3450,133 +3451,262 @@ document.addEventListener("DOMContentLoaded", () => {
             segs.forEach((seg) => {
                 const line = seg.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.cc).toFixed(1)}`).join("");
                 if (seg.length > 1) {
-                    svgEl("path", { class: "cc-area", d: `${line}L${x(seg[seg.length - 1].t).toFixed(1)},${y(0)}L${x(seg[0].t).toFixed(1)},${y(0)}Z` }, cloudChart);
-                    svgEl("path", { class: "cc-line", d: line }, cloudChart);
+                    svgEl("path", { class: "cc-area", d: `${line}L${x(seg[seg.length - 1].t).toFixed(1)},${y(0)}L${x(seg[0].t).toFixed(1)},${y(0)}Z` }, svg);
+                    svgEl("path", { class: "cc-line", d: line }, svg);
                 } else {
-                    svgEl("circle", { class: "hover-dot", cx: x(seg[0].t), cy: y(seg[0].cc), r: 3 }, cloudChart);
+                    svgEl("circle", { class: "hover-dot", cx: x(seg[0].t), cy: y(seg[0].cc), r: 3 }, svg);
                 }
             });
             // Low-confidence samples as hollow markers (only when sparse enough to read)
             if (pts.length <= 300) {
-                pts.filter((p) => (p.conf ?? 1) < 0.5).forEach((p) => svgEl("circle", { class: "cc-low", cx: x(p.t), cy: y(p.cc), r: 3.5 }, cloudChart));
+                pts.filter((p) => (p.conf ?? 1) < 0.5).forEach((p) => svgEl("circle", { class: "cc-low", cx: x(p.t), cy: y(p.cc), r: 3.5 }, svg));
             }
             // Event lane: one tick per meteor / aircraft / satellite / flash, drawn on top so it stays clickable
             const laneY = m.t + ph + 3;
-            svgEl("rect", { class: "ev-lane", x: m.l, y: laneY, width: pw, height: LANE - 3 }, cloudChart);
+            svgEl("rect", { class: "ev-lane", x: m.l, y: laneY, width: pw, height: LANE - 3 }, svg);
             const evs = cloudEvents.filter((e) => e.start_ts >= start && e.start_ts <= end);
-            evs.forEach((e) => svgEl("rect", { class: `ev-tick ev-${e.type}`, x: (x(e.start_ts) - 1).toFixed(1), y: laneY + 1, width: 2, height: LANE - 5, rx: 0.5 }, cloudChart));
-            if (viewTs !== null && viewTs >= start && viewTs <= end) {
-                svgEl("line", { class: "cc-mark", x1: x(viewTs), x2: x(viewTs), y1: m.t, y2: laneY + LANE - 3 }, cloudChart);
-            }
-            cloudGeom = { pts, x, y, m, pw, ph, W, H, laneY, LANE, evs };
+            evs.forEach((e) => svgEl("rect", { class: `ev-tick ev-${e.type}`, x: (x(e.start_ts) - 1).toFixed(1), y: laneY + 1, width: 2, height: LANE - 5, rx: 0.5 }, svg));
+            store.geom = { pts, x, y, m, pw, ph, W, H, laneY, LANE, evs, start, end };
+            setMark(svg, store);
         }
 
-        function showCloudTip(clientX) {
-            if (!cloudGeom || !cloudGeom.pts.length) return;
-            const rect = cloudChart.getBoundingClientRect();
-            const px = ((clientX - rect.left) / rect.width) * cloudGeom.W;
-            let best = cloudGeom.pts[0];
-            cloudGeom.pts.forEach((p) => {
-                if (Math.abs(cloudGeom.x(p.t) - px) < Math.abs(cloudGeom.x(best.t) - px)) best = p;
+        // The viewed moment as a dashed line on a chart (moved without redrawing the whole chart)
+        function setMark(svg, store) {
+            svg.querySelectorAll(".cc-mark").forEach((el) => el.remove());
+            const g = store.geom;
+            if (!g || viewTs === null || viewTs < g.start || viewTs > g.end) return;
+            svgEl("line", { class: "cc-mark", x1: g.x(viewTs), x2: g.x(viewTs), y1: g.m.t, y2: g.laneY + g.LANE - 3 }, svg);
+        }
+        function renderCloudChart() {
+            renderChart(cloudChart, mainStore);
+            if (fv && !fv.classList.contains("hidden")) renderChart(fvChart, fvStore);
+        }
+
+        const SNAP_PX = 8;   // an event this close to the pointer (horizontally) is snapped to
+        // Chart x position of a pointer, in the svg's own units, and the event (if any) close enough to snap to
+        function pointerAt(svg, store, e) {
+            const g = store.geom;
+            if (!g) return null;
+            const rect = svg.getBoundingClientRect();
+            const px = ((e.clientX - rect.left) / rect.width) * g.W;
+            const py = ((e.clientY - rect.top) / rect.height) * g.H;
+            if (px < g.m.l - 4 || px > g.m.l + g.pw + 4) return null;
+            let snap = null;
+            g.evs.forEach((ev) => {
+                const d = Math.abs(g.x(ev.start_ts) - px);
+                if (d <= SNAP_PX && (!snap || d < snap[0])) snap = [d, ev];
             });
-            cloudChart.querySelectorAll(".crosshair, .hover-sel").forEach((el) => el.remove());
-            const cx = cloudGeom.x(best.t);
-            svgEl("line", { class: "crosshair", x1: cx, x2: cx, y1: cloudGeom.m.t, y2: cloudGeom.m.t + cloudGeom.ph }, cloudChart);
-            svgEl("circle", { class: "hover-dot hover-sel", cx, cy: cloudGeom.y(best.cc), r: 5 }, cloudChart);
+            return { g, rect, px, py, ev: snap && snap[1], t: cloudData.start + ((px - g.m.l) / g.pw) * (cloudData.end - cloudData.start) };
+        }
+
+        function showCloudTip(svg, store, tip, e) {
+            const at = pointerAt(svg, store, e);
+            svg.querySelectorAll(".crosshair, .hover-sel").forEach((el) => el.remove());
+            if (!at || !at.g.pts.length) { tip.classList.add("hidden"); return; }
+            const { g, rect, px } = at;
+            svg.style.cursor = "pointer";
+            if (at.ev) {   // snapped onto an event
+                const cx = g.x(at.ev.start_ts);
+                svgEl("line", { class: "crosshair", x1: cx, x2: cx, y1: g.m.t, y2: g.laneY + g.LANE - 3 }, svg);
+                tip.innerHTML = `<strong>${EV_NAMES[at.ev.type] || at.ev.type}${at.ev.label ? " " + at.ev.label : ""}</strong><br>${fmtTime(at.ev.start_ts, true)} ${tzLabel}<br>click to view`;
+                placeTip(tip, rect, cx, g.W);
+                return;
+            }
+            let best = g.pts[0];
+            g.pts.forEach((p) => {
+                if (Math.abs(g.x(p.t) - px) < Math.abs(g.x(best.t) - px)) best = p;
+            });
+            const cx = g.x(best.t);
+            svgEl("line", { class: "crosshair", x1: cx, x2: cx, y1: g.m.t, y2: g.m.t + g.ph }, svg);
+            svgEl("circle", { class: "hover-dot hover-sel", cx, cy: g.y(best.cc), r: 5 }, svg);
             const mode = best.m === "night" ? "Night" : best.m === "day" ? "Day" : "";
             const extra = best.m === "night" ? ` · ${best.stars} stars` : "";
             const conf = (best.conf ?? 1) < 0.5 ? " · low confidence" : "";
             const avg = best.n > 1 ? ` · avg of ${best.n}` : "";
-            cloudTip.innerHTML = `<strong>${best.cc.toFixed(0)}%</strong> cloud<br>${fmtTime(best.t, true)} ${tzLabel}<br>${mode}${extra}${conf}${avg}`;
-            cloudTip.classList.remove("hidden");
-            const left = (cx / cloudGeom.W) * rect.width;
-            const tipW = cloudTip.offsetWidth;
-            cloudTip.style.left = `${Math.min(rect.width - tipW - 4, Math.max(4, left + (left > rect.width / 2 ? -tipW - 12 : 12)))}px`;
+            tip.innerHTML = `<strong>${best.cc.toFixed(0)}%</strong> cloud<br>${fmtTime(best.t, true)} ${tzLabel}<br>${mode}${extra}${conf}${avg}`;
+            placeTip(tip, rect, cx, g.W);
         }
-        cloudChart.addEventListener("pointermove", (e) => showCloudTip(e.clientX));
-        cloudChart.addEventListener("pointerleave", () => {
-            cloudTip.classList.add("hidden");
-            cloudChart.querySelectorAll(".crosshair, .hover-sel").forEach((el) => el.remove());
-        });
+        function placeTip(tip, rect, cx, W) {
+            tip.classList.remove("hidden");
+            const left = (cx / W) * rect.width;
+            const tipW = tip.offsetWidth;
+            tip.style.left = `${Math.min(rect.width - tipW - 4, Math.max(4, left + (left > rect.width / 2 ? -tipW - 12 : 12)))}px`;
+        }
 
-        // ---- Frame viewer: click the chart (a moment) or an event tick to see the archived frame from then ----
+        // Hover shows the cloud value (or the event it snaps to); a click opens the frame at that moment / event
+        function bindChart(svg, store, tip) {
+            let downAt = null;
+            svg.addEventListener("pointermove", (e) => showCloudTip(svg, store, tip, e));
+            svg.addEventListener("pointerleave", () => {
+                tip.classList.add("hidden");
+                svg.querySelectorAll(".crosshair, .hover-sel").forEach((el) => el.remove());
+            });
+            svg.addEventListener("pointerdown", (e) => { downAt = [e.clientX, e.clientY]; });
+            svg.addEventListener("pointerup", (e) => {
+                if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;
+                const at = pointerAt(svg, store, e);
+                if (!at || at.py > at.g.laneY + at.g.LANE) return;
+                if (at.ev) openFrameAt(at.ev.start_ts, at.ev);
+                else openFrameAt(at.t, null);
+            });
+        }
+
+        // ---- Frame viewer: the same chart with its events, plus play / pause / prev / next through the frames ----
         const fv = document.getElementById("frame-viewer");
         const fvImg = document.getElementById("fv-img");
         const fvMsg = document.getElementById("fv-msg");
-        let fvEvent = null;
+        const fvChart = document.getElementById("fv-chart");
+        const fvPlay = document.getElementById("fv-play");
+        const fvSpeed = document.getElementById("fv-speed");
+        let fvEvent = null;     // event the viewer was opened on (or is passing through while playing)
+        let fvFrames = [];      // archived frames around the viewed moment, oldest first
+        let fvIdx = 0;
+        let fvTimer = null;
         let fvReq = 0;
         const EV_NAMES = { meteor: "Meteor", plane: "Aircraft", satellite: "Satellite", flash: "Flash" };
+        const SPAN_BEFORE = 20 * 60, SPAN_AFTER = 60 * 60;
 
+        const eventAt = (ts) => cloudEvents.find((e) => ts >= e.start_ts - 4 && ts <= Math.max(e.end_ts || 0, e.start_ts) + 4) || null;
+
+        async function loadSpan(ts) {
+            const r = await fetch(`/api/frames/span?start=${Math.floor(ts - SPAN_BEFORE)}&end=${Math.ceil(ts + SPAN_AFTER)}&max=900`);
+            if (!r.ok) throw new Error("span");
+            return (await r.json()).frames || [];
+        }
+        const nearestIdx = (frames, ts) => frames.reduce((bi, f, i) => (Math.abs(f.ts - ts) < Math.abs(frames[bi].ts - ts) ? i : bi), 0);
+
+        function showFrame(i) {
+            fvIdx = Math.max(0, Math.min(fvFrames.length - 1, i));
+            const f = fvFrames[fvIdx];
+            if (!f) return;
+            viewTs = f.ts;
+            fvImg.src = f.url;
+            fvImg.classList.remove("hidden");
+            fvMsg.classList.add("hidden");
+            for (let k = 1; k <= 3 && fvIdx + k < fvFrames.length; k++) new Image().src = fvFrames[fvIdx + k].url;   // preload what plays next
+            const ev = eventAt(f.ts);
+            if (ev) fvEvent = ev; else if (fvEvent && (f.ts < fvEvent.start_ts - 4 || f.ts > Math.max(fvEvent.end_ts || 0, fvEvent.start_ts) + 60)) fvEvent = null;
+            const near = cloudData && cloudData.points.length
+                ? cloudData.points.reduce((a, b) => (Math.abs(b.t - f.ts) < Math.abs(a.t - f.ts) ? b : a)) : null;
+            const cc = near && near.cc !== null && near.cc !== undefined && Math.abs(near.t - f.ts) < 1800 ? `${near.cc.toFixed(0)}% cloud` : "";
+            document.getElementById("fv-title").textContent = ev
+                ? `${EV_NAMES[ev.type] || ev.type}${ev.label ? " " + ev.label : ""} · ${fmtTime(ev.start_ts, true)} ${tzLabel}`
+                : `Frame · ${fmtTime(f.ts, true)} ${tzLabel}`;
+            const sec = (n) => String(n).padStart(2, "0");
+            const d = stationDate(new Date(f.ts * 1000));
+            document.getElementById("fv-meta").innerHTML =
+                `<span><strong>${fmtTime(f.ts, true)}:${sec(d.getUTCSeconds())}</strong> ${tzLabel}</span>` +
+                `<span>frame ${fvIdx + 1} / ${fvFrames.length}</span>${cc ? `<span>${cc}</span>` : ""}` +
+                (ev && ev.end_ts ? `<span>event lasts ${Math.max(1, Math.round(ev.end_ts - ev.start_ts))} s</span>` : "");
+            document.getElementById("fv-open").href = f.url;
+            const crop = document.getElementById("fv-crop");
+            const cropUrl = ev && (ev.sky_url || ev.thumbnail_url);
+            crop.classList.toggle("hidden", !cropUrl);
+            if (cropUrl) crop.href = cropUrl;
+            setMark(cloudChart, mainStore);
+            setMark(fvChart, fvStore);
+        }
+
+        // Jump to a moment: (re)load the frames around it unless it is already inside the loaded window
         async function openFrameAt(ts, ev) {
+            stopPlay();
             if (ev !== undefined) fvEvent = ev;
-            viewTs = ts;
-            renderCloudChart();
             fv.classList.remove("hidden");
+            renderChart(fvChart, fvStore);
             const req = ++fvReq;
-            fvMsg.textContent = "Loading…";
-            fvMsg.classList.remove("hidden");
-            const nearest = cloudData && cloudData.points.length
-                ? cloudData.points.reduce((a, b) => (Math.abs(b.t - ts) < Math.abs(a.t - ts) ? b : a)) : null;
-            const cc = nearest && nearest.cc !== null && nearest.cc !== undefined && Math.abs(nearest.t - ts) < 1800 ? `${nearest.cc.toFixed(0)}% cloud` : "";
-            try {
-                const r = await fetch(`/api/frames/near?ts=${ts}`);
+            const inside = fvFrames.length && ts >= fvFrames[0].ts - 30 && ts <= fvFrames[fvFrames.length - 1].ts + 30;
+            if (!inside) {
+                fvMsg.textContent = "Loading…";
+                fvMsg.classList.remove("hidden");
+                try {
+                    const frames = await loadSpan(ts);
+                    if (req !== fvReq) return;
+                    fvFrames = frames;
+                } catch (e) {
+                    fvFrames = [];
+                }
                 if (req !== fvReq) return;
-                if (!r.ok) throw new Error("none");
-                const f = await r.json();
-                viewTs = f.ts;
-                fvImg.src = f.url;
-                fvImg.classList.remove("hidden");
-                fvMsg.classList.add("hidden");
-                const gap = Math.abs(f.delta_s) > 90 ? ` · nearest frame is ${Math.round(Math.abs(f.delta_s) / 60)} min ${f.delta_s < 0 ? "before" : "after"}` : "";
-                document.getElementById("fv-title").textContent = fvEvent
-                    ? `${EV_NAMES[fvEvent.type] || fvEvent.type}${fvEvent.label ? " " + fvEvent.label : ""} · ${fmtTime(fvEvent.start_ts, true)} ${tzLabel}`
-                    : `Frame · ${fmtTime(f.ts, true)} ${tzLabel}`;
-                document.getElementById("fv-meta").innerHTML =
-                    `<span><strong>${fmtTime(f.ts, true)}</strong> ${tzLabel}${gap}</span>${cc ? `<span>${cc}</span>` : ""}` +
-                    (fvEvent && fvEvent.end_ts ? `<span>Event lasted ${Math.max(1, Math.round(fvEvent.end_ts - fvEvent.start_ts))} s</span>` : "");
-                document.getElementById("fv-open").href = f.url;
-                const crop = document.getElementById("fv-crop");
-                const cropUrl = fvEvent && (fvEvent.sky_url || fvEvent.thumbnail_url);
-                crop.classList.toggle("hidden", !cropUrl);
-                if (cropUrl) crop.href = cropUrl;
-                renderCloudChart();
-            } catch (e) {
-                if (req !== fvReq) return;
+            }
+            if (!fvFrames.length) {
                 fvImg.classList.add("hidden");
                 fvMsg.textContent = "No archived frame near that time (frames are kept for a limited number of days).";
                 fvMsg.classList.remove("hidden");
+                return;
             }
+            showFrame(nearestIdx(fvFrames, ts));
+        }
+
+        // Step one frame; at the edge of the loaded window load the next stretch and carry on
+        async function stepFrame(dir) {
+            const j = fvIdx + dir;
+            if (j >= 0 && j < fvFrames.length) { showFrame(j); return true; }
+            if (!fvFrames.length) return false;
+            const edge = fvFrames[fvIdx].ts, req = ++fvReq;
+            try {
+                const frames = await loadSpan(dir > 0 ? edge + SPAN_AFTER / 2 : edge - SPAN_AFTER / 2);
+                if (req !== fvReq || !frames.length) return false;
+                const k = nearestIdx(frames, edge);
+                const next = k + dir;
+                if (next < 0 || next >= frames.length) return false;
+                fvFrames = frames;
+                showFrame(next);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function stopPlay() {
+            if (fvTimer) clearInterval(fvTimer);
+            fvTimer = null;
+            fvPlay.textContent = "▶ Play";
+            fvPlay.classList.remove("active");
+        }
+        function startPlay() {
+            if (!fvFrames.length) return;
+            stopPlay();
+            fvPlay.textContent = "⏸ Pause";
+            fvPlay.classList.add("active");
+            let busy = false;
+            fvTimer = setInterval(async () => {
+                if (busy) return;
+                busy = true;
+                if (!(await stepFrame(1))) stopPlay();   // reached the newest frame
+                busy = false;
+            }, 1000 / Number(fvSpeed.value));
+        }
+        function jumpEvent(dir) {
+            if (viewTs === null) return;
+            const evs = cloudEvents.slice().sort((a, b) => a.start_ts - b.start_ts);
+            const ev = dir > 0 ? evs.find((e) => e.start_ts > viewTs + 2) : evs.slice().reverse().find((e) => e.start_ts < viewTs - 2);
+            if (ev) openFrameAt(ev.start_ts, ev);
         }
         function closeFrameViewer() {
             fvReq++;
+            stopPlay();
             fv.classList.add("hidden");
             viewTs = null;
             fvEvent = null;
+            fvFrames = [];
             renderCloudChart();
         }
         document.getElementById("fv-close").addEventListener("click", closeFrameViewer);
         fv.addEventListener("click", (e) => { if (e.target === fv) closeFrameViewer(); });
-        document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !fv.classList.contains("hidden")) closeFrameViewer(); });
-        fv.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => {
-            if (viewTs !== null) openFrameAt(viewTs + Number(b.dataset.step), null);   // stepping leaves the event
-        }));
-        let downAt = null;
-        cloudChart.addEventListener("pointerdown", (e) => { downAt = [e.clientX, e.clientY]; });
-        cloudChart.addEventListener("pointerup", (e) => {
-            if (!cloudGeom || !downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;
-            const rect = cloudChart.getBoundingClientRect();
-            const px = ((e.clientX - rect.left) / rect.width) * cloudGeom.W;
-            const py = ((e.clientY - rect.top) / rect.height) * cloudGeom.H;
-            const g = cloudGeom;
-            if (px < g.m.l || px > g.m.l + g.pw) return;
-            const t = cloudData.start + ((px - g.m.l) / g.pw) * (cloudData.end - cloudData.start);
-            if (py >= g.laneY - 2 && py <= g.laneY + g.LANE) {   // the event lane: nearest tick within a few pixels
-                let best = null;
-                g.evs.forEach((ev) => { const d = Math.abs(g.x(ev.start_ts) - px); if (d <= 6 && (!best || d < best[0])) best = [d, ev]; });
-                if (best) { openFrameAt(best[1].start_ts, best[1]); return; }
-            }
-            if (py <= g.laneY) openFrameAt(t, null);
+        fvPlay.addEventListener("click", () => (fvTimer ? stopPlay() : startPlay()));
+        fvSpeed.addEventListener("change", () => { if (fvTimer) startPlay(); });
+        document.getElementById("fv-prev").addEventListener("click", () => { stopPlay(); stepFrame(-1); });
+        document.getElementById("fv-next").addEventListener("click", () => { stopPlay(); stepFrame(1); });
+        document.getElementById("fv-prev-ev").addEventListener("click", () => jumpEvent(-1));
+        document.getElementById("fv-next-ev").addEventListener("click", () => jumpEvent(1));
+        document.addEventListener("keydown", (e) => {
+            if (fv.classList.contains("hidden")) return;
+            if (e.key === "Escape") closeFrameViewer();
+            else if (e.key === " ") { e.preventDefault(); fvTimer ? stopPlay() : startPlay(); }
+            else if (e.key === "ArrowLeft") { stopPlay(); stepFrame(-1); }
+            else if (e.key === "ArrowRight") { stopPlay(); stepFrame(1); }
         });
+        bindChart(cloudChart, mainStore, cloudTip);
+        bindChart(fvChart, fvStore, document.getElementById("fv-tooltip"));
 
         async function loadCloudHistory() {
             try {
