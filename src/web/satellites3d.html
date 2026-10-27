@@ -871,7 +871,11 @@
                 const hit = g.screen.map(([id, sx, sy]) => [id, Math.hypot(sx - x, sy - y)]).sort((u, v) => u[1] - v[1])[0];
                 let id = hit && hit[1] < 18 ? hit[0] : null;
                 if (id === selected) id = null;   // clicking the selected satellite again deselects it
-                select(id, true);
+                // A click on empty sky never moves the camera: while orbiting a satellite or standing on the ground it
+                // would snap the view back to looking straight down, so only Esc / x / the satellite itself release it.
+                // A satellite picked from the ground stays a pick: it is shown, the view is kept
+                if (!hit || hit[1] >= 18) { if (camMode || g.walk) return; }
+                select(id, !g.walk, !!g.walk);
             });
             bindGlobeInput(g);
             g.aimed = !!home;
@@ -1330,10 +1334,10 @@
             showCamera();
         }
 
-        function select(id, fly = false) {
+        function select(id, fly = false, keepView = false) {   // keepView: only mark the satellite, leave the camera where it is
             const prev = selected;
             selected = id;
-            if (id !== prev) { if (globe) { exitWalk(globe); globe.pan.set(0, 0, 0); } stopCamera(); rebuildTrack(); poll(); }   // the next poll brings the new selection's track
+            if (id !== prev) { if (globe && !keepView) { exitWalk(globe); globe.pan.set(0, 0, 0); } if (!keepView) stopCamera(); rebuildTrack(); poll(); }   // the next poll brings the new selection's track
             for (const k of [prev, id]) {
                 const s = k != null && sats.get(k);
                 if (!s) continue;
