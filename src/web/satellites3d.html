@@ -812,7 +812,7 @@
             const u = hit.normalize(), piv = u.clone().multiplyScalar(PIVOT_R), off = p.clone().sub(piv), D = Math.min(GLOBE_MAX, Math.max(0.4, off.length()));
             const hd = off.clone().addScaledVector(u, -off.dot(u));
             if (hd.lengthSq() < 1e-6) { const w0 = { u }; walkBasis(w0); hd.copy(_wn); }
-            g.walk = { piv, u, D, theta: Math.asin(Math.max(-1, Math.min(1, off.dot(u) / Math.max(off.length(), 1e-9)))), hd: hd.normalize() };
+            g.walk = { piv, u, D, theta: Math.asin(Math.max(-1, Math.min(1, off.dot(u) / Math.max(off.length(), 1e-9)))), hd: hd.normalize(), dir: 1 };
             g.controls.enabled = false;
         }
         function pivotFrame(G) {
@@ -861,6 +861,7 @@
                 w.h = Math.min(WALK_HMAX, Math.max(WALK_HMIN, w.h * Math.exp(e.deltaY * 0.0025)));
             }, { passive: false, capture: true });
             el.addEventListener("pointerdown", (e) => {
+                if (g.walk && g.walk.piv && !(e.button === 0 && e.ctrlKey)) { exitWalk(g); return; }   // a plain drag is the ordinary globe control again
                 const look = e.button === 0 && (g.walk || e.ctrlKey), move = !!g.walk && e.button === 2;
                 if (!look && !move) return;
                 e.stopImmediatePropagation();
@@ -880,10 +881,11 @@
                     const a = dx * 0.005, ca = Math.cos(a), sa = Math.sin(a);
                     _wt.crossVectors(w.u, w.hd).multiplyScalar(sa);
                     w.hd.multiplyScalar(ca).add(_wt);   // swing round the vertical through the point
-                    const dt = -dy * 0.005;   // drag down = lower; once on the ground, further down tilts the view up to the sky
+                    const dt = -dy * 0.005 * w.dir;   // + = higher; drag down = lower; once on the ground, further down tilts the view up to the sky
                     if (dt < 0 && w.grounded) w.lift = Math.min(1.4, (w.lift || 0) - dt);
                     else if (dt > 0 && w.lift > 0) w.lift = Math.max(0, w.lift - dt);
-                    else w.theta = Math.max(-1.2, Math.min(1.55, w.theta + dt));
+                    else w.theta = Math.max(-1.2, w.theta + dt);
+                    if (w.theta > 1.52) { w.theta = 3.04 - w.theta; w.hd.negate(); w.dir = -w.dir; }   // over the top: carry on down the other side
                     return;
                 }
                 if (drag.move) {   // walk over the ground: drag up = forward, sideways = strafe
