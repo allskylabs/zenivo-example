@@ -7,8 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
-    <link rel="stylesheet" href="/static/tokens.css?v=20261027lv2">
-    <link rel="stylesheet" href="/style.css?v=20261027lv2">
+    <link rel="stylesheet" href="/static/tokens.css?v=20261027lv3">
+    <link rel="stylesheet" href="/style.css?v=20261027lv3">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -200,14 +200,14 @@
     <nav class="m-tabbar" id="m-tabbar" aria-label="Mobile navigation">
         <a class="m-tab" href="/live" data-mpath="/live,/,/index.html"><span class="m-ic">&#9673;</span><span class="m-txt">Live</span></a>
         <a class="m-tab" href="/flights3d" data-mpath="/flights3d"><span class="m-ic">&#9992;</span><span class="m-txt">Flights</span></a>
+        <a class="m-tab" href="/satellites3d" data-mpath="/satellites3d"><span class="m-ic">&#128752;</span><span class="m-txt">Satellites</span></a>
         <a class="m-tab" href="/gallery" data-mpath="/gallery"><span class="m-ic">&#9638;</span><span class="m-txt">Library</span></a>
         <a class="m-tab" href="/focus" data-mpath="/focus"><span class="m-ic">&#9678;</span><span class="m-txt">Camera</span></a>
-        <button class="m-tab" type="button" id="m-more-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="m-more-sheet" data-mpath="/satellites3d,/logs,/calibration,/settings,/obs"><span class="m-ic">&#8943;</span><span class="m-txt">More</span></button>
+        <button class="m-tab" type="button" id="m-more-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="m-more-sheet" data-mpath="/logs,/calibration,/settings,/obs"><span class="m-ic">&#8943;</span><span class="m-txt">More</span></button>
     </nav>
     <div class="m-sheet-backdrop" id="m-sheet-backdrop" hidden></div>
     <div class="m-sheet" id="m-more-sheet" role="dialog" aria-label="More" hidden>
         <div class="m-sheet-grip" aria-hidden="true"></div>
-        <a class="m-sheet-item" href="/satellites3d" data-mpath="/satellites3d">Satellites 3D</a>
         <a class="m-sheet-item" href="/logs" data-mpath="/logs">Activity Log</a>
         <a class="m-sheet-item" href="/calibration" data-mpath="/calibration">Master Dark</a>
         <div class="m-sheet-title">Settings</div>
