@@ -111,6 +111,11 @@
         #info dt { color: var(--text-secondary); }
         #info dd { font-family: var(--font-mono); text-align: right; }
         #info .links { margin-top: 8px; display: flex; gap: 6px; align-items: center; }
+        #info .info-btns { display: flex; gap: 6px; flex-shrink: 0; }
+        #info-mini { display: none; font: 400 12px var(--font-mono); color: var(--text-secondary); }
+        #info.min > :not(h3) { display: none; }
+        #info.min #info-mini { display: inline; }
+        #info.min h3 { margin-bottom: 0; }
         #info a { color: var(--accent); font-size: 12px; }
         #timeline { margin-top: 8px; font-size: 12px; }
         #timeline .tl-head { color: var(--text-secondary); margin-bottom: 4px; }
@@ -294,7 +299,7 @@
     <div id="cam-badge" class="panel"><span class="dot"></span><span id="cam-text"></span><button id="cam-stop" title="Stop (Esc)">Stop</button></div>
 
     <div id="info" class="panel">
-        <h3><span id="info-name"></span><button id="info-close" title="Close">✕</button></h3>
+        <h3><span><span id="info-name"></span> <small id="info-mini"></small></span><span class="info-btns"><button id="info-min" title="Collapse / expand (the satellite stays selected)">▾</button><button id="info-close" title="Deselect the satellite">✕</button></span></h3>
         <div id="info-sub"></div>
         <div id="info-stats"></div>
         <dl id="info-dl"></dl>
@@ -389,6 +394,7 @@
         let selected = null;
         let camMode = null;   // camera following the selected satellite
         let showLabels = pref("labels", "1") === "1";
+        let infoMin = pref("infomin", window.matchMedia("(max-width: 700px)").matches ? "1" : "0") === "1";   // phones start with the compact card
         let filter = pref("filter", "above"), sortBy = pref("sort", "alt"), query = "";
         const layerOn = { sats: true, tracks: true, atmos: pref("atmos", "1") === "1", foot: pref("foot", "1") === "1" };
         let footEl = Math.max(0, Math.min(60, Number(pref("footel", "0")) || 0));   // degrees above the horizon
@@ -1376,8 +1382,11 @@
         function renderInfo() {
             const s = selected != null && sats.get(selected);
             $("info").classList.toggle("show", !!s);
+            $("info").classList.toggle("min", infoMin);
+            $("info-min").textContent = infoMin ? "▴" : "▾";
             if (!s) return;
             const a = s.a;
+            $("info-mini").textContent = `${a.alt_deg.toFixed(0)}° · ${km(a.range_km)}`;
             $("info-name").textContent = a.name;
             $("info-sub").textContent = `NORAD ${a.norad} · ${a.group === "stations" ? "Space station" : "Bright satellite"}`;
             const why = a.visible ? "Visible to the naked eye"
@@ -1434,6 +1443,7 @@
         $("lay-atmos").checked = layerOn.atmos;
         $("lay-atmos").onchange = (e) => { layerOn.atmos = e.target.checked; setPref("atmos", layerOn.atmos ? "1" : "0"); };
         $("info-close").onclick = () => select(null);
+        $("info-min").onclick = () => { infoMin = !infoMin; setPref("infomin", infoMin ? "1" : "0"); renderInfo(); };
         $("btn-track").onclick = () => setCamMode("track");
         $("cam-stop").onclick = () => stopCamera();
         $("left-toggle").onclick = () => $("left-col").classList.toggle("collapsed");
