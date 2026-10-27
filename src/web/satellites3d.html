@@ -1171,8 +1171,8 @@
         }
 
         // Selected satellite's path at orbit height and just above the ground (called from rebuildTrack)
-        // A forecast is a moment's view: a lap later the Earth has turned away, so the sky orbit is shown for half a lap only
-        const SKY_AHEAD_S = 2700, GROUND_AHEAD_S = SKY_AHEAD_S, TICK_S = 900;
+        // A forecast is a moment's view: a lap later the Earth has turned away, so the forecast is kept to about a third of a lap
+        const SKY_AHEAD_S = 1800, GROUND_AHEAD_S = SKY_AHEAD_S, TICK_S = 900;
         function rebuildTrack() {
             if (!globe) return;
             for (const mesh of globe.trackMeshes) { globe.scene.remove(mesh); mesh.geometry.dispose(); }
