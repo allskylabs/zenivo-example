@@ -704,6 +704,15 @@
             gcam.position.set(GLOBE_DIST, 0, 0);
             const controls = new OrbitControls(gcam, canvas);
             Object.assign(controls, { enablePan: false, minDistance: GLOBE_MIN, maxDistance: GLOBE_MAX, zoomSpeed: 0.8 });
+            controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;   // no panning on a globe: right-drag rotates too
+            // OrbitControls turns Ctrl/Shift/Meta + drag into a pan, which is disabled here and would do nothing:
+            // re-issue the press without the modifiers so those drags rotate as well
+            canvas.addEventListener("pointerdown", (e) => {
+                if (e.pointerType !== "mouse" || !(e.ctrlKey || e.metaKey || e.shiftKey) || !e.isTrusted) return;
+                e.stopImmediatePropagation();
+                canvas.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, pointerId: e.pointerId, pointerType: "mouse",
+                    button: e.button === 2 ? 2 : 0, buttons: e.buttons, clientX: e.clientX, clientY: e.clientY }));
+            }, true);
 
             // Earth: day / night-lights textures blended by the sun; a plain dark-blue sphere until (or unless) they load
             const blank = (r, g, b) => { const t = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1); t.needsUpdate = true; return t; };
