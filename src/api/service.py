@@ -3877,6 +3877,10 @@ class AllSkyService:
             for i, pos in enumerate(positions):
                 if self.focus.sweep_cancel:
                     raise InterruptedError
+                if i == 0 and not is_pytest:
+                    # The first frame after focus mode starts can still carry the previous pipeline state: it
+                    # scored 31.6 at 0.0 D where the same spot re-measured 16.8, which then won the sweep
+                    _, since = self._lens_score_multi(pos, method, 0, 1, since, [])
                 scores, since = self._lens_score_multi(pos, method, settle, frames, since, tiles)
                 done_pos.append(pos)
                 sw["points"].append({"pos": round(pos, 4), "score": scores[0], "phase": "sweep"})
