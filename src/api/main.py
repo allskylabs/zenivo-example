@@ -107,6 +107,11 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         def serve_flights3d():
             return FileResponse(os.path.join(web_dir, "flights3d.html"), media_type="text/html", headers=no_cache)
 
+        # 3D map of the satellites above the station (standalone page; loads MapLibre + three.js)
+        @app.get("/satellites3d")
+        def serve_satellites3d():
+            return FileResponse(os.path.join(web_dir, "satellites3d.html"), media_type="text/html", headers=no_cache)
+
         # Standalone full-bleed WebSocket live image view for OBS / Kiosk
         @app.api_route("/full", methods=["GET", "HEAD"])
         @app.api_route("/live/full", methods=["GET", "HEAD"])

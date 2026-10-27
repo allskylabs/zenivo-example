@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Satellites 3D — AllSky Observatory</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+    <link rel="stylesheet" href="/static/tokens.css?v=20261026ns1">
+    <link rel="stylesheet" href="/style.css?v=20261026ns1">
+    <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-sans); overflow: hidden; }
+        /* Shared shell (style.css "Night Sky shell"): fix it to the viewport; the map fills #stage, the area beside the sidebar */
+        .app-shell { height: 100vh; min-height: 0; }
+        .app-main { height: 100%; min-height: 0; }
+        #stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+        #map { position: absolute; inset: 0; background: var(--bg-primary); }
+        #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+        .sat-label {
+            position: absolute; transform: translate(-50%, -100%); white-space: nowrap; pointer-events: auto; cursor: pointer;
+            font: 600 12px/1.25 var(--font-mono); color: var(--text-primary); text-shadow: 0 1px 3px #000, 0 0 2px #000;
+            padding: 1px 4px; border-radius: 4px; user-select: none;
+        }
+        .sat-label small { display: block; font-weight: 400; color: var(--text-secondary); }
+        .sat-label.visible { color: #22d3ee; }
+        .sat-label.in-view { color: var(--warning); }
+        .sat-label.selected { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+        .panel {
+            position: absolute; background: color-mix(in srgb, var(--bg-card) 92%, transparent); border: 1px solid var(--border-color);
+            border-radius: var(--radius-md, 8px); backdrop-filter: blur(6px); font-size: 13px;
+        }
+        #left-col { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: calc(100% - 24px); }
+        #left-col .panel { position: static; }
+        #top { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+        #top .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        #top h1 { font-size: 15px; font-weight: 600; }
+        #btn-night-vision.btn-primary { border-color: var(--accent); color: var(--accent); }
+        #status, #tle { color: var(--text-secondary); font-size: 12px; }
+        #sky { font-size: 12px; font-weight: 600; }
+        #sky.dark { color: #34d399; }
+        #sky.day { color: var(--warning); }
+        .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+        button {
+            background: var(--bg-card-sub); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px;
+            padding: 4px 9px; min-height: 36px; font: inherit; font-size: 12px; cursor: pointer;
+        }
+        button:hover { border-color: var(--accent); }
+        button.on { border-color: var(--accent); color: var(--accent); }
+        button[hidden] { display: none; }
+        #list { top: 12px; right: 12px; width: 350px; max-width: calc(100% - 24px); max-height: calc(100% - 24px); display: flex; flex-direction: column; }
+        #list h2 { font-size: 13px; font-weight: 600; padding: 9px 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; }
+        #list-tools { padding: 8px 12px; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 6px; }
+        #list-tools .btns button { min-height: 30px; }
+        #list-tools .row { display: flex; gap: 6px; }
+        #list-tools input, #list-tools select {
+            background: var(--bg-card-sub); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px;
+            padding: 4px 8px; min-height: 30px; font: inherit; font-size: 12px; min-width: 0;
+        }
+        #list-tools input { flex: 1; }
+        #list-tools input:focus, #list-tools select:focus { outline: none; border-color: var(--accent); }
+        #list ul { list-style: none; overflow-y: auto; }
+        #list li { padding: 6px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; flex-direction: column; gap: 2px; font-family: var(--font-mono); font-size: 12px; }
+        #list li:hover, #list li.selected { background: var(--bg-card-sub); }
+        #list li .r1, #list li .r2 { display: flex; justify-content: space-between; align-items: center; gap: 8px; white-space: nowrap; }
+        #list li .cs { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+        #list li.visible .cs { color: #22d3ee; }
+        #list li .meta { color: var(--text-secondary); font-size: 12px; }
+        .grp { font: 600 10px var(--font-sans); text-transform: uppercase; letter-spacing: 0.04em; padding: 1px 5px; border-radius: 3px;
+            margin-left: 6px; background: var(--bg-card-sub); color: var(--text-secondary); vertical-align: 1px; }
+        .grp.stations { color: #c4b5fd; }
+        .tags { display: flex; gap: 4px; }
+        .tag { font: 600 10px var(--font-sans); padding: 1px 5px; border-radius: 3px; background: var(--bg-card-sub); color: var(--text-secondary); }
+        .tag.vis { color: #22d3ee; } .tag.sun { color: #f59e0b; } .tag.cam { color: var(--warning); }
+        #layers { padding: 10px 12px; width: 200px; display: flex; flex-direction: column; gap: 4px; }
+        #layers h2 { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+        #layers label { display: flex; justify-content: space-between; align-items: center; min-height: 28px; font-size: 13px; cursor: pointer; }
+        #layers input { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+        #cam-foot { position: absolute; left: 12px; bottom: 12px; height: 28px; padding: 0 12px; border-radius: 999px; display: none; align-items: center; gap: 8px;
+            font: 12px var(--font-mono); color: var(--text-secondary); white-space: nowrap; }
+        #cam-foot.show { display: flex; }
+        #cam-foot .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success, #10b981); }
+        #info-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+        #info-stats div { background: var(--bg-card-sub); border-radius: 6px; padding: 6px 8px; }
+        #info-stats small { display: block; font-size: 12px; color: var(--text-secondary); }
+        #info-stats b { font: 600 15px var(--font-mono); }
+        #info-sub { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+        #info { left: 12px; bottom: 48px; padding: 10px 12px; width: 270px; display: none; max-height: calc(100% - 330px); overflow-y: auto; }
+        #info.show { display: block; }
+        #info h3 { font: 600 15px var(--font-mono); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+        #info dl { display: grid; grid-template-columns: auto auto; gap: 2px 14px; font-size: 12px; }
+        #info dt { color: var(--text-secondary); }
+        #info dd { font-family: var(--font-mono); text-align: right; }
+        #info .links { margin-top: 8px; display: flex; gap: 6px; align-items: center; }
+        #info a { color: var(--accent); font-size: 12px; }
+        #timeline { margin-top: 8px; font-size: 12px; }
+        #timeline .tl-head { color: var(--text-secondary); margin-bottom: 4px; }
+        #timeline .tl { position: relative; height: 10px; border-radius: 3px; background: var(--bg-card-sub); overflow: hidden; }
+        #timeline .tl span { position: absolute; top: 0; bottom: 0; }
+        #timeline .tl .above { background: #475569; }
+        #timeline .tl .vis { background: #22d3ee; top: 2px; bottom: 2px; }
+        #timeline .tl-axis { display: flex; justify-content: space-between; color: var(--text-secondary); font: 10px var(--font-mono); margin-top: 2px; }
+        #timeline .tl-note { color: var(--text-secondary); margin-top: 4px; }
+        .legend { display: flex; gap: 10px; font-size: 12px; color: var(--text-secondary); align-items: center; flex-wrap: wrap; }
+        .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+        .station-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; box-shadow: 0 0 10px var(--accent); }
+        #cam-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 6px 8px 6px 12px; display: none;
+            align-items: center; gap: 10px; font-size: 12px; white-space: nowrap; }
+        #cam-badge.show { display: flex; }
+        #cam-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444; animation: blink 1.2s infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
+        #list-toggle { display: none; }
+        @media (max-width: 700px) {
+            #left-col { right: 12px; }
+            #cam-foot { display: none !important; }
+            #list { top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 50vh; }
+            #list.collapsed ul, #list.collapsed #list-tools { display: none; }
+            #list-toggle { display: inline-block; }
+            #info { bottom: auto; top: 150px; right: 12px; width: auto; max-height: 40vh; }
+            #cam-badge { top: auto; bottom: 12px; }
+        }
+    </style>
+    <script type="importmap">
+        { "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+        } }
+    </script>
+</head>
+    <div class="app-shell">
+    <!-- Shared sidebar (bottom tab bar on phones), same markup as index.html; Satellites 3D is the active item -->
+    <aside class="sidebar" id="sidebar">
+        <nav class="tab-bar side-nav" aria-label="Main navigation">
+            <div class="side-group">
+                <div class="side-group-title">Observe</div>
+                <a class="tab-btn side-item" href="/live" data-tab="tab-live"><span class="side-ic">&#9673;</span><span class="side-txt">Live</span></a>
+                <a class="side-item side-link" href="/flights3d"><span class="side-ic">&#9992;</span><span class="side-txt">Flights 3D</span></a>
+                <a class="side-item side-link active" href="/satellites3d" aria-current="page"><span class="side-ic">&#128752;</span><span class="side-txt">Satellites 3D</span></a>
+                <a class="side-item side-link" href="/satellites3d"><span class="side-ic">&#128752;</span><span class="side-txt">Satellites 3D</span></a>
+            </div>
+            <div class="side-group">
+                <div class="side-group-title">Library</div>
+                <a class="tab-btn side-item" href="/gallery" data-tab="tab-gallery"><span class="side-ic">&#9638;</span><span class="side-txt">Gallery &amp; Events</span></a>
+                <a class="tab-btn side-item" href="/logs" data-tab="tab-logs"><span class="side-ic">&#8801;</span><span class="side-txt">Activity Log</span></a>
+            </div>
+            <div class="side-group">
+                <div class="side-group-title">Camera</div>
+                <a class="tab-btn side-item" href="/focus" data-tab="tab-focus"><span class="side-ic">&#9678;</span><span class="side-txt">Focus</span></a>
+                <a class="tab-btn side-item" href="/calibration" data-tab="tab-calibration"><span class="side-ic">&#9680;</span><span class="side-txt">Master Dark</span></a>
+            </div>
+            <div class="side-group side-group-stream">
+                <div class="side-group-title">Stream</div>
+                <a class="side-item side-link" href="/obs/dock"><span class="side-ic">&#9635;</span><span class="side-txt">OBS Dock</span></a>
+                <a class="side-item side-link" href="/obs" target="_blank" rel="noopener"><span class="side-ic">&#8599;</span><span class="side-txt">OBS Preview</span></a>
+            </div>
+            <div class="side-group side-group-settings">
+                <div class="side-group-title">Settings</div>
+                <a class="tab-btn side-item" href="/settings" data-tab="tab-settings"><span class="side-ic">&#9881;</span><span class="side-txt">Settings</span></a>
+                <div class="side-sub-list" id="settings-subnav">
+                    <a class="side-sub" href="/settings#image" data-sub="image">Image Output</a>
+                    <a class="side-sub" href="/settings#detection" data-sub="detection">Detection</a>
+                    <a class="side-sub" href="/settings#station" data-sub="station">Station &amp; Optics</a>
+                    <a class="side-sub" href="/settings#skymask" data-sub="skymask">Sky Mask</a>
+                    <a class="side-sub" href="/settings#integrations" data-sub="integrations">Integrations</a>
+                </div>
+            </div>
+        </nav>
+    </aside>
+
+    <div class="app-main">
+    <header class="navbar">
+        <div class="nav-brand">
+            <div class="pulse-indicator online" title="System Online"></div>
+            <div><h1>AllSky Observatory</h1></div>
+        </div>
+        <div class="nav-metrics">
+            <div class="nav-pill"><span class="pill-label">UTC</span><span class="pill-value" id="nav-utc-clock">00:00:00</span></div>
+            <button id="btn-night-vision" class="btn btn-outline" title="Preserve night vision adaptation (red palette)"><span class="icon">●</span> Red Vision</button>
+        </div>
+    </header>
+
+    <div id="stage">
+    <div id="map"></div>
+    <div id="labels"></div>
+
+    <div id="left-col">
+    <div id="top" class="panel">
+        <div class="row">
+            <h1>Satellites 3D</h1>
+            <span id="status">Loading…</span>
+        </div>
+        <div class="row"><span id="sky"></span><span id="tle"></span></div>
+        <div class="btns">
+            <button id="btn-base-terrain" class="on" title="Dark 3D terrain">Terrain</button>
+            <button id="btn-base-sat" title="Satellite imagery (no labels or borders)">Satellite</button>
+            <button id="btn-base-google" hidden title="Google Maps, dark">Google</button>
+            <button id="btn-labels" class="on" title="Satellite name labels">Labels</button>
+            <button id="btn-home" title="Back to the station">Station</button>
+        </div>
+        <div class="legend">
+            <span><i style="background:#22d3ee"></i>Visible now</span>
+            <span><i style="background:#f59e0b"></i>Sunlit</span>
+            <span><i style="background:#6b7280"></i>Earth's shadow</span>
+        </div>
+    </div>
+
+    <div id="layers" class="panel">
+        <h2>Layers</h2>
+        <label>Satellites <input type="checkbox" id="lay-sats" checked></label>
+        <label>Tracks <input type="checkbox" id="lay-tracks" checked></label>
+        <label>Terrain <input type="checkbox" id="lay-terrain" checked></label>
+    </div>
+    </div><!-- #left-col -->
+
+    <div id="list" class="panel">
+        <h2><span>Satellites</span><span><span id="count">--</span> <button id="list-toggle">▾</button></span></h2>
+        <div id="list-tools">
+            <div class="btns" id="filters">
+                <button data-filter="visible" title="Can be seen by eye right now">Visible now</button>
+                <button data-filter="above" title="Above the horizon">Above horizon</button>
+                <button data-filter="all">All</button>
+            </div>
+            <div class="row">
+                <input id="search" type="search" placeholder="Search name or NORAD" autocomplete="off">
+                <select id="sort" title="Sort">
+                    <option value="alt">Elevation</option>
+                    <option value="range">Range</option>
+                    <option value="height">Height</option>
+                    <option value="name">Name</option>
+                </select>
+            </div>
+        </div>
+        <ul id="sat-list"></ul>
+    </div>
+
+    <div id="cam-foot" class="panel"><span class="dot"></span><span id="cam-foot-text"></span></div>
+
+    <div id="cam-badge" class="panel"><span class="dot"></span><span id="cam-text"></span><button id="cam-stop" title="Stop (Esc)">Stop</button></div>
+
+    <div id="info" class="panel">
+        <h3><span id="info-name"></span><button id="info-close" title="Close">✕</button></h3>
+        <div id="info-sub"></div>
+        <div id="info-stats"></div>
+        <dl id="info-dl"></dl>
+        <div id="timeline"></div>
+        <div class="links">
+            <button id="btn-track" title="Keep the camera on this satellite; rotate and zoom around it">Track</button>
+            <a id="info-link" target="_blank" rel="noopener">N2YO ↗</a>
+        </div>
+    </div>
+    </div><!-- #stage -->
+    </div><!-- .app-main -->
+    </div><!-- .app-shell -->
+
+
+    <script>
+        // Shell behaviour shared with app.js: UTC clock and the Red Vision toggle (same localStorage prefs)
+        (function () {
+            const KEY = "allsky.ui.prefs.v1", btn = document.getElementById("btn-night-vision");
+            const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } };
+            function apply(on) {
+                document.body.classList.toggle("night-mode", on);
+                if (on) document.documentElement.setAttribute("data-theme", "red"); else document.documentElement.removeAttribute("data-theme");
+                btn.classList.toggle("btn-primary", on);
+            }
+            apply(!!read().nightVision);
+            btn.addEventListener("click", () => {
+                const on = !document.body.classList.contains("night-mode");
+                apply(on);
+                try { localStorage.setItem(KEY, JSON.stringify(Object.assign(read(), { nightVision: on }))); } catch (e) { /* not persisted */ }
+            });
+            const clock = document.getElementById("nav-utc-clock");
+            const tick = () => { clock.textContent = new Date().toISOString().slice(11, 19); };
+            tick(); setInterval(tick, 1000);
+        })();
+
+    <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+    <script type="module">
+        import * as THREE from "three";
+
+        // Basemap rule: no OpenStreetMap-derived data. The base is elevation only (no borders, no labels); the
+        // satellite layer is imagery only (no labels, no borders); Google Maps (Map Tiles API, region VN) is
+        // offered when a key is configured. Orbits come from /api/satellites (CelesTrak TLEs, SGP4 on the server).
+        const POLL_MS = 2000;
+        const TRACK_MIN = 90;         // minutes of future track requested for the selected satellite
+        const TRACK_STEP_S = 30;      // sample spacing of the server's track
+        const MAX_EXTRAP_S = 6;       // dead-reckoning limit between polls
+        const HOME_VIEW = { zoom: 2.5, pitch: 45, bearing: 0 };
+        const DEM = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
+        const SAT = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+        const PREF = "allsky.satellites3d.";
+        const MARKER = {   // colour, on-screen size (px) and brightness per lighting state
+            visible: { rgb: [0.13, 0.83, 0.93], px: 26, dim: 1.0 },
+            sunlit: { rgb: [0.96, 0.62, 0.04], px: 20, dim: 0.7 },
+            shadow: { rgb: [0.55, 0.58, 0.64], px: 16, dim: 0.5 },
+        };
+        const MAX_POINTS = 512;
+
+        const $ = (id) => document.getElementById(id);
+        const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+        const compass = (az) => COMPASS[Math.round(((az % 360) + 360) % 360 / 45) % 8];
+        const D2R = Math.PI / 180;
+        const nowS = () => performance.now() / 1000;
+        const wrapLon = (l) => ((l + 540) % 360) - 180;
+        const pref = (k, d) => { try { return localStorage.getItem(PREF + k) || d; } catch (e) { return d; } };
+        const setPref = (k, v) => { try { localStorage.setItem(PREF + k, v); } catch (e) { /* not persisted */ } };
+        const km = (v) => `${Math.round(v).toLocaleString()} km`;
+        const stateOf = (a) => (a.visible ? "visible" : a.sunlit ? "sunlit" : "shadow");
+
+        let station = null, camera = null, sunAlt = null;
+        let origin = null, mPerUnit = 1;    // scene origin (mercator) at the station; mercator units per metre there
+        const sats = new Map();             // norad -> state
+        let selected = null;
+        let camMode = null, camZoom = null, camPending = false;   // camera following the selected satellite
+        let showLabels = pref("labels", "1") === "1";
+        let filter = pref("filter", "above"), sortBy = pref("sort", "alt"), query = "";
+        const layerOn = { sats: true, tracks: true, terrain: true };
+        let lastFetch = 0, inflight = false, again = false;
+
+        // ---------------------------------------------------------------- map: dark 3D terrain from elevation only
+        const RELIEF = ["interpolate", ["linear"], ["elevation"],   // near-grey: saturation close to 0
+            -200, "#050506", 0, "#08090b", 30, "#0a0b0d", 150, "#0d0e11", 400, "#111316",
+            800, "#16181c", 1300, "#1c1f23", 2000, "#24272c", 3000, "#2f3237"];
+        const map = new maplibregl.Map({
+            container: "map",
+            style: {
+                version: 8,
+                sources: {
+                    dem: { type: "raster-dem", tiles: [DEM], encoding: "terrarium", tileSize: 256, maxzoom: 11,
+                        attribution: "Terrain: Mapzen / AWS Terrain Tiles" },
+                    "dem-shade": { type: "raster-dem", tiles: [DEM], encoding: "terrarium", tileSize: 256, maxzoom: 14 },
+                },
+                layers: [
+                    { id: "bg", type: "background", paint: { "background-color": "#070809" } },
+                    { id: "relief", type: "color-relief", source: "dem-shade", paint: { "color-relief-color": RELIEF } },
+                    { id: "hillshade", type: "hillshade", source: "dem-shade",
+                        paint: { "hillshade-exaggeration": 0.75, "hillshade-shadow-color": "#000000",
+                            "hillshade-highlight-color": "#5d636c", "hillshade-accent-color": "#0c0d10" } },
+                ],
+                terrain: { source: "dem", exaggeration: 1 },
+                sky: { "sky-color": "#070809", "horizon-color": "#17191d", "fog-color": "#070809",
+                    "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.5, "fog-ground-blend": 0.35, "atmosphere-blend": 0 },
+            },
+            center: [105.9095, 21.0538], zoom: HOME_VIEW.zoom, pitch: HOME_VIEW.pitch, bearing: HOME_VIEW.bearing, maxPitch: 82,
+            attributionControl: { compact: true },
+        });
+        map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
+        map.on("error", (e) => console.error("map:", e.error?.message || e));
+
+        // Start as soon as the (inline) style is ready rather than on "load", which waits for every terrain tile
+        // (an inline style can finish loading inside the constructor, before a "style.load" listener exists)
+        let styleReady = false;
+        const styleQueue = [];
+        const whenStyle = (fn) => (styleReady ? fn() : styleQueue.push(fn));
+        const markStyleReady = () => {
+            if (styleReady || !map.style || !map.style._loaded) return;
+            styleReady = true;
+            styleQueue.splice(0).forEach((fn) => fn());
+        };
+        for (const ev of ["style.load", "styledata", "load", "idle"]) map.on(ev, markStyleReady);
+        setTimeout(markStyleReady, 0);
+        whenStyle(() => {
+            map.addLayer(satsLayer);
+            setBase(pref("base", "") === "terrain" ? "terrain" : "sat");   // satellite unless the viewer chose terrain before
+        });
+
+        poll();
+        setInterval(() => { if (!document.hidden) poll(); }, POLL_MS);
+        document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastFetch > POLL_MS) poll(); });
+
+        // ---------------------------------------------------------------- Google Maps basemap (optional)
+        const GOOGLE_DARK = [
+            { elementType: "geometry", stylers: [{ color: "#0b1220" }] },
+            { elementType: "labels.text.fill", stylers: [{ color: "#8ea3c0" }] },
+            { elementType: "labels.text.stroke", stylers: [{ color: "#070a13" }] },
+            { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#0d1626" }] },
+            { featureType: "water", elementType: "geometry", stylers: [{ color: "#040914" }] },
+            { featureType: "road", elementType: "geometry", stylers: [{ color: "#1a2740" }] },
+            { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#24375a" }] },
+            { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+            { featureType: "poi", stylers: [{ visibility: "off" }] },
+            { featureType: "transit", stylers: [{ visibility: "off" }] },
+            { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#3a5a86" }] },
+        ];
+        let googleKey = "";
+        const googleSessions = {};
+        fetch("/api/map/config").then((r) => r.json()).then((c) => {
+            googleKey = c.google_maps_key || "";
+            $("btn-base-google").hidden = !googleKey;
+            if (googleKey && pref("base", "") === "google") whenStyle(() => setBase("google"));
+        }).catch(() => {});
+
+        async function googleSource(kind) {
+            if (googleSessions[kind]) return googleSessions[kind];
+            const body = { mapType: "roadmap", language: "vi-VN", region: "VN", styles: GOOGLE_DARK };
+            const r = await fetch(`https://tile.googleapis.com/v1/createSession?key=${encodeURIComponent(googleKey)}`, {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+            if (!r.ok) throw new Error(`Google Maps: ${r.status}`);
+            const s = await r.json();
+            googleSessions[kind] = s.session;
+            return s.session;
+        }
+
+        async function setBase(kind) {
+            setPref("base", kind);
+            for (const k of ["terrain", "google", "sat"]) $(`btn-base-${k}`).classList.toggle("on", k === kind);
+            for (const k of ["google", "sat"]) if (map.getLayer(`g-${k}`)) map.setLayoutProperty(`g-${k}`, "visibility", k === kind ? "visible" : "none");
+            if (map.getLayer("sat-night")) map.setLayoutProperty("sat-night", "visibility", kind === "sat" ? "visible" : "none");
+            map.setLayoutProperty("relief", "visibility", kind === "terrain" ? "visible" : "none");
+            map.setPaintProperty("hillshade", "hillshade-exaggeration", kind === "terrain" ? 0.75 : 0.35);
+            if (kind === "terrain" || map.getLayer(`g-${kind}`)) return;
+            if (kind === "sat") {   // imagery only, in a night look: dark and grey
+                map.addSource("g-sat", { type: "raster", tiles: [SAT], tileSize: 256, maxzoom: 19,
+                    attribution: "Imagery © Esri, Maxar, Earthstar Geographics" });
+                map.addLayer({ id: "g-sat", type: "raster", source: "g-sat",
+                    paint: { "raster-brightness-max": 0.42, "raster-saturation": -1, "raster-contrast": 0.15 } }, "hillshade");
+                map.addSource("sat-night", { type: "geojson", data: { type: "Feature", properties: {},
+                    geometry: { type: "Polygon", coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]]] } } });
+                map.addLayer({ id: "sat-night", type: "fill", source: "sat-night",
+                    paint: { "fill-color": "#000000", "fill-opacity": 0.35 } }, "hillshade");
+                return;
+            }
+            try {
+                const session = await googleSource(kind);
+                map.addSource(`g-${kind}`, { type: "raster", tileSize: 256, maxzoom: 20,
+                    tiles: [`https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${session}&key=${encodeURIComponent(googleKey)}`],
+                    attribution: `Map data ©${new Date().getFullYear()} Google` });
+                map.addLayer({ id: `g-${kind}`, type: "raster", source: `g-${kind}` }, "hillshade");
+            } catch (err) {
+                $("status").textContent = err.message;
+                setBase("terrain");
+            }
+        }
+
+        // ---------------------------------------------------------------- geometry helpers
+        // lon/lat in degrees, alt in metres -> scene units (mercator, relative to the station in x/y)
+        function merc(lon, lat, alt) {
+            const m = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], alt);
+            return [m.x - origin.x, m.y - origin.y, m.z];
+        }
+
+        // ---------------------------------------------------------------- three.js scene
+        const scene = new THREE.Scene();
+        const cam3 = new THREE.Camera();
+        const world = new THREE.Group();
+        scene.add(world);
+        const LOS_MAT = new THREE.LineBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.8, depthTest: false });
+        const DROP_MAT = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthTest: false });
+        const line2 = (mat) => {
+            const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), mat);
+            l.frustumCulled = false; l.visible = false;
+            world.add(l);
+            return l;
+        };
+        const losLine = line2(LOS_MAT), dropLine = line2(DROP_MAT);
+
+        // ---------------------------------------------------------------- satellites: one Points object, constant pixel size
+        const POINTS_VS = `
+            attribute vec3 aColor; attribute float aSize; attribute float aDim; attribute float aRing;
+            uniform float uDpr; varying vec3 vColor; varying float vDim; varying float vRing;
+            void main() {
+                vColor = aColor; vDim = aDim; vRing = aRing;
+                gl_PointSize = aSize * uDpr;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }`;
+        const POINTS_FS = `
+            varying vec3 vColor; varying float vDim; varying float vRing;
+            void main() {
+                float r = length(gl_PointCoord * 2.0 - 1.0);
+                float core = 1.0 - smoothstep(0.16, 0.24, r);
+                float glow = exp(-r * r * 6.0) * 0.55;
+                float ring = vRing > 0.0 ? smoothstep(0.58, 0.64, r) * (1.0 - smoothstep(0.7, 0.76, r)) : 0.0;
+                vec3 rc = vRing > 0.75 ? vec3(1.0) : vec3(0.96, 0.62, 0.04);   // selected: white, in camera view: amber
+                float a = max(core, glow) * vDim;
+                if (r > 1.0 || (a < 0.01 && ring < 0.01)) discard;
+                gl_FragColor = vec4(mix(vColor, rc, ring), max(a, ring * 0.9));
+            }`;
+        const pointGeo = new THREE.BufferGeometry();
+        const ATTR = { position: 3, aColor: 3, aSize: 1, aDim: 1, aRing: 1 };
+        for (const [name, n] of Object.entries(ATTR)) {
+            pointGeo.setAttribute(name, new THREE.BufferAttribute(new Float32Array(MAX_POINTS * n), n).setUsage(THREE.DynamicDrawUsage));
+        }
+        pointGeo.setDrawRange(0, 0);
+        const POINTS_MAT = new THREE.ShaderMaterial({
+            vertexShader: POINTS_VS, fragmentShader: POINTS_FS, transparent: true, depthWrite: false, depthTest: false,
+            blending: THREE.AdditiveBlending, uniforms: { uDpr: { value: window.devicePixelRatio || 1 } },
+        });
+        const points = new THREE.Points(pointGeo, POINTS_MAT);
+        points.frustumCulled = false;
+        world.add(points);
+
+        // ---------------------------------------------------------------- tracks: ribbons, solid behind / dashed ahead, cyan where visible
+        const TRACK_VS = `
+            attribute vec3 aPrev; attribute vec3 aNext; attribute float aSide; attribute float aT; attribute float aVis;
+            uniform vec2 uRes; uniform float uWidth;
+            varying float vT; varying float vSide; varying float vVis;
+            vec2 px(vec4 c) { return c.xy / c.w * uRes * 0.5; }
+            void main() {
+                mat4 m = projectionMatrix * modelViewMatrix;
+                vec4 c = m * vec4(position, 1.0), p = m * vec4(aPrev, 1.0), n = m * vec4(aNext, 1.0);
+                vT = aT; vSide = aSide; vVis = aVis;
+                if (c.w <= 0.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+                vec2 sc = px(c);
+                vec2 d1 = p.w > 0.0 ? sc - px(p) : vec2(0.0), d2 = n.w > 0.0 ? px(n) - sc : vec2(0.0);
+                if (length(d1) < 1e-4) d1 = d2;
+                if (length(d2) < 1e-4) d2 = d1;
+                vec2 dir = normalize(normalize(d1 + 1e-6) + normalize(d2 + 1e-6) + 1e-6);
+                vec2 nrm = vec2(-dir.y, dir.x);
+                c.xy += nrm * aSide * uWidth / uRes * c.w;
+                gl_Position = c;
+            }`;
+        const TRACK_FS = `
+            uniform float uNow; uniform float uBright; varying float vT; varying float vSide; varying float vVis;
+            void main() {
+                bool ahead = vT > uNow;
+                if (ahead && mod(vT, 90.0) > 55.0) discard;   // dashed where the satellite has yet to go
+                float edge = 1.0 - abs(vSide);
+                vec3 col = vVis > 0.5 ? vec3(0.13, 0.83, 0.93) : vec3(0.52, 0.6, 0.74);
+                float a = (ahead ? 0.85 : 0.55) * (vVis > 0.5 ? 1.0 : 0.7) * smoothstep(0.0, 0.7, edge) * uBright;
+                gl_FragColor = vec4(col * (0.75 + 0.5 * edge), a);
+            }`;
+        function trackMaterial(width, bright) {
+            return new THREE.ShaderMaterial({
+                vertexShader: TRACK_VS, fragmentShader: TRACK_FS, transparent: true, depthWrite: false, depthTest: false,
+                side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+                uniforms: { uRes: { value: new THREE.Vector2(1, 1) }, uWidth: { value: width }, uNow: { value: 0 }, uBright: { value: bright } },
+            });
+        }
+        const TRACK_MATS = { orbit: trackMaterial(5, 1.0), ground: trackMaterial(3, 0.5) };
+        let trackMeshes = [];
+
+        // Ribbon through points P with absolute times T (s, same clock as nowS) and visible flags V
+        function buildRibbon(P, T, V, mat) {
+            const m = P.length;
+            const pos = new Float32Array(m * 6), prev = new Float32Array(m * 6), next = new Float32Array(m * 6);
+            const time = new Float32Array(m * 2), vis = new Float32Array(m * 2), side = new Float32Array(m * 2);
+            for (let k = 0; k < m; k++) {
+                for (let j = 0; j < 2; j++) {
+                    const o = (2 * k + j) * 3;
+                    pos.set([P[k].x, P[k].y, P[k].z], o);
+                    prev.set([P[Math.max(0, k - 1)].x, P[Math.max(0, k - 1)].y, P[Math.max(0, k - 1)].z], o);
+                    next.set([P[Math.min(m - 1, k + 1)].x, P[Math.min(m - 1, k + 1)].y, P[Math.min(m - 1, k + 1)].z], o);
+                    time[2 * k + j] = T[k]; vis[2 * k + j] = V[k]; side[2 * k + j] = j ? 1 : -1;
+                }
+            }
+            const idx = [];
+            for (let k = 0; k < m - 1; k++) { const a = 2 * k; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+            const g = new THREE.BufferGeometry();
+            g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+            g.setAttribute("aPrev", new THREE.BufferAttribute(prev, 3));
+            g.setAttribute("aNext", new THREE.BufferAttribute(next, 3));
+            g.setAttribute("aT", new THREE.BufferAttribute(time, 1));
+            g.setAttribute("aVis", new THREE.BufferAttribute(vis, 1));
+            g.setAttribute("aSide", new THREE.BufferAttribute(side, 1));
+            g.setIndex(idx);
+            const mesh = new THREE.Mesh(g, mat);
+            mesh.frustumCulled = false;
+            return mesh;
+        }
+
+        function clearTrack() {
+            for (const mesh of trackMeshes) { world.remove(mesh); mesh.geometry.dispose(); }
+            trackMeshes = [];
+            for (const s of sats.values()) s.trackPts = null;
+        }
+
+        // The selected satellite's path at orbit height, plus its footprint on the ground
+        function rebuildTrack() {
+            clearTrack();
+            const s = selected != null && sats.get(selected);
+            if (!s || !s.track || s.track.length < 2) return;
+            const tr = s.track, lons = [tr[0][1]];
+            let off = 0;
+            for (let i = 1; i < tr.length; i++) {   // unwrap across the antimeridian
+                const d = tr[i][1] - tr[i - 1][1];
+                if (d > 180) off -= 360; else if (d < -180) off += 360;
+                lons.push(tr[i][1] + off);
+            }
+            let i0 = 0;
+            for (let i = 1; i < tr.length; i++) if (Math.abs(tr[i][3]) < Math.abs(tr[i0][3])) i0 = i;
+            const shift = 360 * Math.round((s.fix.lon - lons[i0]) / 360);   // keep the path on the satellite's copy of the world
+            const T = tr.map((q) => s.trackT + q[3]), V = tr.map((q) => (q[5] ? 1 : 0));
+            const orbit = tr.map((q, i) => new THREE.Vector3(...merc(lons[i] + shift, q[0], q[2] * 1000)));
+            const ground = tr.map((q, i) => new THREE.Vector3(...merc(lons[i] + shift, q[0], 0)));
+            trackMeshes = [buildRibbon(orbit, T, V, TRACK_MATS.orbit), buildRibbon(ground, T, V, TRACK_MATS.ground)];
+            for (const mesh of trackMeshes) world.add(mesh);
+            s.trackPts = orbit;
+        }
+
+        // ---------------------------------------------------------------- station
+        function addStationOnMap() {
+            const el = document.createElement("div");
+            el.className = "station-dot";
+            el.title = "AllSky camera";
+            new maplibregl.Marker({ element: el }).setLngLat([station.lon, station.lat]).addTo(map);
+        }
+
+        // ---------------------------------------------------------------- state from the API
+        function poll() {
+            if (inflight) { again = true; return; }
+            inflight = true; again = false;
+            lastFetch = Date.now();
+            const ids = selected != null ? `&ids=${selected}` : "";
+            fetch(`/api/satellites?track=${TRACK_MIN}&below=true&limit=400${ids}`).then((r) => r.json()).then(update).catch(() => {
+                $("status").textContent = "Satellite data unavailable";
+            }).finally(() => { inflight = false; if (again) poll(); });
+        }
+
+        function update(d) {
+            const now = nowS();
+            sunAlt = d.sun_alt_deg;
+            if (d.station && !origin) {
+                station = d.station; camera = d.camera || null;
+                updateCamFoot();
+                origin = maplibregl.MercatorCoordinate.fromLngLat([station.lon, station.lat], 0);
+                mPerUnit = origin.meterInMercatorCoordinateUnits();
+                map.jumpTo({ center: [station.lon, station.lat] });
+                whenStyle(addStationOnMap);
+            }
+            if (!origin) return;
+            const list = d.satellites || [];
+            const dark = sunAlt != null && sunAlt < -3;
+            const nVis = list.filter((a) => a.visible).length, nUp = list.filter((a) => a.above_horizon).length;
+            $("status").textContent = `${nVis} visible now · ${nUp} above horizon · ${list.length} tracked`;
+            $("sky").className = dark ? "dark" : "day";
+            $("sky").textContent = `${dark ? "Dark sky" : "Daylight - satellites can't be seen"} · sun ${sunAlt != null ? sunAlt.toFixed(1) : "--"}°`;
+            $("tle").textContent = `TLE ${d.tle_count ?? "--"} sets${d.tle_age_h != null ? ` · ${d.tle_age_h.toFixed(1)} h old` : ""}`;
+            const seen = new Set();
+            for (const a of list) {
+                seen.add(a.norad);
+                let s = sats.get(a.norad);
+                if (!s) {
+                    s = { label: null, fix: null, vel: null, track: null, trackT: 0, trackPts: null };
+                    sats.set(a.norad, s);
+                }
+                s.a = a;
+                setFix(s, a, now);
+                s.track = a.track || null;
+                s.trackT = now;
+                // Labels only for what matters: the selection, naked-eye passes, the camera's view and the stations
+                s.wantLabel = a.norad === selected || a.visible || a.in_view || a.group === "stations";
+                if (s.wantLabel) {
+                    if (!s.label) {
+                        s.label = document.createElement("div");
+                        s.label.addEventListener("click", (ev) => { ev.stopPropagation(); select(a.norad === selected ? null : a.norad, true); });
+                        $("labels").appendChild(s.label);
+                    }
+                    s.label.className = `sat-label${a.visible ? " visible" : ""}${a.in_view ? " in-view" : ""}${a.norad === selected ? " selected" : ""}`;
+                    s.label.innerHTML = `${esc(a.name)}<small>${Math.round(a.alt_deg)}° · ${km(a.height_km)}</small>`;
+                }
+            }
+            for (const [id, s] of sats) {
+                if (seen.has(id)) continue;
+                if (s.label) s.label.remove();
+                sats.delete(id);
+                if (selected === id) select(null);
+            }
+            if (selected != null) rebuildTrack();
+            renderList();
+            renderInfo();
+            map.triggerRepaint();
+        }
+
+        // ---------------------------------------------------------------- motion
+        // Each satellite is dead-reckoned from its latest fix at the velocity the server's track implies
+        // (or, without a track, from the last two fixes), so it glides between polls
+        function trackVel(track) {
+            if (!track) return null;
+            for (let i = 0; i + 1 < track.length; i++) {
+                const p = track[i], q = track[i + 1];
+                if (p[3] <= 0 && q[3] > 0) {
+                    const dt = q[3] - p[3];
+                    return { lat: (q[0] - p[0]) / dt, lon: wrapLon(q[1] - p[1]) / dt, h: (q[2] - p[2]) * 1000 / dt };
+                }
+            }
+            return null;
+        }
+
+        function setFix(s, a, now) {
+            const old = s.fix;
+            s.fix = { t: now, lat: a.lat, lon: a.lon, h: a.height_km * 1000 };
+            let v = trackVel(a.track);
+            if (!v && old && now - old.t > 0.5 && now - old.t < 30) {
+                const dt = now - old.t;
+                v = { lat: (a.lat - old.lat) / dt, lon: wrapLon(a.lon - old.lon) / dt, h: (s.fix.h - old.h) / dt };
+            }
+            s.vel = v || s.vel || { lat: 0, lon: 0, h: 0 };
+        }
+
+        function positionAt(s, t) {
+            const dt = Math.min(Math.max(t - s.fix.t, 0), MAX_EXTRAP_S), f = s.fix, v = s.vel;
+            return { lat: f.lat + v.lat * dt, lon: wrapLon(f.lon + v.lon * dt), h: f.h + v.h * dt };
+        }
+
+        // ---------------------------------------------------------------- custom layer
+        const satsLayer = {
+            id: "sats-3d", type: "custom", renderingMode: "3d",
+            onAdd(m, gl) {
+                this.renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true });
+                this.renderer.autoClear = false;
+            },
+            render(gl, args) {
+                if (!origin) return;
+                const matrix = args.defaultProjectionData?.mainMatrix || args;   // v5: mercator world -> clip
+                const now = nowS();
+                const M = new THREE.Matrix4().fromArray(matrix).multiply(new THREE.Matrix4().makeTranslation(origin.x, origin.y, 0));
+                cam3.projectionMatrix = M;
+                const canvas = map.getCanvas();
+                const W = canvas.clientWidth, H = canvas.clientHeight;
+                POINTS_MAT.uniforms.uDpr.value = window.devicePixelRatio || 1;
+                for (const mt of Object.values(TRACK_MATS)) { mt.uniforms.uRes.value.set(W, H); mt.uniforms.uNow.value = now; }
+                const v4 = new THREE.Vector4();
+                const project = (p) => {
+                    v4.set(p[0], p[1], p[2], 1).applyMatrix4(M);
+                    return v4.w > 0 ? [(v4.x / v4.w + 1) / 2 * W, (1 - v4.y / v4.w) / 2 * H] : null;
+                };
+
+                const at = pointGeo.attributes;
+                const screen = [];
+                let n = 0;
+                for (const [id, s] of sats) {
+                    if (!s.fix || n >= MAX_POINTS) continue;
+                    const ps = positionAt(s, now), p = merc(ps.lon, ps.lat, ps.h), a = s.a, mk = MARKER[stateOf(a)];
+                    const isSel = id === selected;
+                    s.p = p;
+                    if (layerOn.sats) {
+                        const dim = mk.dim * (a.above_horizon ? 1 : 0.6);
+                        at.position.setXYZ(n, p[0], p[1], p[2]);
+                        at.aColor.setXYZ(n, mk.rgb[0], mk.rgb[1], mk.rgb[2]);
+                        at.aSize.setX(n, mk.px + (isSel ? 12 : 0));
+                        at.aDim.setX(n, isSel ? 1 : dim);
+                        at.aRing.setX(n, isSel ? 1 : a.in_view ? 0.5 : 0);
+                        n++;
+                    }
+                    const sc = layerOn.sats ? project(p) : null;
+                    if (sc) screen.push([id, sc[0], sc[1]]);
+                    if (s.label) {
+                        const onScreen = sc && sc[0] > -50 && sc[0] < W + 50 && sc[1] > -50 && sc[1] < H + 50;
+                        s.label.style.display = showLabels && s.wantLabel && onScreen ? "" : "none";
+                        if (onScreen) { s.label.style.left = `${sc[0]}px`; s.label.style.top = `${sc[1] - 12}px`; }
+                    }
+                    if (isSel) {
+                        this.selPos = { x: p[0], y: p[1], h: ps.h };
+                        losLine.visible = layerOn.sats && !!a.above_horizon;
+                        dropLine.visible = layerOn.sats;
+                        const lp = losLine.geometry.attributes.position, dp = dropLine.geometry.attributes.position;
+                        lp.setXYZ(0, 0, 0, 0); lp.setXYZ(1, p[0], p[1], p[2]); lp.needsUpdate = true;
+                        dp.setXYZ(0, p[0], p[1], p[2]); dp.setXYZ(1, p[0], p[1], 0); dp.needsUpdate = true;
+                        this.selTrack = layerOn.tracks && s.trackPts ? s.trackPts.map((q) => project([q.x, q.y, q.z])) : [];   // for click hit-testing
+                    }
+                }
+                if (selected == null || !sats.has(selected)) { losLine.visible = dropLine.visible = false; this.selTrack = []; }
+                for (const k of Object.keys(at)) at[k].needsUpdate = true;
+                pointGeo.setDrawRange(0, n);
+                for (const mesh of trackMeshes) mesh.visible = layerOn.tracks;
+                this.screen = screen;
+                // Track: the map centre sits on the satellite itself, at its height
+                if (camMode && selected != null && this.selPos && !camPending) {
+                    camPending = true;
+                    const pos = this.selPos;
+                    requestAnimationFrame(() => { camPending = false; steerCamera(pos); });
+                }
+
+                this.renderer.resetState();
+                this.renderer.render(scene, cam3);
+                if (sats.size && !document.hidden) map.triggerRepaint();
+            },
+        };
+
+        // ---------------------------------------------------------------- camera tracking
+        function steerCamera(p) {
+            if (!camMode) return;
+            const mc = new maplibregl.MercatorCoordinate(origin.x + p.x, origin.y + p.y, 0);
+            const o = { center: mc.toLngLat(), elevation: p.h };
+            if (camZoom != null) {
+                const z = map.getZoom();
+                o.zoom = z + (camZoom - z) * 0.08;
+                if (Math.abs(camZoom - o.zoom) < 0.02) camZoom = null;
+            }
+            map.jumpTo(o);
+        }
+
+        function setCamMode(mode) {
+            if (selected == null || !sats.has(selected) || camMode === mode) { stopCamera(); return; }
+            camMode = mode;
+            map.setCenterClampedToGround(false);
+            camZoom = Math.max(map.getZoom(), 4);
+            showCamera();
+            map.triggerRepaint();
+        }
+
+        function stopCamera() {
+            if (!camMode) return;
+            camMode = camZoom = null;
+            // Same viewpoint, but aimed at the ground under the screen centre, so the next pan doesn't jump
+            try {
+                const camLL = map.transform.getCameraLngLat(), camAlt = map.transform.getCameraAltitude();
+                const c = map.getCanvas();
+                const ground = map.unproject([c.clientWidth / 2, c.clientHeight / 2]);
+                const gAlt = map.queryTerrainElevation(ground) || 0;
+                map.setCenterClampedToGround(true);
+                map.jumpTo(map.calculateCameraOptionsFromTo(camLL, camAlt, ground, gAlt));
+            } catch (e) {
+                map.setCenterClampedToGround(true);
+            }
+            showCamera();
+        }
+
+        function showCamera() {
+            const a = selected != null && sats.get(selected)?.a;
+            $("cam-badge").classList.toggle("show", !!(camMode && a));
+            if (camMode && a) $("cam-text").textContent = `Tracking ${a.name} · Esc to stop`;
+            $("btn-track").classList.toggle("on", camMode === "track");
+        }
+
+        map.on("dragstart", stopCamera);   // panning away ends tracking
+        map.on("wheel", () => { camZoom = null; });
+        document.addEventListener("keydown", (e) => { if (e.key === "Escape") stopCamera(); });
+        map.on("click", (e) => {
+            const hit = (satsLayer.screen || []).map(([id, x, y]) => [id, Math.hypot(x - e.point.x, y - e.point.y)])
+                .sort((a, b) => a[1] - b[1])[0];
+            let id = hit && hit[1] < 22 ? hit[0] : null;
+            if (id === selected) id = null;   // clicking the selected satellite again deselects it
+            if (!id && selected != null) {    // ...as does clicking its track
+                const t = satsLayer.selTrack || [];
+                for (let i = 1; i < t.length && t[i] && t[i - 1]; i++) {
+                    const [x1, y1] = t[i - 1], [x2, y2] = t[i], dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy;
+                    const u = l2 ? Math.max(0, Math.min(1, ((e.point.x - x1) * dx + (e.point.y - y1) * dy) / l2)) : 0;
+                    if (Math.hypot(x1 + u * dx - e.point.x, y1 + u * dy - e.point.y) < 14) { select(null); return; }
+                }
+            }
+            select(id, true);
+        });
+
+        // ---------------------------------------------------------------- list + info
+        function visibleSats() {
+            const q = query.trim().toLowerCase();
+            const keep = (a) => (filter === "visible" ? a.visible : filter === "above" ? a.above_horizon : true)
+                && (!q || a.name.toLowerCase().includes(q) || String(a.norad).includes(q));
+            const cmp = {
+                alt: (x, y) => y.alt_deg - x.alt_deg,
+                range: (x, y) => x.range_km - y.range_km,
+                height: (x, y) => x.height_km - y.height_km,
+                name: (x, y) => x.name.localeCompare(y.name),
+            }[sortBy];
+            return [...sats.values()].map((s) => s.a).filter(keep).sort(cmp);
+        }
+
+        function renderList() {
+            const list = visibleSats();
+            $("count").textContent = `${list.length}/${sats.size}`;
+            for (const b of document.querySelectorAll("#filters button")) b.classList.toggle("on", b.dataset.filter === filter);
+            $("sat-list").innerHTML = list.length ? list.map((a) => {
+                const tags = [a.visible ? `<span class="tag vis">Visible now</span>` : "",
+                    a.sunlit ? `<span class="tag sun">Sunlit</span>` : `<span class="tag">Shadow</span>`,
+                    a.in_view ? `<span class="tag cam">In camera</span>` : ""].join("");
+                return `<li data-id="${a.norad}" class="${a.visible ? "visible" : ""}${a.norad === selected ? " selected" : ""}">
+                    <div class="r1"><span><span class="cs">${esc(a.name)}</span><span class="grp ${esc(a.group)}">${a.group === "stations" ? "Station" : "Bright"}</span></span>
+                        <span class="meta">${Math.round(a.alt_deg)}° · ${Math.round(a.az_deg)}° ${compass(a.az_deg)}</span></div>
+                    <div class="r2"><span class="meta">${km(a.range_km)} · h ${km(a.height_km)}</span><span class="tags">${tags}</span></div></li>`;
+            }).join("") : `<li><span class="meta">No satellites match.</span></li>`;
+        }
+        $("sat-list").addEventListener("click", (e) => {
+            const li = e.target.closest("li[data-id]");
+            if (li) select(Number(li.dataset.id), true);
+        });
+
+        // Spans of the next TRACK_MIN minutes (seconds from now) where flag(sample) holds
+        function runs(track, flag) {
+            const out = [];
+            let cur = null;
+            for (const q of track) {
+                if (q[3] < 0) continue;
+                if (flag(q)) { if (!cur) out.push(cur = [q[3], q[3]]); cur[1] = q[3] + TRACK_STEP_S; } else cur = null;
+            }
+            return out;
+        }
+
+        function renderTimeline(track) {
+            const el = $("timeline");
+            const future = track ? track.filter((q) => q[3] >= 0) : [];
+            if (future.length < 2) { el.innerHTML = `<div class="tl-head">Loading pass forecast…</div>`; return; }
+            const total = future[future.length - 1][3] + TRACK_STEP_S, mins = (s) => Math.max(1, Math.round(s / 60));
+            const above = runs(track, (q) => q[4] > 0), vis = runs(track, (q) => q[5]);
+            const bar = (list, cls) => list.map(([a, b]) => `<span class="${cls}" style="left:${a / total * 100}%;width:${(Math.min(b, total) - a) / total * 100}%"></span>`).join("");
+            const aboveNote = !above.length ? `Not above the horizon in the next ${Math.round(total / 60)} min`
+                : above[0][0] <= TRACK_STEP_S ? `Above the horizon for ~${mins(above[0][1])} min more` : `Rises in ~${mins(above[0][0])} min`;
+            const visNote = !vis.length ? "No naked-eye pass in this window"
+                : vis[0][0] <= TRACK_STEP_S ? `Visible now for ~${mins(vis[0][1])} min more`
+                : `Visible in ~${mins(vis[0][0])} min for ~${mins(vis[0][1] - vis[0][0])} min`;
+            el.innerHTML = `<div class="tl-head">Next ${Math.round(total / 60)} min</div>
+                <div class="tl">${bar(above, "above")}${bar(vis, "vis")}</div>
+                <div class="tl-axis"><span>now</span><span>+${Math.round(total / 120)}</span><span>+${Math.round(total / 60)} min</span></div>
+                <div class="tl-note">${aboveNote}<br>${visNote}</div>`;
+        }
+
+        function renderInfo() {
+            const s = selected != null && sats.get(selected);
+            $("info").classList.toggle("show", !!s);
+            if (!s) return;
+            const a = s.a;
+            $("info-name").textContent = a.name;
+            $("info-sub").textContent = `NORAD ${a.norad} · ${a.group === "stations" ? "Space station" : "Bright satellite"}`;
+            const why = a.visible ? "Visible to the naked eye"
+                : !a.above_horizon ? "Below the horizon"
+                : !a.sunlit ? "In Earth's shadow"
+                : sunAlt != null && sunAlt >= -3 ? "Sky too bright (daylight)" : "Not visible";
+            $("info-stats").innerHTML = [["Elevation", `${a.alt_deg.toFixed(1)}°`], ["Azimuth", `${Math.round(a.az_deg)}° ${compass(a.az_deg)}`],
+                ["Range", km(a.range_km)], ["Height", km(a.height_km)]]
+                .map(([k, v]) => `<div><small>${k}</small><b>${esc(v)}</b></div>`).join("");
+            const rows = [
+                ["NORAD", a.norad],
+                ["Group", a.group === "stations" ? "Station" : "Bright"],
+                ["Lighting", a.sunlit ? "Sunlit" : "In Earth's shadow"],
+                ["Visibility", why],
+                ["In camera view", a.in_view ? "yes" : "no"],
+                ["Sub-point", `${a.lat.toFixed(2)}°, ${a.lon.toFixed(2)}°`],
+            ];
+            $("info-dl").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
+            renderTimeline(s.track);
+            $("info-link").href = `https://www.n2yo.com/satellite/?s=${encodeURIComponent(a.norad)}`;
+            showCamera();
+        }
+
+        function select(id, fly = false) {
+            const prev = selected;
+            selected = id;
+            if (id !== prev) { stopCamera(); rebuildTrack(); poll(); }   // the next poll brings the new selection's track
+            for (const k of [prev, id]) {
+                const s = k != null && sats.get(k);
+                if (!s) continue;
+                if (s.label) s.label.classList.toggle("selected", k === id);
+            }
+            if (fly && id != null && sats.get(id) && !camMode) setCamMode("track");   // selecting a satellite follows it
+            renderList();
+            renderInfo();
+            map.triggerRepaint();
+        }
+
+        function updateCamFoot() {
+            const el = $("cam-foot");
+            if (!station || !camera) { el.classList.remove("show"); return; }
+            const f = (v) => (v == null ? "--" : Math.round(v));
+            const fov = camera.fov_horizontal_deg != null ? ` · FOV ${f(camera.fov_horizontal_deg)}°${camera.fov_vertical_deg != null ? `×${f(camera.fov_vertical_deg)}°` : ""}` : "";
+            $("cam-foot-text").textContent = `Camera ${Math.abs(station.lat).toFixed(2)}${station.lat >= 0 ? "N" : "S"} ${Math.abs(station.lon).toFixed(2)}${station.lon >= 0 ? "E" : "W"} · az ${f(camera.pointing_az_deg)}° · alt ${f(camera.pointing_alt_deg)}°${fov}`;
+            el.classList.add("show");
+        }
+
+        // ---------------------------------------------------------------- controls
+        $("lay-sats").onchange = (e) => { layerOn.sats = e.target.checked; map.triggerRepaint(); };
+        $("lay-tracks").onchange = (e) => { layerOn.tracks = e.target.checked; map.triggerRepaint(); };
+        $("lay-terrain").onchange = (e) => { layerOn.terrain = e.target.checked; map.setTerrain(e.target.checked ? { source: "dem", exaggeration: 1 } : null); map.triggerRepaint(); };
+        $("info-close").onclick = () => select(null);
+        $("btn-track").onclick = () => setCamMode("track");
+        $("cam-stop").onclick = () => stopCamera();
+        $("list-toggle").onclick = () => $("list").classList.toggle("collapsed");
+        $("filters").onclick = (e) => {
+            const b = e.target.closest("button[data-filter]");
+            if (!b) return;
+            filter = b.dataset.filter; setPref("filter", filter); renderList();
+        };
+        $("search").oninput = (e) => { query = e.target.value; renderList(); };
+        $("sort").value = sortBy;
+        $("sort").onchange = (e) => { sortBy = e.target.value; setPref("sort", sortBy); renderList(); };
+        $("btn-base-terrain").classList.remove("on");   // setBase() marks the active one once the style is ready
+        $("btn-base-terrain").onclick = () => setBase("terrain");
+        $("btn-base-google").onclick = () => setBase("google");
+        $("btn-base-sat").onclick = () => setBase("sat");
+        $("btn-labels").classList.toggle("on", showLabels);
+        $("btn-labels").onclick = (e) => { showLabels = e.target.classList.toggle("on"); setPref("labels", showLabels ? "1" : "0"); map.triggerRepaint(); };
+        $("btn-home").onclick = () => {
+            stopCamera();
+            if (station) map.easeTo({ center: [station.lon, station.lat], ...HOME_VIEW, duration: 1200 });
+        };
+        if (window.innerWidth <= 700) $("list").classList.add("collapsed");
+        // The map lives in #stage (beside the sidebar), not the window: resize it with its container
+        if (window.ResizeObserver) new ResizeObserver(() => map.resize()).observe($("stage"));
+        window.satellites3d = { map, sats, layer: satsLayer };   // for inspection from the console
+    </script>
+</body>
