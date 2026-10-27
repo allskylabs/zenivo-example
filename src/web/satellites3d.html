@@ -344,6 +344,7 @@
         // Globe-only view: a spherical Earth (day/night textures, optional atmosphere) with every satellite, its recent
         // trail and the selected one's track drawn in 3D. Orbits come from /api/satellites (CelesTrak TLEs, SGP4 on the server).
         const POLL_MS = 2000;
+        const TRAIL_EVERY_MS = 30000;
         const TRACK_MIN = 90;         // minutes of future track requested for the selected satellite
         const TRAIL_S = 1800;         // seconds of recent path requested for every satellite (shows its direction of travel)
         const TRACK_STEP_S = 30;      // sample spacing of the server's track
@@ -380,7 +381,7 @@
         const layerOn = { sats: true, tracks: true, atmos: pref("atmos", "1") === "1", foot: pref("foot", "1") === "1" };
         let footEl = Math.max(0, Math.min(60, Number(pref("footel", "0")) || 0));   // degrees above the horizon
         let globe = null;                   // the globe's three.js state, built at startup
-        let lastFetch = 0, inflight = false, again = false;
+        let lastFetch = 0, lastTrailFetch = 0, inflight = false, again = false;
 
         // ---------------------------------------------------------------- three.js shared materials
         const FOOT_N = 128, FOOT_RINGS = 10;
@@ -468,7 +469,8 @@
                 if (ahead && mod(vT, 36.0) > 13.0) discard;   // short dashes where the satellite has yet to go: a prediction, not an observation
                 float edge = 1.0 - abs(vSide);
                 vec3 col = vVis > 0.5 ? vec3(0.13, 0.83, 0.93) : vec3(0.52, 0.6, 0.74);
-                float a = (ahead ? 0.7 : 0.6) * (vVis > 0.5 ? 1.0 : 0.7) * smoothstep(0.0, 0.7, edge) * uBright * smoothstep(0.0, 1.0, tail);
+                float far = 1.0 - 0.75 * smoothstep(600.0, 4800.0, vT - uNow);   // the further ahead, the less certain: fainter
+                float a = (ahead ? 0.7 * far : 0.6) * (vVis > 0.5 ? 1.0 : 0.7) * smoothstep(0.0, 0.7, edge) * uBright * smoothstep(0.0, 1.0, tail);
                 gl_FragColor = vec4(col * (0.75 + 0.5 * edge), a);
             }`;
         function trackMaterial(width, bright, depthTest = false, tail = 0.45, ahead = 1.0) {   // tail: share of the flown path over which its old end tapers
@@ -592,7 +594,10 @@
             inflight = true; again = false;
             lastFetch = Date.now();
             const ids = selected != null ? `&ids=${selected}` : "";
-            fetch(`/api/satellites?track=${TRACK_MIN}&below=true&limit=400&trail=${TRAIL_S}${ids}`).then((r) => r.json()).then(update).catch(() => {
+            // The long recent paths are costly to compute: ask for them now and then, the head is kept current from the fast polls
+            const withTrail = Date.now() - lastTrailFetch > TRAIL_EVERY_MS;
+            if (withTrail) lastTrailFetch = Date.now();
+            fetch(`/api/satellites?track=${TRACK_MIN}&below=true&limit=400&trail=${withTrail ? TRAIL_S : 0}${ids}`).then((r) => r.json()).then(update).catch(() => {
                 $("status").textContent = "Satellite data unavailable";
             }).finally(() => { inflight = false; if (again) poll(); });
         }
@@ -622,6 +627,7 @@
                 }
                 s.a = a;
                 setFix(s, a, now);
+                if (a.trail) s.trailBase = a.trail.slice(0, -1);   // the server's last point is 'now'; the head comes from this poll's position
                 s.track = a.track || null;
                 s.trackT = now;
                 // Every satellite gets a label; the render loop hides the ones that would overlap a more important one
@@ -1115,8 +1121,8 @@
             if (!globe) return;
             const chains = [];
             for (const s of sats.values()) {
-                const tr = s.a && s.a.trail;
-                if (!tr || tr.length < 2) continue;
+                const tr = s.trailBase && s.a && [...s.trailBase, [s.a.lat, s.a.lon, s.a.height_km, 0]];
+                if (!tr || tr.length < 3) continue;
                 const [mk, gain] = trailStyle(s);
                 chains.push({ pts: smoothPath(tr.map((q) => new THREE.Vector3(...ecef(q[0], q[1], q[2]))), 4), rgb: [mk.rgb[0] * gain, mk.rgb[1] * gain, mk.rgb[2] * gain] });
             }
