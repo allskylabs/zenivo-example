@@ -812,7 +812,7 @@
             const u = hit.normalize(), piv = u.clone().multiplyScalar(PIVOT_R), off = p.clone().sub(piv), D = Math.min(GLOBE_MAX, Math.max(0.4, off.length()));
             const hd = off.clone().addScaledVector(u, -off.dot(u));
             if (hd.lengthSq() < 1e-6) { const w0 = { u }; walkBasis(w0); hd.copy(_wn); }
-            g.walk = { piv, u, D, theta: Math.asin(Math.max(-1, Math.min(1, off.dot(u) / Math.max(off.length(), 1e-9)))), hd: hd.normalize(), dir: 1 };
+            g.walk = { piv, u, D, theta: Math.asin(Math.max(-1, Math.min(1, off.dot(u) / Math.max(off.length(), 1e-9)))), hd: hd.normalize() };
             g.controls.enabled = false;
         }
         function pivotFrame(G) {
@@ -821,8 +821,16 @@
             const place = () => c.position.copy(w.piv).addScaledVector(w.hd, w.D * Math.cos(w.theta)).addScaledVector(w.u, w.D * Math.sin(w.theta));
             place();
             w.grounded = false;
-            for (let i = 0; i < 400 && c.position.length() < R_EARTH + 0.002 && w.theta < 1.55; i++) { w.theta += 0.005; place(); w.grounded = true; }   // never below the ground
-            c.up.copy(w.u);
+            for (let i = 0; i < 800 && c.position.length() < R_EARTH + 0.002; i++) {   // never below the ground: back towards the zenith
+                w.theta += (w.theta < Math.PI / 2 ? 1 : -1) * 0.005; place(); w.grounded = true;
+            }
+            // Roll: follow the orbit continuously over the top, turning the view upright again over ~50 degrees past the
+            // zenith (a plain "up = vertical" would flip the picture in one frame there)
+            const v = _wf.copy(w.piv).sub(c.position).normalize(), th = w.theta;
+            const uc = _wt.copy(w.hd).multiplyScalar(-Math.sin(th)).addScaledVector(w.u, Math.cos(th));
+            const t = Math.min(1, Math.max(0, (th - Math.PI / 2) / 0.9)), phi = Math.PI * t * t * (3 - 2 * t);
+            _wn.crossVectors(v, uc);
+            c.up.copy(uc).multiplyScalar(Math.cos(phi)).addScaledVector(_wn, Math.sin(phi));
             c.lookAt(w.piv);
             if (w.lift) c.rotateX(w.lift);   // on the ground: tilt up to the sky overhead
             const near = Math.max(1e-4, (c.position.length() - R_EARTH) * 0.1);
@@ -881,11 +889,10 @@
                     const a = dx * 0.005, ca = Math.cos(a), sa = Math.sin(a);
                     _wt.crossVectors(w.u, w.hd).multiplyScalar(sa);
                     w.hd.multiplyScalar(ca).add(_wt);   // swing round the vertical through the point
-                    const dt = -dy * 0.005 * w.dir;   // + = higher; drag down = lower; once on the ground, further down tilts the view up to the sky
-                    if (dt < 0 && w.grounded) w.lift = Math.min(1.4, (w.lift || 0) - dt);
-                    else if (dt > 0 && w.lift > 0) w.lift = Math.max(0, w.lift - dt);
-                    else w.theta = Math.max(-1.2, w.theta + dt);
-                    if (w.theta > 1.52) { w.theta = 3.04 - w.theta; w.hd.negate(); w.dir = -w.dir; }   // over the top: carry on down the other side
+                    const dt = -dy * 0.005, low = w.theta < Math.PI / 2 ? -dt : dt;   // low > 0: moving away from the zenith, towards the ground
+                    if (low > 0 && w.grounded) w.lift = Math.min(1.4, (w.lift || 0) + low);   // on the ground: further down tilts the view up to the sky
+                    else if (low < 0 && w.lift > 0) w.lift = Math.max(0, w.lift + low);
+                    else w.theta = Math.max(-1.2, Math.min(Math.PI + 1.2, w.theta + dt));   // over the top and down the far side
                     return;
                 }
                 if (drag.move) {   // walk over the ground: drag up = forward, sideways = strafe
