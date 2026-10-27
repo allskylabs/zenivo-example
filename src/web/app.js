@@ -2768,8 +2768,10 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.strokeStyle = "rgba(251, 191, 36, 0.95)";
             ctx.fillStyle = "rgba(251, 191, 36, 0.95)";
             ctx.lineWidth = 1.5;
+            // The circle is a margin for the timing error (~1.5 s of travel): bigger for a plane that crosses the frame faster
+            const rad = a.frame_v ? Math.max(16, Math.min(44, 14 + Math.hypot(a.frame_v[0] * renderW, a.frame_v[1] * renderH) * 1.5)) : 16;
             ctx.beginPath();
-            ctx.arc(x, y, 12, 0, Math.PI * 2);
+            ctx.arc(x, y, rad, 0, Math.PI * 2);
             ctx.save();
             ctx.globalAlpha = 0.6;
             ctx.stroke();
@@ -2781,7 +2783,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.shadowColor = "rgba(2, 6, 23, 0.95)";
             ctx.shadowBlur = 4;
             ctx.textAlign = x > offsetX + renderW * 0.75 ? "right" : "left";
-            ctx.fillText(txt, x + (ctx.textAlign === "left" ? 14 : -14), y);
+            ctx.fillText(txt, x + (ctx.textAlign === "left" ? rad + 3 : -(rad + 3)), y);
             ctx.shadowBlur = 0;
         });
         ctx.restore();
