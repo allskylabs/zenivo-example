@@ -811,8 +811,13 @@
             const hit = disc > 0 && -b - Math.sqrt(disc) > 0 ? p.clone().addScaledVector(f, -b - Math.sqrt(disc)) : p.clone();   // surface point at the view's centre (or under the camera)
             const u = hit.normalize(), piv = u.clone().multiplyScalar(PIVOT_R), off = p.clone().sub(piv), D = Math.min(GLOBE_MAX, Math.max(0.4, off.length()));
             const hd = off.clone().addScaledVector(u, -off.dot(u));
+            const su0 = _wf.set(0, 1, 0).applyQuaternion(g.cam.quaternion).clone(), theta = Math.asin(Math.max(-1, Math.min(1, off.dot(u) / Math.max(off.length(), 1e-9))));   // su0: the picture's up direction as it is now
+            if (Math.cos(theta) < 0.05) {   // straight above the point: pick the heading that keeps the picture the way up it is
+                const sh = su0.clone().addScaledVector(u, -su0.dot(u));
+                if (sh.lengthSq() > 1e-6) hd.copy(sh).normalize().multiplyScalar(theta > 0 ? -1 : 1);
+            }
             if (hd.lengthSq() < 1e-6) { const w0 = { u }; walkBasis(w0); hd.copy(_wn); }
-            g.walk = { piv, u, D, theta: Math.asin(Math.max(-1, Math.min(1, off.dot(u) / Math.max(off.length(), 1e-9)))), hd: hd.normalize(), su0: _wf.set(0, 1, 0).applyQuaternion(g.cam.quaternion).clone() };   // su0: the picture's up direction as it is now
+            g.walk = { piv, u, D, theta, hd: hd.normalize(), su0 };
             g.controls.enabled = false;
         }
         function pivotFrame(G) {
