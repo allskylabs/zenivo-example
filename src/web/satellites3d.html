@@ -769,9 +769,11 @@
             resizeGlobe();
         }
 
-        // Ctrl + left-drag moves the camera: up/down changes its altitude (down to the ground) with the view direction kept,
-        // sideways turns the view on the spot. Scrolling in past the closest orbit also lowers it. Ground view: left-drag
-        // looks around, right-drag walks, scroll out or Esc leaves
+        // Ctrl + left-drag with nothing selected works like orbiting a selected satellite, around a fixed point just above
+        // the atmosphere over the view's centre: drag down = the camera sinks towards the horizon (down to the ground,
+        // looking up at that point), drag up = it rises over it, sideways = swing round it, scroll = nearer / farther.
+        // Scrolling in past the closest orbit instead lowers the camera in a free ground view (left-drag looks around,
+        // right-drag walks). Esc, the Station button or scrolling right out leaves either view
         const WALK_H0 = GLOBE_MIN - R_EARTH, WALK_HMIN = 0.0005, WALK_HMAX = GLOBE_MAX - R_EARTH;   // altitudes, 1 unit = 1000 km
         const _wn = new THREE.Vector3(), _we = new THREE.Vector3(), _wf = new THREE.Vector3(), _wt = new THREE.Vector3();
         function walkBasis(w) {   // _wn = north, _we = east at the camera's spot
@@ -793,7 +795,8 @@
         }
         function exitWalk(g) {
             if (!g.walk) return;
-            g.cam.position.copy(g.walk.u).multiplyScalar(R_EARTH + Math.max(WALK_H0, g.walk.h));
+            if (g.walk.piv) g.cam.position.setLength(Math.min(GLOBE_MAX, Math.max(GLOBE_MIN, g.cam.position.length())));
+            else g.cam.position.copy(g.walk.u).multiplyScalar(R_EARTH + Math.max(WALK_H0, g.walk.h));
             g.walk = null;
             g.cam.up.set(0, 1, 0);
             g.cam.near = 0.1; g.cam.updateProjectionMatrix();
@@ -801,7 +804,31 @@
             g.controls.enabled = true;
             g.controls.update();
         }
+        const PIVOT_R = R_EARTH * 1.04;   // just above the atmosphere shell (1.03)
+        function enterPivot(g) {
+            const p = g.cam.position, f = _wt.set(0, 0, -1).applyQuaternion(g.cam.quaternion);
+            const b = p.dot(f), disc = b * b - (p.lengthSq() - R_EARTH * R_EARTH);
+            const hit = disc > 0 && -b - Math.sqrt(disc) > 0 ? p.clone().addScaledVector(f, -b - Math.sqrt(disc)) : p.clone();   // surface point at the view's centre (or under the camera)
+            const u = hit.normalize(), piv = u.clone().multiplyScalar(PIVOT_R), off = p.clone().sub(piv), D = Math.min(GLOBE_MAX, Math.max(0.4, off.length()));
+            const hd = off.clone().addScaledVector(u, -off.dot(u));
+            if (hd.lengthSq() < 1e-6) { const w0 = { u }; walkBasis(w0); hd.copy(_wn); }
+            g.walk = { piv, u, D, theta: Math.asin(Math.max(-1, Math.min(1, off.dot(u) / Math.max(off.length(), 1e-9)))), hd: hd.normalize() };
+            g.controls.enabled = false;
+        }
+        function pivotFrame(G) {
+            const w = G.walk, c = G.cam;
+            w.hd.addScaledVector(w.u, -w.hd.dot(w.u)).normalize();
+            const place = () => c.position.copy(w.piv).addScaledVector(w.hd, w.D * Math.cos(w.theta)).addScaledVector(w.u, w.D * Math.sin(w.theta));
+            place();
+            for (let i = 0; i < 400 && c.position.length() < R_EARTH + 0.002 && w.theta < 1.55; i++) { w.theta += 0.005; place(); }   // never below the ground
+            c.up.copy(w.u);
+            c.lookAt(w.piv);
+            const near = Math.max(1e-4, (c.position.length() - R_EARTH) * 0.1);
+            if (Math.abs(near - c.near) > 1e-9 || Math.abs(c.far - 1000) > 1) { c.near = Math.min(near, 0.1); c.updateProjectionMatrix(); }
+            c.updateMatrixWorld();
+        }
         function walkFrame(G) {
+            if (G.walk.piv) { pivotFrame(G); return; }
             const w = G.walk, pitch = w.pitch, cp = Math.cos(pitch);
             walkBasis(w);
             _wf.set(0, 0, 0).addScaledVector(_wn, cp * Math.cos(w.yaw)).addScaledVector(_we, cp * Math.sin(w.yaw)).addScaledVector(w.u, Math.sin(pitch));
@@ -823,6 +850,11 @@
                 }
                 e.preventDefault(); e.stopImmediatePropagation();
                 const w = g.walk;
+                if (w.piv) {
+                    if (e.deltaY > 0 && w.D >= 12) { exitWalk(g); return; }
+                    w.D = Math.min(GLOBE_MAX, Math.max(0.25, w.D * Math.exp(e.deltaY * 0.0025)));
+                    return;
+                }
                 if (e.deltaY > 0 && w.h >= WALK_H0) { exitWalk(g); return; }
                 w.h = Math.min(WALK_HMAX, Math.max(WALK_HMIN, w.h * Math.exp(e.deltaY * 0.0025)));
             }, { passive: false, capture: true });
@@ -838,9 +870,17 @@
                 if (!drag) return;
                 const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
                 drag.x = e.clientX; drag.y = e.clientY;
-                if (drag.alt && !g.walk) enterWalk(g);   // Ctrl-drag from the orbit view: carry on from where the camera is
+                if (drag.alt && !g.walk) enterPivot(g);   // Ctrl-drag from the orbit view: swing round a point above the atmosphere
                 const w = g.walk;
                 if (!w) return;
+                if (w.piv) {
+                    if (drag.move) return;
+                    const a = dx * 0.005, ca = Math.cos(a), sa = Math.sin(a);
+                    _wt.crossVectors(w.u, w.hd).multiplyScalar(sa);
+                    w.hd.multiplyScalar(ca).add(_wt);   // swing round the vertical through the point
+                    w.theta = Math.max(-1.2, Math.min(1.55, w.theta - dy * 0.005));
+                    return;
+                }
                 if (drag.move) {   // walk over the ground: drag up = forward, sideways = strafe
                     walkBasis(w);
                     _wf.set(0, 0, 0).addScaledVector(_wn, Math.cos(w.yaw)).addScaledVector(_we, Math.sin(w.yaw));
