@@ -1165,7 +1165,8 @@
         }
 
         // Selected satellite's path at orbit height and just above the ground (called from rebuildTrack)
-        const GROUND_AHEAD_S = Infinity, TICK_S = 900;   // the whole forecast on the ground too: the "two lines" note and the time dots explain why laps do not overlap
+        // A forecast is a moment's view: a lap later the Earth has turned away, so the sky orbit is shown for half a lap only
+        const SKY_AHEAD_S = 2700, GROUND_AHEAD_S = Infinity, TICK_S = 900;
         function rebuildTrack() {
             if (!globe) return;
             for (const mesh of globe.trackMeshes) { globe.scene.remove(mesh); mesh.geometry.dispose(); }
@@ -1177,17 +1178,18 @@
             const tr = s.track, T = tr.map((q) => s.trackT + q[3]), V = tr.map((q) => (q[5] ? 1 : 0));
             for (const mt of Object.values(globe.trackMats)) mt.uniforms.uT0.value = T[0];
             const tb = nowS();   // the orbit is drawn as the ellipse it is in space (a closed loop), turned with the Earth each frame
-            const orbit = tr.map((q, i) => new THREE.Vector3(...ecef(q[0], inertialLon(q[1], T[i], tb), q[2])));
+            const oi = tr.map((q, i) => i).filter((i) => tr[i][3] <= SKY_AHEAD_S);
+            const orbit = oi.map((i) => new THREE.Vector3(...ecef(tr[i][0], inertialLon(tr[i][1], T[i], tb), tr[i][2])));
             globe.orbitT = tb;
             // How much of the path ahead is drawn on the Earth
             const gi = tr.map((q, i) => i).filter((i) => tr[i][3] <= GROUND_AHEAD_S);
             const ground = gi.map((i) => new THREE.Vector3(...ecef(tr[i][0], tr[i][1], 8)));
-            globe.trackMeshes = [buildRibbon(orbit, T, V, globe.trackMats.orbit), buildRibbon(ground, gi.map((i) => T[i]), gi.map((i) => V[i]), globe.trackMats.ground)];
+            globe.trackMeshes = [buildRibbon(orbit, oi.map((i) => T[i]), oi.map((i) => V[i]), globe.trackMats.orbit), buildRibbon(ground, gi.map((i) => T[i]), gi.map((i) => V[i]), globe.trackMats.ground)];
             // A dot every 15 min ahead, on the sky orbit (white) and on the ground track (amber), so the moment of each point is readable
             tr.forEach((q, i) => {
                 if (q[3] <= 0 || q[3] % TICK_S) return;
                 const text = `+${q[3] / 60} min`;
-                for (const [kind, mesh, vec] of [["sky", 0, orbit[i]], ["ground", 1, ground[gi.indexOf(i)]]]) {
+                for (const [kind, mesh, vec] of [["sky", 0, orbit[oi.indexOf(i)]], ["ground", 1, ground[gi.indexOf(i)]]]) {
                     if (!vec) continue;
                     const el = document.createElement("div");
                     el.className = `tick ${kind}`; el.textContent = text;
