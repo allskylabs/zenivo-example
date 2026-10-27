@@ -459,7 +459,7 @@
                 if (ahead && mod(vT, 36.0) > 13.0) discard;   // short dashes where the satellite has yet to go: a prediction, not an observation
                 float edge = 1.0 - abs(vSide);
                 vec3 col = vVis > 0.5 ? vec3(0.13, 0.83, 0.93) : vec3(0.52, 0.6, 0.74);
-                float a = (ahead ? 0.6 : 0.55) * (vVis > 0.5 ? 1.0 : 0.7) * smoothstep(0.0, 0.7, edge) * uBright;
+                float a = (ahead ? 0.7 : 0.6) * (vVis > 0.5 ? 1.0 : 0.7) * smoothstep(0.0, 0.7, edge) * uBright;
                 gl_FragColor = vec4(col * (0.75 + 0.5 * edge), a);
             }`;
         function trackMaterial(width, bright, depthTest = false, ahead = 1.0) {
@@ -826,7 +826,7 @@
             const g = {
                 canvas, renderer, scene: gscene, cam: gcam, controls, earthMat, atmos, pointsMat, aimed: false, t: nowS(), raf: 0,
                 pointGeo: pointGeometry(MAX_POINTS), stationGeo: pointGeometry(1), shadowGeo: pointGeometry(1), screen: [], trackMeshes: [],
-                trackMats: { orbit: trackMaterial(5, 1.0, true), ground: trackMaterial(3, 0.5, true) },
+                trackMats: { orbit: trackMaterial(7, 1.7, true), ground: trackMaterial(4.5, 1.0, true) },
                 trailsGeo: new THREE.BufferGeometry(), sun: new THREE.Vector3(), pan: new THREE.Vector3(), lastTarget: new THREE.Vector3(),
             };
             for (const geo of [g.pointGeo, g.stationGeo, g.shadowGeo]) {
