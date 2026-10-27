@@ -244,7 +244,7 @@
         <dl id="info-dl"></dl>
         <div id="timeline"></div>
         <div class="links">
-            <button id="btn-track" title="Keep the camera on this satellite; rotate and zoom around it">Track</button>
+            <button id="btn-track" title="Centre the view on this satellite: rotate and zoom around it from any side">Orbit</button>
             <a id="info-link" target="_blank" rel="noopener">N2YO ↗</a>
         </div>
     </div>
@@ -294,7 +294,7 @@
         };
         const MAX_POINTS = 512;
         const R_EARTH = 6.371;        // globe: 1 unit = 1000 km
-        const GLOBE_DIST = 20, GLOBE_MIN = 6.8, GLOBE_MAX = 40;   // camera distance from the Earth's centre
+        const GLOBE_DIST = 20, GLOBE_MIN = 6.8, GLOBE_MAX = 40, SAT_DIST = 3.5, SAT_MIN = 0.25;   // camera distance from the Earth's centre
         const TEX = "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/";
 
         const $ = (id) => document.getElementById(id);
@@ -556,11 +556,12 @@
         }
 
         // ---------------------------------------------------------------- camera tracking
-        // Track turns the globe to the selected satellite's sub-point (see globeFrame); the viewer's own
-        // rotate / zoom gestures (OrbitControls) keep working, and dragging ends tracking
+        // Orbit makes the selected satellite the centre of rotation (see globeFrame); rotate / zoom gestures
+        // (OrbitControls) work around it, and Esc or Stop returns to the whole-Earth view
         function setCamMode(mode) {
             if (selected == null || !sats.has(selected) || camMode === mode) { stopCamera(); return; }
             camMode = mode;
+            if (globe) globe.zoomTo = SAT_DIST;
             showCamera();
         }
 
@@ -573,7 +574,7 @@
         function showCamera() {
             const a = selected != null && sats.get(selected)?.a;
             $("cam-badge").classList.toggle("show", !!(camMode && a));
-            if (camMode && a) $("cam-text").textContent = `Tracking ${a.name} · Esc to stop`;
+            if (camMode && a) $("cam-text").textContent = `Orbiting ${a.name} · Esc to release`;
             $("btn-track").classList.toggle("on", camMode === "track");
         }
 
@@ -700,7 +701,7 @@
             g.los = line2(solid(LOS_MAT), gscene);
             g.drop = line2(solid(DROP_MAT), gscene);
 
-            canvas.addEventListener("pointerdown", (e) => { g.down = [e.clientX, e.clientY]; stopCamera(); });   // dragging ends tracking
+            canvas.addEventListener("pointerdown", (e) => { g.down = [e.clientX, e.clientY]; g.zoomTo = null; });   // the viewer takes over the zoom
             canvas.addEventListener("click", (e) => {
                 if (g.down && Math.hypot(e.clientX - g.down[0], e.clientY - g.down[1]) > 5) return;   // end of a drag
                 const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
@@ -780,6 +781,7 @@
             return _d.multiplyScalar(t).add(c).lengthSq() < R_EARTH * R_EARTH;
         }
 
+        const _goal = new THREE.Vector3(), _prev = new THREE.Vector3();
         function globeFrame() {
             const G = globe;
             if (document.hidden) { G.raf = 0; return; }
@@ -789,11 +791,21 @@
             const W = G.canvas.clientWidth, H = G.canvas.clientHeight;
             if (station && !G.aimed) aimGlobe();
             const sel = selected != null ? sats.get(selected) : null;
-            if (camMode && sel && sel.fix) {   // Track: turn the view to the satellite's sub-point, keeping the distance
-                const ps = positionAt(sel, now), dist = G.cam.position.length();
-                const target = new THREE.Vector3(...ecef(ps.lat, ps.lon, 0)).normalize();
-                G.cam.position.normalize().lerp(target, 1 - Math.exp(-dt * 3)).setLength(dist);
+            // Orbit: the selected satellite becomes the centre of rotation, so the viewer can swing around it and
+            // look at it from any side; the camera moves with it and the offset the viewer chose is kept
+            const orbiting = !!(camMode && sel && sel.fix);
+            const goal = _goal.set(0, 0, 0);
+            if (orbiting) { const ps = positionAt(sel, now); goal.set(...ecef(ps.lat, ps.lon, ps.h / 1000)); }
+            const prevT = _prev.copy(G.controls.target);
+            G.controls.target.lerp(goal, 1 - Math.exp(-dt * 6));
+            G.cam.position.add(prevT.negate().add(G.controls.target));
+            if (orbiting && G.zoomTo != null) {   // first approach: ease in to a comfortable distance, unless the viewer zooms
+                const off = _prev.subVectors(G.cam.position, G.controls.target), d = off.length();
+                const nd = d + (G.zoomTo - d) * 0.08;
+                G.cam.position.copy(G.controls.target).add(off.setLength(nd));
+                if (Math.abs(G.zoomTo - nd) < 0.02) G.zoomTo = null;
             }
+            G.controls.minDistance = orbiting ? SAT_MIN : GLOBE_MIN;
             G.controls.rotateSpeed = Math.max(0.15, Math.min(1, (G.cam.position.length() - R_EARTH) / 14));   // slower close to the ground
             G.controls.update();
             G.cam.updateMatrixWorld();
