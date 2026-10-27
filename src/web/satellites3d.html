@@ -844,8 +844,12 @@
         }
 
         // ---------------------------------------------------------------- camera tracking
+        // While the user is rotating, tilting or zooming, steering is paused so the gesture is not overridden every
+        // frame; it resumes (keeping the chosen bearing, pitch and zoom) a moment after they let go
+        let gestureUntil = 0, pointerDown = false;
+        const pauseSteering = (ms = 700) => { gestureUntil = Math.max(gestureUntil, performance.now() + ms); };
         function steerCamera(p) {
-            if (!camMode) return;
+            if (!camMode || pointerDown || performance.now() < gestureUntil) return;
             const mc = new maplibregl.MercatorCoordinate(origin.x + p.x, origin.y + p.y, 0);
             const o = { center: mc.toLngLat(), elevation: p.h };
             if (camZoom != null) {
@@ -893,7 +897,11 @@
         }
 
         map.on("dragstart", stopCamera);   // panning away ends tracking
-        map.on("wheel", () => { camZoom = null; });
+        map.on("wheel", () => { camZoom = null; pauseSteering(); });
+        map.on("mousedown", () => { pointerDown = true; });
+        map.on("touchstart", () => { pointerDown = true; });
+        window.addEventListener("mouseup", () => { pointerDown = false; pauseSteering(250); });
+        window.addEventListener("touchend", () => { pointerDown = false; pauseSteering(250); });
         document.addEventListener("keydown", (e) => {
             if (e.key !== "Escape") return;
             if (view === "globe" && !camMode) select(null);   // globe: a second Esc deselects
