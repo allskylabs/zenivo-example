@@ -820,9 +820,11 @@
             w.hd.addScaledVector(w.u, -w.hd.dot(w.u)).normalize();
             const place = () => c.position.copy(w.piv).addScaledVector(w.hd, w.D * Math.cos(w.theta)).addScaledVector(w.u, w.D * Math.sin(w.theta));
             place();
-            for (let i = 0; i < 400 && c.position.length() < R_EARTH + 0.002 && w.theta < 1.55; i++) { w.theta += 0.005; place(); }   // never below the ground
+            w.grounded = false;
+            for (let i = 0; i < 400 && c.position.length() < R_EARTH + 0.002 && w.theta < 1.55; i++) { w.theta += 0.005; place(); w.grounded = true; }   // never below the ground
             c.up.copy(w.u);
             c.lookAt(w.piv);
+            if (w.lift) c.rotateX(w.lift);   // on the ground: tilt up to the sky overhead
             const near = Math.max(1e-4, (c.position.length() - R_EARTH) * 0.1);
             if (Math.abs(near - c.near) > 1e-9 || Math.abs(c.far - 1000) > 1) { c.near = Math.min(near, 0.1); c.updateProjectionMatrix(); }
             c.updateMatrixWorld();
@@ -878,7 +880,10 @@
                     const a = dx * 0.005, ca = Math.cos(a), sa = Math.sin(a);
                     _wt.crossVectors(w.u, w.hd).multiplyScalar(sa);
                     w.hd.multiplyScalar(ca).add(_wt);   // swing round the vertical through the point
-                    w.theta = Math.max(-1.2, Math.min(1.55, w.theta - dy * 0.005));
+                    const dt = -dy * 0.005;   // drag down = lower; once on the ground, further down tilts the view up to the sky
+                    if (dt < 0 && w.grounded) w.lift = Math.min(1.4, (w.lift || 0) - dt);
+                    else if (dt > 0 && w.lift > 0) w.lift = Math.max(0, w.lift - dt);
+                    else w.theta = Math.max(-1.2, Math.min(1.55, w.theta + dt));
                     return;
                 }
                 if (drag.move) {   // walk over the ground: drag up = forward, sideways = strafe
