@@ -605,8 +605,9 @@
         function pollTrails() {
             if (trailsBusy || document.hidden || !sats.size || Date.now() - lastTrailFetch < TRAIL_EVERY_MS) return;
             trailsBusy = true; lastTrailFetch = Date.now();
+            const t0 = nowS();
             fetch(`/api/satellites?below=true&limit=400&trail=${TRAIL_S}`).then((r) => r.json()).then((d) => {
-                for (const a of d.satellites || []) { const s = sats.get(a.norad); if (s && a.trail) s.trailBase = a.trail.slice(0, -1); }
+                for (const a of d.satellites || []) { const s = sats.get(a.norad); if (s && a.trail) { s.trailBase = a.trail.slice(0, -1); s.trailT = t0; } }
                 rebuildTrails();
             }).catch(() => { /* the next try */ }).finally(() => { trailsBusy = false; });
         }
@@ -745,6 +746,10 @@
 
         // ---------------------------------------------------------------- globe: a three.js scene of the spherical Earth
         // Axes: y = north pole, lon 0 on +x, lon 90E on -z; SphereGeometry's u = 0 is lon -180, so the texture lines up as is
+        // The orbit is an ellipse fixed in space while the Earth turns under it. This globe is drawn Earth-fixed, so a path
+        // in it drifts west by this much per second; an orbit shown "as it is in space" is the path with that drift taken out
+        const EARTH_RATE = 360.9856 / 86400 * D2R;   // rad/s, one sidereal turn
+        const inertialLon = (lon, tSample, tNow) => lon + EARTH_RATE / D2R * (tSample - tNow);   // where a point seen at tSample sits now, if it stayed fixed in space
         function ecef(lat, lon, hKm) {
             const r = R_EARTH + hKm / 1000, la = lat * D2R, lo = lon * D2R;
             return [r * Math.cos(la) * Math.cos(lo), r * Math.sin(la), -r * Math.cos(la) * Math.sin(lo)];
@@ -1129,11 +1134,13 @@
             if (!globe) return;
             const chains = [];
             for (const s of sats.values()) {
-                const tr = s.trailBase && s.a && [...s.trailBase, [s.a.lat, s.a.lon, s.a.height_km, 0]];
+                const tn = nowS();
+                const tr = s.trailBase && s.a && [...s.trailBase.map((q) => [q[0], inertialLon(q[1], s.trailT + q[3], tn), q[2]]), [s.a.lat, s.a.lon, s.a.height_km, 0]];
                 if (!tr || tr.length < 3) continue;
                 const [mk, gain] = trailStyle(s);
                 chains.push({ pts: smoothPath(tr.map((q) => new THREE.Vector3(...ecef(q[0], q[1], q[2]))), 4), rgb: [mk.rgb[0] * gain, mk.rgb[1] * gain, mk.rgb[2] * gain] });
             }
+            globe.trailsT = nowS();
             const old = globe.trails.geometry;
             globe.trails.geometry = buildTrailGeometry(chains);
             old.dispose();
@@ -1148,7 +1155,9 @@
             if (!s || !s.track || s.track.length < 2) return;
             const tr = s.track, T = tr.map((q) => s.trackT + q[3]), V = tr.map((q) => (q[5] ? 1 : 0));
             for (const mt of Object.values(globe.trackMats)) mt.uniforms.uT0.value = T[0];
-            const orbit = tr.map((q) => new THREE.Vector3(...ecef(q[0], q[1], q[2])));
+            const tb = nowS();   // the orbit is drawn as the ellipse it is in space (a closed loop), turned with the Earth each frame
+            const orbit = tr.map((q, i) => new THREE.Vector3(...ecef(q[0], inertialLon(q[1], T[i], tb), q[2])));
+            globe.orbitT = tb;
             const ground = tr.map((q) => new THREE.Vector3(...ecef(q[0], q[1], 8)));
             globe.trackMeshes = [buildRibbon(orbit, T, V, globe.trackMats.orbit), buildRibbon(ground, T, V, globe.trackMats.ground)];
             for (const mesh of globe.trackMeshes) globe.scene.add(mesh);
@@ -1243,6 +1252,8 @@
             G.pointGeo.setDrawRange(0, n);
             G.screen = screen;
             for (const mesh of G.trackMeshes) mesh.visible = layerOn.tracks;
+            if (G.trackMeshes[0]) G.trackMeshes[0].rotation.y = -EARTH_RATE * (now - G.orbitT);   // the sky path stays fixed in space
+            G.trails.rotation.y = -EARTH_RATE * (now - (G.trailsT || now));
             G.trails.visible = layerOn.tracks;
             for (const mt of Object.values(G.trackMats)) mt.uniforms.uNow.value = now;
             sunDirection(G.sun);
