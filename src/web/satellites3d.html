@@ -27,6 +27,7 @@
             padding: 1px 4px; border-radius: 4px; user-select: none;
         }
         .sat-label small { display: block; font-weight: 400; color: var(--text-secondary); }
+        .sat-label.below { opacity: 0.55; }
         .sat-label.visible { color: #22d3ee; }
         .sat-label.in-view { color: var(--warning); }
         .sat-label.selected { background: color-mix(in srgb, var(--accent) 30%, transparent); }
@@ -671,17 +672,15 @@
                 setFix(s, a, now);
                 s.track = a.track || null;
                 s.trackT = now;
-                // Labels only for what matters: the selection, naked-eye passes, the camera's view and the stations
-                s.wantLabel = a.norad === selected || a.visible || a.in_view || a.group === "stations";
-                if (s.wantLabel) {
-                    if (!s.label) {
-                        s.label = document.createElement("div");
-                        s.label.addEventListener("click", (ev) => { ev.stopPropagation(); select(a.norad === selected ? null : a.norad, true); });
-                        $("labels").appendChild(s.label);
-                    }
-                    s.label.className = `sat-label${a.visible ? " visible" : ""}${a.in_view ? " in-view" : ""}${a.norad === selected ? " selected" : ""}`;
-                    s.label.innerHTML = `${esc(a.name)}<small>${Math.round(a.alt_deg)}° · ${km(a.height_km)}</small>`;
+                // Every satellite gets a label; the render loop hides the ones that would overlap a more important one
+                s.prio = a.norad === selected ? 0 : a.visible ? 1 : a.in_view ? 2 : a.above_horizon ? 3 : a.group === "stations" ? 4 : 5;
+                if (!s.label) {
+                    s.label = document.createElement("div");
+                    s.label.addEventListener("click", (ev) => { ev.stopPropagation(); select(a.norad === selected ? null : a.norad, true); });
+                    $("labels").appendChild(s.label);
                 }
+                s.label.className = `sat-label${a.visible ? " visible" : ""}${a.in_view ? " in-view" : ""}${a.norad === selected ? " selected" : ""}${a.above_horizon ? "" : " below"}`;
+                s.label.innerHTML = `${esc(a.name)}<small>${Math.round(a.alt_deg)}° · ${km(a.height_km)}</small>`;
             }
             for (const [id, s] of sats) {
                 if (seen.has(id)) continue;
@@ -752,6 +751,7 @@
 
                 const at = pointGeo.attributes;
                 const screen = [];
+                const labelCands = [];
                 let n = 0;
                 for (const [id, s] of sats) {
                     if (!s.fix || n >= MAX_POINTS) continue;
@@ -771,8 +771,7 @@
                     if (sc) screen.push([id, sc[0], sc[1]]);
                     if (s.label) {
                         const onScreen = sc && sc[0] > -50 && sc[0] < W + 50 && sc[1] > -50 && sc[1] < H + 50;
-                        s.label.style.display = showLabels && s.wantLabel && onScreen ? "" : "none";
-                        if (onScreen) { s.label.style.left = `${sc[0]}px`; s.label.style.top = `${sc[1] - 12}px`; }
+                        if (showLabels && onScreen) labelCands.push([s, sc]); else s.label.style.display = "none";
                     }
                     if (isSel) {
                         this.selPos = { x: p[0], y: p[1], h: ps.h };
@@ -783,6 +782,17 @@
                         dp.setXYZ(0, p[0], p[1], p[2]); dp.setXYZ(1, p[0], p[1], 0); dp.needsUpdate = true;
                         this.selTrack = layerOn.tracks && s.trackPts ? s.trackPts.map((q) => project([q.x, q.y, q.z])) : [];   // for click hit-testing
                     }
+                }
+                // Declutter: most important first, a label is dropped when its box overlaps one already placed
+                labelCands.sort((u, v) => u[0].prio - v[0].prio);
+                const placed = [];
+                for (const [s, sc] of labelCands) {
+                    const box = [sc[0] - 58, sc[1] - 46, sc[0] + 58, sc[1] - 10];   // the label sits centred above its marker
+                    const hit = s.prio > 0 && placed.some((b) => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1]);
+                    s.label.style.display = hit ? "none" : "";
+                    if (hit) continue;
+                    placed.push(box);
+                    s.label.style.left = `${sc[0]}px`; s.label.style.top = `${sc[1] - 12}px`;
                 }
                 if (selected == null || !sats.has(selected)) { losLine.visible = dropLine.visible = false; this.selTrack = []; }
                 for (const k of Object.keys(at)) at[k].needsUpdate = true;
