@@ -7,8 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
-    <link rel="stylesheet" href="/static/tokens.css?v=20261027lv3">
-    <link rel="stylesheet" href="/style.css?v=20261027lv3">
+    <link rel="stylesheet" href="/static/tokens.css?v=20261028ev1">
+    <link rel="stylesheet" href="/style.css?v=20261028ev1">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -161,7 +161,7 @@
                         <span>Clear time <strong id="cloud-clear">--</strong></span>
                         <span>Range <strong id="cloud-range">--</strong></span>
                         <span>Samples <strong id="cloud-samples">--</strong></span>
-                        <span class="cloud-legend"><i class="lg-night"></i>Night <i class="lg-low"></i>Low confidence</span>
+                        <span class="cloud-legend"><i class="lg-night"></i>Night <i class="lg-low"></i>Low confidence <i class="lg-ev ev-meteor"></i>Meteor <i class="lg-ev ev-plane"></i>Aircraft <i class="lg-ev ev-satellite"></i>Satellite <i class="lg-ev ev-flash"></i>Flash</span>
                     </div>
                     <div class="cloud-chart-wrap" id="cloud-chart-wrap">
                         <svg id="cloud-chart" role="img" aria-label="Cloud cover percentage over time"></svg>
@@ -169,6 +169,24 @@
                         <div class="cloud-empty hidden" id="cloud-empty">No cloud samples in this range yet. One is taken every analysis interval (Settings → Performance).</div>
                     </div>
                     <div class="card-foot cloud-caption" id="cloud-caption">Now <strong id="cloud-now">--</strong> / Avg <span id="cloud-avg-label">24h</span> <strong id="cloud-avg">--</strong></div>
+                    <div class="frame-viewer hidden" id="frame-viewer" role="dialog" aria-modal="true" aria-label="Archived frame">
+                        <div class="fv-box">
+                            <div class="fv-head">
+                                <strong id="fv-title">Frame</strong>
+                                <button type="button" class="fv-close" id="fv-close" aria-label="Close">&times;</button>
+                            </div>
+                            <div class="fv-img-wrap"><img id="fv-img" alt="Archived frame"><div class="fv-msg hidden" id="fv-msg"></div></div>
+                            <div class="fv-meta" id="fv-meta"></div>
+                            <div class="fv-nav">
+                                <button type="button" class="btn btn-sm btn-outline" data-step="-600">&laquo; 10 min</button>
+                                <button type="button" class="btn btn-sm btn-outline" data-step="-60">&lsaquo; 1 min</button>
+                                <button type="button" class="btn btn-sm btn-outline" data-step="60">1 min &rsaquo;</button>
+                                <button type="button" class="btn btn-sm btn-outline" data-step="600">10 min &raquo;</button>
+                                <a class="btn btn-sm btn-outline" id="fv-open" target="_blank" rel="noopener">Full size &#8599;</a>
+                                <a class="btn btn-sm btn-outline hidden" id="fv-crop" target="_blank" rel="noopener">Event crop &#8599;</a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="card histogram-card">
@@ -1212,9 +1230,9 @@
 
     <!-- App JavaScript -->
     <script src="/static/sky_catalog.js"></script>
-    <script src="/app.js?v=20261027lv3"></script>
-    <script src="/static/activity.js?v=20261027lv3"></script>
-    <script src="/static/focus.js?v=20261027lv3"></script>
+    <script src="/app.js?v=20261028ev1"></script>
+    <script src="/static/activity.js?v=20261028ev1"></script>
+    <script src="/static/focus.js?v=20261028ev1"></script>
     <script>
     // Settings sub-navigation: one section at a time, driven by the URL hash (/settings#detection)
     (function () {

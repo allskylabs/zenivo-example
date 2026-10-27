@@ -3369,6 +3369,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         let cloudData = null;
         let cloudGeom = null;
+        let cloudEvents = [];   // brief sky events inside the charted range
+        let viewTs = null;      // moment shown in the frame viewer (marked on the chart)
 
         const svgEl = (tag, attrs, parent) => {
             const el = document.createElementNS(SVG_NS, tag);
@@ -3389,7 +3391,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const box = cloudChart.getBoundingClientRect();
             const W = Math.max(280, Math.round(box.width));
             const H = Math.round(box.height) || 260;
-            const m = { l: 40, r: 12, t: 10, b: 24 };
+            const LANE = 16;   // event ticks sit in a strip under the plot, above the time labels
+            const m = { l: 40, r: 12, t: 10, b: 24 + LANE };
             const pw = W - m.l - m.r;
             const ph = H - m.t - m.b;
             const { start, end } = cloudData;
@@ -3457,7 +3460,15 @@ document.addEventListener("DOMContentLoaded", () => {
             if (pts.length <= 300) {
                 pts.filter((p) => (p.conf ?? 1) < 0.5).forEach((p) => svgEl("circle", { class: "cc-low", cx: x(p.t), cy: y(p.cc), r: 3.5 }, cloudChart));
             }
-            cloudGeom = { pts, x, y, m, pw, ph, W, H };
+            // Event lane: one tick per meteor / aircraft / satellite / flash, drawn on top so it stays clickable
+            const laneY = m.t + ph + 3;
+            svgEl("rect", { class: "ev-lane", x: m.l, y: laneY, width: pw, height: LANE - 3 }, cloudChart);
+            const evs = cloudEvents.filter((e) => e.start_ts >= start && e.start_ts <= end);
+            evs.forEach((e) => svgEl("rect", { class: `ev-tick ev-${e.type}`, x: (x(e.start_ts) - 1).toFixed(1), y: laneY + 1, width: 2, height: LANE - 5, rx: 0.5 }, cloudChart));
+            if (viewTs !== null && viewTs >= start && viewTs <= end) {
+                svgEl("line", { class: "cc-mark", x1: x(viewTs), x2: x(viewTs), y1: m.t, y2: laneY + LANE - 3 }, cloudChart);
+            }
+            cloudGeom = { pts, x, y, m, pw, ph, W, H, laneY, LANE, evs };
         }
 
         function showCloudTip(clientX) {
@@ -3488,6 +3499,85 @@ document.addEventListener("DOMContentLoaded", () => {
             cloudChart.querySelectorAll(".crosshair, .hover-sel").forEach((el) => el.remove());
         });
 
+        // ---- Frame viewer: click the chart (a moment) or an event tick to see the archived frame from then ----
+        const fv = document.getElementById("frame-viewer");
+        const fvImg = document.getElementById("fv-img");
+        const fvMsg = document.getElementById("fv-msg");
+        let fvEvent = null;
+        let fvReq = 0;
+        const EV_NAMES = { meteor: "Meteor", plane: "Aircraft", satellite: "Satellite", flash: "Flash" };
+
+        async function openFrameAt(ts, ev) {
+            if (ev !== undefined) fvEvent = ev;
+            viewTs = ts;
+            renderCloudChart();
+            fv.classList.remove("hidden");
+            const req = ++fvReq;
+            fvMsg.textContent = "Loading…";
+            fvMsg.classList.remove("hidden");
+            const nearest = cloudData && cloudData.points.length
+                ? cloudData.points.reduce((a, b) => (Math.abs(b.t - ts) < Math.abs(a.t - ts) ? b : a)) : null;
+            const cc = nearest && nearest.cc !== null && nearest.cc !== undefined && Math.abs(nearest.t - ts) < 1800 ? `${nearest.cc.toFixed(0)}% cloud` : "";
+            try {
+                const r = await fetch(`/api/frames/near?ts=${ts}`);
+                if (req !== fvReq) return;
+                if (!r.ok) throw new Error("none");
+                const f = await r.json();
+                viewTs = f.ts;
+                fvImg.src = f.url;
+                fvImg.classList.remove("hidden");
+                fvMsg.classList.add("hidden");
+                const gap = Math.abs(f.delta_s) > 90 ? ` · nearest frame is ${Math.round(Math.abs(f.delta_s) / 60)} min ${f.delta_s < 0 ? "before" : "after"}` : "";
+                document.getElementById("fv-title").textContent = fvEvent
+                    ? `${EV_NAMES[fvEvent.type] || fvEvent.type}${fvEvent.label ? " " + fvEvent.label : ""} · ${fmtTime(fvEvent.start_ts, true)} ${tzLabel}`
+                    : `Frame · ${fmtTime(f.ts, true)} ${tzLabel}`;
+                document.getElementById("fv-meta").innerHTML =
+                    `<span><strong>${fmtTime(f.ts, true)}</strong> ${tzLabel}${gap}</span>${cc ? `<span>${cc}</span>` : ""}` +
+                    (fvEvent && fvEvent.end_ts ? `<span>Event lasted ${Math.max(1, Math.round(fvEvent.end_ts - fvEvent.start_ts))} s</span>` : "");
+                document.getElementById("fv-open").href = f.url;
+                const crop = document.getElementById("fv-crop");
+                const cropUrl = fvEvent && (fvEvent.sky_url || fvEvent.thumbnail_url);
+                crop.classList.toggle("hidden", !cropUrl);
+                if (cropUrl) crop.href = cropUrl;
+                renderCloudChart();
+            } catch (e) {
+                if (req !== fvReq) return;
+                fvImg.classList.add("hidden");
+                fvMsg.textContent = "No archived frame near that time (frames are kept for a limited number of days).";
+                fvMsg.classList.remove("hidden");
+            }
+        }
+        function closeFrameViewer() {
+            fvReq++;
+            fv.classList.add("hidden");
+            viewTs = null;
+            fvEvent = null;
+            renderCloudChart();
+        }
+        document.getElementById("fv-close").addEventListener("click", closeFrameViewer);
+        fv.addEventListener("click", (e) => { if (e.target === fv) closeFrameViewer(); });
+        document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !fv.classList.contains("hidden")) closeFrameViewer(); });
+        fv.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => {
+            if (viewTs !== null) openFrameAt(viewTs + Number(b.dataset.step), null);   // stepping leaves the event
+        }));
+        let downAt = null;
+        cloudChart.addEventListener("pointerdown", (e) => { downAt = [e.clientX, e.clientY]; });
+        cloudChart.addEventListener("pointerup", (e) => {
+            if (!cloudGeom || !downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;
+            const rect = cloudChart.getBoundingClientRect();
+            const px = ((e.clientX - rect.left) / rect.width) * cloudGeom.W;
+            const py = ((e.clientY - rect.top) / rect.height) * cloudGeom.H;
+            const g = cloudGeom;
+            if (px < g.m.l || px > g.m.l + g.pw) return;
+            const t = cloudData.start + ((px - g.m.l) / g.pw) * (cloudData.end - cloudData.start);
+            if (py >= g.laneY - 2 && py <= g.laneY + g.LANE) {   // the event lane: nearest tick within a few pixels
+                let best = null;
+                g.evs.forEach((ev) => { const d = Math.abs(g.x(ev.start_ts) - px); if (d <= 6 && (!best || d < best[0])) best = [d, ev]; });
+                if (best) { openFrameAt(best[1].start_ts, best[1]); return; }
+            }
+            if (py <= g.laneY) openFrameAt(t, null);
+        });
+
         async function loadCloudHistory() {
             try {
                 const maxPoints = Math.min(1200, Math.max(100, Math.round(cloudWrap.clientWidth / 2)));
@@ -3504,6 +3594,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (avgEl) avgEl.textContent = pct(sm.mean);
                 const avgLbl = document.getElementById("cloud-avg-label");
                 if (avgLbl) { const act = document.querySelector(".cloud-ranges .btn-range.active"); avgLbl.textContent = act ? act.textContent.trim() : "24h"; }
+                try {
+                    const er = await fetch(`/api/events?since=${cloudData.start}&until=${cloudData.end}&limit=3000&brief=true`);
+                    cloudEvents = er.ok ? ((await er.json()).events || []).filter((e) => e.type !== "clouds") : [];
+                } catch (e) {
+                    cloudEvents = [];
+                }
                 renderCloudChart();
             } catch (e) {
                 /* keep the previous chart */

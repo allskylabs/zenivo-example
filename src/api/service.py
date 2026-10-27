@@ -2539,15 +2539,67 @@ class AllSkyService:
                 self._events_cache = items[: self.EVENT_KEEP_IN_MEMORY]
             return list(self._events_cache)
 
-    def get_events(self, limit: int = 20, event_type: Optional[str] = None) -> Dict[str, Any]:
-        """Detected sky events, newest first (optionally one type)."""
+    def get_events(self, limit: int = 20, event_type: Optional[str] = None, since: Optional[float] = None,
+                   until: Optional[float] = None, brief: bool = False) -> Dict[str, Any]:
+        """Detected sky events, newest first (optionally one type, a time window, or just what a timeline needs)."""
         events = self._load_events()
+        counts: Dict[str, int] = {}
+        for e in events:
+            counts[e.get("type", "?")] = counts.get(e.get("type", "?"), 0) + 1
         if event_type:
             events = [e for e in events if e.get("type") == event_type]
-        counts: Dict[str, int] = {}
-        for e in self._load_events():
-            counts[e.get("type", "?")] = counts.get(e.get("type", "?"), 0) + 1
-        return {"events": events[:limit], "total_count": len(events), "counts": counts, **self.get_event_config()}
+        if since is not None or until is not None:
+            events = [e for e in events if (since is None or self._event_ts(e) >= since) and (until is None or self._event_ts(e) <= until)]
+        out = events[:limit]
+        if brief:
+            out = [{"event_id": e.get("event_id"), "type": e.get("type"), "start_ts": self._event_ts(e),
+                    "end_ts": e.get("end_ts"), "label": (e.get("nearest_flight") or {}).get("callsign"),
+                    "thumbnail_url": e.get("thumbnail_url"), "sky_url": e.get("sky_url")} for e in out]
+        return {"events": out, "total_count": len(events), "counts": counts, **self.get_event_config()}
+
+    @staticmethod
+    def _event_ts(e: Dict[str, Any]) -> float:
+        if e.get("start_ts") is not None:
+            return float(e["start_ts"])
+        try:
+            return datetime.fromisoformat(str(e.get("timestamp"))).timestamp()
+        except ValueError:
+            return 0.0
+
+    def frame_near(self, ts: float) -> Optional[Dict[str, Any]]:
+        """The archived frame closest to a moment (epoch seconds), with the gap to it."""
+        import bisect
+
+        dt = datetime.fromtimestamp(ts).astimezone()
+        key = f"frame_{dt:%Y%m%d_%H%M%S}"
+        best = None
+        for off in (-1, 0):   # the observing day of a time before noon may be the previous date
+            day = (dt.date() + timedelta(days=off)).strftime("%Y-%m-%d")
+            day_dir = os.path.join(self.frames_archive_root, day)
+            if not os.path.isdir(day_dir):
+                continue
+            names = sorted(f for f in os.listdir(day_dir) if f.startswith("frame_") and f.endswith(".jpg"))
+            i = bisect.bisect_left(names, key)
+            for j in (i - 1, i):
+                if 0 <= j < len(names):
+                    try:
+                        t = datetime.strptime(names[j][6:21], "%Y%m%d_%H%M%S").astimezone().timestamp()
+                    except ValueError:
+                        continue
+                    if best is None or abs(t - ts) < abs(best[0] - ts):
+                        best = (t, day, names[j])
+        if best is None:
+            return None
+        t, day, name = best
+        return {"ts": t, "delta_s": round(t - ts, 1), "day": day, "name": name, "url": f"/api/frames/img/{day}/{name}"}
+
+    def frame_image_path(self, day: str, name: str) -> Optional[str]:
+        import re
+
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) or not re.fullmatch(r"frame_\d{8}_\d{6}_\d{3}\.jpg", name):
+            return None
+        path = os.path.join(self.frames_archive_root, day, name)
+        return path if os.path.isfile(path) else None
 
     def event_image_path(self, day: str, name: str) -> Optional[str]:
         import re

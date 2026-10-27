@@ -592,14 +592,37 @@ def build_range_timelapse(
 @router.get("/api/events")
 @router.get("/api/events/meteors")
 def get_meteor_events(
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=20, ge=1, le=3000),
     type: Optional[str] = Query(default=None, pattern="^(meteor|plane|satellite|clouds|flash)$"),
+    since: Optional[float] = Query(default=None, description="epoch seconds, events starting at or after"),
+    until: Optional[float] = Query(default=None, description="epoch seconds, events starting at or before"),
+    brief: bool = Query(default=False, description="only what a timeline needs"),
     service: AllSkyService = Depends(get_service),
 ):
     """
     List detected sky events (meteors, aircraft, satellites, cloud changes, flashes), newest first.
     """
-    return service.get_events(limit=limit, event_type=type)
+    return service.get_events(limit=limit, event_type=type, since=since, until=until, brief=brief)
+
+
+@router.get("/api/frames/near")
+def get_frame_near(ts: float = Query(..., description="epoch seconds"), service: AllSkyService = Depends(get_service)):
+    """The archived frame closest to a moment, for stepping back through the night."""
+    res = service.frame_near(ts)
+    if res is None:
+        raise HTTPException(status_code=404, detail="No archived frame near that time")
+    return res
+
+
+@router.get("/api/frames/img/{day}/{name}")
+def get_frame_image(day: str, name: str, service: AllSkyService = Depends(get_service)):
+    """An archived frame JPEG."""
+    from fastapi.responses import FileResponse
+
+    path = service.frame_image_path(day, name)
+    if not path:
+        raise HTTPException(status_code=404, detail="Frame not found")
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.get("/api/events/config")

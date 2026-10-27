@@ -2338,3 +2338,27 @@ details.registers-box[open] > summary { margin-bottom: 0.3rem; }
 .focus-lens-nudge .btn { min-height: 36px; border-radius: 8px; font-size: 0.8125rem; }
 .focus-afmf button { min-height: 36px; font-size: 0.8125rem; }
 .focus-params-title { margin: 0.9rem 0 0.5rem; font-size: 0.75rem; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Cloud chart: event lane + frame viewer */
+.cloud-legend .lg-ev { width: 8px; height: 8px; border-radius: 2px; margin-left: 0.5rem; }
+.ev-meteor { background: #f472b6; fill: #f472b6; }
+.ev-plane { background: #fbbf24; fill: #fbbf24; }
+.ev-satellite { background: #22d3ee; fill: #22d3ee; }
+.ev-flash { background: #f8fafc; fill: #f8fafc; }
+#cloud-chart { cursor: crosshair; }
+#cloud-chart .ev-tick { opacity: 0.9; }
+#cloud-chart .ev-tick:hover { opacity: 1; }
+#cloud-chart .ev-lane { fill: rgba(148, 163, 184, 0.06); }
+#cloud-chart .cc-mark { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.frame-viewer { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: rgba(2, 6, 23, 0.82); padding: 1rem; }
+.frame-viewer.hidden { display: none; }
+.fv-box { width: min(1100px, 100%); max-height: 100%; overflow: auto; background: var(--bg-card); border: 1px solid var(--border-color, rgba(148, 163, 184, 0.25)); border-radius: 12px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.fv-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.fv-close { background: none; border: 0; color: var(--text-muted); font-size: 1.6rem; line-height: 1; cursor: pointer; }
+.fv-img-wrap { position: relative; background: #000; border-radius: 8px; min-height: 160px; display: flex; align-items: center; justify-content: center; }
+.fv-img-wrap img { width: 100%; height: auto; max-height: 68vh; object-fit: contain; border-radius: 8px; }
+.fv-msg { position: absolute; color: var(--text-muted); }
+.fv-msg.hidden { display: none; }
+.fv-meta { color: var(--text-muted); font-size: 0.85rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+.fv-meta strong { color: var(--text-primary); }
+.fv-nav { display: flex; gap: 0.5rem; flex-wrap: wrap; }
