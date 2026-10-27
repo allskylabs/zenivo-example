@@ -1165,7 +1165,7 @@
         }
 
         // Selected satellite's path at orbit height and just above the ground (called from rebuildTrack)
-        const GROUND_AHEAD_S = 1800, TICK_S = 900;
+        const GROUND_AHEAD_S = Infinity, TICK_S = 900;   // the whole forecast on the ground too: the "two lines" note and the time dots explain why laps do not overlap
         function rebuildTrack() {
             if (!globe) return;
             for (const mesh of globe.trackMeshes) { globe.scene.remove(mesh); mesh.geometry.dispose(); }
@@ -1179,7 +1179,7 @@
             const tb = nowS();   // the orbit is drawn as the ellipse it is in space (a closed loop), turned with the Earth each frame
             const orbit = tr.map((q, i) => new THREE.Vector3(...ecef(q[0], inertialLon(q[1], T[i], tb), q[2])));
             globe.orbitT = tb;
-            // On the Earth only the next GROUND_AHEAD_S of the path: a lap later the track lies elsewhere, which would only confuse
+            // How much of the path ahead is drawn on the Earth
             const gi = tr.map((q, i) => i).filter((i) => tr[i][3] <= GROUND_AHEAD_S);
             const ground = gi.map((i) => new THREE.Vector3(...ecef(tr[i][0], tr[i][1], 8)));
             globe.trackMeshes = [buildRibbon(orbit, T, V, globe.trackMats.orbit), buildRibbon(ground, gi.map((i) => T[i]), gi.map((i) => V[i]), globe.trackMats.ground)];
