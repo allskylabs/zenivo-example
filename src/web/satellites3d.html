@@ -441,12 +441,12 @@
         // ---------------------------------------------------------------- tracks: ribbons, solid behind / dashed ahead, cyan where visible
         const TRACK_VS = `
             attribute vec3 aPrev; attribute vec3 aNext; attribute float aSide; attribute float aT; attribute float aVis;
-            uniform vec2 uRes; uniform float uWidth; uniform float uNow; uniform float uAhead; uniform float uT0;
+            uniform vec2 uRes; uniform float uWidth; uniform float uNow; uniform float uAhead; uniform float uT0; uniform float uTail;
             varying float vT; varying float vSide; varying float vVis;
             vec2 px(vec4 c) { return c.xy / c.w * uRes * 0.5; }
             void main() {
                 mat4 m = projectionMatrix * modelViewMatrix;
-                float tail = clamp((aT - uT0) / max(0.45 * (uNow - uT0), 1.0), 0.0, 1.0);   // the oldest part of the flown path tapers away
+                float tail = clamp((aT - uT0) / max(uTail * (uNow - uT0), 1.0), 0.0, 1.0);   // the oldest part of the flown path tapers away
                 float w = uWidth * (0.12 + 0.88 * smoothstep(0.0, 1.0, tail));   // the predicted part is drawn no thicker than the flown part
                 vec4 c = m * vec4(position, 1.0), p = m * vec4(aPrev, 1.0), n = m * vec4(aNext, 1.0);
                 vT = aT; vSide = aSide; vVis = aVis;
@@ -461,21 +461,21 @@
                 gl_Position = c;
             }`;
         const TRACK_FS = `
-            uniform float uNow; uniform float uT0; uniform float uBright; varying float vT; varying float vSide; varying float vVis;
+            uniform float uNow; uniform float uT0; uniform float uTail; uniform float uBright; varying float vT; varying float vSide; varying float vVis;
             void main() {
                 bool ahead = vT > uNow;
-                float tail = clamp((vT - uT0) / max(0.45 * (uNow - uT0), 1.0), 0.0, 1.0);
+                float tail = clamp((vT - uT0) / max(uTail * (uNow - uT0), 1.0), 0.0, 1.0);
                 if (ahead && mod(vT, 36.0) > 13.0) discard;   // short dashes where the satellite has yet to go: a prediction, not an observation
                 float edge = 1.0 - abs(vSide);
                 vec3 col = vVis > 0.5 ? vec3(0.13, 0.83, 0.93) : vec3(0.52, 0.6, 0.74);
                 float a = (ahead ? 0.7 : 0.6) * (vVis > 0.5 ? 1.0 : 0.7) * smoothstep(0.0, 0.7, edge) * uBright * smoothstep(0.0, 1.0, tail);
                 gl_FragColor = vec4(col * (0.75 + 0.5 * edge), a);
             }`;
-        function trackMaterial(width, bright, depthTest = false, ahead = 1.0) {
+        function trackMaterial(width, bright, depthTest = false, tail = 0.45, ahead = 1.0) {   // tail: share of the flown path over which its old end tapers
             return new THREE.ShaderMaterial({
                 vertexShader: TRACK_VS, fragmentShader: TRACK_FS, transparent: true, depthWrite: false, depthTest,
                 side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
-                uniforms: { uRes: { value: new THREE.Vector2(1, 1) }, uWidth: { value: width }, uNow: { value: 0 }, uT0: { value: 0 }, uBright: { value: bright }, uAhead: { value: ahead } },
+                uniforms: { uRes: { value: new THREE.Vector2(1, 1) }, uWidth: { value: width }, uNow: { value: 0 }, uT0: { value: 0 }, uTail: { value: tail }, uBright: { value: bright }, uAhead: { value: ahead } },
             });
         }
 
@@ -835,7 +835,7 @@
             const g = {
                 canvas, renderer, scene: gscene, cam: gcam, controls, earthMat, atmos, pointsMat, aimed: false, t: nowS(), raf: 0,
                 pointGeo: pointGeometry(MAX_POINTS), stationGeo: pointGeometry(1), shadowGeo: pointGeometry(1), screen: [], trackMeshes: [],
-                trackMats: { orbit: trackMaterial(7, 1.7, true), ground: trackMaterial(4.5, 1.0, true) },
+                trackMats: { orbit: trackMaterial(7, 1.7, true), ground: trackMaterial(4.5, 1.4, true, 0.15) },
                 trailsGeo: new THREE.BufferGeometry(), sun: new THREE.Vector3(), pan: new THREE.Vector3(), lastTarget: new THREE.Vector3(),
             };
             for (const geo of [g.pointGeo, g.stationGeo, g.shadowGeo]) {
