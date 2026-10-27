@@ -2626,7 +2626,8 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.restore();
         }
 
-        // 6. Draw Top-Left Astrometric Overlay Summary Badge
+        // 6. Draw Top-Left Astrometric Overlay Summary Badge (not on a phone: it would cover the picture)
+        if (viewportContainer && viewportContainer.clientWidth < 600) return;
         ctx.save();
         const badgeText = `LST ${formatLstHms(lmstDeg)} • ${visibleConstellationsCount} constellations • ${visibleStarsCount} stars • Center (${optX.toFixed(0)}, ${optY.toFixed(0)}) ${isRectilinear ? `FOV ${hfovDeg.toFixed(1)}° Az ${tiltAzDeg.toFixed(1)}°` : `R90=${r90SensorPx.toFixed(0)}px`} PA=${northPaDeg.toFixed(1)}°`;
         ctx.font = "11px monospace";
