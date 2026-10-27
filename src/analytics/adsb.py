@@ -229,11 +229,11 @@ class AdsbFeed:
                                 **{k: a[k] for k in ("speed_kt", "track_deg", "vrate_fpm") if k in a}})
         return out
 
-    def current(self, max_age_s: float = 60.0, trail_s: float = 0.0) -> List[Dict[str, Any]]:
+    def current(self, max_age_s: float = 60.0, trail_s: float = 0.0, at: Optional[float] = None) -> List[Dict[str, Any]]:
         """Latest state of every aircraft with a position in the last max_age_s seconds; with trail_s, also
         its recent path as [[lat, lon, alt_m, age_s], ...] (oldest first, one point per TRAIL_STEP_S, ending
         at the latest fix)."""
-        now = time.time()
+        now = time.time() if at is None else at   # `at`: dead-reckon to another instant (the displayed frame's, or a second later for the velocity)
         out = []
         with self._lock:
             for a in self._ac.values():

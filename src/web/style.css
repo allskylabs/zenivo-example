@@ -1837,6 +1837,9 @@ body.no-scroll { overflow: hidden; }
     pointer-events: none;
 }
 .frame-info[hidden] { display: none; }
+/* Live viewport: LIVE pill on top, capture info under it, the sky-overlay badge under that (nothing stacked on anything) */
+.viewport-wrapper > .frame-info { top: 44px; left: 12px; }
+.vp-exp { display: none; }   /* exposure and gain are in the capture info already */
 .product-media .frame-info { font-size: 12px; top: 6px; left: 6px; }
 
 /* By Day: one collapsible block per local day */

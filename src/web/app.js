@@ -2630,17 +2630,23 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.save();
         const badgeText = `LST ${formatLstHms(lmstDeg)} • ${visibleConstellationsCount} constellations • ${visibleStarsCount} stars • Center (${optX.toFixed(0)}, ${optY.toFixed(0)}) ${isRectilinear ? `FOV ${hfovDeg.toFixed(1)}° Az ${tiltAzDeg.toFixed(1)}°` : `R90=${r90SensorPx.toFixed(0)}px`} PA=${northPaDeg.toFixed(1)}°`;
         ctx.font = "11px monospace";
-        const bw = ctx.measureText(badgeText).width + 16;
+        // Below the capture info (time / exposure) rather than under it; two lines when the picture is too narrow for one
+        const infoBottom = liveFrameInfo && !liveFrameInfo.hidden ? liveFrameInfo.offsetTop + liveFrameInfo.offsetHeight + 6 : 0;
+        const cut = badgeText.indexOf(" • Center");
+        const oneLine = ctx.measureText(badgeText).width + 16 <= renderW - 20 || cut < 0;
+        const lines = oneLine ? [badgeText] : [badgeText.slice(0, cut), badgeText.slice(cut + 3)];
+        const bw = Math.max(...lines.map((t) => ctx.measureText(t).width)) + 16;
+        const bh = 8 + 14 * lines.length;
         const bx = offsetX + 10;
-        const by = offsetY + 10;
+        const by = Math.max(offsetY + 10, infoBottom);
         ctx.fillStyle = "rgba(2, 6, 23, 0.72)";
         ctx.strokeStyle = "rgba(56, 189, 248, 0.35)";
         ctx.lineWidth = 1;
-        ctx.fillRect(bx, by, bw, 22);
-        ctx.strokeRect(bx, by, bw, 22);
+        ctx.fillRect(bx, by, bw, bh);
+        ctx.strokeRect(bx, by, bw, bh);
         ctx.fillStyle = "#e2e8f0";
         ctx.textAlign = "left";
-        ctx.fillText(badgeText, bx + 8, by + 15);
+        lines.forEach((t, i) => ctx.fillText(t, bx + 8, by + 15 + 14 * i));
         ctx.restore();
     }
 
@@ -2648,6 +2654,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // ---- ADS-B aircraft overlay: marks planes that fall inside the camera's field of view ----
     let aircraftList = [];
     let aircraftFetchedAt = 0;
+    let aircraftT = 0;       // server time of the positions in aircraftList
+    let liveFrameT = null;   // server time the displayed frame was taken (mid-exposure)
+    let aircraftDrawQueued = false;
+    function scheduleAircraftDraw() {
+        if (aircraftDrawQueued) return;
+        aircraftDrawQueued = true;
+        requestAnimationFrame(() => { aircraftDrawQueued = false; drawAircraft(); });
+    }
     function refreshAircraft() {
         if (!chkAircraft || !chkAircraft.checked || document.hidden) return;
         fetch("/api/adsb/aircraft?limit=60")
@@ -2655,6 +2669,7 @@ document.addEventListener("DOMContentLoaded", () => {
             .then((d) => {
                 aircraftList = (d && d.aircraft) || [];
                 aircraftFetchedAt = Date.now();
+                aircraftT = (d && d.t) || 0;
                 drawAircraft();
             })
             .catch(() => {});
@@ -2713,7 +2728,10 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.clip();
         ctx.font = "11px monospace";
         ctx.textBaseline = "middle";
+        // Marks sit where the plane was when the shown frame was taken: the fetched position slid along its own frame velocity
         const age = (Date.now() - aircraftFetchedAt) / 1000.0;
+        const shift = aircraftT && liveFrameT != null ? liveFrameT - aircraftT : age;
+        const lag = Math.max(-5, Math.min(20, shift));
         if (showSat) {
             satelliteList.forEach((sat) => {
                 if (!sat.frame_xy || !sat.in_view || !sat.visible) return;
@@ -2742,6 +2760,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (showAircraft) aircraftList.forEach((a) => {
             if (!a.frame_xy) return;
             let fx = a.frame_xy[0], fy = a.frame_xy[1];
+            if (a.frame_v) { fx += a.frame_v[0] * lag; fy += a.frame_v[1] * lag; }
             if (mirrorX) fx = 1 - fx;
             if (mirrorY) fy = 1 - fy;
             const x = offsetX + fx * renderW;
@@ -2769,7 +2788,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (chkAircraft) {
-        setInterval(refreshAircraft, 3000);
+        setInterval(refreshAircraft, 1500);
         window.addEventListener("resize", drawAircraft);
         setTimeout(refreshAircraft, 400);
     }
@@ -2982,6 +3001,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (data.capture_time) {
             setFrameInfo(liveFrameInfo, data.capture_time, data.exposure_s, data.gain_db, data.brightness);
+            // The instant the picture shows: the middle of its exposure (capture_time is when the exposure ended)
+            const ft = Date.parse(data.capture_time) / 1000 - (typeof data.exposure_s === "number" ? data.exposure_s / 2 : 0);
+            if (isFinite(ft) && ft !== liveFrameT) { liveFrameT = ft; scheduleAircraftDraw(); }
         }
         if (data.histogram) {
             drawHistogram(data.histogram);

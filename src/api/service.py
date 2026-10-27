@@ -2338,9 +2338,17 @@ class AllSkyService:
         station = self._overlay_station()
         obstructions = [np.array(p, np.float32) for p in ((self.station_config.get("sky_mask") or {}).get("obstruction") or [])]
         out = []
-        for a in self.adsb.current(trail_s=trail_s):
+        t_now = time.time()
+        # Where each aircraft will be one second later: lets the page slide every mark to the instant of the frame it is shown on
+        later = {r["icao"]: r for r in self.adsb.current(at=t_now + 1.0)} if sol else {}
+        for a in self.adsb.current(trail_s=trail_s, at=t_now):
             pos = sky_position(station, a["lat"], a["lon"], a["altitude_m"], sol)
             xy = pos.get("frame_xy")
+            nxt = later.get(a["icao"])
+            if xy and nxt:
+                xy2 = sky_position(station, nxt["lat"], nxt["lon"], nxt["altitude_m"], sol).get("frame_xy")
+                if xy2:
+                    pos["frame_v"] = [round(xy2[0] - xy[0], 5), round(xy2[1] - xy[1], 5)]   # frame fractions per second
             in_view = bool(xy) and not any(cv2.pointPolygonTest(p, (float(xy[0]), float(xy[1])), False) >= 0 for p in obstructions)
             out.append({
                 "icao": a["icao"], "callsign": a["callsign"] or None,
@@ -2352,7 +2360,7 @@ class AllSkyService:
                                **self._aircraft_info().describe(a["icao"], a["callsign"] or None))
         out.sort(key=lambda r: (not r["in_view"], not r["above_horizon"], r["distance_km"]))
         st = self.adsb.status()
-        res = {"enabled": True, "connected": st["connected"], "total": len(out),
+        res = {"enabled": True, "connected": st["connected"], "t": t_now, "total": len(out),
                "in_view": sum(1 for r in out if r["in_view"]), "aircraft": out[:limit]}
         if trail_s > 0:
             res["station"] = {"lat": station["latitude_deg"], "lon": station["longitude_deg"], "elevation_m": station["elevation_m"]}
