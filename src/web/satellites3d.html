@@ -703,16 +703,8 @@
             const gcam = new THREE.PerspectiveCamera(40, 1, 0.1, 1000);
             gcam.position.set(GLOBE_DIST, 0, 0);
             const controls = new OrbitControls(gcam, canvas);
-            Object.assign(controls, { enablePan: false, minDistance: GLOBE_MIN, maxDistance: GLOBE_MAX, zoomSpeed: 0.8 });
-            controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;   // no panning on a globe: right-drag rotates too
-            // OrbitControls turns Ctrl/Shift/Meta + drag into a pan, which is disabled here and would do nothing:
-            // re-issue the press without the modifiers so those drags rotate as well
-            canvas.addEventListener("pointerdown", (e) => {
-                if (e.pointerType !== "mouse" || !(e.ctrlKey || e.metaKey || e.shiftKey) || !e.isTrusted) return;
-                e.stopImmediatePropagation();
-                canvas.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, pointerId: e.pointerId, pointerType: "mouse",
-                    button: e.button === 2 ? 2 : 0, buttons: e.buttons, clientX: e.clientX, clientY: e.clientY }));
-            }, true);
+            Object.assign(controls, { enablePan: true, screenSpacePanning: true, minDistance: GLOBE_MIN, maxDistance: GLOBE_MAX, zoomSpeed: 0.8 });
+            controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;   // right-drag (or Ctrl/Shift + left-drag) pans; the pan offset is kept in G.pan
 
             // Earth: day / night-lights textures blended by the sun; a plain dark-blue sphere until (or unless) they load
             const blank = (r, g, b) => { const t = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1); t.needsUpdate = true; return t; };
@@ -747,7 +739,7 @@
                 canvas, renderer, scene: gscene, cam: gcam, controls, earthMat, atmos, pointsMat, aimed: false, t: nowS(), raf: 0,
                 pointGeo: pointGeometry(MAX_POINTS), stationGeo: pointGeometry(1), screen: [], trackMeshes: [],
                 trackMats: { orbit: trackMaterial(5, 1.0, true), ground: trackMaterial(3, 0.5, true) },
-                trailsGeo: new THREE.BufferGeometry(), sun: new THREE.Vector3(),
+                trailsGeo: new THREE.BufferGeometry(), sun: new THREE.Vector3(), pan: new THREE.Vector3(),
             };
             for (const geo of [g.pointGeo, g.stationGeo]) {
                 const pts = new THREE.Points(geo, pointsMat);
@@ -787,6 +779,7 @@
         // Swing the camera over the station, at the default distance
         function aimGlobe() {
             if (!globe || !station) return;
+            globe.pan.set(0, 0, 0);
             globe.cam.position.set(...ecef(station.lat, station.lon, 0)).setLength(GLOBE_DIST);
             globe.controls.update();
             const at = globe.stationGeo.attributes;
@@ -841,7 +834,7 @@
             return _d.multiplyScalar(t).add(c).lengthSq() < R_EARTH * R_EARTH;
         }
 
-        const _goal = new THREE.Vector3(), _prev = new THREE.Vector3();
+        const _goal = new THREE.Vector3(), _prev = new THREE.Vector3(), _pd = new THREE.Vector3();
         function globeFrame() {
             const G = globe;
             if (document.hidden) { G.raf = 0; return; }
@@ -854,8 +847,8 @@
             // Orbit: the selected satellite becomes the centre of rotation, so the viewer can swing around it and
             // look at it from any side; the camera moves with it and the offset the viewer chose is kept
             const orbiting = !!(camMode && sel && sel.fix);
-            const goal = _goal.set(0, 0, 0);
-            if (orbiting) { const ps = positionAt(sel, now); goal.set(...ecef(ps.lat, ps.lon, ps.h / 1000)); }
+            const goal = _goal.copy(G.pan);
+            if (orbiting) { const ps = positionAt(sel, now); goal.add(_prev.set(...ecef(ps.lat, ps.lon, ps.h / 1000))); }
             const prevT = _prev.copy(G.controls.target);
             G.controls.target.lerp(goal, 1 - Math.exp(-dt * 6));
             G.cam.position.add(prevT.negate().add(G.controls.target));
@@ -867,7 +860,9 @@
             }
             G.controls.minDistance = orbiting ? SAT_MIN : GLOBE_MIN;
             G.controls.rotateSpeed = Math.max(0.15, Math.min(1, (G.cam.position.length() - R_EARTH) / 14));   // slower close to the ground
+            const tBefore = _prev.copy(G.controls.target);
             G.controls.update();
+            G.pan.add(_pd.subVectors(G.controls.target, tBefore));   // whatever the viewer panned this frame
             G.cam.updateMatrixWorld();
 
             const at = G.pointGeo.attributes, cp = G.cam.position, v = new THREE.Vector3();
@@ -1008,7 +1003,7 @@
         function select(id, fly = false) {
             const prev = selected;
             selected = id;
-            if (id !== prev) { stopCamera(); rebuildTrack(); poll(); }   // the next poll brings the new selection's track
+            if (id !== prev) { if (globe) globe.pan.set(0, 0, 0); stopCamera(); rebuildTrack(); poll(); }   // the next poll brings the new selection's track
             for (const k of [prev, id]) {
                 const s = k != null && sats.get(k);
                 if (!s) continue;
