@@ -57,7 +57,7 @@ export function drawLayers(core: SkyCore, ctx: CanvasRenderingContext2D, proj: P
 
   const eye = core.mode === 'eye';
   if (core.camera && L.cameraImage && core.cameraImg) drawCameraImage(core, ctx, proj);
-  if (eye) drawEyeGround(ctx, proj, snap.sunAlt);
+  if (eye) { ctx.save(); if (L.seeThroughGround) ctx.globalAlpha = 0.3; drawEyeGround(ctx, proj, snap.sunAlt); ctx.restore(); }
 
   // grids
   if (L.altAzGrid) {

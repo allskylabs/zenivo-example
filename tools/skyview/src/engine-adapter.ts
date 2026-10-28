@@ -10,7 +10,7 @@ import { drawLayers } from './layers';
 import type { Proj } from './layers';
 import { MeteorSim } from './meteors';
 import { bodyDistanceAu, compassOf, constellationOf, CON_FACTS, DEG, eclipticLon, moonPhase, CALENDAR_POINTS, solarTermDates } from './astro';
-import { LAYER_DEFAULTS, LAYER_KEYS, EYE_LAYERS } from './types';
+import { LAYER_DEFAULTS, LAYER_KEYS } from './types';
 import type { CameraFov, Hit, InspectorData, Lang, LayerKey, Layers, Marker, MarkerGroup, ObserverCfg, SkyConfig, ViewMode } from './types';
 
 export interface Constellation { id: string; names: { en: string; i18n?: Record<string, string> }; labels: [number, number][]; lines: [number, number][][] }
@@ -29,7 +29,6 @@ export class SkyCore {
   lang: Lang;
   mode: ViewMode = 'allsky';
   /** the user's layers while the 'eye' preset is active */
-  private savedLayers: Layers | null = null;
   // time
   simMs: number; live: boolean; speed = 1;
   private lastReal = performance.now();
@@ -63,7 +62,7 @@ export class SkyCore {
     this.layers = { ...LAYER_DEFAULTS };
     let lang: Lang = cfg.lang ?? ((navigator.language || 'en').toLowerCase().startsWith('vi') ? 'vi' : 'en');
     try {
-      const s = JSON.parse(localStorage.getItem(this.prefix + 'layers') || '{}') as Record<string, boolean>;
+      const s = JSON.parse(localStorage.getItem(this.prefix + 'layers2') || '{}') as Record<string, boolean>;
       for (const k of LAYER_KEYS) if (typeof s[k] === 'boolean') this.layers[k] = s[k]!;
       const l = localStorage.getItem(this.prefix + 'lang'); if (l === 'en' || l === 'vi') lang = cfg.lang ?? l;
     } catch { /* storage unavailable */ }
@@ -133,15 +132,11 @@ export class SkyCore {
     this.layers[k] = on;
     if (k === 'milkyWay') this.applyMilky();
     if (k === 'stars') this.gl.style.visibility = on || this.mode === '3d' ? 'visible' : 'hidden';
-    if (this.mode !== 'eye') this.persistLayers();
+    this.persistLayers();
     this.dirty = true; this.emit('change');
   }
   private persistLayers(): void {
-    try { localStorage.setItem(this.prefix + 'layers', JSON.stringify(this.layers)); } catch { /* ignore */ }
-  }
-  private replaceLayers(l: Layers): void {
-    this.layers = { ...l }; this.applyMilky();
-    this.gl.style.visibility = this.layers.stars || this.mode === '3d' ? 'visible' : 'hidden';
+    try { localStorage.setItem(this.prefix + 'layers2', JSON.stringify(this.layers)); } catch { /* ignore */ }
   }
   setLang(l: Lang): void { this.lang = l; try { localStorage.setItem(this.prefix + 'lang', l); } catch { /* ignore */ } this.dirty = true; this.emit('change'); }
   setObserver(o: ObserverCfg): void {
@@ -157,8 +152,7 @@ export class SkyCore {
   setMarkers(g: MarkerGroup, list: Marker[]): void { this.markers[g] = list; this.dirty = true; }
   setMode(m: ViewMode): void {
     const was = this.mode; this.mode = m;
-    if (m === 'eye' && was !== 'eye') { this.savedLayers = { ...this.layers }; this.replaceLayers(EYE_LAYERS); }
-    else if (m !== 'eye' && was === 'eye' && this.savedLayers) { this.replaceLayers(this.savedLayers); this.savedLayers = null; this.persistLayers(); }
+    if (m !== was) this.gl.style.visibility = this.layers.stars || m === '3d' ? 'visible' : 'hidden';
     this.dirty = true; this.emit('change');
   }
 
@@ -326,7 +320,7 @@ export class SkyCore {
   proj2d(): Proj {
     const v = this.sky.view;
     return {
-      w: this.gl.clientWidth, h: this.gl.clientHeight, fovDeg: v.fovRad / DEG, clipBelow: true, noBackdrop: false,
+      w: this.gl.clientWidth, h: this.gl.clientHeight, fovDeg: v.fovRad / DEG, clipBelow: !this.layers.seeThroughGround, noBackdrop: false,
       project: d => project(d, v), pxPerRad: (Math.min(v.widthPx, v.heightPx) / 2) / (v.projection === 'stereographic' ? 2 * Math.tan(v.fovRad / 4) : Math.tan(v.fovRad / 2)),
     };
   }

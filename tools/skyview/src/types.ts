@@ -39,19 +39,14 @@ export const LAYER_LABELS: Record<LayerKey, [string, string]> = {
   cardinalDirections: ['Compass (N E S W)', 'Hướng N E S W'], meteors: ['Meteor showers', 'Mưa sao băng'],
   camera: ['Camera frame', 'Khung camera /live'], cameraImage: ['Camera picture', 'Ảnh camera /live'], aircraft: ['Aircraft', 'Máy bay'], satellites: ['Satellites', 'Vệ tinh'], events: ['Detected events', 'Sự kiện đã bắt'],
 };
+/** One option set shared by Observer view and 3D dome. */
 export const LAYER_DEFAULTS: Layers = {
-  stars: true, milkyWay: true, starLabels: true, constellationLines: true, constellationLabels: true, planets: true, moon: true,
-  ecliptic: true, calendarPoints: false, polarAxis: false, equator: false, raGrid: false, decGrid: false, meridian: false, altAzGrid: false,
-  seeThroughGround: true, deepSkyObjects: true, daylightAtmosphere: true, cardinalDirections: true, meteors: true,
-  camera: true, cameraImage: false, aircraft: true, satellites: true, events: true,
-};
-
-/** Layer preset applied while in the 'eye' (observer) mode; the user's own layers are restored on leaving. */
-export const EYE_LAYERS: Layers = {
-  ...LAYER_DEFAULTS,
-  stars: true, milkyWay: true, moon: true, planets: true, cardinalDirections: true, daylightAtmosphere: true, aircraft: true, satellites: true, events: true,
-  starLabels: false, constellationLines: true, constellationLabels: false, ecliptic: false, calendarPoints: false, polarAxis: false, equator: false,
-  raGrid: false, decGrid: false, meridian: false, altAzGrid: false, seeThroughGround: false, deepSkyObjects: false, meteors: false, camera: true, cameraImage: true,
+  stars: true, milkyWay: true, daylightAtmosphere: true, meteors: true,
+  moon: true, planets: true, starLabels: true, deepSkyObjects: false,
+  constellationLines: true, constellationLabels: true,
+  camera: true, cameraImage: true, aircraft: true, satellites: true, events: true,
+  cardinalDirections: true, seeThroughGround: true,
+  ecliptic: true, equator: false, meridian: false, altAzGrid: false, raGrid: false, decGrid: false, polarAxis: false, calendarPoints: false,
 };
 
 /** A host-supplied moving/fixed object in horizontal coordinates. */
@@ -77,6 +72,6 @@ export const LAYER_GROUPS: { id: string; title: [string, string]; open: boolean;
   { id: 'objects', title: ['Objects', 'Thiên thể'], open: true, keys: [{ k: 'moon' }, { k: 'planets' }, { k: 'starLabels' }, { k: 'deepSkyObjects' }] },
   { id: 'cons', title: ['Constellations', 'Chòm sao'], open: true, keys: [{ k: 'constellationLines' }, { k: 'constellationLabels' }] },
   { id: 'live', title: ['Live data', 'Dữ liệu trực tiếp'], open: true, keys: [{ k: 'camera' }, { k: 'cameraImage' }, { k: 'aircraft' }, { k: 'satellites' }, { k: 'events' }] },
-  { id: 'ground', title: ['Horizon', 'Chân trời'], open: true, keys: [{ k: 'cardinalDirections' }, { k: 'seeThroughGround', only: '3d' }] },
+  { id: 'ground', title: ['Horizon', 'Chân trời'], open: true, keys: [{ k: 'cardinalDirections' }, { k: 'seeThroughGround' }] },
   { id: 'lines', title: ['Lines and grids', 'Đường và lưới'], open: false, keys: [{ k: 'ecliptic' }, { k: 'equator' }, { k: 'meridian' }, { k: 'altAzGrid' }, { k: 'raGrid' }, { k: 'decGrid' }, { k: 'polarAxis' }, { k: 'calendarPoints' }] },
 ];
