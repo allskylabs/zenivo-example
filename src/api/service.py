@@ -2552,12 +2552,17 @@ class AllSkyService:
             events = [e for e in events if (since is None or self._event_ts(e) >= since) and (until is None or self._event_ts(e) <= until)]
         out = events[:limit]
         if brief:
+            def callsign(e):  # a meteor / satellite is not a flight: its "nearest aircraft" is only a diagnostic
+                if e.get("type") != "plane":
+                    return None
+                return (e.get("flight") or e.get("nearest_flight") or {}).get("callsign")
+
             out = [{"event_id": e.get("event_id"), "type": e.get("type"), "start_ts": self._event_ts(e),
-                    "end_ts": e.get("end_ts"), "label": (e.get("nearest_flight") or {}).get("callsign"),
+                    "end_ts": e.get("end_ts"), "label": callsign(e),
                     "thumbnail_url": e.get("thumbnail_url"), "sky_url": e.get("sky_url"),
                     "line": e.get("line"), "moving_dot": bool(e.get("moving_dot")), "frames": e.get("frames"),
                     "length_px": e.get("length_px"), "peak_dn": e.get("peak_dn"),
-                    "flight": (e.get("nearest_flight") or {}).get("callsign")} for e in out]
+                    "flight": callsign(e)} for e in out]
         return {"events": out, "total_count": len(events), "counts": counts, **self.get_event_config()}
 
     @staticmethod
