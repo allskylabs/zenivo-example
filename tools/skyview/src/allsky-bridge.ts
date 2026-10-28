@@ -14,7 +14,8 @@ function track(prev: Marker[], raw: Raw[], build: (r: Raw, i: number) => Marker 
     const p = old.get(m.id);
     if (p?.t !== undefined && now - p.t > 300) {
       let d = m.az - p.az; if (d > 180) d -= 360; else if (d < -180) d += 360;
-      m.vaz = d / (now - p.t); m.valt = (m.alt - p.alt) / (now - p.t);
+      const vaz = d / (now - p.t), valt = (m.alt - p.alt) / (now - p.t);
+      if (Math.hypot(vaz, valt) < 0.006) { m.vaz = vaz; m.valt = valt; }   // deg/ms; > 6 deg/s is a mismatch, not motion
     }
     m.t = now; out.push(m);
   });
@@ -34,7 +35,7 @@ export function startAllskyBridge(core: SkyCore, api = ''): () => void {
     core.setMarkers('satellites', track(core.markers.satellites, d.satellites ?? [], (r, i) => {
       const az = num(r.az_deg), alt = num(r.alt_deg); if (az === undefined || alt === undefined) return null;
       const vis = Boolean(r.visible), sun = Boolean(r.sunlit);
-      return { id: String(r.norad_id ?? r.name ?? i), label: String(r.name ?? '?'), az, alt, color: vis ? '#22d3ee' : sun ? '#f59e0b' : '#6b7280', shape: 'square', showLabel: vis || sun,
+      return { id: String(r.norad ?? r.norad_id ?? r.name ?? i), label: String(r.name ?? '?'), az, alt, color: vis ? '#22d3ee' : sun ? '#f59e0b' : '#6b7280', shape: 'square', showLabel: vis || sun,
         rows: [['Status', vis ? 'visible now' : sun ? 'sunlit, too faint or low' : "in Earth's shadow"]] };
     }));
   };
