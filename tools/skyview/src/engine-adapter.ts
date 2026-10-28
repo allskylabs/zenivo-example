@@ -113,7 +113,9 @@ export class SkyCore {
 
   private async loadMilky(base: string): Promise<GrayImage | null> {
     try {
-      const r = await fetch(base + 'catalog/milkyway.png');
+      // NASA SVS Deep Star Maps 2020 (public domain), stars removed, galactic equirectangular; AVIF, PNG is the legacy fallback
+      let r = await fetch(base + 'catalog/milkyway.avif');
+      if (!r.ok) r = await fetch(base + 'catalog/milkyway.png');
       if (!r.ok) return null;
       const bmp = await createImageBitmap(await r.blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
       const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
@@ -122,7 +124,7 @@ export class SkyCore {
       const { width, height } = bmp; const px = x.getImageData(0, 0, width, height).data;
       const data = new Uint8Array(width * height);
       for (let i = 0; i < data.length; i++) data[i] = px[4 * i]!;
-      return smoothMilky({ width, height, data });
+      return { width, height, data };
     } catch { return null; }
   }
   private applyMilky(): void { this.sky?.setMilkyWay(this.layers.milkyWay ? this.milkyImg : null); }
@@ -357,37 +359,3 @@ export class SkyCore {
 }
 export { horizontalDir };
 
-// The shipped milkyway.png is only 5 nested contour levels (posterised, hard edges). Soften it (wrap-in-l box blurs ~ gaussian) and
-// add seam-free multi-octave value noise inside the band so it reads as dust clouds instead of flat bands.
-function smoothMilky(img: GrayImage): GrayImage {
-  const { width: w, height: h } = img;
-  let a = new Float32Array(w * h); for (let i = 0; i < a.length; i++) a[i] = img.data[i]! / 255;
-  let b = new Float32Array(w * h);
-  const box = (src: Float32Array, dst: Float32Array, r: number, horiz: boolean): void => {
-    const n = horiz ? w : h, lines = horiz ? h : w, d = 2 * r + 1;
-    for (let l = 0; l < lines; l++) {
-      const at = (i: number): number => {
-        const k = horiz ? ((i % n) + n) % n : Math.min(n - 1, Math.max(0, i));
-        return src[horiz ? l * w + k : k * w + l]!;
-      };
-      let sum = 0; for (let i = -r; i <= r; i++) sum += at(i);
-      for (let i = 0; i < n; i++) { dst[horiz ? l * w + i : i * w + l] = sum / d; sum += at(i + r + 1) - at(i - r); }
-    }
-  };
-  for (const r of [9, 8, 7]) { box(a, b, r, true); box(b, a, Math.max(3, r - 3), false); }
-  const hash = (x: number, y: number): number => { let n = (x * 374761393 + y * 668265263) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967295; };
-  const vnoise = (x: number, y: number, cell: number): number => {
-    const nx = Math.round(w / cell), fx = x / cell, fy = y / cell, ix = Math.floor(fx), iy = Math.floor(fy);
-    const tx = fx - ix, ty = fy - iy, sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
-    const g = (i: number, j: number): number => hash(((i % nx) + nx) % nx, j);
-    return (g(ix, iy) * (1 - sx) + g(ix + 1, iy) * sx) * (1 - sy) + (g(ix, iy + 1) * (1 - sx) + g(ix + 1, iy + 1) * sx) * sy;
-  };
-  const data = new Uint8Array(w * h);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const v = a[y * w + x]!; if (v < 0.004) continue;
-    const n = 0.5 * vnoise(x, y, 40) + 0.3 * vnoise(x + 7, y + 3, 18) + 0.2 * vnoise(x + 19, y + 11, 8);
-    const m = Math.min(1, v * 6);                       // noise only where the band is
-    data[y * w + x] = Math.max(0, Math.min(255, Math.round(255 * v * (1 - 0.55 * m + 1.1 * m * n))));
-  }
-  return { width: w, height: h, data };
-}
