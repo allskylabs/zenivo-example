@@ -162,7 +162,7 @@ export function buildUi(core: SkyCore, root: HTMLElement, hooks: UiHooks): Ui {
     root, guide, status,
     setModeActive: m => {
       for (const [k, b] of tabBtns) b.classList.toggle('on', k === m);
-      camBtn.style.display = m === '3d' || m === 'eye' ? 'none' : '';
+      camBtn.style.display = m === '3d' ? 'none' : '';
       allTxt[1] = 'All-sky'; allTxt[2] = 'Toàn cảnh'; retext();
     },
   };
