@@ -112,6 +112,11 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         def serve_satellites3d():
             return FileResponse(os.path.join(web_dir, "satellites3d.html"), media_type="text/html", headers=no_cache)
 
+        # Interactive planetarium (standalone page; WebGL sky engine bundle under /static/sky, star data under /static/skydata)
+        @app.get("/sky")
+        def serve_sky():
+            return FileResponse(os.path.join(web_dir, "sky.html"), media_type="text/html", headers=no_cache)
+
         # Standalone full-bleed WebSocket live image view for OBS / Kiosk
         @app.api_route("/full", methods=["GET", "HEAD"])
         @app.api_route("/live/full", methods=["GET", "HEAD"])

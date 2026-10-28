@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sky view — AllSky Observatory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+    <link rel="stylesheet" href="/static/tokens.css?v=20261027lv3">
+    <link rel="stylesheet" href="/style.css?v=20261027lv3">
+    <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-sans); overflow: hidden; }
+        .app-shell { height: 100vh; min-height: 0; }
+        .app-main { height: 100%; min-height: 0; }
+        #stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+        #sky-root { position: absolute; inset: 0; }
+        @media (max-width: 700px) {
+            .navbar h1 { font-size: 14px; white-space: nowrap; }
+            .navbar .pill-label { display: none; }
+            .navbar .nav-metrics { gap: 6px; }
+        }
+    </style>
+</head>
+<body class="dark-mode">
+    <div class="app-shell">
+    <!-- Shared sidebar (bottom tab bar on phones), same markup as index.html; Satellites 3D is the active item -->
+    <aside class="sidebar" id="sidebar">
+        <nav class="tab-bar side-nav" aria-label="Main navigation">
+            <div class="side-group">
+                <div class="side-group-title">Observe</div>
+                <a class="tab-btn side-item" href="/live" data-tab="tab-live"><span class="side-ic">&#9673;</span><span class="side-txt">Live</span></a>
+                <a class="side-item side-link" href="/flights3d"><span class="side-ic">&#9992;</span><span class="side-txt">Flights 3D</span></a>
+                <a class="side-item side-link" href="/satellites3d"><span class="side-ic">&#128752;</span><span class="side-txt">Satellites 3D</span></a>
+                <a class="side-item side-link active" href="/sky" aria-current="page"><span class="side-ic">&#10024;</span><span class="side-txt">Sky view</span></a>
+            </div>
+            <div class="side-group">
+                <div class="side-group-title">Library</div>
+                <a class="tab-btn side-item" href="/gallery" data-tab="tab-gallery"><span class="side-ic">&#9638;</span><span class="side-txt">Gallery &amp; Events</span></a>
+                <a class="tab-btn side-item" href="/logs" data-tab="tab-logs"><span class="side-ic">&#8801;</span><span class="side-txt">Activity Log</span></a>
+            </div>
+            <div class="side-group">
+                <div class="side-group-title">Camera</div>
+                <a class="tab-btn side-item" href="/focus" data-tab="tab-focus"><span class="side-ic">&#9678;</span><span class="side-txt">Focus</span></a>
+                <a class="tab-btn side-item" href="/calibration" data-tab="tab-calibration"><span class="side-ic">&#9680;</span><span class="side-txt">Master Dark</span></a>
+            </div>
+            <div class="side-group side-group-stream">
+                <div class="side-group-title">Stream</div>
+                <a class="side-item side-link" href="/obs/dock"><span class="side-ic">&#9635;</span><span class="side-txt">OBS Dock</span></a>
+                <a class="side-item side-link" href="/obs" target="_blank" rel="noopener"><span class="side-ic">&#8599;</span><span class="side-txt">OBS Preview</span></a>
+            </div>
+            <div class="side-group side-group-settings">
+                <div class="side-group-title">Settings</div>
+                <a class="tab-btn side-item" href="/settings" data-tab="tab-settings"><span class="side-ic">&#9881;</span><span class="side-txt">Settings</span></a>
+                <div class="side-sub-list" id="settings-subnav">
+                    <a class="side-sub" href="/settings#image" data-sub="image">Image Output</a>
+                    <a class="side-sub" href="/settings#detection" data-sub="detection">Detection</a>
+                    <a class="side-sub" href="/settings#station" data-sub="station">Station &amp; Optics</a>
+                    <a class="side-sub" href="/settings#skymask" data-sub="skymask">Sky Mask</a>
+                    <a class="side-sub" href="/settings#integrations" data-sub="integrations">Integrations</a>
+                </div>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Phone navigation (<=768px): same 5-tab bar + More sheet as index.html (style.css hides the sidebar on phones) -->
+    <nav class="m-tabbar" id="m-tabbar" aria-label="Mobile navigation">
+        <a class="m-tab" href="/live" data-mpath="/live,/,/index.html"><span class="m-ic">&#9673;</span><span class="m-txt">Live</span></a>
+        <a class="m-tab" href="/flights3d" data-mpath="/flights3d"><span class="m-ic">&#9992;</span><span class="m-txt">Flights</span></a>
+        <a class="m-tab" href="/satellites3d" data-mpath="/satellites3d"><span class="m-ic">&#128752;</span><span class="m-txt">Satellites</span></a>
+        <a class="m-tab" href="/gallery" data-mpath="/gallery"><span class="m-ic">&#9638;</span><span class="m-txt">Library</span></a>
+        <a class="m-tab" href="/focus" data-mpath="/focus"><span class="m-ic">&#9678;</span><span class="m-txt">Camera</span></a>
+        <button class="m-tab" type="button" id="m-more-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="m-more-sheet" data-mpath="/sky,/logs,/calibration,/settings,/obs"><span class="m-ic">&#8943;</span><span class="m-txt">More</span></button>
+    </nav>
+    <div class="m-sheet-backdrop" id="m-sheet-backdrop" hidden></div>
+    <div class="m-sheet" id="m-more-sheet" role="dialog" aria-label="More" hidden>
+        <div class="m-sheet-grip" aria-hidden="true"></div>
+        <a class="m-sheet-item" href="/sky" data-mpath="/sky">Sky view</a>
+        <a class="m-sheet-item" href="/logs" data-mpath="/logs">Activity Log</a>
+        <a class="m-sheet-item" href="/calibration" data-mpath="/calibration">Master Dark</a>
+        <div class="m-sheet-title">Settings</div>
+        <a class="m-sheet-item" href="/settings#image">Image Output</a>
+        <a class="m-sheet-item" href="/settings#detection">Detection</a>
+        <a class="m-sheet-item" href="/settings#station">Station &amp; Optics</a>
+        <a class="m-sheet-item" href="/settings#skymask">Sky Mask</a>
+        <a class="m-sheet-item" href="/settings#integrations">Integrations</a>
+        <div class="m-sheet-title">Stream / OBS</div>
+        <a class="m-sheet-item" href="/obs/dock">OBS Dock</a>
+        <a class="m-sheet-item" href="/obs" target="_blank" rel="noopener">OBS Preview</a>
+        <button class="m-sheet-item m-sheet-rv" type="button" id="m-rv-toggle" role="switch" aria-checked="false"><span>Red Vision</span><span class="rv-track"><span class="rv-knob"></span></span></button>
+    </div>
+
+    <div class="app-main">
+    <header class="navbar">
+        <div class="nav-brand">
+            <div class="pulse-indicator online" title="System Online"></div>
+            <div><h1>AllSky Observatory</h1></div>
+        </div>
+        <div class="nav-metrics">
+            <div class="nav-pill"><span class="pill-label">UTC</span><span class="pill-value" id="nav-utc-clock">00:00:00</span></div>
+            <button id="btn-night-vision" class="btn btn-outline" title="Preserve night vision adaptation (red palette)"><span class="icon">●</span> Red Vision</button>
+        </div>
+    </header>
+
+    <div id="stage"><div id="sky-root"></div></div>
+    </div><!-- .app-main -->
+    </div><!-- .app-shell -->
+
+    <script>
+        // Phone More sheet + active tab (same behaviour as app.js initMobileNav)
+        (function () {
+            const moreBtn = document.getElementById("m-more-btn"), sheet = document.getElementById("m-more-sheet");
+            const backdrop = document.getElementById("m-sheet-backdrop"), rv = document.getElementById("m-rv-toggle");
+            const nv = document.getElementById("btn-night-vision");
+            const path = location.pathname.replace(/\/+$/, "") || "/";
+            document.querySelectorAll("[data-mpath]").forEach((el) => el.classList.toggle("active", el.getAttribute("data-mpath").split(",").includes(path)));
+            const setOpen = (o) => { sheet.hidden = !o; backdrop.hidden = !o; moreBtn.setAttribute("aria-expanded", o ? "true" : "false"); };
+            moreBtn.addEventListener("click", () => setOpen(sheet.hidden));
+            backdrop.addEventListener("click", () => setOpen(false));
+            document.addEventListener("keydown", (e) => { if (e.key === "Escape") setOpen(false); });
+            const sync = () => { const on = nv.classList.contains("btn-primary"); rv.classList.toggle("btn-primary", on); rv.setAttribute("aria-checked", on ? "true" : "false"); };
+            rv.addEventListener("click", () => { nv.click(); sync(); });
+            sync(); setTimeout(sync, 0);
+        })();
+    </script>
+
+
+    <script>
+        // Shell behaviour shared with app.js: UTC clock and the Red Vision toggle (same localStorage prefs)
+        (function () {
+            const KEY = "allsky.ui.prefs.v1", btn = document.getElementById("btn-night-vision");
+            const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } };
+            function apply(on) {
+                document.body.classList.toggle("night-mode", on);
+                if (on) document.documentElement.setAttribute("data-theme", "red"); else document.documentElement.removeAttribute("data-theme");
+                btn.classList.toggle("btn-primary", on);
+            }
+            apply(!!read().nightVision);
+            btn.addEventListener("click", () => {
+                const on = !document.body.classList.contains("night-mode");
+                apply(on);
+                try { localStorage.setItem(KEY, JSON.stringify(Object.assign(read(), { nightVision: on }))); } catch (e) { /* not persisted */ }
+            });
+            const clock = document.getElementById("nav-utc-clock");
+            const tick = () => { clock.textContent = new Date().toISOString().slice(11, 19); };
+            tick(); setInterval(tick, 1000);
+        })();
+    </script>
+
+    <script type="module" src="/static/sky/sky.js?v=20261028sky1"></script>
+</body>
+</html>

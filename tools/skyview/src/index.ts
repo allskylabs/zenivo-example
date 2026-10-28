@@ -1,0 +1,44 @@
+// Public module API of skyview. Usage:
+//   const sky = await createSky(containerElement, { observer: {latDeg, lonDeg}, dataBaseUrl: '/data/sky/', camera?: {...} });
+//   sky.core.setMarkers('aircraft', [...]);  sky.core.setCamera(...);  sky.core.setObserver(...)
+import { SkyCore } from './engine-adapter';
+import { buildUi } from './ui';
+import type { Ui } from './ui';
+import type { SkyConfig, ViewMode } from './types';
+
+export type { SkyConfig, CameraFov, Marker, MarkerGroup, Layers, LayerKey, Lang, ViewMode, ObserverCfg } from './types';
+export { SkyCore } from './engine-adapter';
+
+export interface SkyHandle { core: SkyCore; ui: Ui; setMode(m: ViewMode): Promise<void>; destroy(): void }
+
+export async function createSky(container: HTMLElement, cfg: SkyConfig): Promise<SkyHandle> {
+  const root = document.createElement('div'); root.className = 'sv-root'; container.append(root);
+  const gl = document.createElement('canvas'); gl.className = 'sv-gl'; gl.style.cursor = 'grab';
+  const ov = document.createElement('canvas'); ov.className = 'sv-ov';
+  root.append(gl, ov);
+  const core = new SkyCore(gl, ov, cfg);
+  let dome: { enter(): void; exit(): void } | null = null;
+  let phone: { enter(): Promise<void>; exit(): void } | null = null;
+  let current: ViewMode = 'allsky';
+  const modes: ViewMode[] = ['allsky', '3d', 'phone'];
+  const setMode = async (m: ViewMode): Promise<void> => {
+    if (m === current) return;
+    try {
+      if (current === '3d') dome?.exit();
+      if (current === 'phone') phone?.exit();
+      current = m; ui.setModeActive(m);
+      if (m === '3d') {
+        if (!dome) { const mod = await import('./dome3d'); dome = await mod.createDome(core, root); }
+        dome.enter();
+      } else if (m === 'phone') {
+        if (!phone) { const mod = await import('./phone'); phone = mod.createPhone(core, root, ui.guide); }
+        await phone.enter();
+      } else { core.setMode('allsky'); core.allSkyView(); }
+    } catch (e) { console.error('mode switch failed', e); current = 'allsky'; core.setMode('allsky'); ui.setModeActive('allsky'); }
+  };
+  const ui = buildUi(core, root, { setMode, modes });
+  ui.setModeActive('allsky');
+  await core.init();
+  core.start();
+  return { core, ui, setMode, destroy: () => { core.stop(); root.remove(); } };
+}
