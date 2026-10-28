@@ -2364,7 +2364,7 @@ details.registers-box[open] > summary { margin-bottom: 0.3rem; }
 #fv-chart .cc-mark { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .frame-viewer { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: rgba(2, 6, 23, 0.82); padding: 1rem; }
 .frame-viewer.hidden { display: none; }
-.fv-box { width: min(1100px, 100%); max-height: 100%; overflow: auto; background: var(--bg-card); border: 1px solid var(--border-color, rgba(148, 163, 184, 0.25)); border-radius: 12px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.fv-box { width: min(1400px, 100%); max-height: 100%; overflow: auto; background: var(--bg-card); border: 1px solid var(--border-color, rgba(148, 163, 184, 0.25)); border-radius: 12px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.6rem; }
 .fv-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .fv-close { background: none; border: 0; color: var(--text-muted); font-size: 1.6rem; line-height: 1; cursor: pointer; }
 .fv-img-wrap { position: relative; background: #000; border-radius: 8px; min-height: 160px; display: flex; align-items: center; justify-content: center; }
@@ -2381,4 +2381,14 @@ details.registers-box[open] > summary { margin-bottom: 0.3rem; }
 
 .fv-boxes { position: absolute; pointer-events: none; overflow: visible; }
 .fv-boxes rect { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; }
-.fv-boxes text { font: 600 12px var(--font-mono, monospace); paint-order: stroke; stroke: rgba(0,0,0,.75); stroke-width: 3px; }
+.fv-boxes text { font-weight: 600; font-family: var(--font-mono, monospace); paint-order: stroke; stroke: rgba(0,0,0,.75); stroke-width: 3px; }
+
+.fv-body { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 0.75rem; min-height: 0; }
+.fv-main { display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
+.fv-events { list-style: none; margin: 0; padding: 0; overflow-y: auto; max-height: 78vh; display: flex; flex-direction: column; gap: 0.35rem; }
+.fv-events li { cursor: pointer; padding: 0.4rem 0.6rem; border-radius: 8px; background: var(--bg-card-sub); border-left: 3px solid var(--pill, var(--accent)); font-size: 0.8rem; }
+.fv-events li:hover { background: rgba(148, 163, 184, 0.16); }
+.fv-events li.active { outline: 1px solid var(--pill, var(--accent)); background: rgba(148, 163, 184, 0.2); }
+.fv-events .ev-type { font-weight: 600; color: var(--text-primary); }
+.fv-events .ev-time, .fv-events .ev-detail { color: var(--text-muted); font-size: 0.75rem; }
+@media (max-width: 900px) { .fv-body { grid-template-columns: 1fr; } .fv-events { max-height: 180px; } }

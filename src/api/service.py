@@ -2555,7 +2555,9 @@ class AllSkyService:
             out = [{"event_id": e.get("event_id"), "type": e.get("type"), "start_ts": self._event_ts(e),
                     "end_ts": e.get("end_ts"), "label": (e.get("nearest_flight") or {}).get("callsign"),
                     "thumbnail_url": e.get("thumbnail_url"), "sky_url": e.get("sky_url"),
-                    "bbox": e.get("bbox")} for e in out]
+                    "line": e.get("line"), "moving_dot": bool(e.get("moving_dot")), "frames": e.get("frames"),
+                    "length_px": e.get("length_px"), "peak_dn": e.get("peak_dn"),
+                    "flight": (e.get("nearest_flight") or {}).get("callsign")} for e in out]
         return {"events": out, "total_count": len(events), "counts": counts, **self.get_event_config()}
 
     @staticmethod

@@ -3606,28 +3606,135 @@ document.addEventListener("DOMContentLoaded", () => {
             setMark(cloudChart, mainStore);
             setMark(fvChart, fvStore);
             drawBoxes();
+            markEventList(true);
         }
 
-        // Box around every event active in the viewed frame (bbox is [x, y, w, h] in the 1152x648 detection frame)
         const EV_COLORS = { meteor: "#f472b6", plane: "#fbbf24", satellite: "#34d399", flash: "#f87171" };
         const fvBoxes = document.getElementById("fv-boxes");
-        function drawBoxes() {
+        // Where an event is at a moment: moving dots are interpolated along their path (line is the first -> last point,
+        // normalised to the frame); a streak is drawn as the whole line
+        // Archive frames are 30 s apart and their file times do not line up exactly with the detector's clock, so a
+        // dot's place is found in the pixels: brighter than in both neighbouring frames, close to the event's path.
+        const GW = 648, GH = 365;
+        const grayCache = new Map();
+        function grayOf(url) {
+            if (!grayCache.has(url)) {
+                if (grayCache.size > 12) grayCache.delete(grayCache.keys().next().value);
+                grayCache.set(url, new Promise((resolve) => {
+                    const im = new Image();
+                    im.onload = () => {
+                        const c = document.createElement("canvas");
+                        c.width = GW; c.height = GH;
+                        const g = c.getContext("2d", { willReadFrequently: true });
+                        g.drawImage(im, 0, 0, GW, GH);
+                        const d = g.getImageData(0, 0, GW, GH).data, out = new Float32Array(GW * GH);
+                        for (let i = 0; i < out.length; i++) out[i] = d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11;
+                        resolve(out);
+                    };
+                    im.onerror = () => resolve(null);
+                    im.src = url;
+                }));
+            }
+            return grayCache.get(url);
+        }
+        async function locateDot(e, i) {
+            const cur = await grayOf(fvFrames[i].url);
+            if (!cur) return null;
+            const nb = (await Promise.all([i - 1, i + 1].filter((j) => j >= 0 && j < fvFrames.length).map((j) => grayOf(fvFrames[j].url)))).filter(Boolean);
+            if (!nb.length) return null;
+            const [x0, y0, x1, y1] = [e.line[0] * GW, e.line[1] * GH, e.line[2] * GW, e.line[3] * GH];
+            const L2 = (x1 - x0) ** 2 + (y1 - y0) ** 2 || 1, R = 14;
+            const dur = Math.max(1, (e.end_ts || e.start_ts) - e.start_ts);
+            const u0 = (fvFrames[i].ts - e.start_ts) / dur, uw = 35 / dur;   // the clocks differ by seconds, not minutes
+            let best = 0, bx = -1, by = -1;
+            for (let y = 1; y < GH - 1; y++) {
+                for (let x = 1; x < GW - 1; x++) {
+                    const t = ((x - x0) * (x1 - x0) + (y - y0) * (y1 - y0)) / L2;
+                    if (t < -0.06 || t > 1.06 || t < u0 - uw || t > u0 + uw) continue;
+                    const px = x0 + t * (x1 - x0) - x, py = y0 + t * (y1 - y0) - y;
+                    if (px * px + py * py > R * R) continue;
+                    const k = y * GW + x;
+                    let m = 0;
+                    for (const n of nb) m = Math.max(m, n[k], n[k - 1], n[k + 1], n[k - GW], n[k + GW]);
+                    const v = cur[k] - m;
+                    if (v > best) { best = v; bx = x; by = y; }
+                }
+            }
+            return best >= 10 ? [bx / GW, by / GH] : null;
+        }
+
+        let boxReq = 0;
+        async function drawBoxes() {
+            const req = ++boxReq;
+            const f = fvFrames[fvIdx], i = fvIdx;
             fvBoxes.innerHTML = "";
-            const f = fvFrames[fvIdx];
             if (!f || !fvImg.naturalWidth) return;
             const wrap = fvImg.parentElement.getBoundingClientRect(), im = fvImg.getBoundingClientRect();
-            const k = Math.min(im.width / fvImg.naturalWidth, im.height / fvImg.naturalHeight);
-            const w = fvImg.naturalWidth * k, h = fvImg.naturalHeight * k;   // object-fit: contain
+            const W = fvImg.naturalWidth, H = fvImg.naturalHeight;
+            const k = Math.min(im.width / W, im.height / H);
+            const w = W * k, h = H * k;   // object-fit: contain
             Object.assign(fvBoxes.style, { left: `${im.left - wrap.left + (im.width - w) / 2}px`, top: `${im.top - wrap.top + (im.height - h) / 2}px`, width: `${w}px`, height: `${h}px` });
-            fvBoxes.setAttribute("viewBox", "0 0 1152 648");
-            fvBoxes.setAttribute("preserveAspectRatio", "none");
-            cloudEvents.filter((e) => e.bbox && f.ts >= e.start_ts - 4 && f.ts <= Math.max(e.end_ts || 0, e.start_ts) + 4).forEach((e) => {
-                const [x, y, bw, bh] = e.bbox, c = EV_COLORS[e.type] || "#fff", pad = 6;
-                svgEl("rect", { x: x - pad, y: y - pad, width: bw + 2 * pad, height: bh + 2 * pad, stroke: c, rx: 4 }, fvBoxes);
-                const t = svgEl("text", { x: x - pad, y: Math.max(12, y - pad - 4), fill: c }, fvBoxes);
-                t.textContent = `${EV_NAMES[e.type] || e.type}${e.label ? " " + e.label : ""}`;
+            fvBoxes.setAttribute("viewBox", `0 0 ${W} ${H}`);
+            const active = cloudEvents.filter((e) => e.line && f.ts >= e.start_ts - 30 && f.ts <= Math.max(e.end_ts || 0, e.start_ts) + 30);
+            const found = await Promise.all(active.map((e) => (e.moving_dot ? locateDot(e, i) : null)));
+            if (req !== boxReq) return;
+            active.forEach((e, n) => {
+                const [x0, y0, x1, y1] = e.line, c = EV_COLORS[e.type] || "#fff";
+                const dur = (e.end_ts || e.start_ts) - e.start_ts;
+                const name = `${EV_NAMES[e.type] || e.type}${e.label ? " " + e.label : ""}`;
+                const inside = f.ts >= e.start_ts - 4 && f.ts <= (e.end_ts || e.start_ts) + 4;
+                let bx, by, bw, bh, dim = false;
+                if (e.moving_dot && dur > 0) {
+                    svgEl("line", { x1: x0 * W, y1: y0 * H, x2: x1 * W, y2: y1 * H, stroke: c, "stroke-width": 1, "stroke-dasharray": "5 4", opacity: 0.45, "vector-effect": "non-scaling-stroke" }, fvBoxes);
+                    let pos = found[n];
+                    if (!pos) {   // dot not visible in this frame (strobe off / too faint): fall back to the timed position
+                        if (!inside) return;
+                        const u = Math.max(0, Math.min(1, (f.ts - e.start_ts) / dur));
+                        pos = [x0 + (x1 - x0) * u, y0 + (y1 - y0) * u];
+                        dim = true;
+                    }
+                    const r = 0.02 * W;
+                    bx = pos[0] * W - r; by = pos[1] * H - r; bw = bh = 2 * r;
+                } else {
+                    if (!inside) return;
+                    const pad = 0.015 * W;
+                    bx = Math.min(x0, x1) * W - pad; by = Math.min(y0, y1) * H - pad;
+                    bw = Math.abs(x1 - x0) * W + 2 * pad; bh = Math.abs(y1 - y0) * H + 2 * pad;
+                }
+                svgEl("rect", { x: bx, y: by, width: bw, height: bh, stroke: c, rx: 3, "stroke-dasharray": dim ? "4 3" : "none", opacity: dim ? 0.6 : 1 }, fvBoxes);
+                const t = svgEl("text", { x: bx, y: Math.max(14, by - 6), fill: c, "font-size": 0.015 * W, opacity: dim ? 0.6 : 1 }, fvBoxes);
+                t.textContent = name;
             });
         }
+
+        // The night's events beside the viewer (same list as "Recent events"); the one in view is highlighted
+        const fvList = document.getElementById("fv-events");
+        function renderEventList() {
+            const evs = cloudEvents.slice().sort((a, b) => b.start_ts - a.start_ts);
+            fvList.innerHTML = evs.map((e) => {
+                const bits = [e.flight ? `✈ ${escapeHtml(e.flight)}` : "", e.length_px ? `${Math.round(e.length_px)} px` : "",
+                    e.frames > 1 ? `${e.frames} frames` : "", e.peak_dn ? `peak +${e.peak_dn} DN` : ""].filter(Boolean).join(" · ");
+                return `<li data-ts="${e.start_ts}" data-id="${escapeHtml(e.event_id || "")}" style="--pill:${EV_COLORS[e.type] || "#fff"}"><div class="ev-type">${EV_NAMES[e.type] || e.type}</div>` +
+                    `<div class="ev-time">${fmtTime(e.start_ts, true)}</div><div class="ev-detail">${bits}</div></li>`;
+            }).join("");
+            markEventList(false);
+        }
+        function markEventList(scroll) {
+            let on = null;
+            fvList.querySelectorAll("li").forEach((li) => {
+                const hit = fvEvent && li.dataset.id === (fvEvent.event_id || "");
+                li.classList.toggle("active", !!hit);
+                if (hit) on = li;
+            });
+            if (on && scroll) on.scrollIntoView({ block: "nearest" });
+        }
+        fvList.addEventListener("click", (e) => {
+            const li = e.target.closest("li[data-ts]");
+            if (!li) return;
+            const ev = cloudEvents.find((x) => (x.event_id || "") === li.dataset.id);
+            openFrameAt(Number(li.dataset.ts), ev || null);
+        });
+        window.openFrameViewerAt = (ts, evId) => openFrameAt(ts, cloudEvents.find((x) => x.event_id === evId) || null);
         fvImg.addEventListener("load", drawBoxes);
         window.addEventListener("resize", drawBoxes);
 
@@ -3637,6 +3744,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (ev !== undefined) fvEvent = ev;
             fv.classList.remove("hidden");
             renderChart(fvChart, fvStore);
+            renderEventList();
             const req = ++fvReq;
             const inside = fvFrames.length && ts >= fvFrames[0].ts - 30 && ts <= fvFrames[fvFrames.length - 1].ts + 30;
             if (!inside) {
@@ -4451,7 +4559,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const openLive = (e) => {
             if (e.target.closest("a")) return;
             const li = e.target.closest("li[data-event-idx]");
-            if (li) openEventViewer(liveEventsData, Number(li.dataset.eventIdx));
+            if (!li) return;
+            const ev = liveEventsData[Number(li.dataset.eventIdx)];
+            if (window.openFrameViewerAt && ev && ev.start_ts) window.openFrameViewerAt(ev.start_ts, ev.event_id);
+            else openEventViewer(liveEventsData, Number(li.dataset.eventIdx));
         };
         liveEventsList.addEventListener("click", openLive);
         liveEventsList.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openLive(e); } });
