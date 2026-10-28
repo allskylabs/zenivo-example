@@ -2,7 +2,7 @@
 // Plain DOM + one injected stylesheet (all rules scoped under .sv-root; colours via --sv-* with fallbacks to the host's CSS variables).
 import type { SkyCore } from './engine-adapter';
 import { solarTermDates, CALENDAR_POINTS } from './astro';
-import { LAYER_KEYS, LAYER_LABELS } from './types';
+import { LAYER_GROUPS, LAYER_KEYS, LAYER_LABELS } from './types';
 import type { ViewMode } from './types';
 
 const CSS = `
@@ -19,8 +19,12 @@ const CSS = `
 .sv-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .sv-row h1{font-size:14px;font-weight:600;margin:0}
 .sv-grow{flex:1}
-.sv-layers{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px}
-.sv-layers label{display:flex;justify-content:space-between;gap:6px;align-items:center;font-size:12px;padding:2px 0}
+.sv-layers{display:grid;grid-template-columns:1fr;gap:1px 10px;padding:2px 0 4px}
+.sv-layers label{display:flex;gap:6px;align-items:center;font-size:12px;padding:2px 0;cursor:pointer}
+.sv-sections{display:flex;flex-direction:column;gap:2px}
+.sv-group{border-top:1px solid rgba(148,163,184,.18);padding-top:3px}
+.sv-group summary{cursor:pointer;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8;padding:3px 0;list-style:none}
+.sv-group summary::before{content:'▸ '}.sv-group[open] summary::before{content:'▾ '}
 .sv-left.sv-collapsed .sv-body{display:none}
 .sv-time{left:10px;right:10px;bottom:10px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;max-width:760px}
 .sv-time input[type=range]{flex:1;min-width:120px;accent-color:var(--sv-accent)}
@@ -69,14 +73,20 @@ export function buildUi(core: SkyCore, root: HTMLElement, hooks: UiHooks): Ui {
   const camBtn = el('button', '', 'Camera view', 'Góc nhìn camera', acts); camBtn.addEventListener('click', () => core.cameraView());
   const allBtn = el('button', '', 'All-sky', 'Toàn cảnh', acts); allBtn.addEventListener('click', () => (core.mode === 'eye' ? core.goTo(0, 89, 160) : core.allSkyView()));
   const allTxt = texts[texts.length - 1]!;
-  const lay = el('div', 'sv-layers', undefined, undefined, body);
   const checks = new Map<string, HTMLInputElement>();
-  for (const k of LAYER_KEYS) {
-    const l = el('label', '', LAYER_LABELS[k][0], LAYER_LABELS[k][1], lay);
-    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = core.layers[k];
-    cb.addEventListener('change', () => core.setLayer(k, cb.checked)); l.append(cb); checks.set(k, cb);
-    // textContent assignment on the label would drop the checkbox: keep text in a span instead
-    const sp = document.createElement('span'); l.textContent = ''; l.append(sp, cb); texts[texts.length - 1] = [sp, LAYER_LABELS[k][0], LAYER_LABELS[k][1]];
+  const onlyRows: { row: HTMLElement; only: ViewMode }[] = [];
+  const sections = el('div', 'sv-sections', undefined, undefined, body);
+  for (const g of LAYER_GROUPS) {
+    const det = el('details', 'sv-group', undefined, undefined, sections); det.open = g.open;
+    el('summary', '', g.title[0], g.title[1], det);
+    const lay = el('div', 'sv-layers', undefined, undefined, det);
+    for (const { k, only } of g.keys) {
+      const l = document.createElement('label'); lay.append(l);
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = core.layers[k];
+      cb.addEventListener('change', () => core.setLayer(k, cb.checked));
+      const sp = document.createElement('span'); l.append(cb, sp); texts.push([sp, LAYER_LABELS[k][0], LAYER_LABELS[k][1]]);
+      checks.set(k, cb); if (only) onlyRows.push({ row: l, only });
+    }
   }
   const collapsed = (): void => { left.classList.toggle('sv-collapsed'); };
   colBtn.addEventListener('click', collapsed);
@@ -163,6 +173,7 @@ export function buildUi(core: SkyCore, root: HTMLElement, hooks: UiHooks): Ui {
     setModeActive: m => {
       for (const [k, b] of tabBtns) b.classList.toggle('on', k === m);
       camBtn.style.display = m === '3d' ? 'none' : '';
+      for (const o of onlyRows) o.row.style.display = o.only === m ? '' : 'none';
       allTxt[1] = 'All-sky'; allTxt[2] = 'Toàn cảnh'; retext();
     },
   };

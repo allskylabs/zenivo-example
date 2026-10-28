@@ -29,15 +29,15 @@ export type Layers = Record<LayerKey, boolean>;
 
 export const LAYER_LABELS: Record<LayerKey, [string, string]> = {
   stars: ['Stars', 'Ngôi sao'], milkyWay: ['Milky Way', 'Dải Ngân Hà'], starLabels: ['Star names', 'Tên sao'],
-  constellationLines: ['Constellations', 'Chòm sao'], constellationLabels: ['Constellation names', 'Tên chòm sao'],
-  planets: ['Planets', 'Hành tinh'], moon: ['Moon and Sun', 'Trăng và Mặt Trời'], ecliptic: ['Ecliptic line', 'Đường hoàng đạo'],
-  calendarPoints: ['Equinoxes and solstices', 'Điểm phân và chí'], polarAxis: ['Earth polar axis', 'Trục quay Trái Đất'],
-  equator: ['Celestial equator', 'Xích đạo trời'], raGrid: ['Right ascension grid', 'Lưới xích kinh (RA)'],
-  decGrid: ['Declination grid', 'Lưới xích vĩ (Dec)'], meridian: ['Meridian', 'Kinh tuyến'], altAzGrid: ['Alt/az grid', 'Lưới chân trời'],
- seeThroughGround: ['Transparent ground', 'Nhìn xuyên chân trời'],
-  deepSkyObjects: ['Messier objects', 'Thiên thể sâu'], daylightAtmosphere: ['Atmosphere haze', 'Khí quyển'],
-  cardinalDirections: ['Compass headings', 'La bàn 4 phương'], meteors: ['Meteors and showers', 'Sao băng'],
-  camera: ['Camera FOV', 'Khung nhìn camera'], cameraImage: ['Camera image', 'Ảnh camera'], aircraft: ['Aircraft', 'Máy bay'], satellites: ['Satellites', 'Vệ tinh'], events: ['Camera events', 'Sự kiện camera'],
+  constellationLines: ['Constellation lines', 'Nối các chòm sao'], constellationLabels: ['Constellation names', 'Tên chòm sao'],
+  planets: ['Planets', 'Hành tinh'], moon: ['Sun and Moon', 'Mặt Trời, Mặt Trăng'], ecliptic: ['Ecliptic', 'Hoàng đạo'],
+  calendarPoints: ['Equinox / solstice points', 'Điểm phân, điểm chí'], polarAxis: ['Celestial poles', 'Cực thiên cầu'],
+  equator: ['Celestial equator', 'Xích đạo thiên cầu'], raGrid: ['RA grid', 'Lưới xích kinh (RA)'],
+  decGrid: ['Dec grid', 'Lưới xích vĩ (Dec)'], meridian: ['Meridian', 'Kinh tuyến'], altAzGrid: ['Alt-az grid', 'Lưới độ cao - phương vị'],
+ seeThroughGround: ['See through the ground', 'Nhìn xuyên mặt đất'],
+  deepSkyObjects: ['Messier objects', 'Thiên thể Messier'], daylightAtmosphere: ['Atmosphere and daylight', 'Khí quyển, ánh sáng ngày'],
+  cardinalDirections: ['Compass (N E S W)', 'Hướng N E S W'], meteors: ['Meteor showers', 'Mưa sao băng'],
+  camera: ['Camera frame', 'Khung camera /live'], cameraImage: ['Camera picture', 'Ảnh camera /live'], aircraft: ['Aircraft', 'Máy bay'], satellites: ['Satellites', 'Vệ tinh'], events: ['Detected events', 'Sự kiện đã bắt'],
 };
 export const LAYER_DEFAULTS: Layers = {
   stars: true, milkyWay: true, starLabels: true, constellationLines: true, constellationLabels: true, planets: true, moon: true,
@@ -70,3 +70,13 @@ export type MarkerGroup = 'aircraft' | 'satellites' | 'events';
 export interface Hit { x: number; y: number; r: number; kind: string; id: string; prio: number; data: Record<string, unknown> }
 export interface InspectorData { title: string; kind: string; above: boolean; rows: [string, string][]; note?: string; az: number; alt: number }
 export type { Vec3 };
+
+/** Option panel layout: sections in display order; `only` limits a section's item to one view mode. */
+export const LAYER_GROUPS: { id: string; title: [string, string]; open: boolean; keys: { k: LayerKey; only?: ViewMode }[] }[] = [
+  { id: 'sky', title: ['Sky', 'Bầu trời'], open: true, keys: [{ k: 'stars' }, { k: 'milkyWay' }, { k: 'daylightAtmosphere' }, { k: 'meteors' }] },
+  { id: 'objects', title: ['Objects', 'Thiên thể'], open: true, keys: [{ k: 'moon' }, { k: 'planets' }, { k: 'starLabels' }, { k: 'deepSkyObjects' }] },
+  { id: 'cons', title: ['Constellations', 'Chòm sao'], open: true, keys: [{ k: 'constellationLines' }, { k: 'constellationLabels' }] },
+  { id: 'live', title: ['Live data', 'Dữ liệu trực tiếp'], open: true, keys: [{ k: 'camera' }, { k: 'cameraImage' }, { k: 'aircraft' }, { k: 'satellites' }, { k: 'events' }] },
+  { id: 'ground', title: ['Horizon', 'Chân trời'], open: true, keys: [{ k: 'cardinalDirections' }, { k: 'seeThroughGround', only: '3d' }] },
+  { id: 'lines', title: ['Lines and grids', 'Đường và lưới'], open: false, keys: [{ k: 'ecliptic' }, { k: 'equator' }, { k: 'meridian' }, { k: 'altAzGrid' }, { k: 'raGrid' }, { k: 'decGrid' }, { k: 'polarAxis' }, { k: 'calendarPoints' }] },
+];
