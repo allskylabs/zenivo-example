@@ -56,6 +56,7 @@ export function drawLayers(core: SkyCore, ctx: CanvasRenderingContext2D, proj: P
   }
 
   const eye = core.mode === 'eye';
+  if (core.camera && L.camera && L.cameraImage && core.cameraImg) drawCameraImage(core, ctx, proj);
   if (eye) drawEyeGround(ctx, proj, snap.sunAlt);
 
   // grids
@@ -271,4 +272,50 @@ function drawEyeGround(ctx: CanvasRenderingContext2D, proj: Proj, sunAlt: number
     }
     if (any) { ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.fill(); ctx.stroke(); }
   }
+}
+
+/** The camera picture warped onto its frame on the sky: a grid of small affine-mapped triangles (rectilinear camera model). */
+function drawCameraImage(core: SkyCore, ctx: CanvasRenderingContext2D, proj: Proj): void {
+  const img = core.cameraImg!, c = core.camera!;
+  if (!img.naturalWidth) return;
+  const f = horizontalDir(c.az * DEG, c.alt * DEG);
+  const r0: Vec3 = [-Math.sin(c.az * DEG), -Math.cos(c.az * DEG), 0];
+  const u0: Vec3 = [r0[1] * f[2] - r0[2] * f[1], r0[2] * f[0] - r0[0] * f[2], r0[0] * f[1] - r0[1] * f[0]];
+  const cr = Math.cos(c.roll * DEG), sr = Math.sin(c.roll * DEG);
+  const r: Vec3 = [r0[0] * cr + u0[0] * sr, r0[1] * cr + u0[1] * sr, r0[2] * cr + u0[2] * sr];
+  const u: Vec3 = [u0[0] * cr - r0[0] * sr, u0[1] * cr - r0[1] * sr, u0[2] * cr - r0[2] * sr];
+  const hx = Math.tan(Math.min(85, c.fovH / 2) * DEG), hy = Math.tan(Math.min(85, c.fovV / 2) * DEG);
+  const NX = 18, NY = 11, W = img.naturalWidth, H = img.naturalHeight;
+  const lim = 2.5 * Math.max(proj.w, proj.h);
+  const grid: ({ x: number; y: number } | null)[][] = [];
+  for (let j = 0; j <= NY; j++) {
+    const row: ({ x: number; y: number } | null)[] = [];
+    for (let i = 0; i <= NX; i++) {
+      const x = -1 + 2 * i / NX, y = 1 - 2 * j / NY;
+      const v: Vec3 = [f[0] + x * hx * r[0] + y * hy * u[0], f[1] + x * hx * r[1] + y * hy * u[1], f[2] + x * hx * r[2] + y * hy * u[2]];
+      const n = Math.hypot(v[0], v[1], v[2]) || 1;
+      const p = proj.project([v[0] / n, v[1] / n, v[2] / n]);
+      row.push(p && Math.abs(p.x - proj.w / 2) < lim && Math.abs(p.y - proj.h / 2) < lim ? p : null);
+    }
+    grid.push(row);
+  }
+  const tri = (a: { x: number; y: number }, b: { x: number; y: number }, c2: { x: number; y: number }, sa: number[], sb: number[], sc: number[]): void => {
+    // affine map from image triangle (sa, sb, sc) to screen triangle (a, b, c2)
+    const d = (sb[0]! - sa[0]!) * (sc[1]! - sa[1]!) - (sc[0]! - sa[0]!) * (sb[1]! - sa[1]!); if (!d) return;
+    const A = ((b.x - a.x) * (sc[1]! - sa[1]!) - (c2.x - a.x) * (sb[1]! - sa[1]!)) / d, C = ((c2.x - a.x) * (sb[0]! - sa[0]!) - (b.x - a.x) * (sc[0]! - sa[0]!)) / d;
+    const B = ((b.y - a.y) * (sc[1]! - sa[1]!) - (c2.y - a.y) * (sb[1]! - sa[1]!)) / d, D = ((c2.y - a.y) * (sb[0]! - sa[0]!) - (b.y - a.y) * (sc[0]! - sa[0]!)) / d;
+    const cx = (a.x + b.x + c2.x) / 3, cy = (a.y + b.y + c2.y) / 3, g = 0.6;   // grow the clip a little so cells overlap (no seams)
+    const e = (q: { x: number; y: number }): [number, number] => { const l = Math.hypot(q.x - cx, q.y - cy) || 1; return [q.x + (q.x - cx) / l * g, q.y + (q.y - cy) / l * g]; };
+    ctx.save(); ctx.beginPath(); ctx.moveTo(...e(a)); ctx.lineTo(...e(b)); ctx.lineTo(...e(c2)); ctx.closePath(); ctx.clip();
+    ctx.transform(A, B, C, D, a.x - A * sa[0]! - C * sa[1]!, a.y - B * sa[0]! - D * sa[1]!);
+    ctx.drawImage(img, 0, 0); ctx.restore();
+  };
+  ctx.save(); ctx.globalAlpha = 0.92;
+  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+    const p00 = grid[j]![i], p10 = grid[j]![i + 1], p01 = grid[j + 1]![i], p11 = grid[j + 1]![i + 1];
+    if (!p00 || !p10 || !p01 || !p11) continue;
+    const s00 = [i / NX * W, j / NY * H], s10 = [(i + 1) / NX * W, j / NY * H], s01 = [i / NX * W, (j + 1) / NY * H], s11 = [(i + 1) / NX * W, (j + 1) / NY * H];
+    tri(p00, p10, p01, s00, s10, s01); tri(p10, p11, p01, s10, s11, s01);
+  }
+  ctx.restore();
 }

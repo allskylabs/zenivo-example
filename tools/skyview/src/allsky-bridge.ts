@@ -64,7 +64,25 @@ export function startAllskyBridge(core: SkyCore, api = ''): () => void {
     }
     core.setMarkers('events', list);
   };
-  const ids = [window.setInterval(() => { if (!document.hidden) void pollSats(); }, 5000), window.setInterval(() => { if (!document.hidden) void pollAir(); }, 2000), window.setInterval(() => { if (!document.hidden) void pollEvents(); }, 60000)];
-  void pollSats(); void pollAir(); void pollEvents();
+  // The camera picture shown inside the camera frame: the live snapshot when the sky time is "now", else the archived frame nearest that moment
+  let imgKey = '', imgBusy = false, imgTimer = 0;
+  const pollImage = async (): Promise<void> => {
+    if (imgBusy || !core.camera || !core.layers.cameraImage || !core.layers.camera) return;
+    imgBusy = true;
+    try {
+      let url: string | null = null, key = '';
+      if (core.isNow) { url = `${api}/api/snapshot.jpg?ts=${Math.floor(Date.now() / 5000)}`; key = url; }
+      else {
+        const d = await getJson<{ url?: string; delta_s?: number }>(`${api}/api/frames/near?ts=${(core.simMs / 1000).toFixed(0)}`);
+        if (d?.url && Math.abs(d.delta_s ?? 0) < 300) { url = api + d.url; key = url; }
+      }
+      if (key === imgKey) return;
+      if (!url) { imgKey = ''; core.setCameraImage(null); return; }
+      await new Promise<void>(res => { const im = new Image(); im.onload = () => { core.setCameraImage(im); imgKey = key; res(); }; im.onerror = () => res(); im.src = url!; });
+    } finally { imgBusy = false; }
+  };
+  core.on('change', () => { window.clearTimeout(imgTimer); imgTimer = window.setTimeout(() => void pollImage(), 500); });
+  const ids = [window.setInterval(() => { if (!document.hidden) void pollImage(); }, 5000), window.setInterval(() => { if (!document.hidden) void pollSats(); }, 5000), window.setInterval(() => { if (!document.hidden) void pollAir(); }, 2000), window.setInterval(() => { if (!document.hidden) void pollEvents(); }, 60000)];
+  void pollSats(); void pollAir(); void pollEvents(); window.setTimeout(() => void pollImage(), 1500);
   return () => ids.forEach(clearInterval);
 }

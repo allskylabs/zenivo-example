@@ -150,6 +150,9 @@ export class SkyCore {
     if (this.sky) { this.sky.observer.latDeg = o.latDeg; this.sky.observer.lonDeg = o.lonDeg; }
     this.bodiesAt = -1e15; this.dirty = true; this.emit('change');
   }
+  /** host-supplied picture from the camera, warped into the camera frame by layers.ts (null = none) */
+  cameraImg: HTMLImageElement | null = null;
+  setCameraImage(img: HTMLImageElement | null): void { this.cameraImg = img; this.dirty = true; }
   setCamera(c: CameraFov | null): void { this.camera = c; this.dirty = true; this.emit('change'); }
   setMarkers(g: MarkerGroup, list: Marker[]): void { this.markers[g] = list; this.dirty = true; }
   setMode(m: ViewMode): void {
