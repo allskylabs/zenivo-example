@@ -60,7 +60,7 @@ export async function createDome(core: SkyCore, root: HTMLElement): Promise<Dome
     vertexShader: 'varying vec3 vP; void main(){vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
     fragmentShader: 'uniform sampler2D tex; uniform mat3 uG; uniform float k; varying vec3 vP; void main(){vec3 g=uG*normalize(vP); float l=atan(g.y,g.x); if(l<0.) l+=6.2831853; float b=asin(clamp(g.z,-1.,1.)); float v=texture2D(tex,vec2(l/6.2831853,.5-b/3.14159265)).r; gl_FragColor=vec4(vec3(.55,.65,.95)*v*k,1.);}',
   });
-  const milky = new Mesh(new SphereGeometry(RD * 0.985, 128, 64), milkyMat); milky.frustumCulled = false; eq.add(milky);
+  const milky = new Mesh(new SphereGeometry(RD * 1.01, 128, 64), milkyMat); milky.frustumCulled = false; eq.add(milky);
   let milkyDone = false;
   const ensureMilky = (): void => {
     if (milkyDone || !core.milkyImg) return; milkyDone = true;
@@ -74,7 +74,7 @@ export async function createDome(core: SkyCore, root: HTMLElement): Promise<Dome
     vertexShader: 'varying vec3 vP; void main(){vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
     fragmentShader: 'uniform float sun; varying vec3 vP; void main(){float h=normalize(vP).y; float day=smoothstep(-0.22,0.1,sun); float tw=smoothstep(-0.32,-0.05,sun)*(1.-smoothstep(-0.05,0.12,sun)); vec3 zen=mix(vec3(.02,.03,.1),vec3(.25,.5,.85),day); vec3 hor=mix(vec3(.05,.07,.15),vec3(.7,.82,.95),day); hor=mix(hor,vec3(.95,.5,.25),tw); float band=pow(1.-clamp(abs(h),0.,1.),3.); vec3 c=mix(zen,hor,band); float a=clamp(day*.9+tw*.4+band*(.18+.25*day),0.,.95); gl_FragColor=vec4(c,a);}',
   });
-  const haze = new Mesh(new SphereGeometry(RD * 0.97, 128, 64), hazeMat); haze.renderOrder = 2; scene.add(haze);
+  const haze = new Mesh(new SphereGeometry(RD * 1.02, 128, 64), hazeMat); haze.renderOrder = 2; scene.add(haze);
 
   // ground + horizon
   const ground = new Mesh(new CircleGeometry(RD, 256), new MeshBasicMaterial({ color: 0x0c1511, transparent: true, opacity: 0.95, side: DoubleSide, depthWrite: false }));
