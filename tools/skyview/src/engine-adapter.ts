@@ -10,7 +10,7 @@ import { drawLayers } from './layers';
 import type { Proj } from './layers';
 import { MeteorSim } from './meteors';
 import { bodyDistanceAu, compassOf, constellationOf, CON_FACTS, DEG, eclipticLon, moonPhase, CALENDAR_POINTS, solarTermDates } from './astro';
-import { LAYER_DEFAULTS, LAYER_KEYS } from './types';
+import { LAYER_DEFAULTS, LAYER_KEYS, EYE_LAYERS } from './types';
 import type { CameraFov, Hit, InspectorData, Lang, LayerKey, Layers, Marker, MarkerGroup, ObserverCfg, SkyConfig, ViewMode } from './types';
 
 export interface Constellation { id: string; names: { en: string; i18n?: Record<string, string> }; labels: [number, number][]; lines: [number, number][][] }
@@ -28,6 +28,8 @@ export class SkyCore {
   layers: Layers;
   lang: Lang;
   mode: ViewMode = 'allsky';
+  /** the user's layers while the 'eye' preset is active */
+  private savedLayers: Layers | null = null;
   // time
   simMs: number; live: boolean; speed = 1;
   private lastReal = performance.now();
@@ -131,8 +133,15 @@ export class SkyCore {
     this.layers[k] = on;
     if (k === 'milkyWay') this.applyMilky();
     if (k === 'stars') this.gl.style.visibility = on || this.mode === '3d' ? 'visible' : 'hidden';
-    try { localStorage.setItem(this.prefix + 'layers', JSON.stringify(this.layers)); } catch { /* ignore */ }
+    if (this.mode !== 'eye') this.persistLayers();
     this.dirty = true; this.emit('change');
+  }
+  private persistLayers(): void {
+    try { localStorage.setItem(this.prefix + 'layers', JSON.stringify(this.layers)); } catch { /* ignore */ }
+  }
+  private replaceLayers(l: Layers): void {
+    this.layers = { ...l }; this.applyMilky();
+    this.gl.style.visibility = this.layers.stars || this.mode === '3d' ? 'visible' : 'hidden';
   }
   setLang(l: Lang): void { this.lang = l; try { localStorage.setItem(this.prefix + 'lang', l); } catch { /* ignore */ } this.dirty = true; this.emit('change'); }
   setObserver(o: ObserverCfg): void {
@@ -143,7 +152,12 @@ export class SkyCore {
   }
   setCamera(c: CameraFov | null): void { this.camera = c; this.dirty = true; this.emit('change'); }
   setMarkers(g: MarkerGroup, list: Marker[]): void { this.markers[g] = list; this.dirty = true; }
-  setMode(m: ViewMode): void { this.mode = m; this.dirty = true; this.emit('change'); }
+  setMode(m: ViewMode): void {
+    const was = this.mode; this.mode = m;
+    if (m === 'eye' && was !== 'eye') { this.savedLayers = { ...this.layers }; this.replaceLayers(EYE_LAYERS); }
+    else if (m !== 'eye' && was === 'eye' && this.savedLayers) { this.replaceLayers(this.savedLayers); this.savedLayers = null; this.persistLayers(); }
+    this.dirty = true; this.emit('change');
+  }
 
   // time
   setTime(ms: number): void { this.simMs = ms; this.live = false; this.dirty = true; this.emit('change'); }
@@ -154,10 +168,16 @@ export class SkyCore {
   get isNow(): boolean { return Math.abs(this.simMs - Date.now()) < 30000; }
 
   // ------------------------------------------------------------ view
-  private setFov(v: ViewState, fovRad: number): ViewState { const k = autoProjection(fovRad); return { ...v, fovRad: clampFov(k, fovRad), projection: k }; }
+  private setFov(v: ViewState, fovRad: number): ViewState {
+    if (this.mode === 'eye') fovRad = Math.max(30 * DEG, Math.min(110 * DEG, fovRad));
+    const k = autoProjection(fovRad); return { ...v, fovRad: clampFov(k, fovRad), projection: k };
+  }
+  /** Observer view: look toward the camera (else south), 35 deg up, 90 deg wide, no roll */
+  eyeView(): void { this.sky.view = this.setFov({ ...this.sky.view, azRad: (this.camera?.az ?? 180) * DEG, altRad: 35 * DEG, rollRad: 0 }, 90 * DEG); this.dirty = true; }
+  private eyeClamp(v: ViewState): ViewState { return { ...v, altRad: Math.max(-5 * DEG, Math.min(89 * DEG, v.altRad)), rollRad: 0 }; }
   allSkyView(): void { this.sky.view = this.setFov({ ...this.sky.view, azRad: 0, altRad: 89.9 * DEG, rollRad: 0 }, 150 * DEG); this.dirty = true; }
   goTo(azDeg: number, altDeg: number, fovDeg?: number, rollDeg = 0): void {
-    this.sky.view = { ...this.sky.view, azRad: azDeg * DEG, altRad: Math.max(-89.9, Math.min(89.9, altDeg)) * DEG, rollRad: rollDeg * DEG };
+    this.sky.view = { ...this.sky.view, azRad: azDeg * DEG, altRad: Math.max(this.mode === 'eye' ? -5 : -89.9, Math.min(this.mode === 'eye' ? 89 : 89.9, altDeg)) * DEG, rollRad: this.mode === 'eye' ? 0 : rollDeg * DEG };
     if (fovDeg) this.sky.view = this.setFov(this.sky.view, fovDeg * DEG);
     this.dirty = true;
   }
@@ -193,6 +213,11 @@ export class SkyCore {
   private rel(e: { clientX: number; clientY: number }): [number, number] { const r = this.gl.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
   private zoomAround(f: number, a: [number, number]): void {
     let nv = zoomView(this.sky.view, f, a);
+    if (this.mode === 'eye') {
+      const lo = 30 * DEG, hi = 110 * DEG;
+      if (nv.fovRad < lo || nv.fovRad > hi) nv = zoomView(this.sky.view, this.sky.view.fovRad / Math.max(lo, Math.min(hi, nv.fovRad)), a);
+      nv = this.eyeClamp({ ...nv, fovRad: Math.max(lo, Math.min(hi, nv.fovRad)) });
+    }
     const kind = autoProjection(nv.fovRad);
     if (kind !== nv.projection) { const d = unproject(a[0], a[1], nv); nv = { ...nv, projection: kind }; const p = project(d, nv); if (p) nv = panView(nv, [p.x, p.y], a); }
     this.sky.view = nv; this.dirty = true;
@@ -210,7 +235,7 @@ export class SkyCore {
       const cur = this.rel(e);
       if (this.pointers.size === 1) {
         this.moved = Math.max(this.moved, Math.hypot(cur[0] - this.downPos[0], cur[1] - this.downPos[1]));
-        if (this.panEnabled) { this.sky.view = panView(this.sky.view, prev, cur); this.dirty = true; }
+        if (this.panEnabled) { const pv = panView(this.sky.view, prev, cur); this.sky.view = this.mode === 'eye' ? this.eyeClamp(pv) : pv; this.dirty = true; }
       } else if (this.pointers.size === 2) {
         this.pointers.set(e.pointerId, cur);
         const [a, b] = [...this.pointers.values()]; const d = Math.hypot(a![0] - b![0], a![1] - b![1]);

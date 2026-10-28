@@ -55,6 +55,9 @@ export function drawLayers(core: SkyCore, ctx: CanvasRenderingContext2D, proj: P
     ctx.fillStyle = `rgba(${r},${g},${b},${a})`; ctx.fillRect(0, 0, w, h);
   }
 
+  const eye = core.mode === 'eye';
+  if (eye) drawEyeGround(ctx, proj, snap.sunAlt);
+
   // grids
   if (L.altAzGrid) {
     ctx.strokeStyle = 'rgba(160,190,255,0.16)'; ctx.lineWidth = 1;
@@ -74,9 +77,14 @@ export function drawLayers(core: SkyCore, ctx: CanvasRenderingContext2D, proj: P
     poly([...Array.from({ length: 61 }, (_, i) => horizontalDir(0, i * 3 * DEG)), ...Array.from({ length: 61 }, (_, i) => horizontalDir(180 * DEG, (180 - i * 3) * DEG))], false);
   }
   // horizon + compass
-  ctx.strokeStyle = 'rgba(52,211,153,0.75)'; ctx.lineWidth = 1.5;
+  if (eye) { ctx.strokeStyle = 'rgba(205,220,235,0.6)'; ctx.lineWidth = 1; } else { ctx.strokeStyle = 'rgba(52,211,153,0.75)'; ctx.lineWidth = 1.5; }
   poly(Array.from({ length: 121 }, (_, i) => horizontalDir(i * 3 * DEG, 0)), false, false);
-  if (L.cardinalDirections) {
+  if (eye) {
+    if (L.cardinalDirections) {
+      const names = core.lang === 'vi' ? ['B', 'ĐB', 'Đ', 'ĐN', 'N', 'TN', 'T', 'TB'] : ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+      names.forEach((c, i) => { const p = proj.project(horizontalDir(i * 45 * DEG, 1.5 * DEG)); if (on(p, 0)) text(c, p.x, p.y - 10, i % 2 ? 'rgba(190,210,225,0.8)' : '#e2e8f0', 'center', i % 2 ? 11 : 15, i % 2 === 0); });
+    }
+  } else if (L.cardinalDirections) {
     ['N', 'E', 'S', 'W'].forEach((c, i) => { const p = proj.project(horizontalDir(i * 90 * DEG, 0.5 * DEG)); if (on(p, 0)) text(c, p.x, p.y - 11, '#6ee7b7', 'center', 14, true); });
   }
   // constellations
@@ -141,6 +149,11 @@ export function drawLayers(core: SkyCore, ctx: CanvasRenderingContext2D, proj: P
     if (sm ? !L.moon : !L.planets) continue;
     const d = eqv(b.raDeg, b.decDeg); if (d[2] < -0.02 && proj.clipBelow) continue;
     const p = proj.project(d); if (!on(p, 10)) continue;
+    if (eye && b.id === 'sun') {
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 160);
+      g.addColorStop(0, 'rgba(255,240,200,0.65)'); g.addColorStop(0.2, 'rgba(255,215,150,0.28)'); g.addColorStop(1, 'rgba(255,200,120,0)');
+      ctx.fillStyle = g; ctx.fillRect(p.x - 160, p.y - 160, 320, 320);
+    }
     const r = Math.max(sm ? 6 : 3.5, Math.min(40, (b.angularDiameterArcsec / 2 / 3600) * DEG * proj.pxPerRad));
     ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7);
     ctx.fillStyle = b.id === 'sun' ? '#ffd24a' : b.id === 'moon' ? `rgba(230,232,238,${0.35 + 0.65 * b.illuminatedFraction})` : '#fde68a'; ctx.fill();
@@ -220,4 +233,37 @@ function drawCamera(core: SkyCore, ctx: CanvasRenderingContext2D, proj: Proj, te
   if (on(pc, 0) && pc) { ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(pc.x - 8, pc.y); ctx.lineTo(pc.x + 8, pc.y); ctx.moveTo(pc.x, pc.y - 8); ctx.lineTo(pc.x, pc.y + 8); ctx.stroke(); }
   const pl = proj.project(at(-1, 1)) ?? pc;
   if (pl && on(pl, 0)) text(c.label ?? 'IMX335', pl.x + 6, pl.y + 12, '#fdba74', 'left', 12, true);
+}
+
+/** Observer view: opaque ground (lower hemisphere as projected quads) and a lighter haze band above the horizon. */
+function drawEyeGround(ctx: CanvasRenderingContext2D, proj: Proj, sunAlt: number): void {
+  const AZ = 72, RINGS = 9, dA = 360 / AZ, dH = 10;
+  const lim = 2.5 * Math.max(proj.w, proj.h);
+  const t = Math.max(0, Math.min(1, (sunAlt + 18) / 24));
+  const lerp = (a: number, b: number): number => a + (b - a) * t;
+  // sky haze band just above the horizon (day / twilight only)
+  if (sunAlt > -12) {
+    const [r, g, b] = sunAlt > 0 ? [165, 205, 245] : sunAlt > -6 ? [255, 170, 110] : [90, 90, 150];
+    const base = sunAlt > 0 ? 0.32 : sunAlt > -6 ? 0.3 : 0.18;
+    for (let k = 0; k < 14; k++) {
+      ctx.beginPath(); let any = false;
+      for (let i = 0; i < AZ; i++) {
+        const q = [[i, k], [i + 1, k], [i + 1, k + 1], [i, k + 1]].map(([a, h]) => proj.project(horizontalDir(a! * dA * DEG, h! * 2.5 * DEG)));
+        if (q.some(p => p === null || Math.abs(p.x - proj.w / 2) > lim || Math.abs(p.y - proj.h / 2) > lim)) continue;
+        ctx.moveTo(q[0]!.x, q[0]!.y); for (let j = 1; j < 4; j++) ctx.lineTo(q[j]!.x, q[j]!.y); ctx.closePath(); any = true;
+      }
+      if (any) { ctx.fillStyle = `rgba(${r},${g},${b},${(base * 0.5 * (1 - k / 14) ** 2).toFixed(3)})`; ctx.fill(); }
+    }
+  }
+  for (let k = 0; k < RINGS; k++) {
+    const f = 1 - 0.55 * k / (RINGS - 1);
+    const col = `rgb(${Math.round(lerp(13, 66) * f)},${Math.round(lerp(15, 74) * f)},${Math.round(lerp(21, 64) * f)})`;
+    ctx.beginPath(); let any = false;
+    for (let i = 0; i < AZ; i++) {
+      const q = [[i, k], [i + 1, k], [i + 1, k + 1], [i, k + 1]].map(([a, h]) => proj.project(horizontalDir(a! * dA * DEG, -h! * dH * DEG)));
+      if (q.some(p => p === null || Math.abs(p.x - proj.w / 2) > lim || Math.abs(p.y - proj.h / 2) > lim)) continue;
+      ctx.moveTo(q[0]!.x, q[0]!.y); for (let j = 1; j < 4; j++) ctx.lineTo(q[j]!.x, q[j]!.y); ctx.closePath(); any = true;
+    }
+    if (any) { ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.fill(); ctx.stroke(); }
+  }
 }

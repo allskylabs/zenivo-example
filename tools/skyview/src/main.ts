@@ -16,7 +16,7 @@ void (async () => {
     });
     startAllskyBridge(sky.core);
     if (n('az') !== undefined || n('alt') !== undefined || n('fov') !== undefined) sky.core.goTo(n('az') ?? 0, n('alt') ?? 89.9, n('fov') ?? 150);
-    const m = q.get('mode'); if (m === '3d') void sky.setMode(m);
+    const m = q.get('mode'); if (m === '3d' || m === 'eye') void sky.setMode(m);
     (window as unknown as { __sky: unknown }).__sky = sky;
   } catch (e) {
     host.textContent = 'Sky view failed: ' + (e instanceof Error ? e.message : String(e)); console.error(e);

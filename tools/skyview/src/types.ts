@@ -5,7 +5,7 @@ export interface ObserverCfg { latDeg: number; lonDeg: number; heightM?: number 
 /** Camera field of view drawn as a labelled rotated frame (az/alt = pointing, degrees). */
 export interface CameraFov { az: number; alt: number; roll: number; fovH: number; fovV: number; label?: string }
 export type Lang = 'en' | 'vi';
-export type ViewMode = 'allsky' | '3d';
+export type ViewMode = 'allsky' | '3d' | 'eye';
 
 export interface SkyConfig {
   observer: ObserverCfg;
@@ -21,7 +21,7 @@ export interface SkyConfig {
 
 export const LAYER_KEYS = [
   'stars', 'milkyWay', 'starLabels', 'constellationLines', 'constellationLabels', 'planets', 'moon', 'ecliptic', 'calendarPoints',
-  'polarAxis', 'equator', 'raGrid', 'decGrid', 'meridian', 'altAzGrid', 'earthGlobe', 'seeThroughGround', 'deepSkyObjects',
+  'polarAxis', 'equator', 'raGrid', 'decGrid', 'meridian', 'altAzGrid', 'seeThroughGround', 'deepSkyObjects',
   'daylightAtmosphere', 'cardinalDirections', 'meteors', 'camera', 'aircraft', 'satellites', 'events',
 ] as const;
 export type LayerKey = typeof LAYER_KEYS[number];
@@ -34,7 +34,7 @@ export const LAYER_LABELS: Record<LayerKey, [string, string]> = {
   calendarPoints: ['Equinoxes and solstices', 'Điểm phân và chí'], polarAxis: ['Earth polar axis', 'Trục quay Trái Đất'],
   equator: ['Celestial equator', 'Xích đạo trời'], raGrid: ['Right ascension grid', 'Lưới xích kinh (RA)'],
   decGrid: ['Declination grid', 'Lưới xích vĩ (Dec)'], meridian: ['Meridian', 'Kinh tuyến'], altAzGrid: ['Alt/az grid', 'Lưới chân trời'],
-  earthGlobe: ['3D Earth globe (3D dome)', 'Quả địa cầu 3D (vòm 3D)'], seeThroughGround: ['Transparent ground', 'Nhìn xuyên chân trời'],
+ seeThroughGround: ['Transparent ground', 'Nhìn xuyên chân trời'],
   deepSkyObjects: ['Messier objects', 'Thiên thể sâu'], daylightAtmosphere: ['Atmosphere haze', 'Khí quyển'],
   cardinalDirections: ['Compass headings', 'La bàn 4 phương'], meteors: ['Meteors and showers', 'Sao băng'],
   camera: ['Camera FOV', 'Khung nhìn camera'], aircraft: ['Aircraft', 'Máy bay'], satellites: ['Satellites', 'Vệ tinh'], events: ['Camera events', 'Sự kiện camera'],
@@ -42,8 +42,16 @@ export const LAYER_LABELS: Record<LayerKey, [string, string]> = {
 export const LAYER_DEFAULTS: Layers = {
   stars: true, milkyWay: true, starLabels: true, constellationLines: true, constellationLabels: true, planets: true, moon: true,
   ecliptic: true, calendarPoints: false, polarAxis: false, equator: false, raGrid: false, decGrid: false, meridian: false, altAzGrid: false,
-  earthGlobe: true, seeThroughGround: false, deepSkyObjects: true, daylightAtmosphere: true, cardinalDirections: true, meteors: true,
+  seeThroughGround: false, deepSkyObjects: true, daylightAtmosphere: true, cardinalDirections: true, meteors: true,
   camera: true, aircraft: true, satellites: true, events: true,
+};
+
+/** Layer preset applied while in the 'eye' (observer) mode; the user's own layers are restored on leaving. */
+export const EYE_LAYERS: Layers = {
+  ...LAYER_DEFAULTS,
+  stars: true, milkyWay: true, moon: true, planets: true, cardinalDirections: true, daylightAtmosphere: true, aircraft: true, satellites: true, events: true,
+  starLabels: false, constellationLines: false, constellationLabels: false, ecliptic: false, calendarPoints: false, polarAxis: false, equator: false,
+  raGrid: false, decGrid: false, meridian: false, altAzGrid: false, seeThroughGround: false, deepSkyObjects: false, meteors: false, camera: false,
 };
 
 /** A host-supplied moving/fixed object in horizontal coordinates. */

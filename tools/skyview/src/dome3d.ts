@@ -1,4 +1,4 @@
-// 3D dome (lazy chunk, three.js): stars, Milky Way, ground, atmosphere haze and a 3D Earth globe. Lines, labels, planets,
+// 3D dome (lazy chunk, three.js): stars, Milky Way, ground and atmosphere haze (celestial sphere only, no Earth globe). Lines, labels, planets,
 // meteors and markers come from the shared overlay (layers.ts) drawn with this camera's projection.
 // Scene frame: +X East, +Y Zenith, -Z North.
 import {
@@ -84,16 +84,6 @@ export async function createDome(core: SkyCore, root: HTMLElement): Promise<Dome
   const gpts: number[] = []; for (const r of [20, 40, 60]) for (let i = 0; i < 64; i++) { const a = i / 64 * 2 * Math.PI, b = (i + 1) / 64 * 2 * Math.PI; gpts.push(r * Math.sin(a), 0, -r * Math.cos(a), r * Math.sin(b), 0, -r * Math.cos(b)); }
   const grid = new LineSegments(new BufferGeometry().setAttribute('position', new Float32BufferAttribute(gpts, 3)), new LineBasicMaterial({ color: 0x1f3a30, transparent: true, opacity: 0.5 })); scene.add(grid);
 
-  // 3D Earth globe (lit by the Sun), polar axis
-  const earth = new Group(); earth.matrixAutoUpdate = false; scene.add(earth);
-  earth.add(new Mesh(new SphereGeometry(GR, 48, 24), new MeshLambertMaterial({ color: 0x2b6cb0 })));
-  const gp: number[] = [];
-  const P = (lat: number, lon: number): number[] => [GR * 1.003 * Math.cos(lat) * Math.cos(lon), GR * 1.003 * Math.cos(lat) * Math.sin(lon), GR * 1.003 * Math.sin(lat)];
-  for (let lat = -60; lat <= 60; lat += 30) for (let i = 0; i < 72; i++) gp.push(...P(lat * DEG, i * 5 * DEG), ...P(lat * DEG, (i + 1) * 5 * DEG));
-  for (let lon = 0; lon < 360; lon += 30) for (let i = 0; i < 36; i++) gp.push(...P((-90 + i * 5) * DEG, lon * DEG), ...P((-90 + (i + 1) * 5) * DEG, lon * DEG));
-  earth.add(new LineSegments(new BufferGeometry().setAttribute('position', new Float32BufferAttribute(gp, 3)), new LineBasicMaterial({ color: 0x9cc7ff, transparent: true, opacity: 0.6 })));
-  const stationDot = new Mesh(new SphereGeometry(0.7, 12, 8), new MeshBasicMaterial({ color: 0xff4d4d })); earth.add(stationDot);
-  const axis = new LineSegments(new BufferGeometry().setAttribute('position', new Float32BufferAttribute([0, 0, -GR * 1.7, 0, 0, GR * 1.7], 3)), new LineBasicMaterial({ color: 0xf472b6 })); earth.add(axis);
   const sunLight = new DirectionalLight(0xffffff, 2.4); scene.add(sunLight, new AmbientLight(0x6070a0, 0.7));
 
   // camera control
@@ -154,12 +144,8 @@ export async function createDome(core: SkyCore, root: HTMLElement): Promise<Dome
     }
     const L = core.layers;
     stars.visible = L.stars; milky.visible = L.milkyWay && milkyDone; haze.visible = L.daylightAtmosphere;
-    earth.visible = L.earthGlobe; axis.visible = L.polarAxis; grid.visible = true;
-    (ground.material as any).opacity = L.seeThroughGround ? 0.12 : L.earthGlobe ? 0.4 : 0.95;
-    // Earth globe frame: columns = (north-up tangent, east, pole) so the observer sits on top of the globe
-    const lat = core.observer.latDeg * DEG, sl = Math.sin(lat), cl = Math.cos(lat);
-    earth.matrix.makeBasis(new Vector3(0, cl, sl), new Vector3(1, 0, 0), new Vector3(0, sl, -cl)).setPosition(0, -GR - 0.3, 0);
-    stationDot.position.set(GR * 1.003 * cl, 0, GR * 1.003 * sl); earth.matrixWorldNeedsUpdate = true;
+    grid.visible = true;
+    (ground.material as any).opacity = L.seeThroughGround ? 0.12 : 0.95;
     renderer.render(scene, camera);
     // overlay
     const ctx = core.ov.getContext('2d')!; const dpr = window.devicePixelRatio || 1;

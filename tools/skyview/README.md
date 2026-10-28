@@ -21,7 +21,7 @@ const sky = await createSky(containerEl, {
 sky.core.setObserver({ latDeg, lonDeg });  sky.core.setCamera(cam | null);
 sky.core.setMarkers('aircraft' | 'satellites' | 'events', Marker[]);  // az/alt in degrees; optional vaz/valt (deg/ms) + t=performance.now() to extrapolate between updates
 sky.core.setLayer(key, bool);  sky.core.setTime(ms);  sky.core.goNow();  sky.core.goTo(az, alt, fovDeg?);
-sky.setMode('allsky' | '3d');  sky.destroy();
+sky.setMode('allsky' | 'eye' | '3d');   // 'eye' = Observer view (vi: Góc nhìn người đứng ngắm): opaque ground, horizon, N/E/S/W, human FOV 30..110 deg (start 90, alt 35, looks toward camera az else south), natural layer preset restored on leaving; ?mode=eye in main.ts  sky.destroy();
 ```
 The container needs a size (the module fills it). Styles are injected, scoped under `.sv-root`, themed by `--bg-card --border-color --text-primary --text-secondary --accent` with fallbacks.
 
