@@ -67,7 +67,7 @@ export function buildUi(core: SkyCore, root: HTMLElement, hooks: UiHooks): Ui {
   body.className = 'sv-body';
   const tabs = el('div', 'sv-row', undefined, undefined, body);
   const tabBtns = new Map<ViewMode, HTMLButtonElement>();
-  const TABS: [ViewMode, string, string][] = [['eye', 'Observer view', 'Góc nhìn người đứng ngắm'], ['3d', '3D dome', 'Vòm trời 3D']];
+  const TABS: [ViewMode, string, string][] = [['eye', 'Inside view', 'Nhìn từ trong'], ['3d', 'Outside view', 'Nhìn từ ngoài']];
   for (const [m, en, vi] of TABS) { if (!hooks.modes.includes(m)) continue; const b = el('button', '', en, vi, tabs); b.addEventListener('click', () => void hooks.setMode(m)); tabBtns.set(m, b); }
   const checks = new Map<string, HTMLInputElement>();
   const onlyRows: { row: HTMLElement; only: ViewMode }[] = [];

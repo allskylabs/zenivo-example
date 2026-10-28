@@ -96,11 +96,6 @@ export async function createDome(core: SkyCore, root: HTMLElement): Promise<Dome
     else { camPos.copy(dir).multiplyScalar(st.dist); tgt.set(0, 0, 0); camera.fov = 50; }
     camera.position.copy(camPos); camera.lookAt(tgt); camera.updateProjectionMatrix(); camera.updateMatrixWorld();
   };
-  const bar = document.createElement('div'); bar.className = 'sv-ui'; bar.style.cssText = 'right:10px;bottom:150px;padding:6px;display:none;gap:6px;flex-direction:row';
-  const mk = (en: string, vi: string, fn: () => void): HTMLButtonElement => { const b = document.createElement('button'); b.dataset.en = en; b.dataset.vi = vi; b.textContent = en; b.addEventListener('click', fn); bar.append(b); return b; };
-  const bIn = mk('Inside view', 'Nhìn từ trong', () => { st.inside = true; st.yaw = 0; st.pitch = -0.7; st.fov = 75; });
-  const bOut = mk('Outside view', 'Nhìn từ ngoài', () => { st.inside = false; st.yaw = 0; st.pitch = 0.38; st.dist = 170; });
-  root.append(bar);
   const rel = (e: { clientX: number; clientY: number }): [number, number] => { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
   const ptrs = new Map<number, [number, number]>(); let pinch = 0, moved = 0, downAt = 0, down: [number, number] = [0, 0];
   const onDown = (e: PointerEvent): void => { if (core.mode !== '3d' || (e.target as HTMLElement).closest('.sv-ui')) return; root.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, rel(e)); if (ptrs.size === 1) { moved = 0; downAt = performance.now(); down = rel(e); } else { moved = 99; const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a![0] - b![0], a![1] - b![1]); } };
@@ -154,10 +149,9 @@ export async function createDome(core: SkyCore, root: HTMLElement): Promise<Dome
     drawLayers(core, ctx, proj());
     core.dirty = false;
     for (const b of [bIn, bOut]) b.textContent = core.lang === 'vi' ? b.dataset.vi! : b.dataset.en!;
-    bIn.style.display = st.inside ? 'none' : ''; bOut.style.display = st.inside ? '' : 'none';
   };
   return {
-    enter: () => { canvas.style.display = 'block'; core.gl.style.visibility = 'hidden'; bar.style.display = 'flex'; core.external = tick; core.setMode('3d'); },
-    exit: () => { canvas.style.display = 'none'; core.gl.style.visibility = core.layers.stars ? 'visible' : 'hidden'; bar.style.display = 'none'; core.external = null; core.dirty = true; },
+    enter: () => { canvas.style.display = 'block'; core.gl.style.visibility = 'hidden'; core.external = tick; core.setMode('3d'); },
+    exit: () => { canvas.style.display = 'none'; core.gl.style.visibility = core.layers.stars ? 'visible' : 'hidden'; core.external = null; core.dirty = true; },
   };
 }
