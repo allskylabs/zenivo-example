@@ -5,7 +5,7 @@ export interface ObserverCfg { latDeg: number; lonDeg: number; heightM?: number 
 /** Camera field of view drawn as a labelled rotated frame (az/alt = pointing, degrees). */
 export interface CameraFov { az: number; alt: number; roll: number; fovH: number; fovV: number; label?: string }
 export type Lang = 'en' | 'vi';
-export type ViewMode = 'allsky' | '3d' | 'phone';
+export type ViewMode = 'allsky' | '3d';
 
 export interface SkyConfig {
   observer: ObserverCfg;

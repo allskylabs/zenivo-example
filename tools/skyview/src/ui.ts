@@ -63,7 +63,7 @@ export function buildUi(core: SkyCore, root: HTMLElement, hooks: UiHooks): Ui {
   body.className = 'sv-body';
   const tabs = el('div', 'sv-row', undefined, undefined, body);
   const tabBtns = new Map<ViewMode, HTMLButtonElement>();
-  const TABS: [ViewMode, string, string][] = [['allsky', 'All-sky 2D', 'Vòm trời 2D'], ['3d', '3D dome', 'Vòm trời 3D'], ['phone', 'Phone finder', 'Dò bằng điện thoại']];
+  const TABS: [ViewMode, string, string][] = [['allsky', 'All-sky 2D', 'Vòm trời 2D'], ['3d', '3D dome', 'Vòm trời 3D']];
   for (const [m, en, vi] of TABS) { if (!hooks.modes.includes(m)) continue; const b = el('button', '', en, vi, tabs); b.addEventListener('click', () => void hooks.setMode(m)); tabBtns.set(m, b); }
   const acts = el('div', 'sv-row', undefined, undefined, body);
   const camBtn = el('button', '', 'Camera view', 'Góc nhìn camera', acts); camBtn.addEventListener('click', () => core.cameraView());

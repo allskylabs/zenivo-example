@@ -298,7 +298,7 @@ export class SkyCore {
   proj2d(): Proj {
     const v = this.sky.view;
     return {
-      w: this.gl.clientWidth, h: this.gl.clientHeight, fovDeg: v.fovRad / DEG, clipBelow: true, noBackdrop: this.mode === 'phone',
+      w: this.gl.clientWidth, h: this.gl.clientHeight, fovDeg: v.fovRad / DEG, clipBelow: true, noBackdrop: false,
       project: d => project(d, v), pxPerRad: (Math.min(v.widthPx, v.heightPx) / 2) / (v.projection === 'stereographic' ? 2 * Math.tan(v.fovRad / 4) : Math.tan(v.fovRad / 2)),
     };
   }

@@ -1,4 +1,4 @@
-// 2D overlay layers drawn on top of the WebGL sky (All-sky/Phone) or of the three.js dome (via a different projector).
+// 2D overlay layers drawn on top of the WebGL sky (All-sky) or of the three.js dome (via a different projector).
 import { horizontalDir, mat3MulVec, radecToVec, raLine, decCircle, eclipticLine } from '@astrophoto/sky-engine';
 import type { Vec3 } from '@astrophoto/sky-engine';
 import type { SkyCore } from './engine-adapter';

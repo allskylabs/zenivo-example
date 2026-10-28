@@ -18,21 +18,16 @@ export async function createSky(container: HTMLElement, cfg: SkyConfig): Promise
   root.append(gl, ov);
   const core = new SkyCore(gl, ov, cfg);
   let dome: { enter(): void; exit(): void } | null = null;
-  let phone: { enter(): Promise<void>; exit(): void } | null = null;
   let current: ViewMode = 'allsky';
-  const modes: ViewMode[] = ['allsky', '3d', 'phone'];
+  const modes: ViewMode[] = ['allsky', '3d'];
   const setMode = async (m: ViewMode): Promise<void> => {
     if (m === current) return;
     try {
       if (current === '3d') dome?.exit();
-      if (current === 'phone') phone?.exit();
       current = m; ui.setModeActive(m);
       if (m === '3d') {
         if (!dome) { const mod = await import('./dome3d'); dome = await mod.createDome(core, root); }
         dome.enter();
-      } else if (m === 'phone') {
-        if (!phone) { const mod = await import('./phone'); phone = mod.createPhone(core, root, ui.guide); }
-        await phone.enter();
       } else { core.setMode('allsky'); core.allSkyView(); }
     } catch (e) { console.error('mode switch failed', e); current = 'allsky'; core.setMode('allsky'); ui.setModeActive('allsky'); }
   };
