@@ -50,8 +50,8 @@ export const LAYER_DEFAULTS: Layers = {
 export const EYE_LAYERS: Layers = {
   ...LAYER_DEFAULTS,
   stars: true, milkyWay: true, moon: true, planets: true, cardinalDirections: true, daylightAtmosphere: true, aircraft: true, satellites: true, events: true,
-  starLabels: false, constellationLines: false, constellationLabels: false, ecliptic: false, calendarPoints: false, polarAxis: false, equator: false,
-  raGrid: false, decGrid: false, meridian: false, altAzGrid: false, seeThroughGround: false, deepSkyObjects: false, meteors: false, camera: false,
+  starLabels: false, constellationLines: true, constellationLabels: false, ecliptic: false, calendarPoints: false, polarAxis: false, equator: false,
+  raGrid: false, decGrid: false, meridian: false, altAzGrid: false, seeThroughGround: false, deepSkyObjects: false, meteors: false, camera: true,
 };
 
 /** A host-supplied moving/fixed object in horizontal coordinates. */
