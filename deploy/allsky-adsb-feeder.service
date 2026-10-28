@@ -1,0 +1,18 @@
+[Unit]
+Description=AllSky ADS-B feeder to virtuallab3d
+After=allsky-ng.service network-online.target
+Wants=network-online.target
+# Starts only once the key file exists (the user creates it on the Pi, never in git)
+ConditionPathExists=/home/pi/allsky-ng/feeder.env
+
+[Service]
+User=pi
+EnvironmentFile=/home/pi/allsky-ng/feeder.env
+ExecStart=/home/pi/allsky-ng/.venv/bin/python /home/pi/allsky-ng/tools/adsb_feeder.py
+Restart=always
+RestartSec=10
+Nice=10
+MemoryMax=64M
+
+[Install]
+WantedBy=multi-user.target
