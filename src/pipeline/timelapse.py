@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import List, Optional, Tuple, Union, Dict, Any
 import numpy as np
 import cv2
+from src.storage import frame_codec
 
 
 def render_metadata_overlay(
@@ -176,7 +177,7 @@ def compile_timelapse(
     def load_frame(item: Union[np.ndarray, str]) -> Optional[np.ndarray]:
         if isinstance(item, str):
             # A truncated JPEG (power cut, full disk) is skipped rather than failing the whole timelapse
-            return cv2.imread(item)
+            return frame_codec.read_frame(item)
         elif isinstance(item, np.ndarray):
             if item.ndim == 2:
                 return cv2.cvtColor(item, cv2.COLOR_GRAY2BGR)
@@ -315,7 +316,7 @@ def frame_quality_mask(
     raw_means: List[Optional[float]] = []
     shape_counts: Dict[Tuple[int, int], int] = {}
     for p in paths:
-        im = cv2.imread(p, cv2.IMREAD_REDUCED_GRAYSCALE_4)
+        im = frame_codec.read_frame(p, cv2.IMREAD_REDUCED_GRAYSCALE_4)
         if im is not None and im.size > 0:
             sh = (int(im.shape[0]), int(im.shape[1]))
             raw_shapes.append(sh)

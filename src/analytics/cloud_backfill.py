@@ -22,6 +22,7 @@ import cv2
 
 from src.analytics.cloud_cover import MIN_TEMPLATE_SAMPLES, CloudReference, analyze_cloud_cover
 from src.analytics.cloud_history import CloudHistory
+from src.storage import frame_codec
 from src.calibration.auto_exposure import calculate_solar_elevation
 
 DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data"))
@@ -80,7 +81,7 @@ def main() -> int:
             except OSError:
                 pass
             last_t = 0.0
-            for path in sorted(glob.glob(os.path.join(day_dir, "frame_*.jpg"))):
+            for path in [os.path.join(day_dir, f) for f in frame_codec.list_frames(day_dir)]:
                 name = os.path.basename(path)
                 # Telemetry carries the offset (older archives were named in UTC); bare names are local time
                 try:
@@ -93,7 +94,7 @@ def main() -> int:
                 if t - last_t < every:
                     continue
                 last_t = t
-                img = cv2.imread(path, cv2.IMREAD_COLOR)
+                img = frame_codec.read_frame(path)
                 if img is None:
                     continue
                 h, w = img.shape[:2]

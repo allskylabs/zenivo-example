@@ -32,6 +32,7 @@ from src.api.schemas import (
     ObsOverlayRequest,
 )
 from src.api.service import AllSkyService
+from src.storage import frame_codec
 from src.api.stream import mjpeg_frame_generator, handle_live_websocket, sse_event_generator
 
 router = APIRouter()
@@ -625,13 +626,13 @@ def get_frames_span(start: float = Query(...), end: float = Query(...), max: int
 
 @router.get("/api/frames/img/{day}/{name}")
 def get_frame_image(day: str, name: str, service: AllSkyService = Depends(get_service)):
-    """An archived frame JPEG."""
+    """An archived frame (AVIF, or JPEG for older days)."""
     from fastapi.responses import FileResponse
 
     path = service.frame_image_path(day, name)
     if not path:
         raise HTTPException(status_code=404, detail="Frame not found")
-    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
+    return FileResponse(path, media_type=frame_codec.media_type(path), headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.get("/api/events/config")

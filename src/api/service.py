@@ -41,6 +41,7 @@ from src.api.histogram import compute_fast_histogram
 from src.pipeline.keogram import KeogramGenerator
 from src.pipeline.startrails import StartrailsAccumulator, StartrailsFrameGate
 from src.pipeline.timelapse import compile_timelapse, frame_quality_mask
+from src.storage import frame_codec
 from src.pipeline.overlay import stamp_info_box, frame_brightness
 from src.pipeline.hot_pixels import StaticPointTracker
 from src.storage.retention import RetentionManager, merge_policy
@@ -1618,13 +1619,7 @@ class AllSkyService:
         day_dir = self._get_today_frames_dir(date_str)
         if not os.path.isdir(day_dir):
             return []
-        files = [
-            os.path.join(day_dir, f)
-            for f in os.listdir(day_dir)
-            if f.startswith("frame_") and f.endswith(".jpg")
-        ]
-        files.sort()
-        return files
+        return [os.path.join(day_dir, f) for f in frame_codec.list_frames(day_dir)]
 
     def _load_today_telemetry_records(self, date_str: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
         """Load archived frame telemetry keyed by filename."""
@@ -1669,7 +1664,7 @@ class AllSkyService:
                 ts_iso = meta_map.get(os.path.basename(p), {}).get("timestamp")
                 return datetime.fromisoformat(ts_iso) if ts_iso else datetime.fromtimestamp(os.path.getmtime(p)).astimezone()
 
-            last = cv2.imread(paths[-1], cv2.IMREAD_COLOR)
+            last = frame_codec.read_frame(paths[-1])
             if last is None:
                 return
             fh, fw = last.shape[:2]
@@ -1680,7 +1675,7 @@ class AllSkyService:
             trails_ok = self._restore_startrails_from_jpeg(today_str, (fh, fw))
             if not keo_ok:
                 for p in paths[-600:]:
-                    img = last if p == paths[-1] else cv2.imread(p, cv2.IMREAD_COLOR)
+                    img = last if p == paths[-1] else frame_codec.read_frame(p)
                     if img is not None:
                         self.keogram_gen.add_frame(img, timestamp=_ts(p))
             if not trails_ok:
@@ -1692,7 +1687,7 @@ class AllSkyService:
                     sun = self._startrails_sun_elev(_ts(p))
                     if sun > gate.max_sun_elev:
                         continue
-                    img = last if p == paths[-1] else cv2.imread(p, cv2.IMREAD_COLOR)
+                    img = last if p == paths[-1] else frame_codec.read_frame(p)
                     if img is None or img.shape[:2] != (fh, fw):
                         continue
                     if meta_map.get(os.path.basename(p), {}).get("stamped", True):
@@ -1813,12 +1808,13 @@ class AllSkyService:
             arch_frame = frame.copy()
 
         day_dir = self._get_today_frames_dir(today_str)
-        fname = f"frame_{now_dt.strftime('%Y%m%d_%H%M%S_%f')[:19]}.jpg"
-        fpath = os.path.join(day_dir, fname)
-        # Frames are stored clean; time / exposure / gain / brightness live in telemetry.jsonl
-        if not cv2.imwrite(fpath, arch_frame, [cv2.IMWRITE_JPEG_QUALITY, 88]):
-            self.activity.error("archive", f"Could not write archived frame {fpath} (disk full or read-only?)")
+        stem = f"frame_{now_dt.strftime('%Y%m%d_%H%M%S_%f')[:19]}"
+        # Frames are stored clean (AVIF, JPEG fallback); time / exposure / gain / brightness live in telemetry.jsonl
+        fpath = frame_codec.write_frame(os.path.join(day_dir, stem), arch_frame)
+        if not fpath:
+            self.activity.error("archive", f"Could not write archived frame {stem} (disk full or read-only?)")
             return None
+        fname = os.path.basename(fpath)
 
         exp_s = float(meta.get("actual_exposure_s", getattr(self.camera, "current_exposure_s", 0.01)))
         gain_db = float(meta.get("gain_db", getattr(self.camera, "current_gain_db", 0.0)))
@@ -2047,7 +2043,7 @@ class AllSkyService:
         size = None
         if width:
             import cv2
-            img = cv2.imread(sel[0])
+            img = frame_codec.read_frame(sel[0])
             if img is not None:
                 h0, w0 = img.shape[:2]
                 size = (int(width) // 2 * 2, int(round(int(width) * h0 / w0 / 2)) * 2)
@@ -2586,7 +2582,7 @@ class AllSkyService:
             day_dir = os.path.join(self.frames_archive_root, day)
             if not os.path.isdir(day_dir):
                 continue
-            names = sorted(f for f in os.listdir(day_dir) if f.startswith("frame_") and f.endswith(".jpg"))
+            names = frame_codec.list_frames(day_dir)
             i = bisect.bisect_left(names, key)
             for j in (i - 1, i):
                 if 0 <= j < len(names):
@@ -2613,7 +2609,7 @@ class AllSkyService:
             ds = day.strftime("%Y-%m-%d")
             day_dir = os.path.join(self.frames_archive_root, ds)
             if os.path.isdir(day_dir):
-                names = sorted(f for f in os.listdir(day_dir) if f.startswith("frame_") and f.endswith(".jpg"))
+                names = frame_codec.list_frames(day_dir)
                 for name in names[bisect.bisect_left(names, k0):bisect.bisect_right(names, k1)]:
                     try:
                         t = datetime.strptime(name[6:21], "%Y%m%d_%H%M%S").astimezone().timestamp()
@@ -2630,7 +2626,7 @@ class AllSkyService:
     def frame_image_path(self, day: str, name: str) -> Optional[str]:
         import re
 
-        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) or not re.fullmatch(r"frame_\d{8}_\d{6}_\d{3}\.jpg", name):
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) or not frame_codec.FRAME_NAME_RE.fullmatch(name):
             return None
         path = os.path.join(self.frames_archive_root, day, name)
         return path if os.path.isfile(path) else None

@@ -11,7 +11,8 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.24.0",
-    "Pillow>=9.0.0",
+    "Pillow>=11.3.0",
+    "pillow-avif-plugin>=1.5.0",
 ]
 
 [project.optional-dependencies]
