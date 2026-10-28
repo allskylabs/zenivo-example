@@ -30,7 +30,11 @@ export async function createSky(container: HTMLElement, cfg: SkyConfig): Promise
         dome.enter();
       } else if (m === 'eye') { core.setMode('eye'); core.eyeView(); }
       else { core.setMode('allsky'); core.allSkyView(); }
-    } catch (e) { console.error('mode switch failed', e); current = 'eye'; core.setMode('eye'); core.eyeView(); ui.setModeActive('eye'); }
+    } catch (e) {
+      console.error('mode switch failed', e);
+      // a deploy replaced the lazy chunk this tab still points at: load the new build
+      if (/dynamically imported module|Failed to fetch|Importing a module script failed/i.test(String(e))) { location.reload(); return; }
+      current = 'eye'; core.setMode('eye'); core.eyeView(); ui.setModeActive('eye'); }
   };
   const ui = buildUi(core, root, { setMode, modes });
   await core.init();
