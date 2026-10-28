@@ -68,7 +68,7 @@ export function startAllskyBridge(core: SkyCore, api = ''): () => void {
   // The camera picture shown inside the camera frame: the live snapshot when the sky time is "now", else the archived frame nearest that moment
   let imgKey = '', imgBusy = false, imgTimer = 0;
   const pollImage = async (): Promise<void> => {
-    if (imgBusy || !core.camera || !core.layers.cameraImage || !core.layers.camera) return;
+    if (imgBusy || !core.camera || !core.layers.cameraImage) return;
     imgBusy = true;
     try {
       let url: string | null = null, key = '';
