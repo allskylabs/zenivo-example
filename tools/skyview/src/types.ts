@@ -34,7 +34,7 @@ export const LAYER_LABELS: Record<LayerKey, [string, string]> = {
   calendarPoints: ['Equinox / solstice points', 'Điểm phân, điểm chí'], polarAxis: ['Celestial poles', 'Cực thiên cầu'],
   equator: ['Celestial equator', 'Xích đạo thiên cầu'], raGrid: ['RA grid', 'Lưới xích kinh (RA)'],
   decGrid: ['Dec grid', 'Lưới xích vĩ (Dec)'], meridian: ['Meridian', 'Kinh tuyến'], altAzGrid: ['Alt-az grid', 'Lưới độ cao - phương vị'],
- seeThroughGround: ['See through the ground', 'Nhìn xuyên mặt đất'],
+ seeThroughGround: ['Show objects below the horizon', 'Hiện vật thể dưới chân trời'],
   deepSkyObjects: ['Messier objects', 'Thiên thể Messier'], daylightAtmosphere: ['Atmosphere and daylight', 'Khí quyển, ánh sáng ngày'],
   cardinalDirections: ['Compass (N E S W)', 'Hướng N E S W'], meteors: ['Meteor showers', 'Mưa sao băng'],
   camera: ['Camera frame', 'Khung camera /live'], cameraImage: ['Camera picture', 'Ảnh camera /live'], aircraft: ['Aircraft', 'Máy bay'], satellites: ['Satellites', 'Vệ tinh'], events: ['Detected events', 'Sự kiện đã bắt'],
@@ -42,7 +42,7 @@ export const LAYER_LABELS: Record<LayerKey, [string, string]> = {
 export const LAYER_DEFAULTS: Layers = {
   stars: true, milkyWay: true, starLabels: true, constellationLines: true, constellationLabels: true, planets: true, moon: true,
   ecliptic: true, calendarPoints: false, polarAxis: false, equator: false, raGrid: false, decGrid: false, meridian: false, altAzGrid: false,
-  seeThroughGround: false, deepSkyObjects: true, daylightAtmosphere: true, cardinalDirections: true, meteors: true,
+  seeThroughGround: true, deepSkyObjects: true, daylightAtmosphere: true, cardinalDirections: true, meteors: true,
   camera: true, cameraImage: false, aircraft: true, satellites: true, events: true,
 };
 
