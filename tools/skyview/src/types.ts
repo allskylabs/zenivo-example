@@ -42,7 +42,7 @@ export const LAYER_LABELS: Record<LayerKey, [string, string]> = {
 /** One option set shared by Observer view and 3D dome. */
 export const LAYER_DEFAULTS: Layers = {
   stars: true, milkyWay: true, daylightAtmosphere: true, meteors: true,
-  moon: true, planets: true, starLabels: true, deepSkyObjects: false,
+  moon: true, planets: true, starLabels: !(typeof matchMedia === 'function' && matchMedia('(max-width: 700px)').matches), deepSkyObjects: false,
   constellationLines: true, constellationLabels: true,
   camera: true, cameraImage: true, aircraft: true, satellites: true, events: true,
   cardinalDirections: true, seeThroughGround: true,
