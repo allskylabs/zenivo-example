@@ -148,7 +148,6 @@ export async function createDome(core: SkyCore, root: HTMLElement): Promise<Dome
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
     drawLayers(core, ctx, proj());
     core.dirty = false;
-    for (const b of [bIn, bOut]) b.textContent = core.lang === 'vi' ? b.dataset.vi! : b.dataset.en!;
   };
   return {
     enter: () => { canvas.style.display = 'block'; core.gl.style.visibility = 'hidden'; core.external = tick; core.setMode('3d'); },
