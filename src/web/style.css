@@ -2378,3 +2378,7 @@ details.registers-box[open] > summary { margin-bottom: 0.3rem; }
 #fv-chart { display: block; width: 100%; height: 150px; touch-action: pan-y; }
 .fv-speed { background: var(--bg-card-sub); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.25rem 0.4rem; font-size: 0.8rem; }
 .fv-nav .btn.active { background: var(--accent); color: #fff; }
+
+.fv-boxes { position: absolute; pointer-events: none; overflow: visible; }
+.fv-boxes rect { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.fv-boxes text { font: 600 12px var(--font-mono, monospace); paint-order: stroke; stroke: rgba(0,0,0,.75); stroke-width: 3px; }

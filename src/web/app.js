@@ -3605,7 +3605,31 @@ document.addEventListener("DOMContentLoaded", () => {
             if (cropUrl) crop.href = cropUrl;
             setMark(cloudChart, mainStore);
             setMark(fvChart, fvStore);
+            drawBoxes();
         }
+
+        // Box around every event active in the viewed frame (bbox is [x, y, w, h] in the 1152x648 detection frame)
+        const EV_COLORS = { meteor: "#f472b6", plane: "#fbbf24", satellite: "#34d399", flash: "#f87171" };
+        const fvBoxes = document.getElementById("fv-boxes");
+        function drawBoxes() {
+            fvBoxes.innerHTML = "";
+            const f = fvFrames[fvIdx];
+            if (!f || !fvImg.naturalWidth) return;
+            const wrap = fvImg.parentElement.getBoundingClientRect(), im = fvImg.getBoundingClientRect();
+            const k = Math.min(im.width / fvImg.naturalWidth, im.height / fvImg.naturalHeight);
+            const w = fvImg.naturalWidth * k, h = fvImg.naturalHeight * k;   // object-fit: contain
+            Object.assign(fvBoxes.style, { left: `${im.left - wrap.left + (im.width - w) / 2}px`, top: `${im.top - wrap.top + (im.height - h) / 2}px`, width: `${w}px`, height: `${h}px` });
+            fvBoxes.setAttribute("viewBox", "0 0 1152 648");
+            fvBoxes.setAttribute("preserveAspectRatio", "none");
+            cloudEvents.filter((e) => e.bbox && f.ts >= e.start_ts - 4 && f.ts <= Math.max(e.end_ts || 0, e.start_ts) + 4).forEach((e) => {
+                const [x, y, bw, bh] = e.bbox, c = EV_COLORS[e.type] || "#fff", pad = 6;
+                svgEl("rect", { x: x - pad, y: y - pad, width: bw + 2 * pad, height: bh + 2 * pad, stroke: c, rx: 4 }, fvBoxes);
+                const t = svgEl("text", { x: x - pad, y: Math.max(12, y - pad - 4), fill: c }, fvBoxes);
+                t.textContent = `${EV_NAMES[e.type] || e.type}${e.label ? " " + e.label : ""}`;
+            });
+        }
+        fvImg.addEventListener("load", drawBoxes);
+        window.addEventListener("resize", drawBoxes);
 
         // Jump to a moment: (re)load the frames around it unless it is already inside the loaded window
         async function openFrameAt(ts, ev) {
