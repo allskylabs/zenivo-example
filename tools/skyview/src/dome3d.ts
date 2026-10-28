@@ -118,8 +118,8 @@ export async function createDome(core: SkyCore, root: HTMLElement): Promise<Dome
       w, h, fovDeg: camera.fov, clipBelow: !core.layers.seeThroughGround, noBackdrop: true,
       pxPerRad: (h / 2) / Math.tan(camera.fov * DEG / 2) * (st.inside ? 1 : 0.4),
       project: d => {
-        const s = sceneOf(d); if (!st.inside && s.dot(camPos) < RD * RD) return null; tmp.copy(s).applyMatrix4(camera.matrixWorldInverse); if (tmp.z >= -0.01) return null;
-        s.project(camera); return { x: (s.x * 0.5 + 0.5) * w, y: (-s.y * 0.5 + 0.5) * h };
+        const s = sceneOf(d); const back = !st.inside && s.dot(camPos) < RD * RD; tmp.copy(s).applyMatrix4(camera.matrixWorldInverse); if (tmp.z >= -0.01) return null;
+        s.project(camera); return { x: (s.x * 0.5 + 0.5) * w, y: (-s.y * 0.5 + 0.5) * h, back };
       },
     };
   };

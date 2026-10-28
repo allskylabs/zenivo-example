@@ -10,7 +10,7 @@ export interface Proj {
   /** hide everything below the horizon (opaque ground) */
   clipBelow: boolean;
   /** horizontal-frame unit vector -> pixels, null when not visible */
-  project(d: Vec3): { x: number; y: number } | null;
+  project(d: Vec3): { x: number; y: number; back?: boolean } | null;
   pxPerRad: number;
   /** the 3D dome draws its own sky/haze */
   noBackdrop?: boolean;
@@ -20,7 +20,10 @@ type P = { x: number; y: number };
 const FONT = '"JetBrains Mono", ui-monospace, monospace';
 const SEASON_COL = ['#86efac', '#fde047', '#fdba74', '#93c5fd'];
 
-export function drawLayers(core: SkyCore, ctx: CanvasRenderingContext2D, proj: Proj): void {
+export function drawLayers(core: SkyCore, ctx: CanvasRenderingContext2D, proj0: Proj): void {
+  // labels of points on the far side of the 3D dome are not drawn (they would overlap the front); the objects themselves still are
+  let lastBack = false;
+  const proj: Proj = { ...proj0, project: d => { const p = proj0.project(d); lastBack = !!p?.back; return p; } };
   const { snap, layers: L } = core;
   const M = snap.M;
   const hits = core.hits = [] as typeof core.hits;
@@ -28,6 +31,7 @@ export function drawLayers(core: SkyCore, ctx: CanvasRenderingContext2D, proj: P
   const on = (p: P | null, m = 30): p is P => p !== null && p.x > -m && p.y > -m && p.x < w + m && p.y < h + m;
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   const text = (s: string, x: number, y: number, color: string, align: CanvasTextAlign = 'left', size = 12, bold = false): void => {
+    if (lastBack) return;
     ctx.font = `${bold ? '600 ' : ''}${size}px ${FONT}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,10,0.75)'; ctx.strokeText(s, x, y); ctx.fillStyle = color; ctx.fillText(s, x, y);
   };
