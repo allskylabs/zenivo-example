@@ -169,7 +169,7 @@ export class SkyCore {
 
   // ------------------------------------------------------------ view
   private setFov(v: ViewState, fovRad: number): ViewState {
-    if (this.mode === 'eye') fovRad = Math.max(30 * DEG, Math.min(110 * DEG, fovRad));
+    if (this.mode === 'eye') fovRad = Math.max(30 * DEG, Math.min(170 * DEG, fovRad));
     const k = autoProjection(fovRad); return { ...v, fovRad: clampFov(k, fovRad), projection: k };
   }
   /** Observer view: look toward the camera (else south), 35 deg up, 90 deg wide, no roll */
@@ -214,7 +214,7 @@ export class SkyCore {
   private zoomAround(f: number, a: [number, number]): void {
     let nv = zoomView(this.sky.view, f, a);
     if (this.mode === 'eye') {
-      const lo = 30 * DEG, hi = 110 * DEG;
+      const lo = 30 * DEG, hi = 170 * DEG;
       if (nv.fovRad < lo || nv.fovRad > hi) nv = zoomView(this.sky.view, this.sky.view.fovRad / Math.max(lo, Math.min(hi, nv.fovRad)), a);
       nv = this.eyeClamp({ ...nv, fovRad: Math.max(lo, Math.min(hi, nv.fovRad)) });
     }

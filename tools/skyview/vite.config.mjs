@@ -19,6 +19,6 @@ export default {
   server: { fs: { allow: [AP, HU, me('../../')] } },
   build: {
     outDir: me('../../src/web/sky/'), emptyOutDir: true, minify: 'esbuild', target: 'es2020', modulePreload: false,
-    rollupOptions: { input: me('./src/main.ts'), output: { format: 'es', entryFileNames: 'sky.js', chunkFileNames: '[name]-[hash].js' } },
+    rollupOptions: { input: me('./src/main.ts'), output: { format: 'es', manualChunks: (id) => (id.endsWith('/src/main.ts') || id.endsWith('/src/dome3d.ts') || id.includes('/three/') ? undefined : 'core'), entryFileNames: 'sky.js', chunkFileNames: '[name]-[hash].js' } },
   },
 };

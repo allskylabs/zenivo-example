@@ -63,11 +63,11 @@ export function buildUi(core: SkyCore, root: HTMLElement, hooks: UiHooks): Ui {
   body.className = 'sv-body';
   const tabs = el('div', 'sv-row', undefined, undefined, body);
   const tabBtns = new Map<ViewMode, HTMLButtonElement>();
-  const TABS: [ViewMode, string, string][] = [['allsky', 'All-sky 2D', 'Vòm trời 2D'], ['eye', 'Observer view', 'Góc nhìn người đứng ngắm'], ['3d', '3D dome', 'Vòm trời 3D']];
+  const TABS: [ViewMode, string, string][] = [['eye', 'Observer view', 'Góc nhìn người đứng ngắm'], ['3d', '3D dome', 'Vòm trời 3D']];
   for (const [m, en, vi] of TABS) { if (!hooks.modes.includes(m)) continue; const b = el('button', '', en, vi, tabs); b.addEventListener('click', () => void hooks.setMode(m)); tabBtns.set(m, b); }
   const acts = el('div', 'sv-row', undefined, undefined, body);
   const camBtn = el('button', '', 'Camera view', 'Góc nhìn camera', acts); camBtn.addEventListener('click', () => core.cameraView());
-  const allBtn = el('button', '', 'All-sky', 'Toàn cảnh', acts); allBtn.addEventListener('click', () => (core.mode === 'eye' ? core.eyeView() : core.allSkyView()));
+  const allBtn = el('button', '', 'All-sky', 'Toàn cảnh', acts); allBtn.addEventListener('click', () => (core.mode === 'eye' ? core.goTo(0, 89, 160) : core.allSkyView()));
   const allTxt = texts[texts.length - 1]!;
   const lay = el('div', 'sv-layers', undefined, undefined, body);
   const checks = new Map<string, HTMLInputElement>();
@@ -163,7 +163,7 @@ export function buildUi(core: SkyCore, root: HTMLElement, hooks: UiHooks): Ui {
     setModeActive: m => {
       for (const [k, b] of tabBtns) b.classList.toggle('on', k === m);
       camBtn.style.display = m === '3d' || m === 'eye' ? 'none' : '';
-      allTxt[1] = m === 'eye' ? 'Reset view' : 'All-sky'; allTxt[2] = m === 'eye' ? 'Về góc nhìn đầu' : 'Toàn cảnh'; retext();
+      allTxt[1] = 'All-sky'; allTxt[2] = 'Toàn cảnh'; retext();
     },
   };
 }
