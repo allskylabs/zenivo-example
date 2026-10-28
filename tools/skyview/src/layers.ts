@@ -222,7 +222,12 @@ function drawCamera(core: SkyCore, ctx: CanvasRenderingContext2D, proj: Proj, te
   const r: Vec3 = [r0[0] * cr + u0[0] * sr, r0[1] * cr + u0[1] * sr, r0[2] * cr + u0[2] * sr];
   const u: Vec3 = [u0[0] * cr - r0[0] * sr, u0[1] * cr - r0[1] * sr, u0[2] * cr - r0[2] * sr];
   const hx = Math.tan(Math.min(85, c.fovH / 2) * DEG), hy = Math.tan(Math.min(85, c.fovV / 2) * DEG);
-  const at = (x: number, y: number): Vec3 => [f[0] + x * hx * r[0] + y * hy * u[0], f[1] + x * hx * r[1] + y * hy * u[1], f[2] + x * hx * r[2] + y * hy * u[2]];
+  // corners/edges of the frame's tangent plane, put back on the unit sphere so they sit ON the celestial sphere (3D dome too)
+  const at = (x: number, y: number): Vec3 => {
+    const v: Vec3 = [f[0] + x * hx * r[0] + y * hy * u[0], f[1] + x * hx * r[1] + y * hy * u[1], f[2] + x * hx * r[2] + y * hy * u[2]];
+    const n = Math.hypot(v[0], v[1], v[2]) || 1;
+    return [v[0] / n, v[1] / n, v[2] / n];
+  };
   const N = 24, pts: Vec3[] = [];
   for (let i = 0; i <= N; i++) pts.push(at(-1 + 2 * i / N, 1));
   for (let i = 0; i <= N; i++) pts.push(at(1, 1 - 2 * i / N));
