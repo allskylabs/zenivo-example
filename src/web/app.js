@@ -3668,7 +3668,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const req = ++boxReq;
             const f = fvFrames[fvIdx], i = fvIdx;
             fvBoxes.innerHTML = "";
-            if (!f || !fvImg.naturalWidth) return;
+            if (!f || f.baked || !fvImg.naturalWidth) return;   // baked: the event's own image already has the box drawn in
             const wrap = fvImg.parentElement.getBoundingClientRect(), im = fvImg.getBoundingClientRect();
             const W = fvImg.naturalWidth, H = fvImg.naturalHeight;
             const k = Math.min(im.width / W, im.height / H);
@@ -3764,6 +3764,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 fvMsg.textContent = "No archived frame near that time (frames are kept for a limited number of days).";
                 fvMsg.classList.remove("hidden");
                 return;
+            }
+            // The archive keeps one frame per 30 s, so a short event (a meteor) usually falls between two of them. The
+            // event's own whole-sky image (taken from the live stream at that moment) is slotted in as a frame so the viewer shows it.
+            if (ev && ev.sky_url && !fvFrames.some((f) => f.ev_id === ev.event_id)) {
+                const near = fvFrames[nearestIdx(fvFrames, ev.start_ts)];
+                if (!near || Math.abs(near.ts - ev.start_ts) > 4) {
+                    const at = fvFrames.findIndex((f) => f.ts > ev.start_ts);
+                    fvFrames.splice(at < 0 ? fvFrames.length : at, 0, { ts: ev.start_ts, url: ev.sky_url, ev_id: ev.event_id, baked: true });
+                }
             }
             showFrame(nearestIdx(fvFrames, ts));
         }
