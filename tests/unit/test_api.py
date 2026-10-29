@@ -204,7 +204,7 @@ class TestGalleryAndEventsAPI:
         monkeypatch.setattr(service, "_save_station_config", lambda: None)
         monkeypatch.setitem(service.station_config, "event_detection", {})
         cfg = api_client.get("/api/events/config").json()
-        assert cfg["enabled"] == {"meteor": 1, "plane": 1, "satellite": 0, "clouds": 0, "flash": 0}
+        assert cfg["enabled"] == {"meteor": 1, "plane": 1, "satellite": 1, "clouds": 0, "flash": 1}
         res = api_client.post("/api/events/config", json={"satellite": True, "plane": False})
         assert res.status_code == 200 and res.json()["enabled"]["satellite"] == 1 and res.json()["enabled"]["plane"] == 0
 
@@ -227,6 +227,7 @@ class TestGalleryAndEventsAPI:
         import cv2
 
         service = AllSkyService.get_instance()
+        monkeypatch.setitem(service.station_config, "sky_mask", None)
         monkeypatch.setitem(service.station_config, "event_detection", {"meteor": 1})
         service.sky_events.reset()
         service._events_night, service._events_sun_ts = True, 2e9  # pretend night, skip the sun check

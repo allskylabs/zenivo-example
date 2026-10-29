@@ -236,3 +236,32 @@ def test_cost_per_frame_is_small(w, h):
     per_frame_ms = (time.perf_counter() - t0) / 2 * 1000
     print(f"{w}x{h}: {per_frame_ms:.1f} ms/frame")
     assert per_frame_ms < 60
+
+
+def test_blooming_strobe_and_multi_frame_gaps_is_plane():
+    """Aircraft strobe with optical bloom (area > 70 px at 640px) flashing only every 2nd frame (skipping frame right after seed)."""
+    path = [(250 + 45 * k, 750 - 30 * k) for k in range(7)]
+    frames = _dots(12, path, value=230, radius=14, skip=(1, 3, 5))
+    det = SkyEventDetector()
+    events = []
+    for i, f in enumerate(frames):
+        events += det.process(f, ALL, ts=2000.0 + 2.3 * i, exposure_s=0.25, gain_db=12.0)
+    for k in range(4):
+        events += det.process(_sky(90 + k, (len(frames) + k) * 0.5), ALL, ts=2000.0 + 2.3 * (len(frames) + k), exposure_s=0.25, gain_db=12.0)
+    assert [e["type"] for e in events] == ["plane"]
+    assert events[0]["frames"] == 4
+    assert events[0]["dashes"] >= 1
+
+
+def test_short_exposure_twilight_strobe_and_ramp_is_plane():
+    """During short twilight exposures (~0.22s ramping up), 2-3 strobe flashes or a single intense flash are caught."""
+    det = SkyEventDetector()
+    out = []
+    # Two strobe flashes separated by 2 dark frames while exposure ramps smoothly
+    for i in range(10):
+        f = _sky(i, i * 0.2)
+        if i in (2, 5):
+            cv2.circle(f, (400 + 25 * i, 500 - 15 * i), 12, (220, 220, 220), -1)
+        out += det.process(f, ALL, ts=2000.0 + 2.3 * i, exposure_s=0.20 * (1.05 ** i), gain_db=12.0)
+    assert [e["type"] for e in out] == ["plane"]
+

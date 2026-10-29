@@ -2183,8 +2183,8 @@ class AllSkyService:
     # ------------------------------------------------------------------
     # Sky events: meteors, aircraft, satellites, flashes, cloud changes
     # ------------------------------------------------------------------
-    EVENT_DEFAULTS: Dict[str, int] = {"meteor": 1, "plane": 1, "satellite": 0, "clouds": 0, "flash": 0}
-    EVENT_NIGHT_SUN_ELEV = -8.0  # streak / flash detection only below this sun elevation
+    EVENT_DEFAULTS: Dict[str, int] = {"meteor": 1, "plane": 1, "satellite": 1, "clouds": 0, "flash": 1}
+    EVENT_NIGHT_SUN_ELEV = -2.0  # streak / moving-object / flash detection below civil sunset
     EVENT_KEEP_IN_MEMORY = 500
 
     def get_event_config(self) -> Dict[str, Any]:
