@@ -768,7 +768,7 @@
         // When focusing a manual lens by turning the physical ring without moving the Dioptre slider
         // (only 0 or 1 lens position recorded, but live frame scores are streaming in st.history),
         // plot the live focus curve across the recent frames so the chart is responsive during hand focusing.
-        if (pts.length <= 1 && st.history.length >= 1) {
+        if (!st.motorized && pts.length <= 1 && st.history.length >= 1) {
             const histPts = st.history.slice(-60);
             const hVals = histPts.map((p) => p.sm ?? p.score).filter((v) => v != null && isFinite(v));
             if (hVals.length >= 1) {
