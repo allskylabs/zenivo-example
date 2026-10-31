@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261028ev9">
-    <link rel="stylesheet" href="/style.css?v=20261028ev9">
+    <link rel="stylesheet" href="/style.css?v=20261031st1">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -464,27 +464,44 @@
                     <span class="badge badge-accent" id="output-res-badge">2592 × 1944</span>
                 </div>
                 <p class="description">
-                    Applied immediately to the live view, archived frames and frames synced to hoan.uk. The sensor still reads the full
-                    frame; RAW10 frames are binned 2×2 / 4×4 before demosaicing when the size allows, otherwise downscaled by pixel
-                    averaging. Smaller sizes cost much less CPU and also reduce noise and file size.
+                    Changes apply immediately. The sensor always reads the full frame; RAW10 frames are binned 2×2 / 4×4 before
+                    demosaicing when the master size allows, otherwise downscaled by pixel averaging. Smaller sizes cost much less CPU
+                    and also reduce noise and file size.
                 </p>
                 <div class="settings-grid">
-                    <fieldset class="settings-group">
-                        <legend>Resolution</legend>
+                    <!-- 1. One master frame; every other size below is a downscale of it (never an upscale) -->
+                    <fieldset class="settings-group field-wide">
+                        <legend>Image size</legend>
                         <div class="field">
-                            <label for="output-resolution">Image size</label>
+                            <label for="output-resolution">Master frame</label>
                             <select id="output-resolution">
                                 <option value="2592x1944">2592 × 1944 (5.0 MP, native sensor)</option>
                             </select>
                         </div>
-                        <p class="field-note" id="output-res-note">Timelapse, keogram and startrails are always stored at 1296 × 972, so changing the resolution does not affect them.</p>
+                        <p class="field-note">
+                            The one size everything else is derived from. Each output below is downscaled from it and is never larger
+                            than it. Resulting sizes:
+                        </p>
+                        <ul class="size-pipeline" id="size-pipeline">
+                            <li><span>Live view</span><strong id="size-live">--</strong></li>
+                            <li><span>Star &amp; cloud analysis</span><strong id="size-analysis">--</strong></li>
+                            <li><span>Archive (timelapse, keogram, startrails)</span><strong id="size-archive">--</strong></li>
+                        </ul>
                     </fieldset>
-                    <!-- Star boost: software sum-binning of the night live view -->
+                    <!-- 2. Live view: what viewers see (size, quality, night star boost) -->
                     <fieldset class="settings-group">
-                        <legend>Star boost (night)</legend>
+                        <legend>Live view</legend>
                         <div class="field-grid">
                             <div class="field">
-                                <label for="star-boost-enabled">Live view &amp; snapshots</label>
+                                <label for="perf-stream-width">Width</label>
+                                <select id="perf-stream-width" data-size-select></select>
+                            </div>
+                            <div class="field">
+                                <label for="perf-stream-quality">JPEG quality</label>
+                                <input type="number" id="perf-stream-quality" min="40" max="95" step="1" value="75" />
+                            </div>
+                            <div class="field">
+                                <label for="star-boost-enabled">Night star boost</label>
                                 <label class="checkbox-label"><input type="checkbox" id="star-boost-enabled" /> Brighten stars by binning</label>
                             </div>
                             <div class="field">
@@ -496,56 +513,41 @@
                                 </select>
                             </div>
                         </div>
-                        <p class="field-note">Sums each star's light over an N×N window above the sky background (stars ~N² brighter, noise only ~N×), so faint stars survive the downscaled live view. Only while the sun is below −6°, only inside the sky mask; the image size, star count, cloud cover and archived frames are unchanged.</p>
+                        <p class="field-note">Star boost sums each star's light over an N×N window above the sky background (stars ~N² brighter, noise only ~N×). It only affects the live view and snapshots, only while the sun is below −6° and only inside the sky mask; star count, cloud cover and archived frames are unchanged.</p>
                     </fieldset>
-                    <!-- Performance: CPU vs. live-view quality -->
+                    <!-- 3. Sky analysis: star count and cloud cover -->
                     <fieldset class="settings-group">
-                        <legend>Performance</legend>
+                        <legend>Star count &amp; cloud cover</legend>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="perf-sky-enabled">Sampling</label>
+                                <label class="checkbox-label"><input type="checkbox" id="perf-sky-enabled" checked /> Sample day and night</label>
+                            </div>
+                            <div class="field">
+                                <label for="perf-sky-interval">Interval (min)</label>
+                                <input type="number" id="perf-sky-interval" data-scale="60" min="0.5" max="60" step="0.5" value="5" />
+                            </div>
+                            <div class="field">
+                                <label for="perf-analysis-width">Analysis width</label>
+                                <select id="perf-analysis-width" data-size-select></select>
+                            </div>
+                        </div>
+                        <p class="field-note">Stars are counted only at night. Each sample is plotted under Live → Cloud Cover History. A smaller analysis width is much cheaper on CPU.</p>
+                    </fieldset>
+                    <!-- 4. Capture timing -->
+                    <fieldset class="settings-group">
+                        <legend>Capture timing</legend>
                         <div class="field-grid">
                             <div class="field">
                                 <label for="perf-capture-interval">Min. time between captures (s)</label>
                                 <input type="number" id="perf-capture-interval" min="0.4" max="60" step="0.1" value="1.0" />
                             </div>
                             <div class="field">
-                                <label for="perf-bg-capture">Capture with no viewer (s, 0 = back to back)</label>
+                                <label for="perf-bg-capture">Time between captures with no viewer (s, 0 = back to back)</label>
                                 <input type="number" id="perf-bg-capture" min="0" max="3600" step="1" value="0" />
                             </div>
-                            <div class="field">
-                                <label for="perf-sky-enabled">Star count &amp; cloud cover</label>
-                                <label class="checkbox-label"><input type="checkbox" id="perf-sky-enabled" checked /> Sample day and night</label>
-                            </div>
-                            <div class="field">
-                                <label for="perf-sky-interval">Sampling interval (min)</label>
-                                <input type="number" id="perf-sky-interval" data-scale="60" min="0.5" max="60" step="0.5" value="5" />
-                            </div>
-                            <div class="field">
-                                <label for="perf-analysis-width">Star/cloud analysis width</label>
-                                <select id="perf-analysis-width">
-                                    <option value="648">648 px (fastest)</option>
-                                    <option value="960">960 px</option>
-                                    <option value="1296">1296 px</option>
-                                    <option value="2592">Full frame (slowest)</option>
-                                </select>
-                            </div>
-                            <div class="field">
-                                <label for="perf-stream-width">Live view width</label>
-                                <select id="perf-stream-width">
-                                    <option value="640">640 px</option>
-                                    <option value="960">960 px</option>
-                                    <option value="1280">1280 px</option>
-                                    <option value="1920">1920 px</option>
-                                </select>
-                            </div>
-                            <div class="field">
-                                <label for="perf-stream-quality">Live view JPEG quality</label>
-                                <input type="number" id="perf-stream-quality" min="40" max="95" step="1" value="75" />
-                            </div>
                         </div>
-                        <p class="field-note">
-                            Raise the capture interval or lower the sizes if the computer runs hot; exposures longer than the interval are not affected.
-                            Cloud cover is sampled day and night (stars only at night); each sample is plotted under Live → Cloud Cover History.
-                            <span id="perf-bin-note"></span>
-                        </p>
+                        <p class="field-note">Raise these if the computer runs hot; exposures longer than the interval are not affected. <span id="perf-bin-note"></span></p>
                     </fieldset>
                     <!-- White balance (RAW10 night mode) -->
                     <fieldset class="settings-group">
@@ -1237,7 +1239,7 @@
 
     <!-- App JavaScript -->
     <script src="/static/sky_catalog.js"></script>
-    <script src="/app.js?v=20261031pl1"></script>
+    <script src="/app.js?v=20261031st1"></script>
     <script src="/static/activity.js?v=20261028ev9"></script>
     <script src="/static/focus.js?v=20261031lp1"></script>
     <script>

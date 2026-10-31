@@ -2392,3 +2392,8 @@ details.registers-box[open] > summary { margin-bottom: 0.3rem; }
 .fv-events .ev-type { font-weight: 600; color: var(--text-primary); }
 .fv-events .ev-time, .fv-events .ev-detail { color: var(--text-muted); font-size: 0.75rem; }
 @media (max-width: 900px) { .fv-body { grid-template-columns: 1fr; } .fv-events { max-height: 180px; } }
+
+/* Image Output: derived-size readout */
+.size-pipeline { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.size-pipeline li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 6px; background: var(--bg-elevated, rgba(255,255,255,0.03)); font-size: 0.9rem; }
+.size-pipeline strong { font-family: ui-monospace, monospace; color: var(--accent, #38bdf8); }

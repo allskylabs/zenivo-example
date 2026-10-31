@@ -985,8 +985,50 @@ document.addEventListener("DOMContentLoaded", () => {
     const outputResBadge = document.getElementById("output-res-badge");
     const hudResolution = document.getElementById("hud-resolution");
 
+    // Single source of truth for derived sizes: one master frame, every output = min(chosen width, master width)
+    const SIZE_STEPS = [648, 960, 1296, 1920];
+    const sizeState = { master: null, perf: null };
+    const effectiveSize = (width) => {
+        const m = sizeState.master;
+        if (!m) return null;
+        const w = Math.min(Number(width) || m.width, m.width);
+        let h = Math.round(m.height * w / m.width);
+        if (h % 2) h += 1;  // even height: H.264 friendly, same rule as the archiver
+        return { width: w, height: h };
+    };
+    const fmtSize = (sz) => (sz ? `${sz.width} × ${sz.height}` : "--");
+
+    function fillSizeSelects() {
+        const m = sizeState.master;
+        if (!m) return;
+        document.querySelectorAll("select[data-size-select]").forEach((el) => {
+            const keep = el.value;
+            const widths = SIZE_STEPS.filter((w) => w < m.width);
+            el.innerHTML = "";
+            widths.concat([m.width]).forEach((w) => {
+                const opt = document.createElement("option");
+                opt.value = String(w);
+                opt.textContent = w === m.width ? `${w} px (same as image size)` : `${w} px`;
+                el.appendChild(opt);
+            });
+            if (keep && [...el.options].some((o) => o.value === keep)) el.value = keep;
+        });
+    }
+
+    function renderSizePipeline() {
+        const cur = (sizeState.perf && sizeState.perf.current) || {};
+        const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+        set("size-live", fmtSize(effectiveSize(cur.stream_max_width)));
+        set("size-analysis", fmtSize(effectiveSize(cur.analysis_max_width)));
+        set("size-archive", sizeState.perf && sizeState.perf.archive_width ? fmtSize(effectiveSize(sizeState.perf.archive_width)) : "--");
+    }
+
     function syncResolutionUI(res) {
         if (!res || !res.width) return;
+        sizeState.master = { width: Number(res.width), height: Number(res.height) };
+        fillSizeSelects();
+        if (sizeState.perf) syncPerformanceUI(sizeState.perf);
+        renderSizePipeline();
         const txt = `${res.width} × ${res.height}`;
         if (outputResBadge) outputResBadge.textContent = txt;
         if (hudResolution) hudResolution.textContent = txt;
@@ -1095,6 +1137,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function syncPerformanceUI(data) {
         if (!data || !data.current) return;
+        sizeState.perf = data;
         Object.entries(perfFields).forEach(([key, el]) => {
             if (!el || document.activeElement === el || data.current[key] === undefined) return;
             if (el.type === "checkbox") {
@@ -1102,7 +1145,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
             const scale = Number(el.dataset.scale || 1);
-            const val = String(scale > 1 ? Number(data.current[key]) / scale : data.current[key]);
+            let val = String(scale > 1 ? Number(data.current[key]) / scale : data.current[key]);
+            if (el.hasAttribute("data-size-select") && sizeState.master) val = String(Math.min(Number(val), sizeState.master.width));
             if (el.tagName === "SELECT" && ![...el.options].some((o) => o.value === val)) {
                 const opt = document.createElement("option");
                 opt.value = val;
@@ -1111,6 +1155,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             el.value = val;
         });
+        renderSizePipeline();
         if (perfBinNote) {
             perfBinNote.textContent = data.raw10_bin > 1 ? `RAW10 binning in use: ${data.raw10_bin}×${data.raw10_bin}.` : "";
         }
