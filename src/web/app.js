@@ -1785,6 +1785,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
     setInterval(updateAstroTiles, 30000);
+
+    // Planets move slowly: refresh every 10 min and draw them like bright stars in the sky overlay
+    function loadPlanets() {
+        fetch("/api/planets").then((r) => (r.ok ? r.json() : [])).then((list) => {
+            if (Array.isArray(list)) window.ALLSKY_PLANETS = list;
+        }).catch(() => {});
+    }
+    loadPlanets();
+    setInterval(loadPlanets, 600000);
     setTimeout(updateAstroTiles, 0);
 
     function computeLmstDeg(lonDeg, dateObj) {
@@ -2446,7 +2455,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     ctx.stroke();
                 }
             };
-            catalog.stars.forEach((star) => {
+            catalog.stars.concat(window.ALLSKY_PLANETS || []).forEach((star) => {
                 const pt = projectRaDecToCanvas(star.ra, star.dec);
                 if (!pt.visible || pt.alt < 1.0) return;
                 visibleStarsCount++;
