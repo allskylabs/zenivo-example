@@ -253,7 +253,7 @@
             <button id="btn-home" title="Back to the station">Station</button>
         </div>
         <div class="legend">
-            <span><i style="background:#22d3ee"></i>Visible now</span>
+            <span><i style="background:#22d3ee"></i>Naked-eye visible</span>
             <span><i style="background:#f59e0b"></i>Sunlit</span>
             <span><i style="background:#6b7280"></i>Earth's shadow</span>
         </div>
@@ -281,7 +281,7 @@
         <h2><span>Satellites</span><span><span id="count">--</span> <button id="list-toggle">▾</button></span></h2>
         <div id="list-tools">
             <div class="btns" id="filters">
-                <button data-filter="visible" title="Can be seen by eye right now">Visible now</button>
+                <button data-filter="visible" title="Above the horizon, lit by the sun and dark sky: can be seen by eye. Not the same as being in the camera frame.">Naked-eye now</button>
                 <button data-filter="above" title="Above the horizon">Above horizon</button>
                 <button data-filter="all">All</button>
             </div>
@@ -645,7 +645,7 @@
             const list = d.satellites || [];
             const dark = sunAlt != null && sunAlt < -3;
             const nVis = list.filter((a) => a.visible).length, nUp = list.filter((a) => a.above_horizon).length;
-            $("status").textContent = !globe ? "Globe view unavailable" : `${nVis} visible now · ${nUp} above horizon · ${list.length} tracked`;
+            $("status").textContent = !globe ? "Globe view unavailable" : `${nVis} naked-eye visible · ${nUp} above horizon · ${list.length} tracked`;
             $("sky").className = dark ? "dark" : "day";
             $("sky").textContent = `${dark ? "Dark sky" : "Daylight - satellites can't be seen"} · sun ${sunAlt != null ? sunAlt.toFixed(1) : "--"}°`;
             $("tle").textContent = `TLE ${d.tle_count ?? "--"} sets${d.tle_age_h != null ? ` · ${d.tle_age_h.toFixed(1)} h old` : ""}`;
@@ -1346,14 +1346,14 @@
             $("count").textContent = `${list.length}/${sats.size}`;
             for (const b of document.querySelectorAll("#filters button")) b.classList.toggle("on", b.dataset.filter === filter);
             $("sat-list").innerHTML = list.length ? list.map((a) => {
-                const tags = [a.visible ? `<span class="tag vis">Visible now</span>` : "",
+                const tags = [a.visible ? `<span class="tag vis">Naked eye</span>` : "",
                     a.sunlit ? `<span class="tag sun">Sunlit</span>` : `<span class="tag">Shadow</span>`,
                     a.in_view ? `<span class="tag cam">In camera</span>` : ""].join("");
                 return `<li data-id="${a.norad}" class="${a.visible ? "visible" : ""}${a.norad === selected ? " selected" : ""}">
                     <div class="r1"><span><span class="cs">${esc(a.name)}</span><span class="grp ${esc(a.group)}">${a.group === "stations" ? "Station" : "Bright"}</span></span>
                         <span class="meta">${Math.round(a.alt_deg)}° · ${Math.round(a.az_deg)}° ${compass(a.az_deg)}</span></div>
                     <div class="r2"><span class="meta">${km(a.range_km)} · h ${km(a.height_km)}</span><span class="tags">${tags}</span></div></li>`;
-            }).join("") : `<li><span class="meta">No satellites match.</span></li>`;
+            }).join("") : `<li><span class="meta">${filter === "visible" ? "No satellite is naked-eye visible right now (above the horizon, sunlit, dark sky). Choose “Above horizon” to see those that are up but unlit." : "No satellites match."}</span></li>`;
         }
         $("sat-list").addEventListener("click", (e) => {
             const li = e.target.closest("li[data-id]");
@@ -1381,7 +1381,7 @@
             const aboveNote = !above.length ? `Not above the horizon in the next ${Math.round(total / 60)} min`
                 : above[0][0] <= TRACK_STEP_S ? `Above the horizon for ~${mins(above[0][1])} min more` : `Rises in ~${mins(above[0][0])} min`;
             const visNote = !vis.length ? "No naked-eye pass in this window"
-                : vis[0][0] <= TRACK_STEP_S ? `Visible now for ~${mins(vis[0][1])} min more`
+                : vis[0][0] <= TRACK_STEP_S ? `Naked-eye visible for ~${mins(vis[0][1])} min more`
                 : `Visible in ~${mins(vis[0][0])} min for ~${mins(vis[0][1] - vis[0][0])} min`;
             el.innerHTML = `<div class="tl-head">Next ${Math.round(total / 60)} min</div>
                 <div class="tl">${bar(above, "above")}${bar(vis, "vis")}</div>
