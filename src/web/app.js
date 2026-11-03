@@ -183,7 +183,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function fmtExposure(exp) {
         return exp < 0.01 ? (exp * 1000).toFixed(2) + " ms" : exp < 0.1 ? (exp * 1000).toFixed(1) + " ms" : exp.toFixed(exp < 1 ? 3 : 1) + " s";
     }
-    function setFrameInfo(el, time, exp, gain, brightness) {
+    function setFrameInfo(el, time, exp, gain, brightness, events) {
         if (!el) return;
         if (!time) {
             el.hidden = true;
@@ -194,7 +194,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (typeof gain === "number") parts.push(`Gain ${gain.toFixed(1)} dB`);
         el.innerHTML = `<div>${fmtLocalIso(time)} ${tzLabel}</div>`
             + (parts.length ? `<div>${parts.join("  ")}</div>` : "")
-            + (typeof brightness === "number" ? `<div>Brightness ${brightness.toFixed(0)}/255</div>` : "");
+            + (typeof brightness === "number" ? `<div>Brightness ${brightness.toFixed(0)}/255</div>` : "")
+            + (Array.isArray(events) && events.length ? `<div class="frame-event">Event: ${[...new Set(events)].map(escapeHtml).join(", ")}</div>` : "");
         el.hidden = false;
     }
     function makeFrameInfo(parent) {
@@ -218,8 +219,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     const i = Math.min(info.frames.length - 1, Math.max(0, Math.floor(video.currentTime * fps + 1e-3)));
                     if (i === last) return;
                     last = i;
-                    const [t, exp, gain, bri] = info.frames[i];
-                    setFrameInfo(el, t, exp, gain, bri);
+                    const [t, exp, gain, bri, evs] = info.frames[i];
+                    setFrameInfo(el, t, exp, gain, bri, evs);
                 };
                 if (video.requestVideoFrameCallback) {
                     const tick = () => {

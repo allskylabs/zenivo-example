@@ -1845,6 +1845,7 @@ body.no-scroll { overflow: hidden; }
     pointer-events: none;
 }
 .frame-info[hidden] { display: none; }
+.frame-info .frame-event { color: #ffcc66; font-weight: 600; }
 /* Live viewport: LIVE pill on top, capture info under it, the sky-overlay badge under that (nothing stacked on anything) */
 .viewport-wrapper > .frame-info { top: 44px; left: 12px; }
 .vp-status .vp-exp { display: none; }   /* exposure and gain are in the capture info already */

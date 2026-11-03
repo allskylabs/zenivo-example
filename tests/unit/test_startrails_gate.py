@@ -38,3 +38,12 @@ def test_persistent_change_is_adopted_after_streak():
     results = [g.check(_sky(90, seed=10 + i), sun_elev=-30.0) for i in range(6)]
     assert results[:4] == ["too_bright"] * 4
     assert results[4] is None and results[5] is None
+
+
+def test_relaxed_gate_keeps_bright_event_frame_but_not_daylight():
+    g = StartrailsFrameGate()
+    assert g.check(_sky(40, seed=1), sun_elev=-30.0) is None
+    bright = _sky(120, seed=2)
+    assert g.check(bright, sun_elev=-30.0) == "too_bright"
+    assert g.check(bright, sun_elev=-30.0, relaxed=True) is None
+    assert g.check(bright, sun_elev=10.0, relaxed=True) == "daylight"

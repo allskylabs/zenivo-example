@@ -224,24 +224,28 @@ class StartrailsFrameGate:
         self.accepted = 0
         self.rejected: dict = {}
 
-    def check(self, frame: np.ndarray, sun_elev: Optional[float] = None) -> Optional[str]:
-        """Return None when the frame is accepted (and update references), else the reject reason."""
-        reason = self._check(frame, sun_elev)
+    def check(self, frame: np.ndarray, sun_elev: Optional[float] = None, relaxed: bool = False) -> Optional[str]:
+        """Return None when the frame is accepted (and update references), else the reject reason.
+        ``relaxed`` (frames archived for a sky event) skips the brightness / clipping checks: an aircraft
+        strobe or bloom there is the very thing being kept; daylight and a shifted camera still reject."""
+        reason = self._check(frame, sun_elev, relaxed)
         if reason is None:
             self.accepted += 1
         elif reason != "daylight":  # expected every day, not a fault worth counting
             self.rejected[reason] = self.rejected.get(reason, 0) + 1
         return reason
 
-    def _check(self, frame: np.ndarray, sun_elev: Optional[float]) -> Optional[str]:
+    def _check(self, frame: np.ndarray, sun_elev: Optional[float], relaxed: bool = False) -> Optional[str]:
         if sun_elev is not None and sun_elev > self.max_sun_elev:
             return "daylight"
         small = cv2.resize(frame, (frame.shape[1] // 4, frame.shape[0] // 4), interpolation=cv2.INTER_AREA)
         grey = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY) if small.ndim == 3 else small
-        if float(np.count_nonzero(grey >= 250)) / grey.size > self.max_saturated_frac:
+        if not relaxed and float(np.count_nonzero(grey >= 250)) / grey.size > self.max_saturated_frac:
             return "saturated"
         med = float(np.median(grey))
-        if self._medians:
+        if relaxed:
+            lo, hi = 0.0, float("inf")
+        elif self._medians:
             ref_med = float(np.median(self._medians))
             lo, hi = self.low_ratio * ref_med, self.high_ratio * ref_med
         else:
@@ -256,7 +260,8 @@ class StartrailsFrameGate:
             if resp >= 0.1 and 4.0 * float(np.hypot(dx, dy)) > self.max_shift_px:
                 return self._soft_reject("misaligned")
         self._ref = g
-        self._medians = (self._medians + [med])[-self.history:]
+        if not relaxed:  # an event frame must not drag the brightness reference
+            self._medians = (self._medians + [med])[-self.history:]
         self._streak = 0
         return None
 
