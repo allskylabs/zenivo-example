@@ -36,6 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const chkAircraft = document.getElementById("chk-aircraft-overlay");
     const chkSatellite = document.getElementById("chk-satellite-overlay");
     const aircraftCanvas = document.getElementById("aircraft-canvas");
+    const chkSonde = document.getElementById("chk-sonde-overlay");
     const btnRefreshFrame = document.getElementById("btn-refresh-frame");
     const btnFullscreen = document.getElementById("btn-fullscreen");
     const viewportContainer = document.getElementById("viewport-container");
@@ -337,6 +338,14 @@ document.addEventListener("DOMContentLoaded", () => {
         chkSatellite.addEventListener("change", () => {
             savePrefs({ satelliteOverlay: chkSatellite.checked });
             if (chkSatellite.checked) refreshSatellites(); else drawAircraft();
+        });
+    }
+
+    if (chkSonde) {
+        chkSonde.checked = !!prefs.sondeOverlay;
+        chkSonde.addEventListener("change", () => {
+            savePrefs({ sondeOverlay: chkSonde.checked });
+            if (chkSonde.checked) refreshSondes(); else drawAircraft();
         });
     }
 
@@ -2731,6 +2740,27 @@ document.addEventListener("DOMContentLoaded", () => {
             .catch(() => {});
     }
 
+    // Radiosondes (SondeHub weather balloons)
+    let sondeList = [];
+    let sondeT = 0;
+    let sondeFetchedAt = 0;
+    function refreshSondes() {
+        if (!chkSonde || !chkSonde.checked || document.hidden) return;
+        fetch("/api/radiosondes")
+            .then((r) => r.json())
+            .then((d) => {
+                sondeList = (d && d.sondes) || [];
+                sondeT = (d && d.t) || 0;
+                sondeFetchedAt = Date.now();
+                drawAircraft();
+            })
+            .catch(() => {});
+    }
+    if (chkSonde) {
+        setInterval(refreshSondes, 3000);
+        setTimeout(refreshSondes, 600);
+    }
+
     // Large satellites (space stations, bright satellites): only those lit by the sun under a dark sky are drawn
     let satelliteList = [];
     function refreshSatellites() {
@@ -2757,7 +2787,8 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.clearRect(0, 0, w, h);
         const showAircraft = !!(chkAircraft && chkAircraft.checked);
         const showSat = !!(chkSatellite && chkSatellite.checked);
-        if (!showAircraft && !showSat) return;
+        const showSonde = !!(chkSonde && chkSonde.checked);
+        if (!showAircraft && !showSat && !showSonde) return;
 
         const st = state.station || {};
         const sensor = st.camera_sensor || {};
@@ -2806,6 +2837,34 @@ document.addEventListener("DOMContentLoaded", () => {
                 ctx.stroke();
                 ctx.restore();
                 const txt = `${sat.name} ${sat.height_km}km`;
+                ctx.shadowColor = "rgba(2, 6, 23, 0.95)";
+                ctx.shadowBlur = 4;
+                ctx.textAlign = x > offsetX + renderW * 0.75 ? "right" : "left";
+                ctx.fillText(txt, x + (ctx.textAlign === "left" ? 16 : -16), y);
+                ctx.shadowBlur = 0;
+            });
+        }
+        if (showSonde) {
+            const sLag = Math.max(-5, Math.min(20, sondeT && liveFrameT != null ? liveFrameT - sondeT : (Date.now() - sondeFetchedAt) / 1000.0));
+            sondeList.forEach((sd) => {
+                if (!sd.frame_xy || !sd.in_view) return;
+                let fx = sd.frame_xy[0], fy = sd.frame_xy[1];
+                if (sd.frame_v) { fx += sd.frame_v[0] * sLag; fy += sd.frame_v[1] * sLag; }
+                if (mirrorX) fx = 1 - fx;
+                if (mirrorY) fy = 1 - fy;
+                const x = offsetX + fx * renderW;
+                const y = offsetY + fy * renderH;
+                ctx.strokeStyle = "rgba(244, 114, 182, 0.95)";
+                ctx.fillStyle = "rgba(244, 114, 182, 0.95)";
+                ctx.lineWidth = 1.5;
+                ctx.save();
+                ctx.globalAlpha = 0.6;
+                ctx.beginPath();
+                ctx.rect(x - 11, y - 11, 22, 22);
+                ctx.moveTo(x - 4, y - 4); ctx.lineTo(x + 4, y + 4); ctx.moveTo(x + 4, y - 4); ctx.lineTo(x - 4, y + 4);
+                ctx.stroke();
+                ctx.restore();
+                const txt = `${sd.serial} ${(sd.altitude_m / 1000).toFixed(1)}km ${sd.distance_km}km`;
                 ctx.shadowColor = "rgba(2, 6, 23, 0.95)";
                 ctx.shadowBlur = 4;
                 ctx.textAlign = x > offsetX + renderW * 0.75 ? "right" : "left";
@@ -4688,6 +4747,40 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch("/api/adsb/aircraft?limit=12");
             if (res.ok) renderFlights(await res.json());
         } catch (err) { /* optional feature */ }
+    }
+
+    // Live page: radiosondes (weather balloons) near the station, refreshed every 20 s
+    const sondesCard = document.getElementById("sondes-card");
+    function renderSondes(d) {
+        const list = (d && d.sondes) || [];
+        if (!d || (!list.length && d.error)) { sondesCard.hidden = true; return; }
+        sondesCard.hidden = false;
+        document.getElementById("sondes-count").textContent = `${d.in_view || 0} in view · ${d.total || 0} heard`;
+        document.getElementById("sondes-status").textContent = "Live from SondeHub (within 300 km)";
+        const ul = document.getElementById("sondes-list");
+        if (!list.length) { ul.innerHTML = `<li class="live-events-empty">No radiosonde flying nearby right now.</li>`; return; }
+        ul.innerHTML = list.map((a) => {
+            const where = a.in_view ? `<span class="fl-inview">● in view</span>`
+                : a.above_horizon ? `${compass(a.az_deg)} ${Math.round(a.alt_deg)}° up` : "below horizon";
+            const dir = a.climb_m_s > 1 ? " ↗" : a.climb_m_s < -1 ? " ↘" : "";
+            return `<li class="flight${a.in_view ? " in-view" : ""}">
+                <div class="fl-top"><a href="https://sondehub.org/${encodeURIComponent(a.serial)}" target="_blank" rel="noopener" class="flight-tag">🎈 ${escapeHtml(a.serial)}</a><span class="fl-where">${where}</span></div>
+                <div class="fl-meta">
+                    <span title="Altitude">${escapeHtml(Number(a.altitude_m).toLocaleString())} m${dir}</span>
+                    <span title="${escapeHtml(a.type || "")}">${a.freq_mhz ? escapeHtml(a.freq_mhz) + " MHz" : escapeHtml(a.type || "")}</span>
+                    <span title="Distance from the camera">${escapeHtml(a.distance_km)} km</span>
+                </div></li>`;
+        }).join("");
+    }
+    async function loadSondes() {
+        try {
+            const res = await fetch("/api/radiosondes?limit=8");
+            if (res.ok) renderSondes(await res.json());
+        } catch (err) { /* optional feature */ }
+    }
+    if (currentPage === "tab-live" && sondesCard) {
+        loadSondes();
+        setInterval(() => { if (!document.hidden) loadSondes(); }, 20000);
     }
 
     if (currentPage === "tab-live" && flightsCard) {

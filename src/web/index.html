@@ -133,6 +133,7 @@
                                 <label class="vp-chip" title="Show star &amp; constellation name labels"><input type="checkbox" id="chk-sky-labels"><i class="vp-dot"></i>Labels</label>
                                 <label class="vp-chip" title="Show horizon circle, altitude rings &amp; N/E/S/W compass"><input type="checkbox" id="chk-grid-overlay"><i class="vp-dot"></i>Grid</label>
                                 <label class="vp-chip" title="Mark aircraft (ADS-B) passing through the field of view"><input type="checkbox" id="chk-aircraft-overlay"><i class="vp-dot"></i>Aircraft</label>
+                                <label class="vp-chip" title="Mark radiosondes (weather balloons, SondeHub) passing through the field of view"><input type="checkbox" id="chk-sonde-overlay"><i class="vp-dot"></i>Radiosonde</label>
                                 <label class="vp-chip" title="Mark large satellites (space stations, bright satellites) that can be seen in the field of view"><input type="checkbox" id="chk-satellite-overlay"><i class="vp-dot"></i>Satellites</label>
                             </div>
                             <div class="vp-actions">
@@ -348,6 +349,17 @@
                         <div class="live-events-status" id="live-events-status">Loading…</div>
                         <ul class="live-events-list" id="live-events-list"></ul>
                         <a class="live-events-more" href="/gallery">All events →</a>
+                    </div>
+
+                    <!-- Radiosondes (weather balloons) near the station, from SondeHub -->
+                    <div class="card flights-card" id="sondes-card" hidden>
+                        <div class="card-header">
+                            <h2>Radiosondes</h2>
+                            <span class="badge" id="sondes-count">--</span>
+                        </div>
+                        <div class="flights-status" id="sondes-status">Loading…</div>
+                        <ul class="flights-list" id="sondes-list"></ul>
+                        <a class="live-events-more" href="https://hoan.uk/weather/radiosonde" target="_blank" rel="noopener">Radiosonde tracker →</a>
                     </div>
 
                     <!-- Aircraft heard by the ADS-B receiver -->
@@ -1241,7 +1253,7 @@
 
     <!-- App JavaScript -->
     <script src="/static/sky_catalog.js"></script>
-    <script src="/app.js?v=20261103ev1"></script>
+    <script src="/app.js?v=20261103sonde1"></script>
     <script src="/static/activity.js?v=20261028ev9"></script>
     <script src="/static/focus.js?v=20261031lp1"></script>
     <script>

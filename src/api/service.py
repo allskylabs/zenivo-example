@@ -2412,6 +2412,40 @@ class AllSkyService:
             res["camera"] = {k: sol.get(k) for k in ("pointing_az_deg", "pointing_alt_deg", "roll_deg", "fov_horizontal_deg", "fov_vertical_deg")}
         return res
 
+    def get_radiosondes_now(self, limit: int = 40) -> Dict[str, Any]:
+        """Weather balloons (SondeHub) near the station with their sky position and camera frame position."""
+        from src.analytics.adsb import sky_position
+        from src.analytics.radiosonde import RadiosondeFeed
+
+        if getattr(self, "_sonde_feed", None) is None:
+            self._sonde_feed = RadiosondeFeed()
+        station = self._overlay_station()
+        sol = self._overlay_solution()
+        obstructions = [np.array(p, np.float32) for p in ((self.station_config.get("sky_mask") or {}).get("obstruction") or [])]
+        t_now = time.time()
+        feed = self._sonde_feed.current(float(station["latitude_deg"]), float(station["longitude_deg"]), at=t_now)
+        later = {s["serial"]: s for s in self._sonde_feed.current(float(station["latitude_deg"]), float(station["longitude_deg"]), at=t_now + 1.0)["sondes"]}
+        out = []
+        for s in feed["sondes"]:
+            pos = sky_position(station, s["lat"], s["lon"], s["alt"], sol)
+            xy = pos.get("frame_xy")
+            nxt = later.get(s["serial"])
+            if xy and nxt:
+                xy2 = sky_position(station, nxt["lat"], nxt["lon"], nxt["alt"], sol).get("frame_xy")
+                if xy2:
+                    pos["frame_v"] = [round(xy2[0] - xy[0], 5), round(xy2[1] - xy[1], 5)]
+            in_view = bool(xy) and not any(cv2.pointPolygonTest(p, (float(xy[0]), float(xy[1])), False) >= 0 for p in obstructions)
+            out.append({
+                "serial": s["serial"], "type": s["type"], "altitude_m": round(s["alt"]),
+                "climb_m_s": round(s["vel_v"], 1), "speed_kmh": round(s["vel_h"] * 3.6),
+                "heading_deg": round(s["heading"]), "freq_mhz": s["freq"], "temp_c": s["temp"],
+                "lat": round(s["lat"], 5), "lon": round(s["lon"], 5), "age_s": s["age_s"], **pos,
+                "in_view": in_view, "above_horizon": pos["alt_deg"] > 0,
+            })
+        out.sort(key=lambda r: (not r["in_view"], not r["above_horizon"], r["distance_km"]))
+        return {"t": t_now, "sondes": out[:limit], "total": len(out), "in_view": sum(r["in_view"] for r in out),
+                "error": feed["error"]}
+
     def get_aircraft_now(self, limit: int = 30, trail_s: float = 0.0,
                          bounds: Optional[str] = None, include_fr24: Optional[bool] = None,
                          compact: bool = False) -> Dict[str, Any]:

@@ -674,6 +674,13 @@ def get_adsb_aircraft(limit: int = Query(default=30, ge=1, le=6000),
     return service.get_aircraft_now(limit=limit, trail_s=trail, bounds=bounds, include_fr24=fr24, compact=compact)
 
 
+@router.get("/api/radiosondes")
+def get_radiosondes(limit: int = Query(default=40, ge=1, le=200),
+                    service: AllSkyService = Depends(get_service)):
+    """Weather balloons (SondeHub radiosondes) near the station: altitude, climb, distance, direction, in camera view."""
+    return service.get_radiosondes_now(limit=limit)
+
+
 @router.get("/api/adsb/flight/{fr24_id}")
 def get_adsb_flight_detail(fr24_id: str, service: AllSkyService = Depends(get_service)):
     """Full Flightradar24 flight detail and complete historical trail from departure airport."""
