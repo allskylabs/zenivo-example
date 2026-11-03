@@ -98,10 +98,14 @@ class EventConfigRequest(BaseModel):
 
 
 class AdsbConfigRequest(BaseModel):
-    """ADS-B receiver (SBS-1 / BaseStation feed, usually port 30003) used to name the flight behind aircraft events."""
+    """ADS-B receiver (SBS-1 / BaseStation feed, usually port 30003) + Flightradar24 Enterprise global feed settings."""
     host: Optional[str] = Field(default=None, max_length=253)
     port: Optional[int] = Field(default=None, ge=1, le=65535)
     enabled: Optional[bool] = None
+    fr24_enabled: Optional[bool] = None
+    fr24_email: Optional[str] = Field(default=None, max_length=254)
+    fr24_password: Optional[str] = Field(default=None, max_length=254)
+    fr24_token: Optional[str] = Field(default=None, max_length=1024)
 
 
 class CloudConfigRequest(BaseModel):

@@ -40,12 +40,15 @@ from src.analytics.focus import (
 from src.api.histogram import compute_fast_histogram
 from src.pipeline.keogram import KeogramGenerator
 from src.pipeline.startrails import StartrailsAccumulator, StartrailsFrameGate
-from src.pipeline.timelapse import compile_timelapse, frame_quality_mask
+from src.pipeline.timelapse import compile_timelapse, frame_quality_mask, select_timelapse_frames
 from src.storage import frame_codec
 from src.pipeline.overlay import stamp_info_box, frame_brightness
 from src.pipeline.hot_pixels import StaticPointTracker
 from src.storage.retention import RetentionManager, merge_policy
 from src.activity import get_activity_log
+
+ARCHIVE_WIDTH = 1296  # stored frame width for timelapse, keogram and startrails (not user-configurable)
+PAST_PEAK_D = 0.30  # keep sweeping this far past a peak so the far half of the parabola is measured
 
 
 class _BoundedCache(OrderedDict):
@@ -264,7 +267,7 @@ class AllSkyService:
         self.adsb = None  # ADS-B feed naming the flight behind aircraft events (start_adsb)
 
         # Observational products pipeline accumulators (Keogram, Startrails, Timelapse)
-        self.keogram_gen = KeogramGenerator(slice_width=3, max_slices=2880)
+        self.keogram_gen = KeogramGenerator(slice_width=3)
         self.startrails_acc = StartrailsAccumulator(comet_mode=False)
         self.startrails_gate = StartrailsFrameGate()  # keeps day/flash/bumped frames out of the stack
         self._last_archive_ts: float = 0.0
@@ -654,7 +657,10 @@ class AllSkyService:
                 try:
                     # The star-boosted viewer frame: aircraft dots are several times brighter there than in
                     # the raw frame (short exposures), and it is what people see
-                    self._detect_sky_events(display, meta, now)
+                    ev_types = self._detect_sky_events(display, meta, now)
+                    if ev_types:
+                        # The event frame would otherwise fall between two archive ticks: keep it
+                        self._maybe_archive_frame_and_update_products(frame, meta, force=True, events=ev_types)
                 except Exception:
                     pass
 
@@ -1674,7 +1680,12 @@ class AllSkyService:
             keo_ok = self._restore_keogram_from_jpeg(today_str, paths, fh, _ts)
             trails_ok = self._restore_startrails_from_jpeg(today_str, (fh, fw))
             if not keo_ok:
-                for p in paths[-600:]:
+                keo_paths = (
+                    [paths[int(i)] for i in np.linspace(0, len(paths) - 1, 600, dtype=int)]
+                    if len(paths) > 600
+                    else paths
+                )
+                for p in keo_paths:
                     img = last if p == paths[-1] else frame_codec.read_frame(p)
                     if img is not None:
                         self.keogram_gen.add_frame(img, timestamp=_ts(p))
@@ -1764,7 +1775,7 @@ class AllSkyService:
             self._save_startrails_stats(today_str)
 
     def _maybe_archive_frame_and_update_products(
-        self, frame: np.ndarray, meta: Dict[str, Any], force: bool = False
+        self, frame: np.ndarray, meta: Dict[str, Any], force: bool = False, events: Optional[List[str]] = None
     ) -> Optional[str]:
         """
         Periodically archive a downscaled 1296x972 frame to data/frames/<YYYY-MM-DD>/,
@@ -1785,6 +1796,8 @@ class AllSkyService:
             self.startrails_acc.reset()
             self.startrails_gate.reset()
             self.activity.success("archive", f"Day {prev_day} closed with {n_prev} archived frames; started {today_str}")
+            if n_prev >= 4:
+                self._trigger_background_timelapse_compile(fps=12.0, date_str=prev_day)
 
         existing_paths = self._list_today_frame_paths(today_str)
         # Fast initial warm-up (every 2.5s for first 15 frames), then every 15s for continuous all-day/night timelapse
@@ -1795,11 +1808,11 @@ class AllSkyService:
         self._last_archive_ts = now
         now_dt = datetime.now().astimezone()
 
-        # Standardize archive resolution to 1296x972 (4:3 half-res of 2592x1944) for fast H.264 compilation
+        # Standardize the archive width for fast H.264 compilation
         h, w = frame.shape[:2]
-        if w != 1296:
-            target_w = 1296
-            target_h = int(round(h * (1296.0 / w)))
+        if w != ARCHIVE_WIDTH:
+            target_w = ARCHIVE_WIDTH
+            target_h = int(round(h * (ARCHIVE_WIDTH / w)))
             if target_h % 2 == 1:
                 target_h += 1
             interp = cv2.INTER_AREA if w > target_w else cv2.INTER_LINEAR
@@ -1831,25 +1844,22 @@ class AllSkyService:
             "brightness": self.last_brightness,
             "stamped": False,
         }
+        if events:
+            rec["events"] = events
         try:
             with open(os.path.join(day_dir, "telemetry.jsonl"), "a", encoding="utf-8") as fp:
                 fp.write(json.dumps(rec) + "\n")
         except Exception:
             pass
 
-        # Prune oldest frames if > 2880 frames in a single day
-        total_frames = len(existing_paths) + 1
-        if total_frames > 2880:
-            for old_p in existing_paths[: total_frames - 2880]:
-                try:
-                    os.remove(old_p)
-                except Exception:
-                    pass
+        total_frames = len(existing_paths) + 1  # no per-day cap: every event keeps its frame
 
         # Update Keogram & Startrails
         try:
             self.keogram_gen.add_frame(arch_frame, timestamp=now_dt)
-            trail_ok = self.startrails_gate.check(arch_frame, self._startrails_sun_elev(now_dt)) is None
+            # A flash frame (lightning, headlight) is exactly what the gate keeps out; other events are kept
+            relaxed = bool(events) and "flash" not in events
+            trail_ok = self.startrails_gate.check(arch_frame, self._startrails_sun_elev(now_dt), relaxed=relaxed) is None
             if trail_ok:
                 self.startrails_acc.add_frame(arch_frame)
             self._save_products(today_str, startrails=trail_ok)
@@ -1867,15 +1877,19 @@ class AllSkyService:
 
         return fpath
 
-    def _trigger_background_timelapse_compile(self, fps: float = 12.0) -> None:
-        """Spawn a non-blocking daemon thread to compile the latest H.264 MP4 timelapse."""
-        if self._timelapse_compiling:
+    def _trigger_background_timelapse_compile(
+        self, fps: float = 12.0, date_str: Optional[str] = None
+    ) -> None:
+        """Spawn a non-blocking daemon thread to compile the H.264 MP4 timelapse."""
+        if self._timelapse_compiling and date_str is None:
             return
 
         def _worker():
             t0 = time.time()
             try:
-                res = self.generate_observational_products(fps=fps, ensure_min_frames=False)
+                res = self.generate_observational_products(
+                    fps=fps, ensure_min_frames=False, date_str=date_str
+                )
                 msg = (
                     f"Timelapse {res.get('date')} updated: {res.get('video_frames_count')} frames, "
                     f"{res.get('duration_s')}s video, {res.get('size_kb', 0) / 1024:.1f} MB in {time.time() - t0:.0f}s"
@@ -1893,17 +1907,19 @@ class AllSkyService:
         t.start()
 
     def generate_observational_products(
-        self, fps: float = 12.0, ensure_min_frames: bool = True
+        self, fps: float = 12.0, ensure_min_frames: bool = True, date_str: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Compile Timelapse (.mp4 H.264), Keogram (.jpg), and Startrails (.jpg) from today's
-        archived frames. If fewer than 4 frames exist and ensure_min_frames=True, captures/archives
-        initial frames immediately so the user gets a playable video right away.
+        Compile Timelapse (.mp4 H.264), Keogram (.jpg), and Startrails (.jpg) from an observing
+        day's archived frames (defaults to today). Uniformly samples up to 600 frames across the
+        full day (dawn -> daytime -> sunset -> night) so daytime footage is never dropped.
         """
-        today_str = self._obs_day_str()
-        paths = self._list_today_frame_paths(today_str)
+        current_obs_day = self._obs_day_str()
+        target_day = date_str or current_obs_day
+        is_today = target_day == current_obs_day
+        paths = self._list_today_frame_paths(target_day)
 
-        if ensure_min_frames and len(paths) < 4:
+        if is_today and ensure_min_frames and len(paths) < 4:
             needed = 4 - len(paths)
             for _ in range(needed):
                 if self.last_frame is not None:
@@ -1913,11 +1929,11 @@ class AllSkyService:
                     self._maybe_archive_frame_and_update_products(f, m, force=True)
                 except Exception:
                     break
-            paths = self._list_today_frame_paths(today_str)
+            paths = self._list_today_frame_paths(target_day)
 
-        if not paths and self.last_frame is not None:
+        if is_today and not paths and self.last_frame is not None:
             self._maybe_archive_frame_and_update_products(self.last_frame, self.last_metadata, force=True)
-            paths = self._list_today_frame_paths(today_str)
+            paths = self._list_today_frame_paths(target_day)
 
         if not paths:
             raise RuntimeError("No frames available to compile timelapse")
@@ -1925,13 +1941,12 @@ class AllSkyService:
         with self._timelapse_lock:
             self._timelapse_compiling = True
             try:
-                meta_map = self._load_today_telemetry_records(today_str)
-                # Up to 600 recent frames that pass the quality check (wrong-size or brightness-glitch
-                # frames would flicker the video); rejected frames stay in the archive
-                window = paths[-1000:]
-                keep = frame_quality_mask(window)
-                selected_paths = [p for p, ok in zip(window, keep) if ok][-600:]
-                rejected_count = len(window) - sum(keep)
+                meta_map = self._load_today_telemetry_records(target_day)
+                # Up to 600 frames uniformly sampled across the full observing day that pass the
+                # quality check (wrong-size or brightness-glitch frames would flicker the video)
+                selected_paths, rejected_count = select_timelapse_frames(
+                    paths, max_frames=600, telemetry_map=meta_map
+                )
                 if not selected_paths:
                     raise RuntimeError("No frames passed the quality check for the timelapse")
                 timestamps: List[datetime] = []
@@ -1951,6 +1966,13 @@ class AllSkyService:
                 compile_paths = list(selected_paths)
                 compile_ts = list(timestamps)
                 compile_telem = list(telemetry_list)
+                # Quiet stretches are sampled (fast forward); each event frame is held for ~1 s so it can be seen
+                hold = max(2, int(round(float(fps))))
+                reps = [hold if tl.get("events") else 1 for tl in telemetry_list]
+                if any(r > 1 for r in reps):
+                    compile_paths = [p for p, r in zip(selected_paths, reps) for _ in range(r)]
+                    compile_ts = [t for t, r in zip(timestamps, reps) for _ in range(r)]
+                    compile_telem = [tl for tl, r in zip(telemetry_list, reps) for _ in range(r)]
                 if len(compile_paths) < 12:
                     repeat = max(2, int(np.ceil(16 / max(1, len(compile_paths)))))
                     compile_paths = [p for p in selected_paths for _ in range(repeat)]
@@ -1959,11 +1981,12 @@ class AllSkyService:
 
                 station_name = str(self.station_config.get("location_name", "AllSky Hanoi"))
                 latest_mp4 = os.path.join(self.timelapses_dir, "latest.mp4")
-                dated_mp4 = os.path.join(self.timelapses_dir, f"{today_str}.mp4")
+                dated_mp4 = os.path.join(self.timelapses_dir, f"{target_day}.mp4")
+                out_mp4 = latest_mp4 if is_today else dated_mp4
 
                 compile_timelapse(
                     compile_paths,
-                    output_path=latest_mp4,
+                    output_path=out_mp4,
                     fps=float(fps),
                     fourcc_str="avc1",
                     add_overlay=False,
@@ -1971,32 +1994,36 @@ class AllSkyService:
                     timestamps=compile_ts,
                     station_name=station_name,
                 )
-                self._write_timelapse_info(today_str, float(fps), compile_ts, compile_telem)
-                try:
-                    import shutil
-                    shutil.copy2(latest_mp4, dated_mp4)
-                except Exception:
-                    pass
+                self._write_timelapse_info(
+                    target_day, float(fps), compile_ts, compile_telem, update_latest=is_today
+                )
+                if is_today:
+                    try:
+                        import shutil
+                        shutil.copy2(latest_mp4, dated_mp4)
+                    except Exception:
+                        pass
 
-                # Keogram & Startrails are rewritten on every archived frame; only rebuild them if missing
-                keo_latest = os.path.join(self.keograms_dir, "latest.jpg")
-                st_latest = os.path.join(self.startrails_dir, "latest.jpg")
-                if not os.path.isfile(keo_latest) or not os.path.isfile(st_latest):
-                    self._restore_today_products()
+                    # Keogram & Startrails are rewritten on every archived frame; only rebuild them if missing
+                    keo_latest = os.path.join(self.keograms_dir, "latest.jpg")
+                    st_latest = os.path.join(self.startrails_dir, "latest.jpg")
+                    if not os.path.isfile(keo_latest) or not os.path.isfile(st_latest):
+                        self._restore_today_products()
 
-                self._last_timelapse_compile_ts = time.time()
-                mp4_size_kb = round(os.path.getsize(latest_mp4) / 1024.0, 1) if os.path.isfile(latest_mp4) else 0.0
+                    self._last_timelapse_compile_ts = time.time()
+
+                mp4_size_kb = round(os.path.getsize(out_mp4) / 1024.0, 1) if os.path.isfile(out_mp4) else 0.0
                 duration_s = round(len(compile_paths) / max(1.0, float(fps)), 1)
                 return {
                     "success": True,
-                    "date": today_str,
+                    "date": target_day,
                     "archived_frames_count": len(paths),
                     "rejected_frames_count": rejected_count,
                     "video_frames_count": len(compile_paths),
                     "fps": float(fps),
                     "duration_s": duration_s,
                     "size_kb": mp4_size_kb,
-                    "timelapse_url": "/uploads/allsky/timelapses/latest.mp4",
+                    "timelapse_url": "/uploads/allsky/timelapses/latest.mp4" if is_today else f"/uploads/allsky/timelapses/{target_day}.mp4",
                     "keogram_url": "/uploads/allsky/keograms/latest.jpg",
                     "startrails_url": "/uploads/allsky/startrails/latest.jpg",
                     "updated_at": datetime.now().astimezone().isoformat(),
@@ -2026,8 +2053,7 @@ class AllSkyService:
             d += timedelta(days=1)
         if not paths:
             raise RuntimeError("No archived frames in the selected range")
-        keep = frame_quality_mask(paths[-3000:])
-        sel = [p for p, ok in zip(paths[-3000:], keep) if ok][-1500:]
+        sel, _ = select_timelapse_frames(paths, max_frames=1500, telemetry_map=telem_map)
         if not sel:
             raise RuntimeError("No frames passed the quality check for the timelapse")
         stamps: List[datetime] = []
@@ -2062,20 +2088,23 @@ class AllSkyService:
         }
 
     def _write_timelapse_info(self, today_str: str, fps: float, stamps: List[datetime],
-                              telem: List[Dict[str, Any]]) -> None:
+                              telem: List[Dict[str, Any]], update_latest: bool = True) -> None:
         """Per-video-frame capture info (latest.json + <date>.json) for the web player's HTML overlay."""
         import json
 
         frames = [
-            [t.isoformat(timespec="seconds"), rec.get("exposure_s"), rec.get("gain_db"), rec.get("brightness")]
+            [t.isoformat(timespec="seconds"), rec.get("exposure_s"), rec.get("gain_db"), rec.get("brightness"), rec.get("events")]
             for t, rec in zip(stamps, telem)
         ]
-        tmp = os.path.join(self.timelapses_dir, ".info.json.tmp")
+        tmp = os.path.join(self.timelapses_dir, f".info_{today_str}.json.tmp")
         try:
             with open(tmp, "w", encoding="utf-8") as fp:
-                json.dump({"fps": fps, "fields": ["time", "exposure_s", "gain_db", "brightness"], "frames": frames}, fp)
-            shutil.copyfile(tmp, os.path.join(self.timelapses_dir, f"{today_str}.json"))
-            os.replace(tmp, os.path.join(self.timelapses_dir, "latest.json"))
+                json.dump({"fps": fps, "fields": ["time", "exposure_s", "gain_db", "brightness", "events"], "frames": frames}, fp)
+            if update_latest:
+                shutil.copyfile(tmp, os.path.join(self.timelapses_dir, f"{today_str}.json"))
+                os.replace(tmp, os.path.join(self.timelapses_dir, "latest.json"))
+            else:
+                os.replace(tmp, os.path.join(self.timelapses_dir, f"{today_str}.json"))
         except OSError:
             pass
 
@@ -2214,8 +2243,9 @@ class AllSkyService:
                 self.sky_events.reset()
         return {"success": True, **self.get_event_config()}
 
-    def _detect_sky_events(self, frame: np.ndarray, meta: Dict[str, Any], now: float) -> None:
-        """Streak / flash detection on a new frame at night (a few ms on a ~640 px gray copy)."""
+    def _detect_sky_events(self, frame: np.ndarray, meta: Dict[str, Any], now: float) -> List[str]:
+        """Streak / flash detection on a new frame at night (a few ms on a ~640 px gray copy).
+        Returns the types of the events found (their frame is archived)."""
         enabled = {k for k, v in self.get_event_config()["enabled"].items() if v and k != "clouds"}
         if now - self._events_sun_ts >= 60.0:
             from src.calibration.auto_exposure import calculate_solar_elevation
@@ -2225,7 +2255,7 @@ class AllSkyService:
                 self.sky_events.reset()  # daybreak: drop the reference frame, free its memory
             self._events_night = night
         if not enabled or not self._events_night:
-            return
+            return []
         events = self.sky_events.process(
             frame, enabled, ts=now,
             exposure_s=float(meta.get("actual_exposure_s", getattr(self.camera, "current_exposure_s", 0.0))),
@@ -2234,6 +2264,7 @@ class AllSkyService:
         )
         for ev in events:
             self._record_sky_event(ev)
+        return [str(ev.get("type")) for ev in events]
 
     def _cloud_event(self, frame: np.ndarray, cc: float, now: float) -> None:
         """Clouds arriving / clearing, from the (already sampled) cloud cover, with hysteresis."""
@@ -2253,19 +2284,40 @@ class AllSkyService:
     # ------------------------------------------------------------------
     ADSB_DEFAULT_PORT = 30003
 
+    def _fr24(self):
+        """Flightradar24 global & Enterprise feed helper (created on first use)."""
+        if getattr(self, "fr24", None) is None:
+            from src.analytics.fr24 import Fr24Feed
+            cfg = self.station_config.get("adsb") or {}
+            self.fr24 = Fr24Feed(
+                enabled=bool(cfg.get("fr24_enabled", 1)),
+                email=str(cfg.get("fr24_email") or ""),
+                password=str(cfg.get("fr24_password") or ""),
+                token=str(cfg.get("fr24_token") or ""),
+            )
+        return self.fr24
+
     def get_adsb_config(self) -> Dict[str, Any]:
         cfg = self.station_config.get("adsb") or {}
         sol = self.station_config.get("bright_star_solution") or {}
+        fr = self._fr24()
         return {
             "enabled": int(bool(cfg.get("enabled", 1))) if cfg.get("host") else 0,
             "host": cfg.get("host") or "",
             "port": int(cfg.get("port") or self.ADSB_DEFAULT_PORT),
             "pointing_solved": bool(sol.get("success")),
             "status": self.adsb.status() if self.adsb is not None else None,
+            "fr24_enabled": int(bool(cfg.get("fr24_enabled", 1))),
+            "fr24_email": str(cfg.get("fr24_email") or ""),
+            "fr24_has_token": bool(fr.subscription_key),
+            "fr24_authenticated": bool(fr.logged_in),
+            "fr24": fr.status(),
         }
 
     def set_adsb_config(self, host: Optional[str] = None, port: Optional[int] = None,
-                        enabled: Optional[bool] = None) -> Dict[str, Any]:
+                        enabled: Optional[bool] = None, fr24_enabled: Optional[bool] = None,
+                        fr24_email: Optional[str] = None, fr24_password: Optional[str] = None,
+                        fr24_token: Optional[str] = None) -> Dict[str, Any]:
         cfg = dict(self.station_config.get("adsb") or {})
         if host is not None:
             host = host.strip()
@@ -2278,12 +2330,43 @@ class AllSkyService:
             cfg["port"] = int(port)
         if enabled is not None:
             cfg["enabled"] = int(bool(enabled))
+        if fr24_enabled is not None:
+            cfg["fr24_enabled"] = int(bool(fr24_enabled))
+        if fr24_email is not None:
+            cfg["fr24_email"] = fr24_email.strip()
+        if fr24_token is not None:
+            cfg["fr24_token"] = fr24_token.strip()
+
+        fr = self._fr24()
+        fr.enabled = bool(cfg.get("fr24_enabled", 1))
+        if fr24_token is not None:
+            fr.token = cfg["fr24_token"]
+            fr.subscription_key = cfg["fr24_token"]
+            fr.logged_in = bool(cfg["fr24_token"])
+            fr.account_tier = "enterprise" if cfg["fr24_token"] else "public"
+            fr.last_error = None
+        fr24_login = None
+        if fr24_email and fr24_password:
+            try:
+                fr.login(fr24_email.strip(), fr24_password)
+                cfg["fr24_email"] = fr.email
+                cfg["fr24_token"] = fr.subscription_key
+                fr24_login = {"ok": True}
+            except ValueError as exc:
+                fr24_login = {"ok": False, "message": str(exc)}
+
         self.station_config["adsb"] = cfg
         self._save_station_config()
         self.start_adsb()
         c = self.get_adsb_config()
-        self.activity.info("events", f"ADS-B flight matching: {c['host']}:{c['port']}" if c["enabled"] else "ADS-B flight matching off")
+        if fr24_login is not None:
+            c["fr24_login"] = fr24_login
+        self.activity.info("events", f"ADS-B flight matching: {c['host']}:{c['port']}" if c["enabled"] else "ADS-B flight matching updated")
         return {"success": True, **c}
+
+    def get_fr24_flight_detail(self, fr24_id: str) -> Dict[str, Any]:
+        """Full Flightradar24 flight detail and historical trail from departure airport."""
+        return self._fr24().flight_detail(fr24_id)
 
     def _star_ref(self) -> Optional[Dict[str, Any]]:
         """Solved pointing + station + now, for the star-visibility part of the cloud estimate."""
@@ -2329,47 +2412,193 @@ class AllSkyService:
             res["camera"] = {k: sol.get(k) for k in ("pointing_az_deg", "pointing_alt_deg", "roll_deg", "fov_horizontal_deg", "fov_vertical_deg")}
         return res
 
-    def get_aircraft_now(self, limit: int = 30, trail_s: float = 0.0) -> Dict[str, Any]:
-        """Aircraft the ADS-B receiver hears right now: flight, altitude, speed, distance, direction, and
-        whether it is inside the camera's open sky (frame_xy in frame fractions). With trail_s (3D map),
-        also lat/lon, each aircraft's recent path, the station and the camera's pointing."""
+    def get_aircraft_now(self, limit: int = 30, trail_s: float = 0.0,
+                         bounds: Optional[str] = None, include_fr24: Optional[bool] = None,
+                         compact: bool = False) -> Dict[str, Any]:
+        """Aircraft heard right now (local ADS-B receiver + Flightradar24 global feed when bounds is given):
+        flight, altitude, speed, distance, direction, and whether it is inside the camera's open sky."""
         from src.analytics.adsb import motion_fields, sky_position
 
-        if self.adsb is None:
+        fr = self._fr24()
+        use_fr24 = bool(bounds) and (include_fr24 if include_fr24 is not None else fr.enabled)
+        if self.adsb is None and not use_fr24:
             return {"enabled": False, "connected": False, "aircraft": []}
+
         self._adsb_view_ts = time.time()  # someone is looking: keep the feed on, day or night
         sol = self._overlay_solution()
         station = self._overlay_station()
+        st_lat = float(station["latitude_deg"])
+        st_lon = float(station["longitude_deg"])
+        cos_st = math.cos(math.radians(st_lat))
         obstructions = [np.array(p, np.float32) for p in ((self.station_config.get("sky_mask") or {}).get("obstruction") or [])]
-        out = []
+        out: List[Dict[str, Any]] = []
+        by_icao: Dict[str, Dict[str, Any]] = {}
         t_now = time.time()
-        # Where each aircraft will be one second later: lets the page slide every mark to the instant of the frame it is shown on
-        later = {r["icao"]: r for r in self.adsb.current(at=t_now + 1.0)} if sol else {}
-        for a in self.adsb.current(trail_s=trail_s, at=t_now):
-            pos = sky_position(station, a["lat"], a["lon"], a["altitude_m"], sol)
-            xy = pos.get("frame_xy")
-            nxt = later.get(a["icao"])
-            if xy and nxt:
-                xy2 = sky_position(station, nxt["lat"], nxt["lon"], nxt["altitude_m"], sol).get("frame_xy")
-                if xy2:
-                    pos["frame_v"] = [round(xy2[0] - xy[0], 5), round(xy2[1] - xy[1], 5)]   # frame fractions per second
-            in_view = bool(xy) and not any(cv2.pointPolygonTest(p, (float(xy[0]), float(xy[1])), False) >= 0 for p in obstructions)
-            out.append({
-                "icao": a["icao"], "callsign": a["callsign"] or None,
-                "altitude_m": round(a["altitude_m"]), **motion_fields(a), **pos,
-                "in_view": in_view, "above_horizon": pos["alt_deg"] > 0, "age_s": round(a["age_s"], 1),
-            })
-            if trail_s > 0:
-                out[-1].update(lat=round(a["lat"], 5), lon=round(a["lon"], 5), trail=a.get("trail") or [],
+
+        if self.adsb is not None:
+            # Where each aircraft will be one second later: lets the page slide every mark to the instant of the frame it is shown on
+            later = {r["icao"]: r for r in self.adsb.current(at=t_now + 1.0)} if sol else {}
+            for a in self.adsb.current(trail_s=trail_s, at=t_now):
+                pos = sky_position(station, a["lat"], a["lon"], a["altitude_m"], sol)
+                xy = pos.get("frame_xy")
+                nxt = later.get(a["icao"])
+                if xy and nxt:
+                    xy2 = sky_position(station, nxt["lat"], nxt["lon"], nxt["altitude_m"], sol).get("frame_xy")
+                    if xy2:
+                        pos["frame_v"] = [round(xy2[0] - xy[0], 5), round(xy2[1] - xy[1], 5)]   # frame fractions per second
+                in_view = bool(xy) and not any(cv2.pointPolygonTest(p, (float(xy[0]), float(xy[1])), False) >= 0 for p in obstructions)
+                rec: Dict[str, Any] = {
+                    "icao": a["icao"], "callsign": a["callsign"] or None, "source": "local",
+                    "altitude_m": round(a["altitude_m"]), **motion_fields(a), **pos,
+                    "in_view": in_view, "above_horizon": pos["alt_deg"] > 0, "age_s": round(a["age_s"], 1),
+                }
+                if trail_s > 0:
+                    rec.update(lat=round(a["lat"], 5), lon=round(a["lon"], 5), trail=a.get("trail") or [],
                                **self._aircraft_info().describe(a["icao"], a["callsign"] or None))
-        out.sort(key=lambda r: (not r["in_view"], not r["above_horizon"], r["distance_km"]))
-        st = self.adsb.status()
-        res = {"enabled": True, "connected": st["connected"], "t": t_now, "total": len(out),
-               "in_view": sum(1 for r in out if r["in_view"]), "aircraft": out[:limit]}
-        if trail_s > 0:
+                out.append(rec)
+                by_icao[a["icao"]] = rec
+
+        local_count = len(out)
+        fr24_count = 0
+        global_total = 0
+
+        if use_fr24:
+            fr_list, global_total = fr.current(
+                bounds=bounds,
+                station_lat=st_lat,
+                station_lon=st_lon,
+                trail_s=trail_s,
+            )
+            ac_info = self._aircraft_info()
+            for f in fr_list:
+                icao = f["icao"]
+                cs = f.get("callsign") or ""
+                icao3 = f.get("airline_icao") or (cs[:3] if len(cs) >= 4 and cs[:3].isalpha() else "")
+                al = ac_info._airline(icao3) if icao3 else None
+                existing = by_icao.get(icao)
+                if existing is not None:
+                    existing["source"] = "both"
+                    existing["fr24_id"] = f["fr24_id"]
+                    if not existing.get("callsign") and cs:
+                        existing["callsign"] = cs
+                    if not existing.get("type") and f.get("type"):
+                        existing["type"] = f["type"]
+                    if not existing.get("reg") and f.get("reg"):
+                        existing["reg"] = f["reg"]
+                    if not existing.get("route") and f.get("route"):
+                        existing["route"] = f["route"]
+                    if al and not existing.get("airline_iata"):
+                        existing["airline_iata"], existing["airline"] = al
+                    elif f.get("airline_iata") and not existing.get("airline_iata"):
+                        existing["airline_iata"] = f["airline_iata"]
+                    continue
+
+                flat = float(f["lat"])
+                flon = float(f["lon"])
+                falt = float(f["altitude_m"])
+                # Fast geodetic filter: aircraft > 450 km away cannot be above the optical horizon
+                if abs(flat - st_lat) <= 4.2 and abs(flon - st_lon) <= 4.5:
+                    pos = sky_position(station, flat, flon, falt, None)
+                    above_hor = pos["alt_deg"] > 0
+                else:
+                    dlat = flat - st_lat
+                    dlon = (flon - st_lon) * cos_st
+                    dist_km = round(math.hypot(dlat, dlon) * 111.13, 1)
+                    az_deg = round((math.degrees(math.atan2(dlon, dlat)) + 360.0) % 360.0, 1)
+                    pos = {"distance_km": dist_km, "az_deg": az_deg, "alt_deg": -5.0}
+                    above_hor = False
+
+                rec = {
+                    "icao": icao,
+                    "fr24_id": f["fr24_id"],
+                    "callsign": cs or None,
+                    "source": "fr24",
+                    "altitude_m": round(falt),
+                    "speed_kmh": round(f["speed_kmh"]) if f.get("speed_kmh") is not None else None,
+                    "heading_deg": round(f["heading_deg"]) if f.get("heading_deg") is not None else None,
+                    "climb_m_min": round(f["climb_m_min"]) if f.get("climb_m_min") is not None else None,
+                    **pos,
+                    "in_view": False,
+                    "above_horizon": above_hor,
+                    "age_s": round(f["age_s"], 1),
+                    "lat": round(flat, 4),
+                    "lon": round(flon, 4),
+                    "trail": f.get("trail") or [],
+                }
+                if f.get("type"):
+                    rec["type"] = f["type"]
+                if f.get("reg"):
+                    rec["reg"] = f["reg"]
+                if f.get("route"):
+                    rec["route"] = f["route"]
+                if al:
+                    rec["airline_iata"], rec["airline"] = al
+                elif f.get("airline_iata"):
+                    rec["airline_iata"] = f["airline_iata"]
+                out.append(rec)
+                by_icao[icao] = rec
+                fr24_count += 1
+
+        out.sort(key=lambda r: (not r["in_view"], r.get("source") == "fr24", not r["above_horizon"], r["distance_km"]))
+        if bounds and bounds.strip().lower() in ("global", "world", "all") and len(out) > limit:
+            near = [r for r in out if r.get("source") != "fr24" or r["distance_km"] <= 350.0][:160]
+            near_ids = {r["icao"] for r in near}
+            far = [r for r in out if r["icao"] not in near_ids]
+            rem = max(0, limit - len(near))
+            if rem > 0 and len(far) > rem:
+                step = len(far) / float(rem)
+                far = [far[int(i * step)] for i in range(rem)]
+            sliced = (near + far)[:limit]
+        else:
+            sliced = out[:limit]
+
+        compact_rows: List[List[Any]] = []
+        if compact:
+            full_list: List[Dict[str, Any]] = []
+            for r in sliced:
+                if r.get("source") != "fr24" or r["distance_km"] <= 350.0 or len(r.get("trail") or []) > 1:
+                    full_list.append(r)
+                else:
+                    compact_rows.append([
+                        r["icao"],
+                        r.get("fr24_id") or "",
+                        r.get("callsign") or "",
+                        r.get("type") or "",
+                        r.get("airline_iata") or "",
+                        r.get("airline") or "",
+                        r.get("reg") or "",
+                        r.get("route") or "",
+                        r["lat"],
+                        r["lon"],
+                        r["altitude_m"],
+                        r.get("speed_kmh"),
+                        r.get("heading_deg"),
+                        r.get("climb_m_min"),
+                        r["distance_km"],
+                        r["az_deg"],
+                        r.get("age_s", 0.0),
+                    ])
+            sliced = full_list
+
+        st = self.adsb.status() if self.adsb is not None else {"connected": False}
+        res: Dict[str, Any] = {
+            "enabled": True,
+            "connected": bool(st["connected"] or (use_fr24 and (fr24_count > 0 or global_total > 0))),
+            "local_connected": bool(st["connected"]),
+            "t": t_now,
+            "total": len(out),
+            "local_count": local_count,
+            "fr24_count": fr24_count,
+            "global_total": global_total,
+            "in_view": sum(1 for r in out if r["in_view"]),
+            "aircraft": sliced,
+            "fr24": fr.status(),
+        }
+        if compact_rows:
+            res["compact_aircraft"] = compact_rows
+        if trail_s > 0 or use_fr24:
             res["station"] = {"lat": station["latitude_deg"], "lon": station["longitude_deg"], "elevation_m": station["elevation_m"]}
             if sol:
-                # Frame edges in focal units (the page casts rays through them), plus the solver's own FOV
                 cx, cy = sol["optical_center_px"]
                 f = float(sol["focal_px"])
                 res["camera"] = {"az_deg": sol["pointing_az_deg"], "alt_deg": sol["pointing_alt_deg"],
@@ -2949,6 +3178,7 @@ class AllSkyService:
             "defaults": dict(self.PERFORMANCE_DEFAULTS),
             "limits": {k: list(v) for k, v in self.PERFORMANCE_LIMITS.items()},
             "raw10_bin": get_raw10_bin(),
+            "archive_width": ARCHIVE_WIDTH,
         }
 
     def set_performance(self, persist: bool = True, **values: Optional[float]) -> Dict[str, Any]:
@@ -3995,17 +4225,17 @@ class AllSkyService:
                         worse = (
                             (not np.isfinite(q))
                             or (abs(q) > abs(best[r]) * 1.3 if lower else q < best[r] * 0.7)
-                            or (not lower and rise >= 0.06 * abs(best[r]) and (best[r] - q) >= 0.30 * rise and pos - (best_at[r] or 0.0) >= 0.16 - 1e-9)
+                            or (not lower and rise >= 0.06 * abs(best[r]) and (best[r] - q) >= 0.30 * rise and pos - (best_at[r] or 0.0) >= PAST_PEAK_D - 1e-9)
                         )
                         worse_run[r] = worse_run[r] + 1 if worse else 0
                 sw["progress"] = 0.95 * (i + 1) / len(positions)
 
                 # Once any region is past its peak, the others need not hold the sweep: a region that is
                 # flat (blank sky, cloud) or has not improved for 0.6 D since its best is not going to peak
-                any_peak = any(worse_run[r] >= 3 and (best_at[r] is None or pos - best_at[r] >= 0.16 - 1e-9) for r in range(n_roi))
+                any_peak = any(worse_run[r] >= 3 and (best_at[r] is None or pos - best_at[r] >= PAST_PEAK_D - 1e-9) for r in range(n_roi))
 
                 def finished(r):
-                    if worse_run[r] >= 3 and (best_at[r] is None or pos - best_at[r] >= 0.16 - 1e-9):
+                    if worse_run[r] >= 3 and (best_at[r] is None or pos - best_at[r] >= PAST_PEAK_D - 1e-9):
                         return True  # clearly past its peak (at least 4 steps down the right side of the parabola)
                     if pos < 1.0:
                         return False  # scan the entire sky focus range (0.0 to 1.0 D) before early exit
@@ -4083,7 +4313,7 @@ class AllSkyService:
             coarse = 0.04 if final < 1.6 else 0.1 if final < 3.0 else 0.25
             fine = max(0.02 if not is_pytest else 0.01, coarse / (2 if not is_pytest else 4))
             span = (1.5 if not is_pytest else 2.0) * coarse
-            top, bottom = min(positions[-1], final + span), max(lo, final - span)
+            top, bottom = min(positions[-1], final + 2 * span), max(lo, final - span)  # extra far side: fits the parabola better
             back = [round(top - k * fine, 4) for k in range(int(round((top - bottom) / fine)) + 1)]
             sw["phase"] = "refine"
             refine: List[Tuple[float, Optional[float]]] = []

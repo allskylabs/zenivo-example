@@ -69,6 +69,8 @@ def render_metadata_overlay(
             parts.append(f"Clouds: {telemetry['cloud_cover_pct']:.0f}%")
         elif "cloud_cover" in telemetry:
             parts.append(f"Clouds: {telemetry['cloud_cover']:.0f}%")
+        if telemetry.get("events"):  # only when the caller asks for the overlay (custom video); stored frames stay clean
+            parts.append("Event: " + ", ".join(sorted(set(map(str, telemetry["events"])))))
 
     banner_text = " | ".join(parts)
 
@@ -302,6 +304,7 @@ def frame_quality_mask(
     window: int = 7,
     rel_tol: float = 0.3,
     abs_tol: float = 20.0,
+    telemetry_map: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[bool]:
     """
     Which archived frames are fit for the video (True) and which are skipped (False).
@@ -309,13 +312,34 @@ def frame_quality_mask(
     A frame is skipped when its size is not the archive size (a different camera or mode was
     running), or when its mean brightness jumps away from the median of its neighbours
     (a black or saturated glitch frame). Neighbours are taken in time order, so a slow dusk or
-    dawn ramp is followed and only single-frame or block glitches are removed. Frames are read at
-    1/4 scale, so the check is cheap. Skipped frames stay on disk; only the video leaves them out.
+    dawn ramp is followed and only single-frame or block glitches are removed. When telemetry_map
+    carries precomputed frame brightness, only the image header is read for dimensions; otherwise
+    frames are read at 1/4 scale. Skipped frames stay on disk; only the video leaves them out.
     """
+    from PIL import Image
+
     raw_shapes: List[Optional[Tuple[int, int]]] = []
     raw_means: List[Optional[float]] = []
     shape_counts: Dict[Tuple[int, int], int] = {}
     for p in paths:
+        rec = None
+        if telemetry_map:
+            fname = os.path.basename(p)
+            rec = telemetry_map.get(fname) or telemetry_map.get(
+                f"{os.path.basename(os.path.dirname(p))}/{fname}"
+            )
+        b_val = rec.get("brightness") if isinstance(rec, dict) else None
+        if b_val is not None:
+            try:
+                with Image.open(p) as im:
+                    w_px, h_px = im.size
+                sh = ((int(h_px) + 3) // 4, (int(w_px) + 3) // 4)
+                raw_shapes.append(sh)
+                raw_means.append(float(b_val))
+                shape_counts[sh] = shape_counts.get(sh, 0) + 1
+                continue
+            except Exception:
+                pass
         im = frame_codec.read_frame(p, cv2.IMREAD_REDUCED_GRAYSCALE_4)
         if im is not None and im.size > 0:
             sh = (int(im.shape[0]), int(im.shape[1]))
@@ -352,3 +376,111 @@ def frame_quality_mask(
         med = float(np.median(near))
         keep.append(abs(m - med) <= max(abs_tol, rel_tol * med))
     return keep
+
+
+def _select_sampled_frames(
+    paths: List[str],
+    max_frames: int = 600,
+    telemetry_map: Optional[Dict[str, Dict[str, Any]]] = None,
+    window: int = 7,
+    rel_tol: float = 0.3,
+    abs_tol: float = 20.0,
+) -> Tuple[List[str], int]:
+    """
+    Uniformly sample up to ``max_frames`` quality-checked frames across the full ``paths``
+    sequence (dawn -> daytime -> dusk -> night) instead of taking only the tail.
+
+    Brightness neighbour filtering runs on the full un-strided sequence first so dawn/dusk
+    ramps keep their true frame-to-frame step size; dimension checks then run on the sampled pool.
+    Returns ``(selected_paths, rejected_count)``.
+    """
+    if not paths:
+        return [], 0
+
+    if len(paths) <= max_frames:
+        keep = frame_quality_mask(
+            paths, window=window, rel_tol=rel_tol, abs_tol=abs_tol, telemetry_map=telemetry_map
+        )
+        kept = [p for p, ok in zip(paths, keep) if ok]
+        return kept, len(paths) - len(kept)
+
+    # 1. Full-resolution brightness glitch rejection using telemetry_map when available
+    pre_rejected = 0
+    candidates = list(paths)
+    if telemetry_map:
+        means: List[Optional[float]] = []
+        for p in paths:
+            fname = os.path.basename(p)
+            rec = telemetry_map.get(fname) or telemetry_map.get(
+                f"{os.path.basename(os.path.dirname(p))}/{fname}"
+            )
+            b = rec.get("brightness") if isinstance(rec, dict) else None
+            means.append(float(b) if b is not None else None)
+        if any(m is not None for m in means):
+            b_keep: List[bool] = []
+            for i, m in enumerate(means):
+                if m is None:
+                    b_keep.append(True)
+                    continue
+                near = [
+                    means[j]
+                    for j in range(max(0, i - window), min(len(means), i + window + 1))
+                    if means[j] is not None
+                ]
+                med = float(np.median(near))
+                b_keep.append(abs(m - med) <= max(abs_tol, rel_tol * med))
+            candidates = [p for p, ok in zip(paths, b_keep) if ok]
+            pre_rejected = len(paths) - len(candidates)
+
+    if not candidates:
+        return [], len(paths)
+
+    # 2. Uniformly sample across the full day and verify frame dimensions/readability
+    pool_limit = min(len(candidates), max_frames + 32)
+    idx = np.linspace(0, len(candidates) - 1, pool_limit, dtype=int)
+    pool = [candidates[int(i)] for i in idx]
+
+    # Only check shape consistency on the strided pool (rel_tol=1e9 skips re-running strided brightness diff)
+    keep = frame_quality_mask(
+        pool,
+        window=window,
+        rel_tol=1e9 if telemetry_map else rel_tol,
+        abs_tol=1e9 if telemetry_map else abs_tol,
+        telemetry_map=telemetry_map,
+    )
+    kept = [p for p, ok in zip(pool, keep) if ok]
+    rejected_count = pre_rejected + (len(pool) - len(kept))
+
+    if len(kept) > max_frames:
+        idx2 = np.linspace(0, len(kept) - 1, max_frames, dtype=int)
+        selected = [kept[int(i)] for i in idx2]
+    else:
+        selected = kept
+    return selected, rejected_count
+
+
+def _event_frame(p: str, telemetry_map: Optional[Dict[str, Dict[str, Any]]]) -> bool:
+    if not telemetry_map:
+        return False
+    fname = os.path.basename(p)
+    rec = telemetry_map.get(fname) or telemetry_map.get(f"{os.path.basename(os.path.dirname(p))}/{fname}")
+    return bool(isinstance(rec, dict) and rec.get("events"))
+
+
+def select_timelapse_frames(
+    paths: List[str],
+    max_frames: int = 600,
+    telemetry_map: Optional[Dict[str, Dict[str, Any]]] = None,
+    **kwargs: Any,
+) -> Tuple[List[str], int]:
+    """
+    ``_select_sampled_frames`` plus every frame archived for a sky event (meteor, aircraft, ...):
+    the quiet stretches are sped up by sampling, the events are always kept.
+    """
+    selected, rejected = _select_sampled_frames(paths, max_frames, telemetry_map, **kwargs)
+    events = [p for p in paths if _event_frame(p, telemetry_map)]
+    if not events:
+        return selected, rejected
+    keep = set(selected) | set(events)
+    merged = [p for p in paths if p in keep]
+    return merged, max(0, len(paths) - len(merged))

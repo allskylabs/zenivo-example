@@ -370,7 +370,7 @@ def test_sweep_is_one_pass_with_parabola_and_rejects_near_object(lens_client):
     out = [p["pos"] for p in sw["points"] if p["phase"] == "sweep"]
     back = [p["pos"] for p in sw["points"] if p["phase"] == "refine"]
     assert out == sorted(out) and back == sorted(back, reverse=True), "one way out, one way back"
-    assert back and max(back) - min(back) <= 0.17 and abs(cam.lens_position_target - TRUE_FOCUS) <= 0.02
+    assert back and max(back) - min(back) <= 0.30 and abs(cam.lens_position_target - TRUE_FOCUS) <= 0.02
     assert sw["state"] == "done" and sw["fit"] and abs(sw["fit"]["vertex"] - TRUE_FOCUS) <= 0.03
     # Zoom on something 0.6 m away: sharpening all the way to the end of the sky range
     cam.true_focus = 1.6

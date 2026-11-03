@@ -150,3 +150,53 @@ def test_trails_survive_a_restart(tmp_path):
     fresh._parse(b"MSG,3,333,0,8880AB,100,,,,,,10100,,,21.10000,105.9,,,0,0,0,0", now)
     (a,) = fresh.current(trail_s=900)
     assert len(a["trail"]) == len(feed_trail) + 1
+
+
+def test_flights3d_globe_and_terrain_structure():
+    from pathlib import Path
+    html = (Path(__file__).resolve().parents[2] / "src" / "web" / "flights3d.html").read_text(encoding="utf-8")
+    assert 'projection: { type: "globe" }' in html
+    assert 'terrain: { source: "dem", exaggeration: 1 }' in html
+    assert "new maplibregl.GlobeControl()" in html
+    assert 'id="btn-globe"' in html
+    assert 'id="btn-fr24"' in html
+    assert 'id="fr24-modal"' in html
+    assert 'id="lay-fr24"' in html
+    assert "function llToUnitSphere(" in html
+    assert "function globePos(" in html
+    assert "function enuBasis(" in html
+    assert "function boundsParam(" in html
+    assert "function fastLiveryMaterials(" in html
+    assert "projectionTransition" in html
+
+
+def test_fr24_row_parsing_and_status():
+    import time
+    from src.analytics.fr24 import Fr24Feed
+    feed = Fr24Feed(enabled=True, email="ops@allsky.hoan.uk", token="test_enterprise_token")
+    st = feed.status()
+    assert st["enabled"] is True
+    assert st["authenticated"] is True
+    assert st["account_tier"] == "enterprise"
+
+    now = time.time()
+    row = [
+        "8881B3", 21.2144, 105.8022, 281, 35000, 460, "4521",
+        "F-VVNB1", "A359", "VN-A899", int(now) - 2, "HAN", "FRA",
+        "VN37", 0, 640, "HVN37", 0, "HVN"
+    ]
+    ac = feed._parse_row("3f9a12b4", row, now, 600.0)
+    assert ac is not None
+    assert ac["icao"] == "8881B3"
+    assert ac["fr24_id"] == "3f9a12b4"
+    assert ac["callsign"] == "HVN37"
+    assert ac["type"] == "A359"
+    assert ac["reg"] == "VN-A899"
+    assert ac["route"] == "HAN-FRA"
+    assert ac["airline_iata"] == "VN"
+    assert ac["airline_icao"] == "HVN"
+    assert round(ac["altitude_m"]) == round(35000 * 0.3048)
+    assert round(ac["speed_kmh"]) == round(460 * 1.852)
+    assert round(ac["climb_m_min"]) == round(640 * 0.3048)
+    assert len(ac["trail"]) == 1
+

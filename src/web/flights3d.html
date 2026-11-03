@@ -26,17 +26,21 @@
         #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
         .ac-label {
             position: absolute; transform: translate(-50%, -100%); white-space: nowrap; pointer-events: auto; cursor: pointer;
-            font: 600 12px/1.25 var(--font-mono); color: var(--text-primary); text-shadow: 0 1px 3px #000, 0 0 2px #000;
-            padding: 1px 4px; border-radius: 4px; user-select: none;
+            font: 600 11px/1.2 var(--font-mono); color: var(--text-primary); text-shadow: 0 1px 2px #000;
+            background: rgba(7, 10, 18, 0.72); border: 1px solid rgba(148, 163, 184, 0.22);
+            padding: 2px 5px; border-radius: 4px; user-select: none;
         }
-        .ac-label small { display: block; font-weight: 400; color: var(--text-secondary); }
-        .ac-label.in-view { color: var(--warning); }
-        .ph { font-size: 12px; font-weight: 600; margin-left: 6px; }
+        .ac-label small { display: block; font-weight: 400; font-size: 10px; color: var(--text-secondary); }
+        .ac-label.in-view { color: var(--warning); border-color: rgba(245, 158, 11, 0.45); }
+        .ph { font-size: 11px; font-weight: 600; margin-left: 5px; }
         .ph.to, .ph.up { color: #34d399; } .ph.ldg, .ph.down { color: #fbbf24; }
-        .ac-label.selected { background: color-mix(in srgb, var(--accent) 30%, transparent); }
-        .place { font: 500 12px var(--font-sans); color: #8ea3c0; text-shadow: 0 1px 3px #000, 0 0 2px #000; white-space: nowrap; pointer-events: none; }
+        .ac-label.selected { background: color-mix(in srgb, var(--accent) 32%, rgba(7, 10, 18, 0.88)); border-color: var(--accent); z-index: 5; }
+        .place { font: 500 11px var(--font-sans); color: #8ea3c0; text-shadow: 0 1px 3px #000, 0 0 2px #000; white-space: nowrap; pointer-events: none; }
         .place.airport { color: #c4b5fd; }
-        .place.ring { color: #38bdf8; opacity: 0.75; font-size: 12px; }
+        .place.ring { color: #38bdf8; opacity: 0.75; font-size: 11px; }
+        #stage.labels-off .ac-label:not(.selected), #stage.labels-off .place { display: none !important; }
+        #stage.globe-far .place { display: none !important; }
+        #stage.zoom-mid .place.city, #stage.zoom-mid .place.airport:not(.vn-airport) { display: none !important; }
         .panel {
             position: absolute; background: color-mix(in srgb, var(--bg-card) 92%, transparent); border: 1px solid var(--border-color);
             border-radius: var(--radius-md, 8px); backdrop-filter: blur(6px); font-size: 13px;
@@ -56,13 +60,14 @@
         button:hover { border-color: var(--accent); }
         button.on { border-color: var(--accent); color: var(--accent); }
         button[hidden] { display: none; }
-        #list { top: 12px; right: 12px; width: 350px; max-width: calc(100% - 24px); max-height: calc(100% - 24px); display: flex; flex-direction: column; }
+        #list { top: 12px; right: 12px; width: 370px; max-width: calc(100% - 24px); max-height: calc(100% - 24px); display: flex; flex-direction: column; }
         #list h2 { font-size: 13px; font-weight: 600; padding: 9px 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; }
         #list ul { list-style: none; overflow-y: auto; }
         #list li { padding: 6px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; white-space: nowrap; font-family: var(--font-mono); font-size: 12px; }
         #list li:hover, #list li.selected { background: var(--bg-card-sub); }
         #list li.in-view .cs { color: var(--warning); }
-        #list li .meta { color: var(--text-secondary); font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+        #list li .id { display: flex; align-items: center; min-width: 0; flex: 1 1 auto; overflow: hidden; }
+        #list li .meta { color: var(--text-secondary); font-size: 12px; flex: 0 0 auto; text-align: right; }
         #layers { padding: 10px 12px; width: 200px; display: flex; flex-direction: column; gap: 4px; }
         #layers h2 { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
         #layers label { display: flex; justify-content: space-between; align-items: center; min-height: 28px; font-size: 13px; cursor: pointer; }
@@ -76,18 +81,38 @@
         #info-stats small { display: block; font-size: 12px; color: var(--text-secondary); }
         #info-stats b { font: 600 15px var(--font-mono); }
         #info-sub { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
-        #info { left: 12px; bottom: 48px; padding: 10px 12px; width: 260px; display: none; }
+        #info { left: 12px; bottom: 48px; max-height: calc(100% - 176px); overflow-y: auto; padding: 10px 12px; width: 270px; z-index: 20; display: none; }
         #info.show { display: block; }
         #info h3 { font: 600 15px var(--font-mono); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
         #info-logo { display: block; max-width: 100%; max-height: 34px; margin: 2px 0 6px; background: #f8fafc; border-radius: 4px; padding: 3px 6px; }
         #info-logo[hidden] { display: none; }
+        #info-photo { display: block; width: 100%; max-height: 120px; object-fit: cover; border-radius: 6px; margin: 0 0 4px; }
+        #info-photo[hidden] { display: none; }
+        #info-photo-credit { font-size: 10px; color: var(--text-secondary); margin: 0 0 6px; text-align: right; }
+        #info-photo-credit[hidden] { display: none; }
         #info-model { display: block; width: 100%; height: 130px; margin: 0 0 6px; border-radius: 6px;
             background: radial-gradient(ellipse at 50% 60%, #1b2a44 0%, #0b1220 75%); }
         #info dl { display: grid; grid-template-columns: auto auto; gap: 2px 14px; font-size: 12px; }
         #info dt { color: var(--text-secondary); }
         #info dd { font-family: var(--font-mono); text-align: right; }
-        #info .links { margin-top: 8px; display: flex; gap: 6px; align-items: center; }
+        #info .links { margin-top: 8px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
         #info a { color: var(--accent); font-size: 12px; }
+        #info a[hidden] { display: none; }
+        #fr24-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 340px; max-width: calc(100% - 24px);
+            padding: 14px 16px; z-index: 40; display: none; flex-direction: column; gap: 10px; box-shadow: 0 16px 40px rgba(0,0,0,0.65); }
+        #fr24-modal.show { display: flex; }
+        #fr24-modal h3 { font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        #fr24-modal .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
+        #fr24-modal input[type="text"], #fr24-modal input[type="email"], #fr24-modal input[type="password"] {
+            background: var(--bg-card-sub); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px;
+            padding: 6px 8px; font: 12px var(--font-mono);
+        }
+        #fr24-modal .badge-row { display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-sub);
+            padding: 6px 8px; border-radius: 6px; font-size: 12px; }
+        #fr24-modal .tier { font-family: var(--font-mono); font-weight: 600; color: var(--accent); }
+        #fr24-msg { font-size: 12px; color: var(--text-secondary); min-height: 16px; }
+        .src-tag { font-size: 10px; padding: 1px 4px; border-radius: 3px; background: rgba(56, 189, 248, 0.16); color: #38bdf8; margin-left: 5px; }
+        .src-tag.local { background: rgba(16, 185, 129, 0.18); color: #34d399; }
         .legend { display: flex; gap: 10px; font-size: 12px; color: var(--text-secondary); align-items: center; flex-wrap: wrap; }
         .legend .ramp { width: 120px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #ffd166, #06d6a0, #38bdf8, #8b5cf6, #f472b6); }
         .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
@@ -219,6 +244,8 @@
             <button id="btn-trails" class="on" title="Flight paths: click to change length">Trails 10 min</button>
             <button id="btn-labels" class="on" title="Callsign labels">Labels</button>
             <button id="btn-home" title="Back to the station">Station</button>
+            <button id="btn-globe" title="Zoom out to the 3D globe">Globe</button>
+            <button id="btn-fr24" class="on" title="Flightradar24 Global &amp; Enterprise account settings">FR24 Global</button>
         </div>
         <div class="legend">
             <span>Altitude</span><span>0</span><span class="ramp"></span><span>12 km</span>
@@ -229,6 +256,8 @@
     <div id="layers" class="panel">
         <h2>Layers</h2>
         <label>Aircraft <input type="checkbox" id="lay-aircraft" checked></label>
+        <label>Global (FR24) <input type="checkbox" id="lay-fr24" checked></label>
+        <label>Labels <input type="checkbox" id="lay-labels" checked></label>
         <label>Trails <input type="checkbox" id="lay-trails" checked></label>
         <label>Camera frustum <input type="checkbox" id="lay-frustum" checked></label>
         <label>Airports <input type="checkbox" id="lay-airports" checked></label>
@@ -250,12 +279,44 @@
         <div id="info-sub"></div>
         <div id="info-stats"></div>
         <canvas id="info-model" title="Drag to turn"></canvas>
+        <img id="info-photo" alt="" hidden>
+        <div id="info-photo-credit" hidden></div>
         <img id="info-logo" alt="" hidden>
         <dl id="info-dl"></dl>
         <div class="links">
             <button id="btn-track" title="Keep the camera on this aircraft; rotate and zoom around it">Track</button>
             <button id="btn-chase" title="Fly behind the aircraft, turning with it">Chase</button>
+            <a id="info-fr24" target="_blank" rel="noopener" hidden>FR24 ↗</a>
             <a id="info-link" target="_blank" rel="noopener">ADS-B Exchange ↗</a>
+        </div>
+    </div>
+
+    <div id="fr24-modal" class="panel" role="dialog" aria-label="Flightradar24 Enterprise Account">
+        <h3><span>Flightradar24 Global &amp; Enterprise</span><button id="fr24-close" title="Close">✕</button></h3>
+        <div class="badge-row">
+            <span>Status: <b id="fr24-tier" class="tier">Global Live</b></span>
+            <span id="fr24-worldwide">-- worldwide</span>
+        </div>
+        <label style="display:flex;justify-content:space-between;align-items:center;font-size:13px;cursor:pointer">
+            <span>Combine FR24 Global Data</span>
+            <input type="checkbox" id="fr24-enabled" checked style="accent-color:var(--accent);width:16px;height:16px">
+        </label>
+        <div class="field">
+            <span>Enterprise Account Email</span>
+            <input type="email" id="fr24-email" placeholder="you@company.com" autocomplete="username">
+        </div>
+        <div class="field">
+            <span>Enterprise Password (used once to obtain token)</span>
+            <input type="password" id="fr24-password" placeholder="••••••••••••" autocomplete="current-password">
+        </div>
+        <div class="field">
+            <span>Or Subscription Key / Token (_frPl)</span>
+            <input type="text" id="fr24-token" placeholder="Optional direct FR24 token">
+        </div>
+        <div id="fr24-msg"></div>
+        <div class="btns" style="justify-content:flex-end">
+            <button id="fr24-clear" title="Clear saved token">Clear Token</button>
+            <button id="fr24-save" class="on">Save &amp; Connect</button>
         </div>
     </div>
     </div><!-- #stage -->
@@ -359,15 +420,16 @@
         const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
         const compass = (az) => COMPASS[Math.round(((az % 360) + 360) % 360 / 45) % 8];
         const D2R = Math.PI / 180;
+        const R_EARTH = 6371008.8;    // MapLibre globe radius in metres ( circumference 40030173.592 / 2π )
         const nowS = () => performance.now() / 1000;
 
         let station = null, camera = null;
-        let origin = null, mPerUnit = 1;    // scene origin (mercator) at the station; mercator units per metre there
+        let origin = null, originSphere = null, stationBasis = null, mPerUnit = 1;
         const aircraft = new Map();         // icao -> state
         let selected = null, centering = false;
         let camMode = null, camZoom = null, camPitch = null, camPending = false;   // camera tracking the selected aircraft
         let trailIdx = 0, trailSpan = TRAIL_CHOICES[0], showLabels = true;
-        const layerOn = { aircraft: true, trails: true, frustum: true, airports: true, terrain: true };
+        const layerOn = { aircraft: true, fr24: true, trails: true, frustum: true, airports: true, terrain: true };
         let frustumGroup = null;
         const airportMarkers = [];
         const AIRPORT_LAYERS = ["rwy-glow", "rwy", "rwy-centre", "rwy-edge", "rwy-thresh", "rwy-appr"];
@@ -375,9 +437,9 @@
             for (const id of AIRPORT_LAYERS) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", layerOn.airports ? "visible" : "none");
             for (const m of airportMarkers) m.getElement().style.display = layerOn.airports ? "" : "none";
         }
-        let lastFetch = 0, haveTrails = false;
+        let lastFetch = 0, lastBounds = "", pollSeq = 0, pollInFlight = false, haveTrails = false, moveTimer = 0;
 
-        // ---------------------------------------------------------------- map: dark 3D terrain from elevation only
+        // ---------------------------------------------------------------- map: 3D Globe + 3D DEM terrain
         const RELIEF = ["interpolate", ["linear"], ["elevation"],   // near-grey: saturation close to 0
             -200, "#050506", 0, "#08090b", 30, "#0a0b0d", 150, "#0d0e11", 400, "#111316",
             800, "#16181c", 1300, "#1c1f23", 2000, "#24272c", 3000, "#2f3237"];
@@ -385,6 +447,8 @@
             container: "map",
             style: {
                 version: 8,
+                projection: { type: "globe" },
+                light: { anchor: "map", position: [1.5, 90, 80] },
                 sources: {
                     // 3D surface from coarse tiles (z11, ~75 m): finer DEM tiles carry noise (trees, buildings) that
                     // makes flat runways bumpy and swallows aircraft on the ground; hillshade keeps the fine detail
@@ -400,13 +464,29 @@
                             "hillshade-highlight-color": "#5d636c", "hillshade-accent-color": "#0c0d10" } },
                 ],
                 terrain: { source: "dem", exaggeration: 1 },
-                sky: { "sky-color": "#070809", "horizon-color": "#17191d", "fog-color": "#070809",
-                    "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.5, "fog-ground-blend": 0.35, "atmosphere-blend": 0 },
+                sky: { "sky-color": "#05070d", "horizon-color": "#182438", "fog-color": "#07090e",
+                    "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.5, "fog-ground-blend": 0.35,
+                    "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 0.85, 6, 0.85, 10, 0.45, 12, 0] },
             },
             center: [105.9095, 21.0538], zoom: 9, pitch: 64, bearing: -20, maxPitch: 82,
             attributionControl: { compact: true },
         });
         map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
+        map.addControl(new maplibregl.GlobeControl(), "bottom-right");
+        const syncZoomClass = () => {
+            const z = map.getZoom();
+            $("stage").classList.toggle("globe-far", z < 6.8);
+            $("stage").classList.toggle("zoom-mid", z >= 6.8 && z < 8.6);
+        };
+        map.on("zoom", syncZoomClass);
+        syncZoomClass();
+        map.on("moveend", () => {
+            if (camMode) return;
+            clearTimeout(moveTimer);
+            moveTimer = setTimeout(() => {
+                if (!document.hidden && (boundsParam() !== lastBounds || Date.now() - lastFetch > 800)) poll();
+            }, 350);
+        });
         map.on("error", (e) => console.error("map:", e.error?.message || e));
 
         // Places for orientation (the base has no labels of its own)
@@ -421,13 +501,13 @@
             ["Cao Bằng", 106.2572, 22.6657], ["Hà Giang", 104.9784, 22.8233], ["Móng Cái", 107.9666, 21.5243],
         ];
         function addPlaces() {
-            for (const [name, lon, lat] of PLACES) addText(name, lon, lat, "place");
+            for (const [name, lon, lat] of PLACES) addText(name, lon, lat, "place city");
         }
         function addText(text, lon, lat, cls) {
             const el = document.createElement("div");
             el.className = cls;
             el.textContent = text;
-            return new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(map);
+            return new maplibregl.Marker({ element: el, opacityWhenCovered: "0" }).setLngLat([lon, lat]).addTo(map);
         }
 
         // Start as soon as the (inline) style is ready rather than on "load", which waits for every terrain tile
@@ -504,15 +584,14 @@
             lights("rwy-thresh", "#4ade80", 0.8, 4.5, 11);
             lights("rwy-appr", "#fff7e0", 1, 6, 10);
             for (const a of d.airports) {
-                if (a.type === "small" && !VN_AIRPORT_NAMES[a.ident]) continue;
-                const name = VN_AIRPORT_NAMES[a.ident] || a.name.replace(/\s*(International\s*)?(Airport|Air Base|Airfield)\s*$/i, "");
-                airportMarkers.push(addText(`✈ ${name} ${a.iata || a.ident}`, a.lon, a.lat, "place airport"));
+                const isVn = !!VN_AIRPORT_NAMES[a.ident];
+                if (!isVn && (a.type === "small" || !a.iata || /^[A-Z]{2}-\d/.test(a.ident))) continue;
+                const rawName = VN_AIRPORT_NAMES[a.ident] || a.name.split("/")[0].replace(/\s*(International\s*)?(Airport|Air Base|Airfield)\s*$/i, "").trim();
+                const cls = isVn ? "place airport vn-airport" : "place airport";
+                airportMarkers.push(addText(`✈ ${rawName} ${a.iata || a.ident}`, a.lon, a.lat, cls));
             }
             applyAirports();
         }
-        poll();
-        setInterval(() => { if (!document.hidden) poll(); }, POLL_MS);
-        document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastFetch > POLL_MS) poll(); });
 
         // ---------------------------------------------------------------- Google Maps basemap (optional)
         const GOOGLE_DARK = [
@@ -553,19 +632,14 @@
             try { localStorage.setItem(BASE_KEY, kind); } catch (e) { /* not persisted */ }
             for (const k of ["terrain", "google", "sat"]) $(`btn-base-${k}`).classList.toggle("on", k === kind);
             for (const k of ["google", "sat"]) if (map.getLayer(`g-${k}`)) map.setLayoutProperty(`g-${k}`, "visibility", k === kind ? "visible" : "none");
-            if (map.getLayer("sat-night")) map.setLayoutProperty("sat-night", "visibility", kind === "sat" ? "visible" : "none");
             map.setLayoutProperty("relief", "visibility", kind === "terrain" ? "visible" : "none");
             map.setPaintProperty("hillshade", "hillshade-exaggeration", kind === "terrain" ? 0.75 : 0.35);
             if (kind === "terrain" || map.getLayer(`g-${kind}`)) return;
-            if (kind === "sat") {   // imagery only, in a night look: dark and grey
+            if (kind === "sat") {   // imagery only, in a night look across the entire globe (including poles)
                 map.addSource("g-sat", { type: "raster", tiles: [SAT], tileSize: 256, maxzoom: 19,
                     attribution: "Imagery © Esri, Maxar, Earthstar Geographics" });
                 map.addLayer({ id: "g-sat", type: "raster", source: "g-sat",
-                    paint: { "raster-brightness-max": 0.42, "raster-saturation": -1, "raster-contrast": 0.15 } }, "hillshade");
-                map.addSource("sat-night", { type: "geojson", data: { type: "Feature", properties: {},
-                    geometry: { type: "Polygon", coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]]] } } });
-                map.addLayer({ id: "sat-night", type: "fill", source: "sat-night",
-                    paint: { "fill-color": "#000000", "fill-opacity": 0.35 } }, "hillshade");
+                    paint: { "raster-brightness-max": 0.28, "raster-saturation": -1, "raster-contrast": 0.15 } }, "hillshade");
                 return;
             }
             try {
@@ -580,12 +654,46 @@
             }
         }
 
-        // ---------------------------------------------------------------- geometry helpers
-        function merc(lon, lat, alt) {
-            const m = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], alt);
-            return [m.x - origin.x, m.y - origin.y, m.z];
+        // ---------------------------------------------------------------- 3D globe + ENU geometry helpers
+        // MapLibre GL JS v5 globe unit sphere: Y = North (+lat), Z = (lon=0, lat=0), X = (lon=90°E, lat=0), r = 1 + alt / R_EARTH.
+        // We store scene positions in metres relative to originSphere * R_EARTH so Float32 buffers stay millimeter-accurate.
+        function llToUnitSphere(lon, lat, alt = 0) {
+            const la = lon * D2R, ph = lat * D2R, r = 1 + (alt || 0) / R_EARTH, c = Math.cos(ph) * r;
+            return [Math.sin(la) * c, Math.sin(ph) * r, Math.cos(la) * c];
         }
-        function enuToScene(e, n, u) { return [e * mPerUnit, -n * mPerUnit, u * mPerUnit]; }
+        function globePos(lon, lat, alt = 0) {
+            const s = llToUnitSphere(lon, lat, alt);
+            return [(s[0] - originSphere[0]) * R_EARTH, (s[1] - originSphere[1]) * R_EARTH, (s[2] - originSphere[2]) * R_EARTH];
+        }
+        function enuBasis(lon, lat) {
+            const la = lon * D2R, ph = lat * D2R;
+            const sinLa = Math.sin(la), cosLa = Math.cos(la), sinPh = Math.sin(ph), cosPh = Math.cos(ph);
+            return {
+                e: [cosLa, 0, -sinLa],
+                n: [-sinPh * sinLa, cosPh, -sinPh * cosLa],
+                u: [cosPh * sinLa, sinPh, cosPh * cosLa],
+            };
+        }
+        function enuOffset(b, e, n, u) {
+            return [
+                b.e[0] * e + b.n[0] * n + b.u[0] * u,
+                b.e[1] * e + b.n[1] * n + b.u[1] * u,
+                b.e[2] * e + b.n[2] * n + b.u[2] * u,
+            ];
+        }
+        function sceneToLngLatAlt(p) {
+            const sx = originSphere[0] + p[0] / R_EARTH;
+            const sy = originSphere[1] + p[1] / R_EARTH;
+            const sz = originSphere[2] + p[2] / R_EARTH;
+            const r = Math.hypot(sx, sy, sz) || 1;
+            return {
+                lon: Math.atan2(sx, sz) / D2R,
+                lat: Math.asin(Math.max(-1, Math.min(1, sy / r))) / D2R,
+                alt: (r - 1) * R_EARTH,
+                sx, sy, sz, r,
+                u: [sx / r, sy / r, sz / r],
+            };
+        }
 
         // Camera -> ENU rotation from the star-solved pointing (same as src/analytics/adsb.py pointing_rotation)
         function pointingRotation(azDeg, altDeg, rollDeg) {
@@ -603,7 +711,8 @@
 
         // ---------------------------------------------------------------- three.js scene
         const scene = new THREE.Scene();
-        scene.add(new THREE.HemisphereLight(0xc8d6ff, 0x20222a, 1.6));
+        const hemi = new THREE.HemisphereLight(0xc8d6ff, 0x20222a, 1.6);
+        scene.add(hemi);
         const sun = new THREE.DirectionalLight(0xffffff, 2.4);
         sun.position.set(0.5, -0.7, 1);
         scene.add(sun);
@@ -686,7 +795,7 @@
             }
             pts.push([x0, leRoot - cr]);
             const shape = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x * side, y)));
-            const g = new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: true, bevelThickness: thick * 0.35,
+            const g = new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: !opts.lod, bevelThickness: thick * 0.35,
                 bevelSize: Math.min(thick * 0.35, ct * 0.2), bevelSegments: 2, curveSegments: 1 });
             g.translate(0, 0, -thick / 2);
             return g;
@@ -710,8 +819,8 @@
             return st;
         }
 
-        function buildModel(fam, type, st) {
-            const key = `${fam}|${type || ""}|${st.tip}|${st.nose}|${st.engScale}`;
+        function buildModel(fam, type, st, lod = false) {
+            const key = `${fam}|${type || ""}|${st.tip}|${st.nose}|${st.engScale}|${lod ? "lod" : "hi"}`;
             if (MODEL_CACHE.has(key)) return MODEL_CACHE.get(key);
             const f = FAMILIES[fam];
             const s = (TYPE_LEN[type] || f.L) / f.L;   // stretch the family to the type's real length
@@ -724,7 +833,7 @@
             const blade = st.cone === "blade";
             const noseLen = nl * R, tailLen = (fam === "ga" ? 4.5 : blade ? 3.8 : 3.3) * R;
             const prof = [new THREE.Vector2(0, -half)];
-            const N = 90;
+            const N = lod ? 10 : 90;
             for (let i = 0; i <= N; i++) {
                 const y = -half + (L * i) / N;
                 const yn = half - y, yt = y + half;
@@ -733,7 +842,7 @@
                 if (yt < tailLen) { const q = yt / tailLen; r = Math.min(r, R * ((blade ? 0.09 : 0.16) + (blade ? 0.91 : 0.84) * Math.pow(q, 0.75))); }
                 prof.push(new THREE.Vector2(Math.max(r, 0.001), y));
             }
-            const fus = new THREE.LatheGeometry(prof, 36);
+            const fus = new THREE.LatheGeometry(prof, lod ? 8 : 36);
             const pos = fus.attributes.position, uv = fus.attributes.uv;
             for (let i = 0; i < pos.count; i++) {
                 let x = pos.getX(i), z = pos.getZ(i);
@@ -765,10 +874,11 @@
             const x0 = R * 0.4, x1 = f.span / 2;
             const tipZ = wz + (x1 - x0) * Math.tan(f.dih * D2R);
             for (const side of [1, -1]) {
-                const w = surface(x0, x1, leRoot, f.cr, f.ct, f.sweep, thick, side, { kink: !f.high, raked: st.tip === "raked" });
+                const w = surface(x0, x1, leRoot, f.cr, f.ct, f.sweep, thick, side, { kink: !f.high && !lod, raked: st.tip === "raked" && !lod, lod });
                 w.rotateY(-side * f.dih * D2R);
                 w.translate(0, 0, wz);
                 slots.paint.push(w);
+                if (lod) continue;
                 const tipLe = leRoot - (x1 - x0) * Math.tan(f.sweep * D2R);
                 // vertical tip device: planform (chord, height) at the tip, canted outward by `cant` radians
                 const tipFin = (pts, cant, down = false) => {
@@ -798,21 +908,23 @@
             // --- engines under the wings (turbofans) with pylons and dark fan faces
             for (const [ex, er0, el0] of f.eng || []) {
                 const er = er0 * st.engScale, el = el0 * Math.sqrt(st.engScale);
-                const prof2 = [[0, -0.62], [0.3, -0.6], [0.55, -0.5], [0.8, -0.28], [0.97, -0.02], [1, 0.22], [0.96, 0.44], [0.86, 0.5]]
+                const prof2 = (lod ? [[0, -0.6], [0.95, -0.1], [1, 0.3], [0.85, 0.5]]
+                    : [[0, -0.62], [0.3, -0.6], [0.55, -0.5], [0.8, -0.28], [0.97, -0.02], [1, 0.22], [0.96, 0.44], [0.86, 0.5]])
                     .map(([r, y]) => new THREE.Vector2(r * er, y * el));
                 for (const side of [1, -1]) {
                     const x = side * ex;
                     const le = leRoot - (ex - x0) * Math.tan(f.sweep * D2R);
                     const zc = wz + (ex - x0) * Math.tan(f.dih * D2R) - er - thick * 0.6;
                     const yc = le + el * 0.15;
-                    const n = new THREE.LatheGeometry(prof2, 24);
-                    if (st.engFlat) {   // 737: flattened bottom of the nacelle (low ground clearance)
+                    const n = new THREE.LatheGeometry(prof2, lod ? 6 : 24);
+                    if (st.engFlat && !lod) {   // 737: flattened bottom of the nacelle (low ground clearance)
                         const np = n.attributes.position;
                         for (let i = 0; i < np.count; i++) if (np.getZ(i) < 0) np.setZ(i, np.getZ(i) * 0.72);
                         n.computeVertexNormals();
                     }
                     n.translate(x, yc, zc);
                     slots.engine.push(n);
+                    if (lod) continue;
                     const fan = new THREE.CircleGeometry(er * 0.86, 24);
                     fan.rotateX(-Math.PI / 2);
                     fan.translate(x, yc + el * 0.44, zc);
@@ -835,22 +947,24 @@
             const finBase = topZ * 0.82;
             const finShape = new THREE.Shape(finPts.map(([a, b]) => new THREE.Vector2(a, b)));
             const ft = Math.max(0.15, R * 0.12);
-            const fin = new THREE.ExtrudeGeometry(finShape, { depth: ft, bevelEnabled: true, bevelThickness: ft * 0.4, bevelSize: ft * 0.4, bevelSegments: 2 });
+            const fin = new THREE.ExtrudeGeometry(finShape, { depth: ft, bevelEnabled: !lod, bevelThickness: ft * 0.4, bevelSize: ft * 0.4, bevelSegments: 2 });
             fin.translate(0, 0, -ft / 2);
             fin.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, finBase, 0, 0, 0, 1));
             slots.brand.push(fin);
             // Square logo centred on the fin; edges clamp to the logo's background colour
-            const cx = (finTe + finLe + finTipLe + finTipLe - fct) / 4, cy = fh * 0.48;
-            const size = Math.min(fh, (fcr + fct) / 2) * 0.95;
-            for (const side of [1, -1]) {
-                const d = new THREE.ShapeGeometry(finShape);
-                const p = d.attributes.position, u = d.attributes.uv;
-                for (let i = 0; i < p.count; i++) {
-                    const uu = (p.getX(i) - cx) / size + 0.5, vv = (p.getY(i) - cy) / size + 0.5;
-                    u.setXY(i, side > 0 ? uu : 1 - uu, vv);
+            if (!lod) {
+                const cx = (finTe + finLe + finTipLe + finTipLe - fct) / 4, cy = fh * 0.48;
+                const size = Math.min(fh, (fcr + fct) / 2) * 0.95;
+                for (const side of [1, -1]) {
+                    const d = new THREE.ShapeGeometry(finShape);
+                    const p = d.attributes.position, u = d.attributes.uv;
+                    for (let i = 0; i < p.count; i++) {
+                        const uu = (p.getX(i) - cx) / size + 0.5, vv = (p.getY(i) - cy) / size + 0.5;
+                        u.setXY(i, side > 0 ? uu : 1 - uu, vv);
+                    }
+                    d.applyMatrix4(new THREE.Matrix4().set(0, 0, side, side * ft * 0.95, 1, 0, 0, 0, 0, 1, 0, finBase, 0, 0, 0, 1));
+                    (side > 0 ? slots.decalR : slots.decalL).push(d);
                 }
-                d.applyMatrix4(new THREE.Matrix4().set(0, 0, side, side * ft * 0.95, 1, 0, 0, 0, 0, 1, 0, finBase, 0, 0, 0, 1));
-                (side > 0 ? slots.decalR : slots.decalL).push(d);
             }
 
             // --- horizontal stabilisers (T-tail on turboprops)
@@ -858,7 +972,7 @@
             const stLe = f.ttail ? finTipLe + 0.2 : finTe + scr * 1.05;
             const stZ = f.ttail ? finBase + fh : topZ * 0.25;
             for (const side of [1, -1]) {
-                const st = surface(f.ttail ? 0 : R * 0.2, ss / 2, stLe, scr, sct, ssw, Math.max(0.1, ft * 0.8), side);
+                const st = surface(f.ttail ? 0 : R * 0.2, ss / 2, stLe, scr, sct, ssw, Math.max(0.1, ft * 0.8), side, { lod });
                 st.rotateY(-side * (f.ttail ? 0 : 7) * D2R);
                 st.translate(0, 0, stZ);
                 slots.paint.push(st);
@@ -869,13 +983,13 @@
             for (const [ex, er, el, pr, nb] of f.prop || []) {
                 for (const side of [1, -1]) {
                     const x = side * ex;
-                    const n = new THREE.CapsuleGeometry(er, el - 2 * er, 6, 16);
+                    const n = new THREE.CapsuleGeometry(er, el - 2 * er, lod ? 2 : 6, lod ? 6 : 16);
                     n.translate(x, leRoot - el * 0.25, wz - er * 0.2);
                     slots.engine.push(n);
-                    props.push({ x, y: leRoot + el * 0.27 + 0.1, z: wz - er * 0.2, r: pr, n: nb });
+                    if (!lod) props.push({ x, y: leRoot + el * 0.27 + 0.1, z: wz - er * 0.2, r: pr, n: nb });
                 }
             }
-            if (f.nose) props.push({ x: 0, y: half + 0.05, z: 0, r: 0.95, n: 2 });
+            if (f.nose && !lod) props.push({ x: 0, y: half + 0.05, z: 0, r: 0.95, n: 2 });
 
             const geos = {};
             for (const [k, list] of Object.entries(slots)) if (list.length) geos[k] = mergeSlot(list);
@@ -1045,6 +1159,27 @@
             tex.needsUpdate = true;
         }
 
+        const FAST_MAT_CACHE = new Map();
+        const BRAND_PALETTE = [0x0ea5e9, 0xe11d48, 0x10b981, 0xf59e0b, 0x6366f1, 0x8b5cf6, 0x14b8a6, 0xec4899, 0x3b82f6, 0xd97706];
+        function fastLiveryMaterials(iata, icao3) {
+            const key = iata || icao3 || "-";
+            if (FAST_MAT_CACHE.has(key)) return FAST_MAT_CACHE.get(key);
+            let h = 0;
+            for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
+            const brandCol = BRAND_PALETTE[Math.abs(h) % BRAND_PALETTE.length];
+            const mats = {
+                body: phong({ color: 0xf8fafc, emissive: 0x38bdf8, emissiveIntensity: 0.28 }),
+                paint: phong({ color: 0xe2e8f0, emissive: 0x38bdf8, emissiveIntensity: 0.22 }),
+                brand: phong({ color: brandCol, emissive: brandCol, emissiveIntensity: 0.2 }),
+                engine: phong({ color: 0xe6e9ee, side: THREE.DoubleSide }),
+                dark: new THREE.MeshBasicMaterial({ color: 0x0b0f17, side: THREE.DoubleSide }),
+                decalR: phong({ color: brandCol, side: THREE.DoubleSide }),
+                decalL: phong({ color: brandCol, side: THREE.DoubleSide }),
+            };
+            FAST_MAT_CACHE.set(key, mats);
+            return mats;
+        }
+
         function liveryMaterials(model, modelKey, iata, icao3) {
             const key = `${modelKey}|${iata || icao3 || "-"}`;
             if (MAT_CACHE.has(key)) return MAT_CACHE.get(key);
@@ -1092,43 +1227,130 @@
         const GLOW = glowTexture();
         const glowMat = (color, opacity = 1) => new THREE.SpriteMaterial({ map: GLOW, color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity });
         const LIGHT_MAT = { red: glowMat(0xff3040), green: glowMat(0x30ff70), white: glowMat(0xffffff), beacon: glowMat(0xff2020) };
-        const HALO = { selected: glowMat(0x38bdf8, 0.45), inView: glowMat(0xf59e0b, 0.4) };
+        const HALO = { selected: glowMat(0x38bdf8, 0.55), inView: glowMat(0xf59e0b, 0.5), heard: glowMat(0x38bdf8, 0.36) };
 
-        function makePlane(a, icao3) {
+        function makePlane(a, icao3, fast = false) {
             const fam = familyFor(a.type);
-            const st = typeStyle(a.type, fam, a.model);
-            const model = buildModel(fam, a.type, st);
-            const mats = liveryMaterials(model, `${fam}|${a.type || ""}|${st.cockpit}`, a.airline_iata, icao3);
+            const st = fast ? typeStyle("", fam, "") : typeStyle(a.type, fam, a.model);
+            const model = buildModel(fam, fast ? "" : a.type, st);
+            const mats = fast
+                ? fastLiveryMaterials(a.airline_iata, icao3)
+                : liveryMaterials(model, `${fam}|${a.type || ""}|${st.cockpit}`, a.airline_iata, icao3);
             const g = new THREE.Group();
             g.matrixAutoUpdate = false;
-            for (const [k, geo] of Object.entries(model.geos)) g.add(new THREE.Mesh(geo, mats[k]));
-            // spinning props
-            g.userData.props = model.props.map((p) => {
-                const hub = new THREE.Group();
-                hub.position.set(p.x, p.y, p.z);
-                for (let i = 0; i < p.n; i++) {
-                    const b = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, p.r), mats.dark);
-                    b.position.z = p.r / 2;
-                    const arm = new THREE.Group(); arm.rotation.y = (i / p.n) * 2 * Math.PI; arm.add(b);
-                    hub.add(arm);
-                }
-                g.add(hub);
-                return hub;
-            });
-            // lights
+            for (const [k, geo] of Object.entries(model.geos)) {
+                if (fast && (k === "decalR" || k === "decalL")) continue;
+                g.add(new THREE.Mesh(geo, mats[k]));
+            }
             const sz = Math.max(1.6, model.R * 0.9);
             const add = (mat, x, y, z, k = 1) => { const sp = new THREE.Sprite(mat); sp.position.set(x, y, z); sp.scale.setScalar(sz * k); g.add(sp); return sp; };
-            const { wingTip: wx, tipY: wy, tipZ: wzz } = model;
-            add(LIGHT_MAT.green, wx, wy, wzz); add(LIGHT_MAT.red, -wx, wy, wzz);
-            g.userData.strobes = [add(LIGHT_MAT.white, wx, wy - 0.4, wzz, 1.7), add(LIGHT_MAT.white, -wx, wy - 0.4, wzz, 1.7),
-                add(LIGHT_MAT.white, 0, -model.L / 2 - 0.2, model.R * 0.2, 1.3)];
-            g.userData.beacons = [add(LIGHT_MAT.beacon, 0, 0, model.topZ + 0.25, 1.2), add(LIGHT_MAT.beacon, 0, 0, -model.R - 0.25, 1.2)];
+            if (fast) {
+                g.userData.props = [];
+                g.userData.strobes = [];
+                g.userData.beacons = [];
+            } else {
+                // spinning props
+                g.userData.props = model.props.map((p) => {
+                    const hub = new THREE.Group();
+                    hub.position.set(p.x, p.y, p.z);
+                    for (let i = 0; i < p.n; i++) {
+                        const b = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, p.r), mats.dark);
+                        b.position.z = p.r / 2;
+                        const arm = new THREE.Group(); arm.rotation.y = (i / p.n) * 2 * Math.PI; arm.add(b);
+                        hub.add(arm);
+                    }
+                    g.add(hub);
+                    return hub;
+                });
+                // lights
+                const { wingTip: wx, tipY: wy, tipZ: wzz } = model;
+                add(LIGHT_MAT.green, wx, wy, wzz); add(LIGHT_MAT.red, -wx, wy, wzz);
+                g.userData.strobes = [add(LIGHT_MAT.white, wx, wy - 0.4, wzz, 1.7), add(LIGHT_MAT.white, -wx, wy - 0.4, wzz, 1.7),
+                    add(LIGHT_MAT.white, 0, -model.L / 2 - 0.2, model.R * 0.2, 1.3)];
+                g.userData.beacons = [add(LIGHT_MAT.beacon, 0, 0, model.topZ + 0.25, 1.2), add(LIGHT_MAT.beacon, 0, 0, -model.R - 0.25, 1.2)];
+            }
             g.userData.halo = add(HALO.selected, 0, 0, 0, (model.L * 1.4) / sz);
             g.userData.halo.visible = false;
             g.userData.phase = Math.random() * 2;
             g.userData.L = model.L;
             g.userData.R = model.R;
             return g;
+        }
+
+        // ---------------------------------------------------------------- GPU InstancedMesh pool (thousands of aircraft in <=8 draw calls)
+        const MAX_INST = 6000;
+        const INST_MAT = new THREE.MeshPhongMaterial({
+            color: 0xffffff,
+            emissive: 0x38bdf8,
+            emissiveIntensity: 0.25,
+            shininess: 35,
+            specular: 0x334155,
+            vertexColors: true,
+        });
+        const INST_MESHES = {};
+        const INST_COUNTS = {};
+        const INST_COLOR = new THREE.Color();
+        const INST_MAT4 = new THREE.Matrix4();
+
+        function getInstancedFamily(fam) {
+            if (INST_MESHES[fam]) return INST_MESHES[fam];
+            const m = buildModel(fam, "", typeStyle("", fam, ""), true);
+            const slotColors = {
+                body: [0.98, 0.99, 1.0],
+                paint: [0.90, 0.93, 0.97],
+                brand: [0.35, 0.68, 0.98],
+                engine: [0.91, 0.93, 0.96],
+                dark: [0.08, 0.11, 0.16],
+            };
+            const parts = [];
+            for (const [k, geo] of Object.entries(m.geos)) {
+                if (k === "decalR" || k === "decalL") continue;
+                const g = geo.clone();
+                const cnt = g.attributes.position.count;
+                const col = new Float32Array(cnt * 3);
+                const [r, gr, b] = slotColors[k] || slotColors.body;
+                for (let i = 0; i < cnt; i++) {
+                    col[i * 3] = r; col[i * 3 + 1] = gr; col[i * 3 + 2] = b;
+                }
+                g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+                parts.push(g);
+            }
+            const merged = mergeGeometries(parts, false);
+            const im = new THREE.InstancedMesh(merged, INST_MAT, MAX_INST);
+            im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            im.frustumCulled = false;
+            im.count = 0;
+            im.userData = { L: m.L, R: m.R };
+            world.add(im);
+            INST_MESHES[fam] = im;
+            return im;
+        }
+
+        // Fixed DOM Pool for aircraft labels (max 48 DOM nodes instead of thousands)
+        const LABEL_POOL_SIZE = 48;
+        const labelPool = Array.from({ length: LABEL_POOL_SIZE }, () => {
+            const el = document.createElement("div");
+            el.className = "ac-label";
+            el.style.display = "none";
+            el.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                const id = el.dataset.icao;
+                if (id) select(id === selected ? null : id, true);
+            });
+            $("labels").appendChild(el);
+            return el;
+        });
+        let activeLabelCount = 0;
+        let orderedAircraft = [];
+
+        function rebuildOrderedAircraft() {
+            orderedAircraft = [...aircraft.entries()].sort(([, A], [, B]) => {
+                const a = A.a, b = B.a;
+                if ((a.icao === selected) !== (b.icao === selected)) return a.icao === selected ? -1 : 1;
+                if (!!a.in_view !== !!b.in_view) return a.in_view ? -1 : 1;
+                if ((a.source !== "fr24") !== (b.source !== "fr24")) return a.source !== "fr24" ? -1 : 1;
+                return (a.distance_km || 0) - (b.distance_km || 0);
+            });
         }
 
         // ================================================================ trails: smooth ribbons, fading with age, coloured by altitude
@@ -1179,8 +1401,11 @@
         // Catmull-Rom through the fixes (several samples per segment), plus a head vertex that follows the plane
         function buildTrail(s) {
             if (s.trail) { world.remove(s.trail); s.trail.geometry.dispose(); s.trail = null; }
+            const isSel = s.a.icao === selected;
+            if (!isSel && s.a.source === "fr24" && ((s.a.distance_km || 9999) > 450 || lastBounds === "global" || map.getZoom() < 6.0)) return;
             const now = nowS();
-            const pts = trailSpan ? s.pts.filter((p) => now - p.t <= trailSpan) : [];
+            const span = isSel && s.fullTrail ? Math.max(trailSpan || 600, s.spanS || 86400) : trailSpan;
+            const pts = span ? s.pts.filter((p) => now - p.t <= span) : [];
             if (pts.length < 2) return;
             const P = pts.map((p) => new THREE.Vector3(...p.xyz));
             const curve = new THREE.CatmullRomCurve3(P, false, "centripetal", 0.5);
@@ -1222,7 +1447,7 @@
             g.setAttribute("aAlt", new THREE.BufferAttribute(alt, 1));
             g.setAttribute("aSide", new THREE.BufferAttribute(side, 1));
             g.setIndex(idx);
-            const mesh = new THREE.Mesh(g, s.a.icao === selected ? TRAIL_MATS.selected : TRAIL_MATS.normal);
+            const mesh = new THREE.Mesh(g, isSel ? TRAIL_MATS.selected : TRAIL_MATS.normal);
             mesh.frustumCulled = false;
             mesh.userData.n = n;
             s.trail = mesh;
@@ -1244,7 +1469,7 @@
         // ---------------------------------------------------------------- station
         function buildStation() {
             const group = new THREE.Group();
-            const s0 = merc(station.lon, station.lat, station.elevation_m || 0);
+            const s0 = globePos(station.lon, station.lat, station.elevation_m || 0);
             if (camera) {
                 const R = pointingRotation(camera.az_deg, camera.alt_deg, camera.roll_deg || 0);
                 const fish = camera.projection === "equidistant", k = camera.distortion_k || 0;
@@ -1262,7 +1487,7 @@
                 const toScene = ([x, y, z]) => {
                     const v = [0, 1, 2].map((i) => R.right[i] * x + R.down[i] * y + R.axis[i] * z);
                     const d = 12000 / Math.hypot(...v);
-                    const p = enuToScene(v[0] * d, v[1] * d, Math.max(v[2] * d, 0));   // rays below the horizon end on the ground
+                    const p = enuOffset(stationBasis, v[0] * d, v[1] * d, Math.max(v[2] * d, 0));   // rays below the horizon end on the ground
                     return new THREE.Vector3(s0[0] + p[0], s0[1] + p[1], s0[2] + p[2]);
                 };
                 // Frame outline, sampled along each edge so a fisheye's edges curve as they do on the sky
@@ -1295,7 +1520,7 @@
             const el = document.createElement("div");
             el.className = "station-dot";
             el.title = "AllSky camera";
-            new maplibregl.Marker({ element: el }).setLngLat([station.lon, station.lat]).addTo(map);
+            new maplibregl.Marker({ element: el, opacityWhenCovered: "0" }).setLngLat([station.lon, station.lat]).addTo(map);
             const rings = [10, 25, 50, 100, 200].map((km) => {
                 const coords = [];
                 for (let i = 0; i <= 120; i++) {
@@ -1324,65 +1549,134 @@
         }
         function kind(a) { return a.icao === selected ? "selected" : a.in_view ? "inView" : "heard"; }
 
-        function poll() {
+        function boundsParam() {
+            try {
+                if (map.getZoom() < 4.8) return "global";
+                const b = map.getBounds();
+                if (!b) return "global";
+                let n = Math.min(85, b.getNorth()), s = Math.max(-85, b.getSouth());
+                let w = Math.max(-180, b.getWest()), e = Math.min(180, b.getEast());
+                if (n - s > 75 || e - w > 135 || w >= e) return "global";
+                const padLat = Math.max(1.5, (n - s) * 0.18), padLon = Math.max(1.5, (e - w) * 0.18);
+                n = Math.min(85, n + padLat); s = Math.max(-85, s - padLat);
+                w = Math.max(-180, w - padLon); e = Math.min(180, e + padLon);
+                return `${n.toFixed(2)},${s.toFixed(2)},${w.toFixed(2)},${e.toFixed(2)}`;
+            } catch (e) {
+                return "global";
+            }
+        }
+
+        function poll(forceBounds) {
+            const b = typeof forceBounds === "string" ? forceBounds : boundsParam();
+            if (pollInFlight && !forceBounds && b === lastBounds) return;
+            pollInFlight = true;
             lastFetch = Date.now();
+            const seq = ++pollSeq;
             const span = haveTrails ? 30 : Math.max(...TRAIL_CHOICES);
-            fetch(`/api/adsb/aircraft?limit=400&trail=${span}`).then((r) => r.json()).then((d) => { update(d); haveTrails = true; }).catch(() => {
-                $("status").textContent = "Receiver unavailable";
-            });
+            lastBounds = b;
+            const fr = layerOn.fr24 ? "true" : "false";
+            fetch(`/api/adsb/aircraft?limit=5000&trail=${span}&bounds=${encodeURIComponent(b)}&fr24=${fr}&compact=true`)
+                .then((r) => r.json())
+                .then((d) => { if (seq === pollSeq) { update(d); haveTrails = true; } })
+                .catch(() => { if (seq === pollSeq) $("status").textContent = "Receiver unavailable"; })
+                .finally(() => { if (seq === pollSeq) pollInFlight = false; });
+        }
+
+        function ensureDetailMesh(s, z) {
+            const a = s.a;
+            const wantFull = a.icao === selected || (z >= 8.0 && a.source !== "fr24");
+            if (!wantFull) {
+                if (s.mesh) s.mesh.visible = false;
+                return false;
+            }
+            const icao3 = /^[A-Z]{3}\d/.test(a.callsign || "") ? a.callsign.slice(0, 3) : "";
+            const key = `full|${s.fam}|${a.type || ""}|${a.model || ""}|${a.airline_iata || icao3}`;
+            if (!s.mesh || s.mesh.userData.key !== key) {
+                if (s.mesh) world.remove(s.mesh);
+                s.mesh = makePlane(a, icao3, false);
+                s.mesh.userData.key = key;
+                world.add(s.mesh);
+            }
+            return true;
         }
 
         function update(d) {
-            if (!d.enabled) { $("status").textContent = "ADS-B is turned off (Settings)"; return; }
-            $("status").textContent = d.connected ? `${d.in_view || 0} in view · ${d.total || 0} heard` : "Receiver not connected";
+            if (d.fr24) {
+                const tier = d.fr24.account_tier === "enterprise" ? "Enterprise" : "Global Live";
+                $("fr24-tier").textContent = tier;
+                $("fr24-worldwide").textContent = d.fr24.global_total ? `${Number(d.fr24.global_total).toLocaleString()} worldwide` : "-- worldwide";
+                $("btn-fr24").textContent = d.fr24.account_tier === "enterprise" ? "FR24 Enterprise" : "FR24 Global";
+                $("btn-fr24").classList.toggle("on", !!layerOn.fr24 && !!d.fr24.enabled);
+            }
+            if (!d.enabled && !(d.fr24 && d.fr24.enabled)) { $("status").textContent = "ADS-B is turned off (Settings)"; return; }
+            if (Array.isArray(d.compact_aircraft) && d.compact_aircraft.length) {
+                if (!Array.isArray(d.aircraft)) d.aircraft = [];
+                for (let i = 0; i < d.compact_aircraft.length; i++) {
+                    const r = d.compact_aircraft[i];
+                    d.aircraft.push({
+                        icao: r[0], fr24_id: r[1] || null, callsign: r[2] || null, type: r[3] || null,
+                        airline_iata: r[4] || null, airline: r[5] || null, reg: r[6] || null, route: r[7] || null,
+                        lat: r[8], lon: r[9], altitude_m: r[10], speed_kmh: r[11], heading_deg: r[12],
+                        climb_m_min: r[13], distance_km: r[14], az_deg: r[15], age_s: r[16] || 0,
+                        source: "fr24", in_view: false, above_horizon: false, trail: []
+                    });
+                }
+            }
+            const localTxt = d.connected ? `${d.in_view || 0} in view · ${d.local_count ?? d.total ?? 0} local` : "Local off";
+            const frTxt = (layerOn.fr24 && d.fr24_count != null) ? ` · ${Number(d.fr24_count).toLocaleString()} FR24${d.fr24?.global_total ? ` (${Number(d.fr24.global_total).toLocaleString()} global)` : ""}` : "";
+            $("status").textContent = localTxt + frTxt;
             if (d.station && !origin) {
                 station = d.station; camera = d.camera || null;
                 updateCamFoot();
                 origin = maplibregl.MercatorCoordinate.fromLngLat([station.lon, station.lat], 0);
-                mPerUnit = origin.meterInMercatorCoordinateUnits();
-                map.jumpTo({ center: [station.lon, station.lat] });
+                originSphere = llToUnitSphere(station.lon, station.lat, 0);
+                stationBasis = enuBasis(station.lon, station.lat);
+                hemi.position.set(...stationBasis.u);
+                sun.position.set(...enuOffset(stationBasis, 0.5, -0.7, 1.0));
+                fill.position.set(...enuOffset(stationBasis, -0.6, 0.5, 0.3));
+                mPerUnit = 1;
+                if (map.getZoom() > 5.5) map.jumpTo({ center: [station.lon, station.lat] });
                 whenStyle(addStationOnMap);
                 buildStation();
             }
             if (!origin) return;
             const now = nowS();
+            const z = map.getZoom();
             const seen = new Set();
             for (const a of d.aircraft || []) {
                 if (a.lat == null) continue;
                 seen.add(a.icao);
                 let s = aircraft.get(a.icao);
                 if (!s) {
-                    s = { mesh: null, label: document.createElement("div"), trail: null, drop: null, fix: null, disp: null, pts: [] };
-                    s.label.className = "ac-label";
-                    s.label.addEventListener("click", (ev) => { ev.stopPropagation(); select(a.icao === selected ? null : a.icao, true); });
-                    $("labels").appendChild(s.label);
+                    const fam = familyFor(a.type);
+                    const fDim = FAMILIES[fam] || FAMILIES.narrow;
+                    s = { mesh: null, fam, L: TYPE_LEN[a.type] || fDim.L, R: fDim.R, labelHtml: "", trail: null, drop: null, fix: null, disp: null, pts: [], fullTrail: false, spanS: 600 };
+                    getInstancedFamily(fam);
                     aircraft.set(a.icao, s);
+                } else if (a.type && s.a?.type !== a.type) {
+                    s.fam = familyFor(a.type);
+                    const fDim = FAMILIES[s.fam] || FAMILIES.narrow;
+                    s.L = TYPE_LEN[a.type] || fDim.L;
+                    s.R = fDim.R;
+                    getInstancedFamily(s.fam);
                 }
+                if (s.detail) Object.assign(a, s.detail);
                 s.a = a;
+                s.labelHtml = "";
                 setFix(s, a, now);
-                // (Re)build the model when its type or airline becomes known
-                const icao3 = /^[A-Z]{3}\d/.test(a.callsign || "") ? a.callsign.slice(0, 3) : "";
-                const key = `${familyFor(a.type)}|${a.type || ""}|${a.model || ""}|${a.airline_iata || icao3}`;
-                if (!s.mesh || s.mesh.userData.key !== key) {
-                    if (s.mesh) world.remove(s.mesh);
-                    s.mesh = makePlane(a, icao3);
-                    s.mesh.userData.key = key;
-                    world.add(s.mesh);
-                }
-                mergeTrail(s, a.trail || [], now);
+                ensureDetailMesh(s, z);
+                if (a.trail && a.trail.length) mergeTrail(s, a.trail, now);
                 buildTrail(s);
-                s.label.className = `ac-label${a.in_view ? " in-view" : ""}${a.icao === selected ? " selected" : ""}`;
-                s.label.innerHTML = `${esc(a.callsign || a.icao)}${phaseTag(a, false)}${a.type ? ` <span style="opacity:.65">${esc(a.type)}</span>` : ""}<small>${(a.altitude_m / 1000).toFixed(1)} km</small>`;
             }
             for (const [icao, s] of aircraft) {
                 if (seen.has(icao)) continue;
                 if (s.mesh) world.remove(s.mesh);
                 if (s.trail) { world.remove(s.trail); s.trail.geometry.dispose(); }
                 if (s.drop) { world.remove(s.drop); s.drop.geometry.dispose(); }
-                s.label.remove();
                 aircraft.delete(icao);
                 if (selected === icao) select(null);
             }
+            rebuildOrderedAircraft();
             renderList();
             renderInfo();
             map.triggerRepaint();
@@ -1394,12 +1688,12 @@
             for (const [lat, lon, alt, age] of trail) {
                 const t = now - age;
                 if (t <= lastT + 0.5) continue;
-                const xyz = merc(lon, lat, alt);
+                const xyz = globePos(lon, lat, alt);
                 const q = s.pts[s.pts.length - 1];
-                if (q && Math.hypot(xyz[0] - q.xyz[0], xyz[1] - q.xyz[1]) < 2 * mPerUnit) continue;   // under 2 m: nothing new
+                if (q && Math.hypot(xyz[0] - q.xyz[0], xyz[1] - q.xyz[1], xyz[2] - q.xyz[2]) < 2) continue;   // under 2 m: nothing new
                 s.pts.push({ t, alt, xyz });
             }
-            const keep = Math.max(...TRAIL_CHOICES);
+            const keep = s.fullTrail ? Math.max(86400, s.spanS || 86400) : Math.max(...TRAIL_CHOICES);
             while (s.pts.length > 2 && now - s.pts[0].t > keep) s.pts.shift();
         }
 
@@ -1419,28 +1713,28 @@
                 const w = angDiff(hdg, old.hdg) / (t - old.t);
                 turn = Math.max(-3.5, Math.min(3.5, 0.5 * w + 0.5 * old.turn));
             }
-            s.fix = { t, p: merc(a.lon, a.lat, a.altitude_m), hdg, turn,
+            s.fix = { t, p: globePos(a.lon, a.lat, a.altitude_m || 0), b: enuBasis(a.lon, a.lat), hdg, turn,
                 v: a.speed_kmh != null ? a.speed_kmh / 3.6 : 0, vs: (a.climb_m_min || 0) / 60 };
         }
 
-        // Predicted position (scene units), heading (deg) and velocity (scene units / s) at time t
+        // Predicted position (scene metres), heading (deg) and velocity (scene metres / s) at time t
         function predictAt(f, t) {
             const dt = Math.min(Math.max(t - f.t, 0), MAX_EXTRAP_S);
             const h0 = f.hdg * D2R, w = f.turn * D2R, h = h0 + w * dt;
             let e, n;
             if (Math.abs(w) > 1e-4) { e = f.v / w * (Math.cos(h0) - Math.cos(h)); n = f.v / w * (Math.sin(h) - Math.sin(h0)); }
             else { e = f.v * dt * Math.sin(h0); n = f.v * dt * Math.cos(h0); }
-            const d = enuToScene(e, n, f.vs * dt);
+            const d = enuOffset(f.b, e, n, f.vs * dt);
             const moving = t - f.t < MAX_EXTRAP_S;
             return { p: [f.p[0] + d[0], f.p[1] + d[1], f.p[2] + d[2]], hdg: f.hdg + f.turn * dt,
-                vel: moving ? enuToScene(f.v * Math.sin(h), f.v * Math.cos(h), f.vs) : [0, 0, 0] };
+                vel: moving ? enuOffset(f.b, f.v * Math.sin(h), f.v * Math.cos(h), f.vs) : [0, 0, 0] };
         }
 
         function stepDisplay(s, now, dt) {
             const f = s.fix;
             const tgt = predictAt(f, now);
             const d = s.disp;
-            if (!d || Math.hypot(tgt.p[0] - d.p[0], tgt.p[1] - d.p[1]) > 8000 * mPerUnit) {
+            if (!d || Math.hypot(tgt.p[0] - d.p[0], tgt.p[1] - d.p[1], tgt.p[2] - d.p[2]) > 8000) {
                 s.disp = { p: tgt.p.slice(), hdg: tgt.hdg, bank: 0, pitch: 0 };
                 return s.disp;
             }
@@ -1463,94 +1757,308 @@
             },
             render(gl, args) {
                 if (!origin) return;
-                const matrix = args.defaultProjectionData?.mainMatrix || args;   // v5: mercator world -> clip
+                const pd = args.defaultProjectionData || {};
+                const trans = pd.projectionTransition ?? 0;   // 1 = pure 3D globe (z<=11), 1->0 = z11..12 transition, 0 = mercator
+                const mainMat = pd.mainMatrix || args;
+                const mercMat = pd.fallbackMatrix || mainMat;
+                const clipPlane = pd.clippingPlane || null;
                 const now = nowS();
-                const mpp = 40075016.686 * Math.cos(map.getCenter().lat * D2R) / (512 * Math.pow(2, map.getZoom()));
-                const k = Math.max(1, PLANE_PX * mpp / 40) * mPerUnit;   // metres -> mercator, enlarged when far
+                const z = map.getZoom();
+                const cLL = map.getCenter();
+                const mpp = 40075016.686 * Math.cos(cLL.lat * D2R) / (512 * Math.pow(2, z));
+                const targetPx = z <= 2.5 ? 8.5
+                    : z <= 5.0 ? 8.5 + (z - 2.5) * 1.4
+                    : z <= 7.5 ? 12.0 + (z - 5.0) * 1.8
+                    : z <= 10.0 ? 16.5 + (z - 7.5) * 3.4
+                    : 25.0 + Math.min(12, (z - 10.0) * 4.5);
 
-                const M = new THREE.Matrix4().fromArray(matrix).multiply(new THREE.Matrix4().makeTranslation(origin.x, origin.y, 0));
+                const invR = 1 / R_EARTH;
+                const M_globe = new THREE.Matrix4().fromArray(mainMat)
+                    .multiply(new THREE.Matrix4().makeTranslation(originSphere[0], originSphere[1], originSphere[2]))
+                    .multiply(new THREE.Matrix4().makeScale(invR, invR, invR));
+                let M = M_globe;
+                if (trans < 0.999) {
+                    const pRef = globePos(cLL.lng, cLL.lat, 0);
+                    const bRef = enuBasis(cLL.lng, cLL.lat);
+                    const mRef = maplibregl.MercatorCoordinate.fromLngLat([cLL.lng, cLL.lat], 0);
+                    const kRef = mRef.meterInMercatorCoordinateUnits();
+                    const T_g2m = new THREE.Matrix4()
+                        .makeTranslation(mRef.x, mRef.y, 0)
+                        .multiply(new THREE.Matrix4().makeScale(kRef, -kRef, kRef))
+                        .multiply(new THREE.Matrix4().set(
+                            bRef.e[0], bRef.e[1], bRef.e[2], 0,
+                            bRef.n[0], bRef.n[1], bRef.n[2], 0,
+                            bRef.u[0], bRef.u[1], bRef.u[2], 0,
+                            0, 0, 0, 1
+                        ))
+                        .multiply(new THREE.Matrix4().makeTranslation(-pRef[0], -pRef[1], -pRef[2]));
+                    const M_merc = new THREE.Matrix4().fromArray(mercMat).multiply(T_g2m);
+                    if (trans <= 0.001) {
+                        M = M_merc;
+                    } else {
+                        M = new THREE.Matrix4();
+                        for (let i = 0; i < 16; i++) M.elements[i] = M_merc.elements[i] * (1 - trans) + M_globe.elements[i] * trans;
+                    }
+                }
                 cam3.projectionMatrix = M;
                 const canvas = map.getCanvas();
                 const W = canvas.clientWidth, H = canvas.clientHeight;
                 for (const mt of Object.values(TRAIL_MATS)) {
                     mt.uniforms.uRes.value.set(W, H); mt.uniforms.uNow.value = now; mt.uniforms.uSpan.value = trailSpan || 1;
                 }
+                const selState = selected && aircraft.get(selected);
+                if (selState && selState.fullTrail) {
+                    TRAIL_MATS.selected.uniforms.uSpan.value = Math.max(trailSpan || 600, selState.spanS || 600);
+                }
                 const v4 = new THREE.Vector4();
+                const pCenter = globePos(cLL.lng, cLL.lat, 0);
+                v4.set(pCenter[0], pCenter[1], pCenter[2], 1).applyMatrix4(M);
+                const wCenter = Math.max(1e-6, v4.w);
+
                 const screen = [];
+                const drawnAc = [];
+                const labelBoxes = [];
+                let usedLabels = 0;
+                const minAcSep = z < 3.5 ? 9 : z < 5.5 ? 12 : z < 8.5 ? 15 : 0;
+                const cell = Math.max(8, minAcSep || 12);
+                const gCols = Math.max(1, Math.ceil((W + 96) / cell));
+                const gRows = Math.max(1, Math.ceil((H + 96) / cell));
+                if (!this.occGrid || this.occGrid.length < gCols * gRows) {
+                    this.occGrid = new Int32Array(gCols * gRows);
+                }
+                const occGrid = this.occGrid;
+                occGrid.fill(-1, 0, gCols * gRows);
+
+                for (const fam of Object.keys(INST_MESHES)) INST_COUNTS[fam] = 0;
                 const tmp = new THREE.Matrix4();
 
                 const frameDt = Math.min(0.25, Math.max(0, now - (this.lastT || now)));
                 this.lastT = now;
-                for (const [icao, s] of aircraft) {
-                    if (!s.mesh || !s.fix) continue;
+
+                for (let idx = 0; idx < orderedAircraft.length; idx++) {
+                    const [icao, s] = orderedAircraft[idx];
+                    if (!s.fix) continue;
                     const dsp = stepDisplay(s, now, frameDt);
-                    const p = dsp.p.slice();
-                    // Low aircraft: never below the terrain (baro altitude on the ground reads ~0 m, the DEM more)
-                    let groundZ = 0;
-                    if ((s.a.altitude_m || 0) < 3000) {
+                    const geo = sceneToLngLatAlt(dsp.p);
+                    const behindGlobe = trans > 0.01 && clipPlane &&
+                        (geo.sx * clipPlane[0] + geo.sy * clipPlane[1] + geo.sz * clipPlane[2] + clipPlane[3] < -0.005);
+                    const a = s.a;
+                    let showAc = layerOn.aircraft && !behindGlobe && (a.source !== "fr24" || layerOn.fr24);
+
+                    // Project base position for perspective normalization and O(1) 2D grid deconfliction
+                    v4.set(dsp.p[0], dsp.p[1], dsp.p[2], 1).applyMatrix4(M);
+                    const inFront = v4.w > 0;
+                    const sx0 = inFront ? (v4.x / v4.w + 1) / 2 * W : -9999;
+                    const sy0 = inFront ? (1 - v4.y / v4.w) / 2 * H : -9999;
+                    const onViewport = inFront && sx0 > -40 && sx0 < W + 40 && sy0 > -40 && sy0 < H + 40;
+                    let gx = -1, gy = -1;
+
+                    if (showAc && onViewport) {
+                        gx = Math.floor((sx0 + 48) / cell);
+                        gy = Math.floor((sy0 + 48) / cell);
+                        if (minAcSep > 0 && icao !== selected && !a.in_view && a.source === "fr24") {
+                            const r2 = minAcSep * minAcSep;
+                            for (let dy = -1; dy <= 1 && showAc; dy++) {
+                                const ry = gy + dy;
+                                if (ry < 0 || ry >= gRows) continue;
+                                for (let dx = -1; dx <= 1; dx++) {
+                                    const rx = gx + dx;
+                                    if (rx < 0 || rx >= gCols) continue;
+                                    const occIdx = occGrid[ry * gCols + rx];
+                                    if (occIdx >= 0) {
+                                        const ddx = sx0 - drawnAc[occIdx][0], ddy = sy0 - drawnAc[occIdx][1];
+                                        if (ddx * ddx + ddy * ddy < r2) { showAc = false; break; }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (!showAc) {
+                        if (s.mesh) { s.mesh.visible = false; s.mesh.userData.halo.visible = false; }
+                        if (s.trail) s.trail.visible = false;
+                        if (s.drop) s.drop.visible = false;
+                        continue;
+                    }
+                    if (onViewport) {
+                        const dIdx = drawnAc.length;
+                        drawnAc.push([sx0, sy0, icao]);
+                        if (gx >= 0 && gx < gCols && gy >= 0 && gy < gRows && occGrid[gy * gCols + gx] < 0) {
+                            occGrid[gy * gCols + gx] = dIdx;
+                        }
+                    }
+
+                    const L = s.L || 40, R = s.R || 2.0;
+                    const persp = (z < 11 && inFront) ? Math.min(1.45, Math.max(0.32, v4.w / wCenter)) : 1.0;
+                    const effL = L * Math.pow(40 / L, z < 9.5 ? 0.72 : 0.15);
+                    const boost = icao === selected ? 1.35 : a.in_view ? 1.15 : 1.0;
+                    const k = Math.max(1, targetPx * boost * mpp * persp / effL);
+
+                    let groundAlt = 0;
+                    if ((a.altitude_m || 0) < 3000 && z >= 7.5 && onViewport) {
                         if (!s.groundT || now - s.groundT > 0.5) {
-                            const ll = new maplibregl.MercatorCoordinate(origin.x + p[0], origin.y + p[1], 0).toLngLat();
-                            s.groundM = map.queryTerrainElevation(ll) || 0;
+                            s.groundM = map.queryTerrainElevation([geo.lon, geo.lat]) || 0;
                             s.groundT = now;
                         }
-                        groundZ = s.groundM * mPerUnit;
-                        p[2] = Math.max(p[2], groundZ + (s.mesh.userData.R + 1.8) * k);
+                        groundAlt = s.groundM;
                     }
-                    const a = s.a;
+                    const minAlt = groundAlt + (R + 2.2) * k;
+                    const lift = geo.alt < minAlt ? minAlt - geo.alt : 0;
+                    const p = [
+                        dsp.p[0] + geo.u[0] * lift,
+                        dsp.p[1] + geo.u[1] * lift,
+                        dsp.p[2] + geo.u[2] * lift,
+                    ];
+                    const groundDelta = groundAlt - geo.alt;
+                    const groundP = [
+                        dsp.p[0] + geo.u[0] * groundDelta,
+                        dsp.p[1] + geo.u[1] * groundDelta,
+                        dsp.p[2] + geo.u[2] * groundDelta,
+                    ];
                     const h = dsp.hdg * D2R;
-                    const mesh = s.mesh;
-                    mesh.matrix.makeTranslation(p[0], p[1], p[2])
-                        .multiply(tmp.makeScale(k, -k, k))
-                        .multiply(tmp.makeRotationZ(-h))
-                        .multiply(tmp.makeRotationX(dsp.pitch))
-                        .multiply(tmp.makeRotationY(dsp.bank));
-                    mesh.matrixWorldNeedsUpdate = true;
-                    // lights: beacons 1 Hz, strobes double flash; props spin
-                    const ud = mesh.userData, ph = now + ud.phase;
-                    const bOn = (ph % 1.0) < 0.12, st = ph % 1.3, sOn = st < 0.05 || (st > 0.14 && st < 0.19);
-                    for (const b of ud.beacons) b.visible = bOn;
-                    for (const sp of ud.strobes) sp.visible = sOn;
-                    for (const pr of ud.props) pr.rotation.y = ph * 25;
-                    mesh.visible = layerOn.aircraft;
-                    const kd = kind(a);
-                    ud.halo.visible = layerOn.aircraft && kd !== "heard";
-                    if (ud.halo.visible) ud.halo.material = HALO[kd];
+                    const b = s.fix.b;
+                    const useFull = ensureDetailMesh(s, z);
+                    if (useFull && s.mesh) {
+                        const mesh = s.mesh;
+                        const ud = mesh.userData;
+                        mesh.matrix.set(
+                            b.e[0], b.n[0], b.u[0], p[0],
+                            b.e[1], b.n[1], b.u[1], p[1],
+                            b.e[2], b.n[2], b.u[2], p[2],
+                            0,      0,      0,      1
+                        )
+                            .multiply(tmp.makeScale(k, k, k))
+                            .multiply(tmp.makeRotationZ(-h))
+                            .multiply(tmp.makeRotationX(dsp.pitch))
+                            .multiply(tmp.makeRotationY(dsp.bank));
+                        mesh.matrixWorldNeedsUpdate = true;
+                        const ph = now + ud.phase;
+                        const bOn = (ph % 1.0) < 0.12, st = ph % 1.3, sOn = st < 0.05 || (st > 0.14 && st < 0.19);
+                        for (const bc of ud.beacons) bc.visible = bOn;
+                        for (const sp of ud.strobes) sp.visible = sOn;
+                        for (const pr of ud.props) pr.rotation.y = ph * 25;
+                        mesh.visible = true;
+                        const kd = kind(a);
+                        ud.halo.visible = kd !== "heard" || z < 5.5;
+                        if (ud.halo.visible) ud.halo.material = HALO[kd];
+                    } else {
+                        const im = getInstancedFamily(s.fam);
+                        const iIdx = INST_COUNTS[s.fam] || 0;
+                        if (iIdx < MAX_INST) {
+                            const fL = im.userData.L || L;
+                            const ik = k * (L / fL);
+                            INST_MAT4.set(
+                                b.e[0], b.n[0], b.u[0], p[0],
+                                b.e[1], b.n[1], b.u[1], p[1],
+                                b.e[2], b.n[2], b.u[2], p[2],
+                                0,      0,      0,      1
+                            )
+                                .multiply(tmp.makeScale(ik, ik, ik))
+                                .multiply(tmp.makeRotationZ(-h))
+                                .multiply(tmp.makeRotationX(dsp.pitch))
+                                .multiply(tmp.makeRotationY(dsp.bank));
+                            im.setMatrixAt(iIdx, INST_MAT4);
+                            INST_COLOR.setHex(a.in_view ? 0xfef08a : a.source !== "fr24" ? 0xe0f2fe : 0xffffff);
+                            im.setColorAt(iIdx, INST_COLOR);
+                            INST_COUNTS[s.fam] = iIdx + 1;
+                        }
+                    }
 
-                    if (s.trail) s.trail.visible = layerOn.trails;
-                    if (s.trail) {   // the path ends at the tail, not inside the fuselage
-                        const back = mesh.userData.L * 0.5 * k;
-                        moveTrailHead(s, [p[0] - Math.sin(h) * back, p[1] + Math.cos(h) * back, p[2]], now);
+                    if (s.trail) s.trail.visible = layerOn.trails && (a.source !== "fr24" || layerOn.fr24);
+                    if (s.trail && s.trail.visible) {
+                        const back = L * 0.5 * k;
+                        const tailOff = enuOffset(b, -Math.sin(h) * back, -Math.cos(h) * back, 0);
+                        moveTrailHead(s, [p[0] + tailOff[0], p[1] + tailOff[1], p[2] + tailOff[2]], now);
                     }
-                    if (!s.drop) {
-                        s.drop = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), DROP_MAT);
-                        s.drop.frustumCulled = false;
-                        world.add(s.drop);
+                    if (z >= 7.2 && onViewport && (icao === selected || a.source !== "fr24" || (a.distance_km || 9999) < 350)) {
+                        if (!s.drop) {
+                            s.drop = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), DROP_MAT);
+                            s.drop.frustumCulled = false;
+                            world.add(s.drop);
+                        }
+                        s.drop.visible = true;
+                        s.drop.material = icao === selected ? DROP_SEL : DROP_MAT;
+                        const dp = s.drop.geometry.attributes.position;
+                        dp.setXYZ(0, p[0], p[1], p[2]); dp.setXYZ(1, groundP[0], groundP[1], groundP[2]); dp.needsUpdate = true;
+                    } else if (s.drop) {
+                        s.drop.visible = false;
                     }
-                    s.drop.visible = layerOn.aircraft;
-                    s.drop.material = icao === selected ? DROP_SEL : DROP_MAT;
-                    const dp = s.drop.geometry.attributes.position;
-                    dp.setXYZ(0, p[0], p[1], p[2]); dp.setXYZ(1, p[0], p[1], groundZ); dp.needsUpdate = true;
 
                     if (icao === selected) {
                         this.selPos = p.slice();
                         this.selHeading = dsp.hdg;
                         v4.set(p[0], p[1], p[2], 1).applyMatrix4(M);
                         this.sel = v4.w > 0 ? [(v4.x / v4.w + 1) / 2 * W, (1 - v4.y / v4.w) / 2 * H] : null;
-                        this.selTrail = (trailSpan ? s.pts : []).map((q) => {   // screen-space trail, for click hit-testing
+                        this.selTrail = ((trailSpan || s.fullTrail) ? s.pts : []).map((q) => {
                             v4.set(q.xyz[0], q.xyz[1], q.xyz[2], 1).applyMatrix4(M);
                             return v4.w > 0 ? [(v4.x / v4.w + 1) / 2 * W, (1 - v4.y / v4.w) / 2 * H] : null;
                         });
                     }
-                    v4.set(p[0], p[1], p[2] + (ud.L * 0.3 + 6) * k, 1).applyMatrix4(M);
-                    if (v4.w > 0) {
-                        const x = (v4.x / v4.w + 1) / 2 * W, y = (1 - v4.y / v4.w) / 2 * H;
-                        const onScreen = x > -50 && x < W + 50 && y > -50 && y < H + 50;
-                        s.label.style.display = showLabels && layerOn.aircraft && onScreen ? "" : "none";
-                        if (onScreen) { s.label.style.left = `${x}px`; s.label.style.top = `${y}px`; screen.push([icao, x, y]); }
-                    } else {
-                        s.label.style.display = "none";
+                    if (onViewport) {
+                        const lblH = (L * 0.3 + 6) * k;
+                        v4.set(p[0] + b.u[0] * lblH, p[1] + b.u[1] * lblH, p[2] + b.u[2] * lblH, 1).applyMatrix4(M);
+                        if (v4.w > 0) {
+                            const x = (v4.x / v4.w + 1) / 2 * W, y = (1 - v4.y / v4.w) / 2 * H;
+                            const onScreen = x > 24 && x < W - 24 && y > 28 && y < H - 12;
+                            if (onScreen) screen.push([icao, x, y]);
+                            const maxLbl = z < 5.0 ? 0 : z < 6.8 ? 16 : z < 8.5 ? 26 : 40;
+                            const wantLabel = onScreen && usedLabels < LABEL_POOL_SIZE && (icao === selected || (showLabels && (
+                                (a.in_view && z >= 4.5) ||
+                                (labelBoxes.length < maxLbl && (a.source !== "fr24" || z >= 5.5))
+                            )));
+                            let canPlace = wantLabel;
+                            const box = [x - 54, y - 32, x + 54, y + 4];
+                            if (canPlace && icao !== selected) {
+                                for (let i = 0; i < labelBoxes.length; i++) {
+                                    const B = labelBoxes[i];
+                                    if (!(box[2] < B[0] || box[0] > B[2] || box[3] < B[1] || box[1] > B[3])) { canPlace = false; break; }
+                                }
+                                if (canPlace) {
+                                    for (let i = 0; i < drawnAc.length; i++) {
+                                        if (drawnAc[i][2] === icao) continue;
+                                        const ax = drawnAc[i][0], ay = drawnAc[i][1];
+                                        if (ax >= box[0] - 8 && ax <= box[2] + 8 && ay >= box[1] - 8 && ay <= box[3] + 8) { canPlace = false; break; }
+                                    }
+                                }
+                            }
+                            if (canPlace) {
+                                labelBoxes.push(box);
+                                const el = labelPool[usedLabels++];
+                                const cls = `ac-label${a.in_view ? " in-view" : ""}${icao === selected ? " selected" : ""}`;
+                                if (el.className !== cls) el.className = cls;
+                                if (el.dataset.icao !== icao) el.dataset.icao = icao;
+                                const html = s.labelHtml || (s.labelHtml = `${esc(a.callsign || a.icao)}${phaseTag(a, false)}${a.type ? ` <span style="opacity:.65">${esc(a.type)}</span>` : ""}<small>${((a.altitude_m || 0) / 1000).toFixed(1)} km</small>`);
+                                if (el._html !== html) { el.innerHTML = html; el._html = html; }
+                                el.style.display = "";
+                                el.style.left = `${x}px`;
+                                el.style.top = `${y}px`;
+                            }
+                        }
                     }
                 }
+                for (let i = usedLabels; i < activeLabelCount; i++) {
+                    labelPool[i].style.display = "none";
+                }
+                activeLabelCount = usedLabels;
+
+                for (const [fam, im] of Object.entries(INST_MESHES)) {
+                    const cnt = INST_COUNTS[fam] || 0;
+                    im.count = cnt;
+                    if (cnt > 0) {
+                        if (im.instanceMatrix.clearUpdateRanges) {
+                            im.instanceMatrix.clearUpdateRanges();
+                            im.instanceMatrix.addUpdateRange(0, cnt * 16);
+                        }
+                        im.instanceMatrix.needsUpdate = true;
+                        if (im.instanceColor) {
+                            if (im.instanceColor.clearUpdateRanges) {
+                                im.instanceColor.clearUpdateRanges();
+                                im.instanceColor.addUpdateRange(0, cnt * 3);
+                            }
+                            im.instanceColor.needsUpdate = true;
+                        }
+                    }
+                }
+
                 this.screen = screen;
                 // Track / chase: the map centre sits on the aircraft itself, at its altitude
                 if (camMode && selected && this.selPos && !camPending) {
@@ -1566,6 +2074,7 @@
                 }
 
                 this.renderer.resetState();
+                if (z < 7.0) gl.clear(gl.DEPTH_BUFFER_BIT);
                 this.renderer.render(scene, cam3);
                 if (aircraft.size && !document.hidden) map.triggerRepaint();
             },
@@ -1574,8 +2083,8 @@
         // ---------------------------------------------------------------- camera tracking
         function steerCamera(p, heading) {
             if (!camMode) return;
-            const mc = new maplibregl.MercatorCoordinate(origin.x + p[0], origin.y + p[1], 0);
-            const o = { center: mc.toLngLat(), elevation: p[2] / mc.meterInMercatorCoordinateUnits() };
+            const geo = sceneToLngLatAlt(p);
+            const o = { center: [geo.lon, geo.lat], elevation: geo.alt };
             if (camZoom != null) {
                 const z = map.getZoom();
                 o.zoom = z + (camZoom - z) * 0.08;
@@ -1632,7 +2141,7 @@
 
         map.on("dragstart", () => { centering = false; stopCamera(); });   // panning away ends tracking
         map.on("wheel", () => { camZoom = null; });
-        document.addEventListener("keydown", (e) => { if (e.key === "Escape") stopCamera(); });
+        document.addEventListener("keydown", (e) => { if (e.key === "Escape") { stopCamera(); $("fr24-modal").classList.remove("show"); } });
         map.on("click", (e) => {
             const hit = (planesLayer.screen || []).map(([icao, x, y]) => [icao, Math.hypot(x - e.point.x, y + 8 - e.point.y)])
                 .sort((a, b) => a[1] - b[1])[0];
@@ -1689,7 +2198,7 @@
                     const k = `${familyFor(a.type)}|${a.type || ""}|${a.model || ""}|${a.airline_iata || icao3}`;
                     if (k !== key) {
                         if (plane) sc.remove(plane);
-                        plane = makePlane(a, icao3);
+                        plane = makePlane(a, icao3, false);
                         plane.userData.halo.visible = false;
                         sc.add(plane);
                         key = k;
@@ -1705,18 +2214,24 @@
 
         // ---------------------------------------------------------------- list + info
         function sortedAircraft() {
-            return [...aircraft.values()].map((s) => s.a)
-                .sort((x, y) => (y.in_view - x.in_view) || (x.distance_km - y.distance_km));
+            const out = [];
+            for (let i = 0; i < orderedAircraft.length; i++) {
+                const a = orderedAircraft[i][1].a;
+                if (layerOn.fr24 || a.source !== "fr24") out.push(a);
+            }
+            return out;
         }
 
         function renderList() {
             const list = sortedAircraft();
-            $("count").textContent = list.length;
-            $("ac-list").innerHTML = list.length ? list.map((a) =>
-                `<li data-icao="${esc(a.icao)}" class="${a.in_view ? "in-view" : ""}${a.icao === selected ? " selected" : ""}">
-                    <span class="id">${flagImg(a)}${logoImg(a)}<span class="cs">${esc(a.callsign || a.icao)}</span>${phaseTag(a, true)}</span>
-                    <span class="meta">${a.type ? esc(a.type) + " " : ""}${(a.altitude_m / 1000).toFixed(1)}km · ${a.distance_km}km ${compass(a.az_deg)}</span></li>`).join("")
-                : `<li><span class="meta">No aircraft heard right now.</span></li>`;
+            $("count").textContent = list.length.toLocaleString();
+            const shown = list.slice(0, 120);
+            $("ac-list").innerHTML = shown.length ? shown.map((a) => {
+                const srcBadge = a.source && a.source !== "fr24" ? `<span class="src-tag local">LOCAL</span>` : "";
+                return `<li data-icao="${esc(a.icao)}" class="${a.in_view ? "in-view" : ""}${a.icao === selected ? " selected" : ""}">
+                    <span class="id">${flagImg(a)}${logoImg(a)}<span class="cs">${esc(a.callsign || a.icao)}</span>${srcBadge}${phaseTag(a, false)}</span>
+                    <span class="meta">${a.type ? esc(a.type) + " " : ""}${(a.altitude_m / 1000).toFixed(1)}km · ${a.distance_km}km ${compass(a.az_deg)}</span></li>`;
+            }).join("") : `<li><span class="meta">No aircraft heard right now.</span></li>`;
         }
         $("ac-list").addEventListener("click", (e) => {
             const li = e.target.closest("li[data-icao]");
@@ -1730,18 +2245,36 @@
             const a = s.a;
             $("info-cs").textContent = a.callsign || a.icao;
             preview.show(a);
+            const photo = $("info-photo"), credit = $("info-photo-credit");
+            if (a.photo_url) {
+                if (photo.getAttribute("src") !== a.photo_url) {
+                    photo.hidden = true;
+                    photo.onload = () => { photo.hidden = false; };
+                    photo.onerror = () => { photo.hidden = true; };
+                    photo.src = a.photo_url;
+                }
+                if (a.photo_credit) { credit.textContent = `Photo © ${a.photo_credit}`; credit.hidden = false; }
+                else credit.hidden = true;
+            } else {
+                photo.hidden = true; photo.removeAttribute("src");
+                credit.hidden = true;
+            }
             const logo = $("info-logo");
             if (a.airline_iata) {
                 const src = LOGO_WORD(a.airline_iata);
                 if (logo.getAttribute("src") !== src) { logo.hidden = true; logo.onload = () => { logo.hidden = false; }; logo.src = src; }
             } else { logo.hidden = true; logo.removeAttribute("src"); }
             const route = a.route ? a.route.split("-").join(" → ") : null;
+            const srcLabel = a.source === "both" ? "Local ADS-B + FR24" : a.source === "fr24" ? "Flightradar24 Global" : "Local ADS-B";
             const rows = [
                 a.airline ? ["Airline", a.airline] : null,
                 route ? ["Route", route] : null,
+                a.origin?.name ? ["Origin", `${a.origin.iata || ""} ${a.origin.name}`.trim()] : null,
+                a.destination?.name ? ["Destination", `${a.destination.iata || ""} ${a.destination.name}`.trim()] : null,
                 ["Aircraft", a.model || a.type || "--"],
                 a.reg ? ["Registration", a.reg] : null,
                 ["ICAO", a.icao],
+                ["Source", srcLabel],
                 ["Altitude", `${Number(a.altitude_m).toLocaleString()} m`],
                 ["Speed", a.speed_kmh != null ? `${a.speed_kmh} km/h` : "--"],
                 ["Heading", a.heading_deg != null ? `${a.heading_deg}° ${compass(a.heading_deg)}` : "--"],
@@ -1757,6 +2290,13 @@
                 .map(([k, v]) => `<div><small>${k}</small><b>${esc(v)}</b></div>`).join("");
             $("info-dl").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
             $("info-link").href = `https://globe.adsbexchange.com/?icao=${encodeURIComponent(String(a.icao).toLowerCase())}`;
+            const frLink = $("info-fr24");
+            if (a.fr24_id) {
+                frLink.href = `https://www.flightradar24.com/${encodeURIComponent(a.callsign || a.icao)}/${encodeURIComponent(a.fr24_id)}`;
+                frLink.hidden = false;
+            } else {
+                frLink.hidden = true;
+            }
             showCamera();
         }
 
@@ -1764,11 +2304,37 @@
             const prev = selected;
             selected = icao;
             if (icao !== prev) stopCamera();
+            const z = map.getZoom();
             for (const id of [prev, icao]) {
                 const s = id && aircraft.get(id);
                 if (!s) continue;
-                if (s.trail) s.trail.material = id === selected ? TRAIL_MATS.selected : TRAIL_MATS.normal;
-                s.label.classList.toggle("selected", id === selected);
+                ensureDetailMesh(s, z);
+                buildTrail(s);
+            }
+            rebuildOrderedAircraft();
+            const selS = icao && aircraft.get(icao);
+            if (selS && selS.a.fr24_id && !selS.fullTrail) {
+                const fid = selS.a.fr24_id;
+                fetch(`/api/adsb/flight/${encodeURIComponent(fid)}`).then((r) => (r.ok ? r.json() : null)).then((det) => {
+                    if (!det || selected !== icao) return;
+                    const s = aircraft.get(icao);
+                    if (!s) return;
+                    s.detail = {};
+                    for (const k of ["model", "reg", "airline", "airline_iata", "airline_icao", "route", "origin", "destination", "photo_url", "photo_credit", "country_code"]) {
+                        if (det[k]) { s.detail[k] = det[k]; s.a[k] = det[k]; }
+                    }
+                    s.labelHtml = "";
+                    ensureDetailMesh(s, map.getZoom());
+                    if (Array.isArray(det.trail) && det.trail.length >= 2) {
+                        const now = nowS();
+                        s.pts = det.trail.map(([lat, lon, alt, age]) => ({ t: now - age, alt, xyz: globePos(lon, lat, alt) }));
+                        s.fullTrail = true;
+                        s.spanS = Math.max(600, det.trail[0][3] || 600);
+                        buildTrail(s);
+                    }
+                    renderInfo();
+                    map.triggerRepaint();
+                }).catch(() => {});
             }
             planesLayer.sel = null;
             centering = false;
@@ -1787,8 +2353,23 @@
             el.classList.add("show");
         }
 
-        // ---------------------------------------------------------------- controls
+        function setLabels(on) {
+            showLabels = !!on;
+            $("btn-labels").classList.toggle("on", showLabels);
+            $("btn-labels").textContent = showLabels ? "Labels" : "Labels off";
+            if ($("lay-labels")) $("lay-labels").checked = showLabels;
+            $("stage").classList.toggle("labels-off", !showLabels);
+            map.triggerRepaint();
+        }
         $("lay-aircraft").onchange = (e) => { layerOn.aircraft = e.target.checked; map.triggerRepaint(); };
+        $("lay-fr24").onchange = (e) => {
+            layerOn.fr24 = e.target.checked;
+            $("btn-fr24").classList.toggle("on", layerOn.fr24);
+            poll();
+            renderList();
+            map.triggerRepaint();
+        };
+        $("lay-labels").onchange = (e) => setLabels(e.target.checked);
         $("lay-trails").onchange = (e) => { layerOn.trails = e.target.checked; map.triggerRepaint(); };
         $("lay-frustum").onchange = (e) => { layerOn.frustum = e.target.checked; if (frustumGroup) frustumGroup.visible = e.target.checked; map.triggerRepaint(); };
         $("lay-airports").onchange = (e) => { layerOn.airports = e.target.checked; applyAirports(); map.triggerRepaint(); };
@@ -1811,15 +2392,83 @@
             for (const s of aircraft.values()) buildTrail(s);
             map.triggerRepaint();
         };
-        $("btn-labels").onclick = (e) => { showLabels = e.target.classList.toggle("on"); map.triggerRepaint(); };
+        $("btn-labels").onclick = () => setLabels(!showLabels);
         $("btn-home").onclick = () => {
-            stopCamera();
+            camMode = camZoom = camPitch = null; centering = false; map.setCenterClampedToGround(true); showCamera();
             if (station) map.easeTo({ center: [station.lon, station.lat], zoom: 9, pitch: 64, bearing: -20, duration: 1200 });
+        };
+        $("btn-globe").onclick = () => {
+            camMode = camZoom = camPitch = null; centering = false; map.setCenterClampedToGround(true); showCamera();
+            if (map.getProjection()?.type !== "globe") map.setProjection({ type: "globe" });
+            const c = station ? [station.lon, station.lat] : [105.9095, 21.0538];
+            map.easeTo({ center: c, zoom: 2.2, pitch: 20, bearing: 0, duration: 1200 });
+            poll("global");
+        };
+        function openFr24Modal() {
+            $("fr24-msg").textContent = "";
+            fetch("/api/adsb").then((r) => r.json()).then((cfg) => {
+                $("fr24-enabled").checked = cfg.fr24_enabled !== false;
+                $("fr24-email").value = cfg.fr24_email || "";
+                $("fr24-password").value = "";
+                $("fr24-token").placeholder = cfg.fr24_authenticated ? "Authenticated token saved (enter to replace)" : "Optional direct FR24 token";
+                if (cfg.fr24) {
+                    $("fr24-tier").textContent = cfg.fr24.account_tier === "enterprise" ? "Enterprise" : "Global Live";
+                    $("fr24-worldwide").textContent = cfg.fr24.global_total ? `${Number(cfg.fr24.global_total).toLocaleString()} worldwide` : "-- worldwide";
+                }
+            }).catch(() => {});
+            $("fr24-modal").classList.add("show");
+        }
+        $("btn-fr24").onclick = () => {
+            if ($("fr24-modal").classList.contains("show")) $("fr24-modal").classList.remove("show");
+            else openFr24Modal();
+        };
+        $("fr24-close").onclick = () => $("fr24-modal").classList.remove("show");
+        $("fr24-save").onclick = () => {
+            const body = {
+                fr24_enabled: $("fr24-enabled").checked,
+                fr24_email: $("fr24-email").value.trim(),
+            };
+            const pw = $("fr24-password").value;
+            const tk = $("fr24-token").value.trim();
+            if (pw) body.fr24_password = pw;
+            if (tk) body.fr24_token = tk;
+            $("fr24-msg").textContent = "Connecting to Flightradar24…";
+            fetch("/api/adsb", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+                .then((r) => r.json())
+                .then((res) => {
+                    layerOn.fr24 = res.fr24_enabled !== false;
+                    $("lay-fr24").checked = layerOn.fr24;
+                    if (res.fr24_login && !res.fr24_login.ok) {
+                        $("fr24-msg").textContent = `Login notice: ${res.fr24_login.message || "check credentials"}`;
+                    } else if (res.fr24_authenticated) {
+                        $("fr24-msg").textContent = "Flightradar24 Enterprise authenticated!";
+                    } else {
+                        $("fr24-msg").textContent = "Saved Flightradar24 Global settings.";
+                    }
+                    $("fr24-password").value = "";
+                    $("fr24-token").value = "";
+                    poll();
+                })
+                .catch((err) => { $("fr24-msg").textContent = `Error: ${err.message}`; });
+        };
+        $("fr24-clear").onclick = () => {
+            fetch("/api/adsb", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fr24_token: "" }) })
+                .then((r) => r.json())
+                .then(() => {
+                    $("fr24-token").value = "";
+                    $("fr24-token").placeholder = "Optional direct FR24 token";
+                    $("fr24-tier").textContent = "Global Live";
+                    $("fr24-msg").textContent = "Cleared saved FR24 token.";
+                    poll();
+                }).catch(() => {});
         };
         if (window.innerWidth <= 700) { $("list").classList.add("collapsed"); $("left-col").classList.add("collapsed"); }
         // The map lives in #stage (beside the sidebar), not the window: resize it with its container
         if (window.ResizeObserver) new ResizeObserver(() => map.resize()).observe($("stage"));
-        window.flights3d = { map, aircraft, preview, layer: planesLayer };   // for inspection from the console
+        poll();
+        setInterval(() => { if (!document.hidden && !map.isMoving()) poll(); }, POLL_MS);
+        document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastFetch > POLL_MS) poll(); });
+        window.flights3d = { map, aircraft, preview, layer: planesLayer, poll, instancedMeshes: INST_MESHES, instancedCounts: INST_COUNTS, labelPool };   // for inspection from the console
     </script>
 </body>
 </html>

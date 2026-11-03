@@ -412,6 +412,14 @@ def get_snapshot_jpeg(service: AllSkyService = Depends(get_service)):
         raise HTTPException(status_code=500, detail=f"Snapshot generation failed: {e}")
 
 
+@router.get("/api/planets")
+def get_planets():
+    """Naked-eye planets (J2000 RA/Dec, visual magnitude) for the live sky overlay."""
+    from datetime import datetime, timezone
+    from src.calibration.bright_star_solver import planet_positions
+    return planet_positions(datetime.now(timezone.utc))
+
+
 # ----------------------------------------------------------------------
 # Focus assistant
 # ----------------------------------------------------------------------
@@ -654,12 +662,25 @@ def get_adsb_config(service: AllSkyService = Depends(get_service)):
 
 
 @router.get("/api/adsb/aircraft")
-def get_adsb_aircraft(limit: int = Query(default=30, ge=1, le=400),
+def get_adsb_aircraft(limit: int = Query(default=30, ge=1, le=6000),
                       trail: float = Query(default=0.0, ge=0.0, le=900.0),
+                      bounds: Optional[str] = Query(default=None, max_length=120),
+                      fr24: Optional[bool] = Query(default=None),
+                      compact: bool = Query(default=False),
                       service: AllSkyService = Depends(get_service)):
-    """Aircraft heard right now: flight, altitude, speed, heading, distance, direction, in camera view.
-    trail=<seconds> adds lat/lon and each aircraft's recent path (3D map)."""
-    return service.get_aircraft_now(limit=limit, trail_s=trail)
+    """Aircraft heard right now (local ADS-B + Flightradar24 global feed): flight, altitude, speed, heading,
+    distance, direction, in camera view. trail=<seconds> adds lat/lon and each aircraft's recent path (3D map);
+    bounds=north,south,west,east or 'global' queries Flightradar24 for that region or the whole globe."""
+    return service.get_aircraft_now(limit=limit, trail_s=trail, bounds=bounds, include_fr24=fr24, compact=compact)
+
+
+@router.get("/api/adsb/flight/{fr24_id}")
+def get_adsb_flight_detail(fr24_id: str, service: AllSkyService = Depends(get_service)):
+    """Full Flightradar24 flight detail and complete historical trail from departure airport."""
+    try:
+        return service.get_fr24_flight_detail(fr24_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
 @router.get("/api/satellites")
@@ -690,7 +711,7 @@ def get_map_airports(service: AllSkyService = Depends(get_service)):
 
 @router.post("/api/adsb")
 def set_adsb_config(req: AdsbConfigRequest, service: AllSkyService = Depends(get_service)):
-    """Set the ADS-B receiver (SBS-1 feed host/port) or turn flight matching on/off (persisted)."""
+    """Set the ADS-B receiver (SBS-1 feed host/port), Flightradar24 Enterprise credentials, or turn flight matching on/off (persisted)."""
     try:
         return service.set_adsb_config(**req.model_dump(exclude_none=True))
     except ValueError as exc:

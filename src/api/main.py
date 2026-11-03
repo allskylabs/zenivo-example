@@ -7,6 +7,7 @@ import os
 from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
 
@@ -24,6 +25,8 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         description="Edge Web UI and Real-Time REST/Streaming API for Sony IMX335 + RTS5869 Camera Subsystem.",
         version="1.0.0",
     )
+
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     # Allow CORS for development and cross-origin network access
     app.add_middleware(
