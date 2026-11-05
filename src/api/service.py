@@ -2414,6 +2414,27 @@ class AllSkyService:
         sol = self._overlay_solution()
         if sol:
             res["camera"] = {k: sol.get(k) for k in ("pointing_az_deg", "pointing_alt_deg", "roll_deg", "fov_horizontal_deg", "fov_vertical_deg")}
+            # /sky draws the picture as displayed (night orientation): turn the stored native-frame solution into
+            # the displayed frame, and convert the roll to the skyview convention (opposite sign to the solver's).
+            tf = self.station_config.get("image_transform") or {}
+            rot180 = int(tf.get("rotate_deg", 0)) % 360 == 180
+            fh = bool(tf.get("flip_horizontal")) != rot180
+            fv = bool(tf.get("flip_vertical")) != rot180
+            roll = -float(sol.get("roll_deg") or 0.0)
+            try:
+                cx, cy = (float(v) for v in sol["optical_center_px"])
+                f = float(sol["focal_px"])
+                w, h = float(sol.get("frame_width") or 2 * cx), float(sol.get("frame_height") or 2 * cy)
+                if fh and fv:
+                    roll += 180.0
+                if fh:
+                    cx = w - cx
+                if fv:
+                    cy = h - cy
+                res["camera"]["view_roll_deg"] = ((roll + 180.0) % 360.0) - 180.0
+                res["camera"]["lens"] = {"f": f, "k": float(sol.get("distortion_k") or 0.0), "cx": cx, "cy": cy, "w": w, "h": h}
+            except (KeyError, TypeError, ValueError):
+                res["camera"]["view_roll_deg"] = ((roll + 180.0) % 360.0) - 180.0
         return res
 
     def get_radiosondes_now(self, limit: int = 40) -> Dict[str, Any]:

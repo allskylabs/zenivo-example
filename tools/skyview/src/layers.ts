@@ -218,6 +218,18 @@ export function drawLayers(core: SkyCore, ctx: CanvasRenderingContext2D, proj0: 
   void OBLIQUITY;
 }
 
+/** Ray (horizontal frame) through pixel (px, py) of the frame as displayed, for a fisheye camera; null outside the usable range. */
+function lensRay(c: NonNullable<SkyCore['camera']>, f: Vec3, r: Vec3, u: Vec3, px: number, py: number): Vec3 | null {
+  const L = c.lens!;
+  const dx = px - L.cx, dy = py - L.cy, rho = Math.hypot(dx, dy);
+  if (rho < 1e-6) return f;
+  let th = rho / L.f;
+  for (let i = 0; i < 6; i++) { const g = L.f * (th + L.k * th ** 3) - rho, dg = L.f * (1 + 3 * L.k * th * th); if (Math.abs(dg) < 1e-9) break; th -= g / dg; }
+  if (!(th > 0) || th > 2.4) return null;
+  const s = Math.sin(th), a = s * dx / rho, b = -s * dy / rho, cz = Math.cos(th);
+  return [f[0] * cz + a * r[0] + b * u[0], f[1] * cz + a * r[1] + b * u[1], f[2] * cz + a * r[2] + b * u[2]];
+}
+
 function drawCamera(core: SkyCore, ctx: CanvasRenderingContext2D, proj: Proj, text: (s: string, x: number, y: number, c: string, a?: CanvasTextAlign, s2?: number, b?: boolean) => void, on: (p: P | null, m?: number) => boolean, poly: (pts: Vec3[], eq: boolean, clip?: boolean) => void): void {
   const c = core.camera!;
   const f = horizontalDir(c.az * DEG, c.alt * DEG);
@@ -234,10 +246,21 @@ function drawCamera(core: SkyCore, ctx: CanvasRenderingContext2D, proj: Proj, te
     return [v[0] / n, v[1] / n, v[2] / n];
   };
   const N = 24, pts: Vec3[] = [];
-  for (let i = 0; i <= N; i++) pts.push(at(-1 + 2 * i / N, 1));
-  for (let i = 0; i <= N; i++) pts.push(at(1, 1 - 2 * i / N));
-  for (let i = 0; i <= N; i++) pts.push(at(1 - 2 * i / N, -1));
-  for (let i = 0; i <= N; i++) pts.push(at(-1, -1 + 2 * i / N));
+  if (c.lens) {
+    // fisheye frame: the picture edge, clipped to the part the lens really images (image circle ~ 90 deg)
+    const L = c.lens, edge = (px: number, py: number): void => {
+      const v = lensRay(c, f, r, u, px, py); if (v) pts.push(v);
+    };
+    for (let i = 0; i <= N; i++) edge(L.w * i / N, 0);
+    for (let i = 0; i <= N; i++) edge(L.w, L.h * i / N);
+    for (let i = 0; i <= N; i++) edge(L.w * (1 - i / N), L.h);
+    for (let i = 0; i <= N; i++) edge(0, L.h * (1 - i / N));
+  } else {
+    for (let i = 0; i <= N; i++) pts.push(at(-1 + 2 * i / N, 1));
+    for (let i = 0; i <= N; i++) pts.push(at(1, 1 - 2 * i / N));
+    for (let i = 0; i <= N; i++) pts.push(at(1 - 2 * i / N, -1));
+    for (let i = 0; i <= N; i++) pts.push(at(-1, -1 + 2 * i / N));
+  }
   ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 2; poly(pts, false, false);
   const pc = proj.project(f);
   if (on(pc, 0) && pc) { ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(pc.x - 8, pc.y); ctx.lineTo(pc.x + 8, pc.y); ctx.moveTo(pc.x, pc.y - 8); ctx.lineTo(pc.x, pc.y + 8); ctx.stroke(); }
@@ -289,14 +312,16 @@ function drawCameraImage(core: SkyCore, ctx: CanvasRenderingContext2D, proj: Pro
   const r: Vec3 = [r0[0] * cr + u0[0] * sr, r0[1] * cr + u0[1] * sr, r0[2] * cr + u0[2] * sr];
   const u: Vec3 = [u0[0] * cr - r0[0] * sr, u0[1] * cr - r0[1] * sr, u0[2] * cr - r0[2] * sr];
   const hx = Math.tan(Math.min(85, c.fovH / 2) * DEG), hy = Math.tan(Math.min(85, c.fovV / 2) * DEG);
-  const NX = 18, NY = 11, W = img.naturalWidth, H = img.naturalHeight;
+  const NX = c.lens ? 40 : 18, NY = c.lens ? 30 : 11, W = img.naturalWidth, H = img.naturalHeight;
   const lim = 2.5 * Math.max(proj.w, proj.h);
   const grid: ({ x: number; y: number } | null)[][] = [];
   for (let j = 0; j <= NY; j++) {
     const row: ({ x: number; y: number } | null)[] = [];
     for (let i = 0; i <= NX; i++) {
       const x = -1 + 2 * i / NX, y = 1 - 2 * j / NY;
-      const v: Vec3 = [f[0] + x * hx * r[0] + y * hy * u[0], f[1] + x * hx * r[1] + y * hy * u[1], f[2] + x * hx * r[2] + y * hy * u[2]];
+      let v: Vec3 | null = [f[0] + x * hx * r[0] + y * hy * u[0], f[1] + x * hx * r[1] + y * hy * u[1], f[2] + x * hx * r[2] + y * hy * u[2]];
+      if (c.lens) v = lensRay(c, f, r, u, i / NX * c.lens.w, j / NY * c.lens.h);
+      if (!v) { row.push(null); continue; }
       const n = Math.hypot(v[0], v[1], v[2]) || 1;
       const p = proj.project([v[0] / n, v[1] / n, v[2] / n]);
       row.push(p && Math.abs(p.x - proj.w / 2) < lim && Math.abs(p.y - proj.h / 2) < lim ? p : null);

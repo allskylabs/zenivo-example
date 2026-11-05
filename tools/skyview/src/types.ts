@@ -3,7 +3,9 @@ import type { Vec3 } from '@astrophoto/sky-engine';
 
 export interface ObserverCfg { latDeg: number; lonDeg: number; heightM?: number }
 /** Camera field of view drawn as a labelled rotated frame (az/alt = pointing, degrees). */
-export interface CameraFov { az: number; alt: number; roll: number; fovH: number; fovV: number; label?: string }
+/** Fisheye lens of the camera frame as shown (equidistant, r = f(theta + k theta^3), optical centre in frame pixels). */
+export interface CameraLens { f: number; k: number; cx: number; cy: number; w: number; h: number }
+export interface CameraFov { az: number; alt: number; roll: number; fovH: number; fovV: number; label?: string; lens?: CameraLens }
 export type Lang = 'en' | 'vi';
 export type ViewMode = 'allsky' | '3d' | 'eye';
 
