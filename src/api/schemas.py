@@ -128,7 +128,7 @@ class SkyMaskRequest(BaseModel):
 
 class ManualStarSolveRequest(BaseModel):
     """Stars clicked on the live frame (fractions of the displayed image) to find the camera pointing."""
-    points: List[List[float]] = Field(..., min_length=4, max_length=24, description="[x, y] fractions, x right, y down")
+    points: List[List[float]] = Field(..., min_length=4, max_length=80, description="[x, y] fractions, x right, y down")
     apply: bool = Field(False, description="Store the result; false only identifies the stars")
 
 

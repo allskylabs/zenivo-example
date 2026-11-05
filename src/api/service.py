@@ -5186,12 +5186,12 @@ class AllSkyService:
             shown.append([round(px / w, 4), round(py / h, 4)])
             native.append([w - 1 - px if mirror_x else px, h - 1 - py if mirror_y else py, flux])
         det = np.array(native, dtype=np.float64)
-        det = det[np.argsort(-det[:, 2])]
+        det = det[np.argsort(-det[:, 2])][:40]  # the pattern search seeds on the brightest 16, all 40 are matched
         lat = float(self.station_config.get("latitude_deg", 21.0285))
         lon = float(self.station_config.get("longitude_deg", 105.8542))
         res = bss.solve_bright_stars(
             np.zeros((h, w, 3), np.uint8), lat, lon, when=when or datetime.now().astimezone(), projection="equidistant",
-            hfov_candidates_deg=range(160, 196, 2), max_mag=4.6, n_detections=len(det), n_seed_stars=70,
+            hfov_candidates_deg=range(160, 196, 2), max_mag=4.6 if len(det) < 10 else 5.4, n_detections=min(len(det), 16), n_seed_stars=70,
             sep_tol_deg=1.0, min_matches=min(4, len(det)), max_residual_px=10.0, max_rms_px=8.0,
             detections=det, sky_mask=np.ones((h, w), dtype=bool), min_completeness=0.0)
         out: Dict[str, Any] = {"success": bool(res.get("success")), "points": shown, "clicked": len(det)}
@@ -5207,7 +5207,7 @@ class AllSkyService:
         out["pointing"] = {k: res.get(k) for k in ("pointing_az_deg", "pointing_alt_deg", "roll_deg",
                                                     "fov_horizontal_deg", "fov_vertical_deg")}
         out["applied"] = False
-        if len(res["matched_stars"]) < max(4, len(det) - 1):
+        if len(res["matched_stars"]) < min(len(det), 6):
             out["warning"] = (f"Only {len(res['matched_stars'])} of {len(det)} clicked stars matched; "
                               "check that every click is on a real star")
         if apply:
