@@ -1734,7 +1734,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 body: JSON.stringify({ points: picks, apply }),
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+            if (!res.ok) {
+                const d = data.detail;
+                throw new Error(Array.isArray(d) ? d.map((e) => e.msg || JSON.stringify(e)).join("; ") : (d || `HTTP ${res.status}`));
+            }
             return data;
         };
         document.getElementById("align-identify").addEventListener("click", async () => {
