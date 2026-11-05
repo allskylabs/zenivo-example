@@ -2280,7 +2280,22 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // Project Celestial J2000 (raDeg, decDeg) -> Canvas (x, y, alt, az, visible)
-        function projectRaDecToCanvas(raDeg, decDeg) {
+        // J2000 catalogue positions are precessed to the equinox of date first (~0.38 deg by 2026, ~6 px on the sensor);
+        // the Sun and Moon formulas already give positions of date (ofDate = true)
+        const precT = (nowUtc.getTime() / 86400000.0 + 2440587.5 - 2451545.0) / 36525.0;
+        const precZeta = ((2306.2181 * precT + 0.30188 * precT * precT) / 3600.0) * (Math.PI / 180.0);
+        const precZ = ((2306.2181 * precT + 1.09468 * precT * precT) / 3600.0) * (Math.PI / 180.0);
+        const precTheta = ((2004.3109 * precT - 0.42665 * precT * precT) / 3600.0) * (Math.PI / 180.0);
+        function projectRaDecToCanvas(raDeg0, decDeg0, ofDate = false) {
+            let raDeg = raDeg0, decDeg = decDeg0;
+            if (!ofDate) {
+                const r = (raDeg0 * Math.PI) / 180.0, dc = (decDeg0 * Math.PI) / 180.0;
+                const pa = Math.cos(dc) * Math.sin(r + precZeta);
+                const pb = Math.cos(precTheta) * Math.cos(dc) * Math.cos(r + precZeta) - Math.sin(precTheta) * Math.sin(dc);
+                const pc = Math.sin(precTheta) * Math.cos(dc) * Math.cos(r + precZeta) + Math.cos(precTheta) * Math.sin(dc);
+                raDeg = ((((Math.atan2(pa, pb) + precZ) * 180.0) / Math.PI) % 360.0 + 360.0) % 360.0;
+                decDeg = (Math.asin(Math.max(-1.0, Math.min(1.0, pc))) * 180.0) / Math.PI;
+            }
             const haRad = ((((lmstDeg - raDeg) % 360.0) + 360.0) % 360.0) * (Math.PI / 180.0);
             const decRad = (decDeg * Math.PI) / 180.0;
             const sinDec = Math.sin(decRad);
@@ -2830,7 +2845,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.shadowColor = "rgba(2, 6, 23, 0.95)";
             ctx.shadowBlur = 4;
             bodies.forEach((b) => {
-                const pt = projectRaDecToCanvas(b.pos.ra, b.pos.dec);
+                const pt = projectRaDecToCanvas(b.pos.ra, b.pos.dec, true);
                 if (!pt.visible) return;
                 ctx.strokeStyle = b.ring;
                 ctx.lineWidth = 1.6;
