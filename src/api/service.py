@@ -4995,7 +4995,15 @@ class AllSkyService:
             attempts.reverse()
         intr = None if refit_lens else self._lens_intrinsics(w)
         try:
+            # Solved optics (optical centre, roll) live in native sensor coordinates and the overlay applies the
+            # display mirror/rotation itself, so solve on the native-orientation frame (the transform is its own
+            # inverse). The sky mask is drawn on the displayed image, hence built there and turned back.
             mask = bss.combined_sky_mask(frame, self.station_config.get("sky_mask"))
+            if mask is not None:
+                mask = self._apply_image_transform(mask.astype(np.uint8), False).astype(bool)
+            frame = self._apply_image_transform(frame, False)
+            if frames is not None:
+                frames = [self._apply_image_transform(f, False) for f in frames]
             if exclude is not None and exclude.shape == frame.shape[:2]:
                 mask = (np.ones(exclude.shape, dtype=bool) if mask is None else mask) & ~exclude
             tracked, when = None, None
