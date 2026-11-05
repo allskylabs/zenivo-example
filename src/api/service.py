@@ -2711,14 +2711,26 @@ class AllSkyService:
         if trail_s > 0 or use_fr24:
             res["station"] = {"lat": station["latitude_deg"], "lon": station["longitude_deg"], "elevation_m": station["elevation_m"]}
             if sol:
-                cx, cy = sol["optical_center_px"]
-                f = float(sol["focal_px"])
+                # Lens + frame from the station optics (sensor pixels); the solve may have run at another size
+                opt = self.station_config.get("optics") or {}
+                sens = self.station_config.get("camera_sensor") or {}
+                w, h = float(sens.get("width_px") or 0.0), float(sens.get("height_px") or 0.0)
+                if opt.get("focal_length_px") and w and h:
+                    f = float(opt["focal_length_px"])
+                    proj = str(opt.get("lens_projection") or "equidistant")
+                    kd = float(opt.get("distortion_k") or 0.0)
+                else:
+                    f = float(sol["focal_px"])
+                    cx, cy = sol["optical_center_px"]
+                    w = float(sol.get("frame_width") or 2 * cx)
+                    h = float(sol.get("frame_height") or 2 * cy)
+                    proj = str(sol.get("projection") or "rectilinear")
+                    kd = float(sol.get("distortion_k") or 0.0)
                 res["camera"] = {"az_deg": sol["pointing_az_deg"], "alt_deg": sol["pointing_alt_deg"],
                                  "roll_deg": sol.get("roll_deg", 0.0),
                                  "hfov_deg": sol.get("fov_horizontal_deg"), "vfov_deg": sol.get("fov_vertical_deg"),
-                                 "projection": sol.get("projection", "rectilinear"),
-                                 "distortion_k": float(sol.get("distortion_k") or 0.0),
-                                 "half_w": round(cx / f, 5), "half_h": round(cy / f, 5)}
+                                 "projection": proj, "distortion_k": kd,
+                                 "half_w": round(w / 2.0 / f, 5), "half_h": round(h / 2.0 / f, 5)}
         return res
 
     def _aircraft_info(self):
