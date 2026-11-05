@@ -4601,6 +4601,12 @@ class AllSkyService:
             tf = self.station_config.setdefault(
                 "image_transform", {"flip_horizontal": False, "flip_vertical": False, "rotate_deg": 0}
             )
+
+            def night_flips() -> Tuple[bool, bool]:
+                rot = int(tf.get("rotate_deg", 0)) % 360 == 180
+                return bool(tf.get("flip_horizontal")) != rot, bool(tf.get("flip_vertical")) != rot
+
+            before = night_flips()
             if flip_horizontal is not None:
                 tf["flip_horizontal"] = bool(flip_horizontal)
             if flip_vertical is not None:
@@ -4609,6 +4615,15 @@ class AllSkyService:
                 tf["rotate_deg"] = 180 if int(rotate_deg) % 360 == 180 else 0
             if rotate_isp_180 is not None:
                 tf["rotate_isp_180"] = bool(rotate_isp_180)
+            # The sky mask is drawn on the displayed (night) image: turn it with the image so it keeps covering
+            # the same part of the sky. Solved optics are stored in sensor coordinates and need no change.
+            after = night_flips()
+            mask = self.station_config.get("sky_mask")
+            if mask and after != before:
+                fx, fy = after[0] != before[0], after[1] != before[1]
+                for key in ("sky", "obstruction"):
+                    mask[key] = [[[round(1.0 - x, 4) if fx else x, round(1.0 - y, 4) if fy else y]
+                                  for x, y in poly] for poly in mask.get(key, [])]
             self._save_station_config()
             self.activity.info(
                 "camera",
