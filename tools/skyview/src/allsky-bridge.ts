@@ -31,7 +31,7 @@ export function startAllskyBridge(core: SkyCore, api = ''): () => void {
     if (c && num(c.pointing_az_deg) !== undefined && num(c.pointing_alt_deg) !== undefined && (num(c.fov_horizontal_deg) || num(c.fov_vertical_deg))) {
       const fh = num(c.fov_horizontal_deg) ?? num(c.fov_vertical_deg)!, fv = num(c.fov_vertical_deg) ?? fh;
       const L = c.lens as Record<string, number> | undefined;
-      const lens = L && num(L.f) && num(L.w) && num(L.h) ? { f: L.f!, k: num(L.k) ?? 0, cx: num(L.cx) ?? L.w! / 2, cy: num(L.cy) ?? L.h! / 2, w: L.w!, h: L.h! } : undefined;
+      const lens = L && num(L.f) && num(L.w) && num(L.h) ? { f: L.f!, k: num(L.k) ?? 0, cx: num(L.cx) ?? L.w! / 2, cy: num(L.cy) ?? L.h! / 2, w: L.w!, h: L.h!, rect: (c.lens as { proj?: string }).proj === 'rectilinear' } : undefined;
       core.setCamera({ az: c.pointing_az_deg!, alt: c.pointing_alt_deg!, roll: num(c.view_roll_deg) ?? num(c.roll_deg) ?? 0, fovH: fh, fovV: fv, label: 'IMX335', lens });
     } else core.setCamera(null);
     core.setMarkers('satellites', track(core.markers.satellites, d.satellites ?? [], (r, i) => {

@@ -224,8 +224,8 @@ function lensRay(c: NonNullable<SkyCore['camera']>, f: Vec3, r: Vec3, u: Vec3, p
   const L = c.lens!;
   const dx = px - L.cx, dy = py - L.cy, rho = Math.hypot(dx, dy);
   if (rho < 1e-6) return f;
-  let th = rho / L.f;
-  for (let i = 0; i < 6; i++) { const g = L.f * (th + L.k * th ** 3) - rho, dg = L.f * (1 + 3 * L.k * th * th); if (Math.abs(dg) < 1e-9) break; th -= g / dg; }
+  let th = L.rect ? Math.atan(rho / L.f) : rho / L.f;   // rectilinear: rho = f tan(theta); fisheye: rho = f (theta + k theta^3)
+  if (!L.rect) for (let i = 0; i < 6; i++) { const g = L.f * (th + L.k * th ** 3) - rho, dg = L.f * (1 + 3 * L.k * th * th); if (Math.abs(dg) < 1e-9) break; th -= g / dg; }
   if (!(th > 0) || th > 2.4) return null;
   const s = Math.sin(th), a = s * dx / rho, b = -s * dy / rho, cz = Math.cos(th);
   return [f[0] * cz + a * r[0] + b * u[0], f[1] * cz + a * r[1] + b * u[1], f[2] * cz + a * r[2] + b * u[2]];

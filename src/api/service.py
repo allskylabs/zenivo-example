@@ -2422,13 +2422,18 @@ class AllSkyService:
             fv = bool(tf.get("flip_vertical")) != rot180
             roll = -float(sol.get("roll_deg") or 0.0)
             try:
-                cx, cy = (float(v) for v in sol["optical_center_px"])
-                f = float(sol["focal_px"])
-                # the solved frame is the snapshot size; the optical centre is NOT the frame centre, so 2*cx is wrong
-                out_res = self.station_config.get("output_resolution") or {}
+                # Lens in sensor pixels (station optics), whatever size the star solve ran at; the page maps the picture by proportion
+                opt = self.station_config.get("optics") or {}
                 sens = self.station_config.get("camera_sensor") or {}
-                w = float(sol.get("frame_width") or out_res.get("width") or sens.get("width_px") or 2 * cx)
-                h = float(sol.get("frame_height") or out_res.get("height") or sens.get("height_px") or 2 * cy)
+                w, h = float(sens.get("width_px") or 0.0), float(sens.get("height_px") or 0.0)
+                if opt.get("focal_length_px") and opt.get("optical_center_x_px") and w and h:
+                    f, cx, cy = float(opt["focal_length_px"]), float(opt["optical_center_x_px"]), float(opt["optical_center_y_px"])
+                    kd, proj = float(opt.get("distortion_k") or 0.0), str(opt.get("lens_projection") or "equidistant")
+                else:
+                    cx, cy = (float(v) for v in sol["optical_center_px"])
+                    f, kd, proj = float(sol["focal_px"]), float(sol.get("distortion_k") or 0.0), str(sol.get("projection") or "equidistant")
+                    w = float(sol.get("frame_width") or 2 * cx)
+                    h = float(sol.get("frame_height") or 2 * cy)
                 if fh and fv:
                     roll += 180.0
                 if fh:
@@ -2436,7 +2441,7 @@ class AllSkyService:
                 if fv:
                     cy = h - cy
                 res["camera"]["view_roll_deg"] = ((roll + 180.0) % 360.0) - 180.0
-                res["camera"]["lens"] = {"f": f, "k": float(sol.get("distortion_k") or 0.0), "cx": cx, "cy": cy, "w": w, "h": h}
+                res["camera"]["lens"] = {"f": f, "k": kd, "cx": cx, "cy": cy, "w": w, "h": h, "proj": proj}
             except (KeyError, TypeError, ValueError):
                 res["camera"]["view_roll_deg"] = ((roll + 180.0) % 360.0) - 180.0
         return res
