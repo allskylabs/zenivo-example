@@ -237,6 +237,7 @@ def test_service_fixed_lens_solve_updates_pointing_only(monkeypatch):
         "fov_horizontal_deg": 170.0,
     }
     svc.station_config.pop("sky_mask", None)
+    svc.station_config["image_transform"] = {}  # the synthetic frames are already in sensor orientation
     frames, times = _sky_series()
     res = svc._solve_bright_star_pattern(frames[-1], LAT, LON, frames, times)
     assert res is not None and res["success"], res
