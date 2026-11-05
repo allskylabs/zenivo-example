@@ -800,6 +800,7 @@ def solve_bright_stars(
     min_completeness: float = 0.6,
     detections: Optional[np.ndarray] = None,
     sky_mask: Optional[np.ndarray] = None,
+    deep: bool = False,
 ) -> Dict[str, Any]:
     """Find camera pointing from bright stars. Returns success False with a reason when unsure.
 
@@ -828,7 +829,7 @@ def solve_bright_stars(
     if len(det) < 4:
         return {"success": False, "error": f"only {len(det)} star-like points detected"}
 
-    stars = bright_objects(when, max_mag)
+    stars = bright_objects(when, max_mag, deep=deep)
     altaz = stars_alt_az(stars, latitude_deg, longitude_deg, when)
     up = altaz[:, 0] > min_alt_deg
     stars = [s for s, u in zip(stars, up) if u]

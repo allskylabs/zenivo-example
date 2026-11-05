@@ -5200,9 +5200,9 @@ class AllSkyService:
         lon = float(self.station_config.get("longitude_deg", 105.8542))
         res = bss.solve_bright_stars(
             np.zeros((h, w, 3), np.uint8), lat, lon, when=when or datetime.now().astimezone(), projection="equidistant",
-            hfov_candidates_deg=range(160, 196, 2), max_mag=4.6 if len(det) < 10 else 5.4, n_detections=min(len(det), 16), n_seed_stars=70,
+            hfov_candidates_deg=(176, 179, 182, 185), max_mag=4.5, n_detections=min(len(det), 8), n_seed_stars=100,
             sep_tol_deg=1.0, min_matches=min(4, len(det)), max_residual_px=10.0, max_rms_px=8.0,
-            detections=det, sky_mask=np.ones((h, w), dtype=bool), min_completeness=0.0)
+            detections=det, sky_mask=np.ones((h, w), dtype=bool), min_completeness=0.0, deep=True)
         out: Dict[str, Any] = {"success": bool(res.get("success")), "points": shown, "clicked": len(det),
                                "skipped": skipped}
         if not res.get("success"):
