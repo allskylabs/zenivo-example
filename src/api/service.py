@@ -2398,8 +2398,12 @@ class AllSkyService:
 
         if getattr(self, "_sat_tracker", None) is None:
             self._sat_tracker = SatelliteTracker(os.path.join(self.output_dir, "cache", "sat_tle.json"))
-        res = self._sat_tracker.current(self._overlay_station(), self._overlay_solution(), track_min=track_min,
-                                        include_below=below, track_ids=track_ids, trail_s=trail_s)
+        try:
+            res = self._sat_tracker.current(self._overlay_station(), self._overlay_solution(), track_min=track_min,
+                                            include_below=below, track_ids=track_ids, trail_s=trail_s)
+        except Exception as exc:
+            # A missing sgp4 or an unreachable TLE feed must not hide the camera pointing the /sky page needs
+            res = {"satellites": [], "error": f"{type(exc).__name__}: {exc}"}
         obstructions = [np.array(p, np.float32) for p in ((self.station_config.get("sky_mask") or {}).get("obstruction") or [])]
         for r in res["satellites"]:
             xy = r.get("frame_xy")
