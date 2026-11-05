@@ -5162,8 +5162,10 @@ class AllSkyService:
         mirror_x, mirror_y = bool(tf.get("flip_horizontal")) != rot, bool(tf.get("flip_vertical")) != rot
         reach = max(10, int(w * 0.012))
         # Like every other solve, only stars on the open sky (your sky mask, minus obstructions) count
-        sky = bss.combined_sky_mask(frame, self.station_config.get("sky_mask"))
-        shown, native = [], []
+        user_mask = self.station_config.get("sky_mask")
+        sky = bss.combined_sky_mask(frame, user_mask, use_auto=not (user_mask or {}).get("sky"))
+        shown, native, skipped = [], [], []
+        picked = 0
         for fx, fy in points:
             cx, cy = int(round(float(fx) * w)), int(round(float(fy) * h))
             x0, x1, y0, y1 = max(0, cx - reach), min(w, cx + reach + 1), max(0, cy - reach), min(h, cy + reach + 1)
@@ -5179,13 +5181,20 @@ class AllSkyService:
             if tot > 0:
                 xs, ys = np.meshgrid(np.arange(a, b_), np.arange(c_, d_))
                 px, py = float((wgt * xs).sum() / tot), float((wgt * ys).sum() / tot)
+            picked += 1
             if sky is not None and not sky[min(h - 1, int(round(py))), min(w - 1, int(round(px)))]:
-                raise ValueError("A clicked star lies outside the sky mask: click only stars on the open sky "
-                                 "(or adjust the sky mask first)")
+                skipped.append(picked)  # outside the sky mask: ignored, like every other solve
+                shown.append([round(px / w, 4), round(py / h, 4)])
+                native.append(None)
+                continue
             flux = float(max(1.0, patch.max() - np.median(patch)))
             shown.append([round(px / w, 4), round(py / h, 4)])
             native.append([w - 1 - px if mirror_x else px, h - 1 - py if mirror_y else py, flux])
-        det = np.array(native, dtype=np.float64)
+        valid = [n for n in native if n is not None]
+        if len(valid) < 4:
+            raise ValueError(f"Only {len(valid)} of your clicks lie on the open sky inside the sky mask "
+                             f"(ignored: {', '.join(map(str, skipped)) or 'none'}); click at least 4 stars there")
+        det = np.array(valid, dtype=np.float64)
         det = det[np.argsort(-det[:, 2])][:40]  # the pattern search seeds on the brightest 16, all 40 are matched
         lat = float(self.station_config.get("latitude_deg", 21.0285))
         lon = float(self.station_config.get("longitude_deg", 105.8542))
@@ -5194,13 +5203,18 @@ class AllSkyService:
             hfov_candidates_deg=range(160, 196, 2), max_mag=4.6 if len(det) < 10 else 5.4, n_detections=min(len(det), 16), n_seed_stars=70,
             sep_tol_deg=1.0, min_matches=min(4, len(det)), max_residual_px=10.0, max_rms_px=8.0,
             detections=det, sky_mask=np.ones((h, w), dtype=bool), min_completeness=0.0)
-        out: Dict[str, Any] = {"success": bool(res.get("success")), "points": shown, "clicked": len(det)}
+        out: Dict[str, Any] = {"success": bool(res.get("success")), "points": shown, "clicked": len(det),
+                               "skipped": skipped}
         if not res.get("success"):
             out["error"] = res.get("error", "no consistent star pattern")
             return out
         out["matched_stars"] = res["matched_stars"]
         out["names"] = []
-        for nx, ny, _ in native:
+        for item in native:
+            if item is None:
+                out["names"].append(None)
+                continue
+            nx, ny, _ = item
             hit = next((m for m in res["matched_stars"] if abs(m["x"] - nx) < 1.0 and abs(m["y"] - ny) < 1.0), None)
             out["names"].append({"name": hit["name"], "mag": hit["mag"]} if hit else None)
         out["rms_px"] = res["rms_px"]
@@ -5210,6 +5224,9 @@ class AllSkyService:
         if len(res["matched_stars"]) < min(len(det), 6):
             out["warning"] = (f"Only {len(res['matched_stars'])} of {len(det)} clicked stars matched; "
                               "check that every click is on a real star")
+        if skipped:
+            out["warning"] = (out.get("warning", "") + f" Clicks {', '.join(map(str, skipped))} are outside the sky "
+                              "mask and were ignored.").strip()
         if apply:
             applied = self._apply_bright_star_solution(res, w, h)
             self.station_config["solve_source"] = "manual star alignment"
