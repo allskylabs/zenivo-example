@@ -1596,6 +1596,8 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (e) {}
         };
         maskEditor.addEventListener("toggle", () => { if (maskEditor.open) loadMask(); });
+        // <details open> fires its toggle event before this script runs, so load once now as well
+        if (maskEditor.open) loadMask();
         maskImg.addEventListener("load", () => { maskRetries = 0; drawMask(); });
         window.addEventListener("resize", rafDebounced(drawMask));
         maskCanvas.addEventListener("click", (ev) => {
