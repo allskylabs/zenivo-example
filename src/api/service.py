@@ -5080,6 +5080,7 @@ class AllSkyService:
             return None
         if not res.get("success"):
             self.activity.info("station", f"Bright-star solve: {res.get('error')}; trying the hoan.uk plate solver")
+            self._last_bright_error = str(res.get("error") or "")
             return None
         if res.get("mode") == "fixed_lens":
             return self._apply_fixed_lens_solution(res)
@@ -5351,6 +5352,9 @@ class AllSkyService:
         )
         if not solved.get("success"):
             reason = solved.get("error") or "no solution"
+            local = getattr(self, "_last_bright_error", "")
+            if local:
+                reason = f"{reason}. Local bright-star match: {local}"
             self.activity.error(
                 "station",
                 f"Plate-solve FAILED: {reason}. Station/lens parameters were left unchanged.",
