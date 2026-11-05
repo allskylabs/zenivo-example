@@ -404,7 +404,12 @@ class AllSkyService:
         med = float(np.median(a))
         p1, p99 = float(np.percentile(a, 1)), float(np.percentile(a, 99.5))
         lo, hi = p1, max(p99, p1 + 1.0)
-        img = np.clip((a - lo) / (hi - lo) * 255.0, 0, 255).astype(np.uint8)
+        if hi - lo < 8.0:
+            # nearly flat (e.g. mostly zeros): widen to the real extremes, sqrt curve so sparse pixels show
+            hi = max(float(np.percentile(a, 99.99)), float(a.max()) * 0.25, lo + 8.0)
+            img = (np.sqrt(np.clip((a - lo) / (hi - lo), 0, 1)) * 255.0).astype(np.uint8)
+        else:
+            img = np.clip((a - lo) / (hi - lo) * 255.0, 0, 255).astype(np.uint8)
         h, w = img.shape[:2]
         scale = 1000.0 / max(h, w)
         if scale < 1.0:
