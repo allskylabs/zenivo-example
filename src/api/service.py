@@ -420,7 +420,7 @@ class AllSkyService:
         if med > 150:
             warnings.append("median > 150 DN: dark too bright (light leak / not dark), will be rejected")
         if med < 20:
-            warnings.append("median < 20 DN: black level missing (pedestal subtracted or clipped), dark is suspect")
+            warnings.append("note: median < 20 DN - the sensor black pedestal falls with gain (36 DN @12 dB, 13 @18 dB, 0 @21 dB+, measured) and clips at 0, so this dark holds only hot pixels; expected at high gain, suspect at low gain")
         if float((a >= 1023).sum()) / n > 0.001:
             warnings.append("more than 0.1% saturated pixels (1023)")
         stats = {
