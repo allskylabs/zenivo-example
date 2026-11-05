@@ -2436,10 +2436,9 @@ class AllSkyService:
                     h = float(sol.get("frame_height") or 2 * cy)
                 if fh and fv:
                     roll += 180.0
-                if fh:
-                    cx = w - cx
-                if fv:
-                    cy = h - cy
+                # optics are pixel indices; the page works in continuous picture coordinates (pixel i covers [i, i+1))
+                cx = w - cx - 0.5 if fh else cx + 0.5
+                cy = h - cy - 0.5 if fv else cy + 0.5
                 res["camera"]["view_roll_deg"] = ((roll + 180.0) % 360.0) - 180.0
                 res["camera"]["lens"] = {"f": f, "k": kd, "cx": cx, "cy": cy, "w": w, "h": h, "proj": proj}
             except (KeyError, TypeError, ValueError):

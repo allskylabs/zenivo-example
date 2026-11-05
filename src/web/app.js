@@ -2144,8 +2144,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const rot180 = Number(tf.rotate_deg || 0) % 360 === 180;
         const mirrorX = !!tf.flip_horizontal !== rot180;
         const mirrorY = !!tf.flip_vertical !== rot180;
-        const toImgX = (sx) => (mirrorX ? sensorW - sx : sx);
-        const toImgY = (sy) => (mirrorY ? sensorH - sy : sy);
+        // Solver/optics coordinates are pixel indices (centre of pixel i at i); the canvas draws the picture with
+        // pixel i covering [i, i+1), so add half a pixel, and mirror around the frame edge (index i -> W-1-i)
+        const toImgX = (sx) => (mirrorX ? sensorW - sx - 0.5 : sx + 0.5);
+        const toImgY = (sy) => (mirrorY ? sensorH - sy - 0.5 : sy + 0.5);
 
         const cxCanvas = offsetX + toImgX(optX) * scaleX;
         const cyCanvas = offsetY + toImgY(optY) * scaleY;
