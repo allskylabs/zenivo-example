@@ -199,6 +199,7 @@ export function drawLayers(core: SkyCore, ctx: CanvasRenderingContext2D, proj0: 
   };
   if (L.satellites && now) for (const m of core.markers.satellites) draw(m, 's');
   if (L.aircraft && now) for (const m of core.markers.aircraft) draw(m, 'a');
+  if (L.sondes && now) for (const m of core.markers.sondes) draw(m, 'r');
   if (L.events) {
     const t = core.simMs / 1000;
     for (const m of core.markers.events) {

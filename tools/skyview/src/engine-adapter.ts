@@ -40,7 +40,7 @@ export class SkyCore {
   meteors = new MeteorSim();
   private meteorDay = -1;
   // state
-  markers: Record<MarkerGroup, Marker[]> = { aircraft: [], satellites: [], events: [] };
+  markers: Record<MarkerGroup, Marker[]> = { aircraft: [], satellites: [], sondes: [], events: [] };
   hits: Hit[] = [];
   selected: string | null = null;
   snap!: Snapshot;

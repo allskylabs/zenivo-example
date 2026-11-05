@@ -24,7 +24,7 @@ export interface SkyConfig {
 export const LAYER_KEYS = [
   'stars', 'milkyWay', 'starLabels', 'constellationLines', 'constellationLabels', 'planets', 'moon', 'ecliptic', 'calendarPoints',
   'polarAxis', 'equator', 'raGrid', 'decGrid', 'meridian', 'altAzGrid', 'seeThroughGround', 'deepSkyObjects',
-  'daylightAtmosphere', 'cardinalDirections', 'meteors', 'camera', 'cameraImage', 'aircraft', 'satellites', 'events',
+  'daylightAtmosphere', 'cardinalDirections', 'meteors', 'camera', 'cameraImage', 'aircraft', 'satellites', 'sondes', 'events',
 ] as const;
 export type LayerKey = typeof LAYER_KEYS[number];
 export type Layers = Record<LayerKey, boolean>;
@@ -39,14 +39,14 @@ export const LAYER_LABELS: Record<LayerKey, [string, string]> = {
  seeThroughGround: ['Show objects below the horizon', 'Hiện vật thể dưới chân trời'],
   deepSkyObjects: ['Messier objects', 'Thiên thể Messier'], daylightAtmosphere: ['Atmosphere and daylight', 'Khí quyển, ánh sáng ngày'],
   cardinalDirections: ['Compass (N E S W)', 'Hướng N E S W'], meteors: ['Meteor showers', 'Mưa sao băng'],
-  camera: ['Camera frame', 'Khung camera /live'], cameraImage: ['Camera picture', 'Ảnh camera /live'], aircraft: ['Aircraft', 'Máy bay'], satellites: ['Satellites', 'Vệ tinh'], events: ['Detected events', 'Sự kiện đã bắt'],
+  camera: ['Camera frame', 'Khung camera /live'], cameraImage: ['Camera picture', 'Ảnh camera /live'], aircraft: ['Aircraft', 'Máy bay'], satellites: ['Satellites', 'Vệ tinh'], sondes: ['Radiosondes', 'Bóng thăm dò (radiosonde)'], events: ['Detected events', 'Sự kiện đã bắt'],
 };
 /** One option set shared by Observer view and 3D dome. */
 export const LAYER_DEFAULTS: Layers = {
   stars: true, milkyWay: true, daylightAtmosphere: true, meteors: true,
   moon: true, planets: true, starLabels: !(typeof matchMedia === 'function' && matchMedia('(max-width: 700px)').matches), deepSkyObjects: false,
   constellationLines: true, constellationLabels: true,
-  camera: true, cameraImage: true, aircraft: true, satellites: true, events: true,
+  camera: true, cameraImage: true, aircraft: true, satellites: true, sondes: true, events: true,
   cardinalDirections: true, seeThroughGround: true,
   ecliptic: true, equator: false, meridian: false, altAzGrid: false, raGrid: false, decGrid: false, polarAxis: false, calendarPoints: false,
 };
@@ -62,7 +62,7 @@ export interface Marker {
   az2?: number; alt2?: number; ts?: number;
   rows?: [string, string][];
 }
-export type MarkerGroup = 'aircraft' | 'satellites' | 'events';
+export type MarkerGroup = 'aircraft' | 'satellites' | 'sondes' | 'events';
 
 export interface Hit { x: number; y: number; r: number; kind: string; id: string; prio: number; data: Record<string, unknown> }
 export interface InspectorData { title: string; kind: string; above: boolean; rows: [string, string][]; note?: string; az: number; alt: number }
@@ -73,7 +73,7 @@ export const LAYER_GROUPS: { id: string; title: [string, string]; open: boolean;
   { id: 'sky', title: ['Sky', 'Bầu trời'], open: true, keys: [{ k: 'stars' }, { k: 'milkyWay' }, { k: 'daylightAtmosphere' }, { k: 'meteors' }] },
   { id: 'objects', title: ['Objects', 'Thiên thể'], open: true, keys: [{ k: 'moon' }, { k: 'planets' }, { k: 'starLabels' }, { k: 'deepSkyObjects' }] },
   { id: 'cons', title: ['Constellations', 'Chòm sao'], open: true, keys: [{ k: 'constellationLines' }, { k: 'constellationLabels' }] },
-  { id: 'live', title: ['Live data', 'Dữ liệu trực tiếp'], open: true, keys: [{ k: 'camera' }, { k: 'cameraImage' }, { k: 'aircraft' }, { k: 'satellites' }, { k: 'events' }] },
+  { id: 'live', title: ['Live data', 'Dữ liệu trực tiếp'], open: true, keys: [{ k: 'camera' }, { k: 'cameraImage' }, { k: 'aircraft' }, { k: 'satellites' }, { k: 'sondes' }, { k: 'events' }] },
   { id: 'ground', title: ['Horizon', 'Chân trời'], open: true, keys: [{ k: 'cardinalDirections' }, { k: 'seeThroughGround' }] },
   { id: 'lines', title: ['Lines and grids', 'Đường và lưới'], open: false, keys: [{ k: 'ecliptic' }, { k: 'equator' }, { k: 'meridian' }, { k: 'altAzGrid' }, { k: 'raGrid' }, { k: 'decGrid' }, { k: 'polarAxis' }, { k: 'calendarPoints' }] },
 ];

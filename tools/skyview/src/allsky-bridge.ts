@@ -51,6 +51,17 @@ export function startAllskyBridge(core: SkyCore, api = ''): () => void {
         rows: [['Altitude', am !== undefined ? `${Math.round(am)} m` : 'n/a'], ['In camera view', r.in_view ? 'yes' : 'no']] };
     }));
   };
+  const pollSondes = async (): Promise<void> => {
+    const d = await getJson<{ sondes?: Raw[] }>(`${api}/api/radiosondes`);
+    if (!d) return;
+    core.setMarkers('sondes', track(core.markers.sondes, d.sondes ?? [], (r, i) => {
+      const az = num(r.az_deg), alt = num(r.alt_deg); if (az === undefined || alt === undefined) return null;
+      const am = num(r.altitude_m), cl = num(r.climb_m_s), up = r.above_horizon !== false;
+      return { id: String(r.serial ?? i), label: String(r.serial ?? 'sonde'), az, alt, color: up ? '#34d399' : '#6b7280', shape: 'dot',
+        rows: [['Type', String(r.type ?? '?')], ['Altitude', am !== undefined ? `${Math.round(am)} m` : 'n/a'], ['Climb', cl !== undefined ? `${cl} m/s` : 'n/a'],
+          ['Distance', `${num(r.distance_km) ?? '?'} km`], ['Frequency', `${num(r.freq_mhz) ?? '?'} MHz`], ['Status', up ? 'above the horizon' : 'below the horizon (landed or not yet risen)']] };
+    }));
+  };
   const pollEvents = async (): Promise<void> => {
     const since = Math.floor(Date.now() / 1000) - 2 * 3600;
     // full (non-brief) records: only those carry the sky_from / sky_to az-alt of a streak
@@ -85,7 +96,7 @@ export function startAllskyBridge(core: SkyCore, api = ''): () => void {
     } finally { imgBusy = false; }
   };
   core.on('change', () => { window.clearTimeout(imgTimer); imgTimer = window.setTimeout(() => void pollImage(), 500); });
-  const ids = [window.setInterval(() => { if (!document.hidden) void pollImage(); }, 5000), window.setInterval(() => { if (!document.hidden) void pollSats(); }, 5000), window.setInterval(() => { if (!document.hidden) void pollAir(); }, 2000), window.setInterval(() => { if (!document.hidden) void pollEvents(); }, 60000)];
-  void pollSats(); void pollAir(); void pollEvents(); window.setTimeout(() => void pollImage(), 1500);
+  const ids = [window.setInterval(() => { if (!document.hidden) void pollImage(); }, 5000), window.setInterval(() => { if (!document.hidden) void pollSats(); }, 5000), window.setInterval(() => { if (!document.hidden) void pollAir(); }, 2000), window.setInterval(() => { if (!document.hidden) void pollSondes(); }, 15000), window.setInterval(() => { if (!document.hidden) void pollEvents(); }, 60000)];
+  void pollSats(); void pollAir(); void pollSondes(); void pollEvents(); window.setTimeout(() => void pollImage(), 1500);
   return () => ids.forEach(clearInterval);
 }
