@@ -421,8 +421,14 @@ class AllSkyService:
         warnings = []
         if med > 150:
             warnings.append("median > 150 DN: dark too bright (light leak / not dark), will be rejected")
+        gm = re.search(r"gain(\d+)dB", name)
+        gain = float(gm.group(1)) if gm else 0.0
+        info = []
         if med < 20:
-            warnings.append("note: median < 20 DN - the sensor black pedestal falls with gain (36 DN @12 dB, 13 @18 dB, 0 @21 dB+, measured) and clips at 0, so this dark holds only hot pixels; expected at high gain, suspect at low gain")
+            if gain >= 21:
+                info.append("High gain: the sensor black pedestal (36 DN @12 dB, 13 @18 dB) falls to 0 from ~21 dB and clips, so this dark holds only hot pixels. Expected.")
+            else:
+                warnings.append("median < 20 DN at low gain: black level should still be ~13-36 DN, dark is suspect")
         if float((a >= 1023).sum()) / n > 0.001:
             warnings.append("more than 0.1% saturated pixels (1023)")
         stats = {
@@ -431,7 +437,7 @@ class AllSkyService:
             "median": round(med, 2), "std": round(float(a.std()), 2),
             "zero_pct": round(float((a == 0).sum()) / n * 100, 2),
             "saturated_pct": round(float((a >= 1023).sum()) / n * 100, 3),
-            "stretch": [round(lo, 1), round(hi, 1)], "warnings": warnings,
+            "stretch": [round(lo, 1), round(hi, 1)], "warnings": warnings, "info": info,
         }
         return (buf.tobytes() if ok else b""), stats
 

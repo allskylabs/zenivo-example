@@ -683,8 +683,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const q = encodeURIComponent(fn);
             const st = await (await fetch(`/api/calibration/dark-preview?file=${q}&stats=1`)).json();
             const warn = (st.warnings || []).map((w) => `<div style="color:#ff6b6b">⚠ ${w}</div>`).join("") || `<div style="color:#51cf66">OK</div>`;
+            const info = (st.info || []).map((w) => `<div style="color:#74c0fc">ℹ ${w}</div>`).join("");
             box.innerHTML = `<strong>${st.filename}</strong> ${st.shape[1]}x${st.shape[0]} ${st.dtype}<br>` +
-                `min ${st.min} · max ${st.max} · mean ${st.mean} · median ${st.median} · std ${st.std} · zero ${st.zero_pct}% · sat ${st.saturated_pct}% · stretch ${st.stretch[0]}–${st.stretch[1]} DN${warn}` +
+                `min ${st.min} · max ${st.max} · mean ${st.mean} · median ${st.median} · std ${st.std} · zero ${st.zero_pct}% · sat ${st.saturated_pct}% · stretch ${st.stretch[0]}–${st.stretch[1]} DN${warn}${info}` +
                 `<img src="/api/calibration/dark-preview?file=${q}" style="max-width:100%;margin-top:8px;display:block">`;
         } catch (e) {
             box.textContent = "Preview failed: " + e;
