@@ -1566,8 +1566,24 @@ document.addEventListener("DOMContentLoaded", () => {
             mask.obstruction.forEach((p) => poly(p, "obstruction", true));
             poly(current.pts, current.kind, false);
         };
-        const loadMask = async () => {
+        // The snapshot can fail transiently (camera busy, service restarting): retry instead of leaving a broken image
+        let maskRetries = 0, maskRetryTimer = null;
+        const loadMaskFrame = () => {
+            clearTimeout(maskRetryTimer);
             maskImg.src = `/api/live/snapshot.jpg?t=${Date.now()}`;
+        };
+        maskImg.addEventListener("error", () => {
+            if (maskRetries >= 8) {
+                showAlert(maskAlert, "❌ Could not load the live frame. Click the frame area to retry.", "error", true);
+                return;
+            }
+            maskRetries++;
+            maskRetryTimer = setTimeout(loadMaskFrame, Math.min(1000 * maskRetries, 5000));
+        });
+        maskImg.addEventListener("click", () => { maskRetries = 0; loadMaskFrame(); });
+        const loadMask = async () => {
+            maskRetries = 0;
+            loadMaskFrame();
             try {
                 const res = await fetch("/api/station/sky-mask");
                 if (res.ok) {
@@ -1580,7 +1596,7 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (e) {}
         };
         maskEditor.addEventListener("toggle", () => { if (maskEditor.open) loadMask(); });
-        maskImg.addEventListener("load", drawMask);
+        maskImg.addEventListener("load", () => { maskRetries = 0; drawMask(); });
         window.addEventListener("resize", rafDebounced(drawMask));
         maskCanvas.addEventListener("click", (ev) => {
             const r = maskCanvas.getBoundingClientRect();
