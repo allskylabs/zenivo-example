@@ -171,8 +171,14 @@ export class SkyCore {
     if (this.mode === 'eye') fovRad = Math.max(30 * DEG, Math.min(170 * DEG, fovRad));
     const k = autoProjection(fovRad); return { ...v, fovRad: clampFov(k, fovRad), projection: k };
   }
-  /** Observer view: look toward the camera (else south), 35 deg up, 90 deg wide, no roll */
-  eyeView(): void { this.sky.view = this.setFov({ ...this.sky.view, azRad: (this.camera?.az ?? 180) * DEG, altRad: 35 * DEG, rollRad: 0 }, 90 * DEG); this.dirty = true; }
+  /** Observer view: with a camera, look where it points and open as wide as the eye mode allows (the all-sky fisheye
+   *  picture then fills the view like /live); else south, 35 deg up, 90 deg wide. No roll. */
+  eyeView(): void {
+    const c = this.camera;
+    this.sky.view = c ? this.setFov({ ...this.sky.view, azRad: c.az * DEG, altRad: Math.min(89, c.alt) * DEG, rollRad: 0 }, 170 * DEG)
+      : this.setFov({ ...this.sky.view, azRad: 180 * DEG, altRad: 35 * DEG, rollRad: 0 }, 90 * DEG);
+    this.dirty = true;
+  }
   private eyeClamp(v: ViewState): ViewState { return { ...v, altRad: Math.max(-5 * DEG, Math.min(89 * DEG, v.altRad)), rollRad: 0 }; }
   allSkyView(): void { this.sky.view = this.setFov({ ...this.sky.view, azRad: 0, altRad: 89.9 * DEG, rollRad: 0 }, 150 * DEG); this.dirty = true; }
   goTo(azDeg: number, altDeg: number, fovDeg?: number, rollDeg = 0): void {
