@@ -2424,7 +2424,11 @@ class AllSkyService:
             try:
                 cx, cy = (float(v) for v in sol["optical_center_px"])
                 f = float(sol["focal_px"])
-                w, h = float(sol.get("frame_width") or 2 * cx), float(sol.get("frame_height") or 2 * cy)
+                # the solved frame is the snapshot size; the optical centre is NOT the frame centre, so 2*cx is wrong
+                out_res = self.station_config.get("output_resolution") or {}
+                sens = self.station_config.get("camera_sensor") or {}
+                w = float(sol.get("frame_width") or out_res.get("width") or sens.get("width_px") or 2 * cx)
+                h = float(sol.get("frame_height") or out_res.get("height") or sens.get("height_px") or 2 * cy)
                 if fh and fv:
                     roll += 180.0
                 if fh:
@@ -5092,6 +5096,7 @@ class AllSkyService:
         sensor = self.station_config.get("camera_sensor") or {}
         pitch = float(sensor.get("pixel_pitch_um") or 2.0)
         # The solved frame may be downscaled to the output resolution; station optics use sensor pixels
+        res["frame_width"], res["frame_height"] = int(w), int(h)  # the stored solution is in this frame's pixels
         k = float(sensor.get("width_px") or w) / float(w)
         w, h = w * k, h * k
         focal_sensor_px = res["focal_px"] * k
