@@ -413,7 +413,9 @@ class AllSkyService:
         h, w = img.shape[:2]
         scale = 1000.0 / max(h, w)
         if scale < 1.0:
-            img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+            k = int(np.ceil(1.0 / scale))
+            img = cv2.dilate(img, np.ones((k, k), np.uint8))  # max-pool so lone hot pixels survive the downscale
+            img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_NEAREST)
         ok, buf = cv2.imencode(".png", img)
         n = a.size
         warnings = []
