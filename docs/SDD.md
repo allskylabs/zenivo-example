@@ -125,7 +125,19 @@ opens, it falls back to the simulator (unless told not to).
    - RAW10 frames: subtract the master dark and repair hot pixels before demosaicing.
    - Otherwise: subtract in 8-bit image space.
    - An LRU cache holds 4 darks.
-5. Image transform (flip/rotate), then downscale to the output resolution.
+5. Image transform (mirror/flip/rotate 180°), then downscale to the output resolution.
+   - **When**: right after the camera frame is captured, dark-subtracted and hot-pixel repaired (steps 3-4 stay in
+     native sensor orientation, because the dark library and hot-pixel tracker are native), and before everything
+     else: auto-exposure, star boost, JPEG/WebP, archive, timelapse, event detection and plate solving all see the
+     transformed ("display") frame.
+   - Night (RAW10) frames use `rotate_deg` and the flips. Day (ISP) frames add `rotate_isp_180` on top.
+   - **Coordinate spaces.** Solved optics (optical centre, roll, focal length, distortion) are stored in *native
+     sensor* coordinates. The sky overlay projects stars in native coordinates and applies the current transform
+     itself (`toImgX/toImgY` in `app.js`), so changing the orientation needs no new solve. The plate solver therefore
+     un-transforms its input frames first (`_solve_bright_star_pattern`). The sky mask polygons are drawn on the
+     displayed image, so they are stored in *display* fractions and are turned with the image whenever
+     the orientation changes (`set_image_transform`). Anything in display space (archived frames, event
+     boxes) keeps the orientation it was captured with.
 6. **Auto-exposure** (auto mode)
    - The sky profile (day, civil, nautical, night) comes from the solar elevation, with 1° hysteresis.
    - Target luma is 142 by day and 85 at night, with deadbands, clipping guards and a fast drop
