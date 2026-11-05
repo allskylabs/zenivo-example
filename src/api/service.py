@@ -390,6 +390,44 @@ class AllSkyService:
         except Exception:
             pass
 
+    def get_dark_preview(self, filename: str):
+        """Return (png_bytes, stats) for a saved RAW10 master dark; None if missing/invalid name."""
+        import cv2
+        name = os.path.basename(filename or "")
+        if name != filename or not (name.startswith("master_dark_raw10_") and name.endswith(".npy")):
+            return None
+        path = os.path.join(self.calibration_dir, name)
+        if not os.path.isfile(path):
+            return None
+        arr = np.load(path)
+        a = arr.astype(np.float32)
+        med = float(np.median(a))
+        p1, p99 = float(np.percentile(a, 1)), float(np.percentile(a, 99.5))
+        lo, hi = p1, max(p99, p1 + 1.0)
+        img = np.clip((a - lo) / (hi - lo) * 255.0, 0, 255).astype(np.uint8)
+        h, w = img.shape[:2]
+        scale = 1000.0 / max(h, w)
+        if scale < 1.0:
+            img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+        ok, buf = cv2.imencode(".png", img)
+        n = a.size
+        warnings = []
+        if med > 150:
+            warnings.append("median > 150 DN: dark too bright (light leak / not dark), will be rejected")
+        if med < 20:
+            warnings.append("median < 20 DN: black level missing (pedestal subtracted or clipped), dark is suspect")
+        if float((a >= 1023).sum()) / n > 0.001:
+            warnings.append("more than 0.1% saturated pixels (1023)")
+        stats = {
+            "filename": name, "shape": [int(h), int(w)], "dtype": str(arr.dtype),
+            "min": float(a.min()), "max": float(a.max()), "mean": round(float(a.mean()), 2),
+            "median": round(med, 2), "std": round(float(a.std()), 2),
+            "zero_pct": round(float((a == 0).sum()) / n * 100, 2),
+            "saturated_pct": round(float((a >= 1023).sum()) / n * 100, 3),
+            "stretch": [round(lo, 1), round(hi, 1)], "warnings": warnings,
+        }
+        return (buf.tobytes() if ok else b""), stats
+
     def _list_calibration_files(self) -> List[Dict[str, Any]]:
         """List saved 10-bit Bayer RAW master dark files (master_dark_raw10_*.npy) in data/calibration/darks/ sorted newest first."""
         files_info: List[Dict[str, Any]] = []

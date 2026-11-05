@@ -271,6 +271,22 @@ def get_calibration_status(
     return service.get_calibration_status()
 
 
+@router.get("/api/calibration/dark-preview")
+def get_dark_preview(
+    file: str = Query(...),
+    stats: bool = Query(False),
+    service: AllSkyService = Depends(get_service),
+):
+    """Contrast-stretched PNG preview (or stats JSON with stats=1) of a saved RAW10 master dark."""
+    res = service.get_dark_preview(file)
+    if res is None:
+        raise HTTPException(status_code=404, detail="dark not found")
+    png, st = res
+    if stats:
+        return st
+    return Response(content=png, media_type="image/png")
+
+
 @router.post("/api/calibration/auto-library")
 def trigger_auto_dark_library(
     only_missing: bool = Query(default=False),

@@ -662,13 +662,34 @@ document.addEventListener("DOMContentLoaded", () => {
                             <td><strong class="text-accent">${f.filename}</strong></td>
                             <td>${f.size_kb} KB</td>
                             <td>${f.modified_at ? fmtLocalIso(f.modified_at) : "--"}</td>
-                            <td class="text-muted">${f.file_path}</td>
+                            <td><button class="btn btn-sm" onclick="window.showDarkPreview('${f.filename}')">View</button></td>
                         </tr>`
                     )
                     .join("");
             }
         }
     }
+
+    window.showDarkPreview = async function (fn) {
+        let box = document.getElementById("dark-preview-box");
+        if (!box) {
+            box = document.createElement("div");
+            box.id = "dark-preview-box";
+            box.style.cssText = "margin-top:12px;padding:12px;border:1px solid #444;border-radius:8px;";
+            document.getElementById("dark-library-body").closest(".events-table-wrapper").after(box);
+        }
+        box.textContent = "Loading...";
+        try {
+            const q = encodeURIComponent(fn);
+            const st = await (await fetch(`/api/calibration/dark-preview?file=${q}&stats=1`)).json();
+            const warn = (st.warnings || []).map((w) => `<div style="color:#ff6b6b">⚠ ${w}</div>`).join("") || `<div style="color:#51cf66">OK</div>`;
+            box.innerHTML = `<strong>${st.filename}</strong> ${st.shape[1]}x${st.shape[0]} ${st.dtype}<br>` +
+                `min ${st.min} · max ${st.max} · mean ${st.mean} · median ${st.median} · std ${st.std} · zero ${st.zero_pct}% · sat ${st.saturated_pct}% · stretch ${st.stretch[0]}–${st.stretch[1]} DN${warn}` +
+                `<img src="/api/calibration/dark-preview?file=${q}" style="max-width:100%;margin-top:8px;display:block">`;
+        } catch (e) {
+            box.textContent = "Preview failed: " + e;
+        }
+    };
 
     async function pollCalibrationStatus() {
         try {
