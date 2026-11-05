@@ -1641,6 +1641,145 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Manual star alignment: click real stars on the live frame, the server identifies them and fixes the pointing
+    const alignBox = document.getElementById("star-align");
+    if (alignBox) {
+        const alignImg = document.getElementById("align-img");
+        const alignCanvas = document.getElementById("align-canvas");
+        const alignAlert = document.getElementById("align-alert");
+        const btnApply = document.getElementById("align-apply");
+        let picks = [];          // [x, y] fractions (snapped to the star once identified)
+        let maskPolys = { sky: [], obstruction: [] };
+        let identified = null;   // last successful preview
+        let alignRetries = 0, alignTimer = null;
+
+        const drawAlign = () => {
+            const w = alignImg.clientWidth, h = alignImg.clientHeight;
+            if (!w || !h) return;
+            alignCanvas.width = w;
+            alignCanvas.height = h;
+            const ctx = alignCanvas.getContext("2d");
+            ctx.clearRect(0, 0, w, h);
+            const outline = (polys, rgb) => polys.forEach((pts) => {
+                ctx.beginPath();
+                pts.forEach(([x, y], i) => (i ? ctx.lineTo(x * w, y * h) : ctx.moveTo(x * w, y * h)));
+                ctx.closePath();
+                ctx.strokeStyle = `rgba(${rgb},0.7)`;
+                ctx.setLineDash([6, 4]);
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.setLineDash([]);
+            });
+            outline(maskPolys.sky, "34,197,94");
+            outline(maskPolys.obstruction, "239,68,68");
+            const names = new Map();
+            if (identified) identified.matched_stars.forEach((m) => names.set(`${m.x}|${m.y}`, m));
+            picks.forEach(([x, y], i) => {
+                ctx.strokeStyle = "#fbbf24";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(x * w, y * h, 14, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = "#fbbf24";
+                ctx.font = "bold 13px sans-serif";
+                ctx.fillText(String(i + 1), x * w + 18, y * h - 12);
+            });
+            if (identified) {
+                ctx.font = "bold 13px sans-serif";
+                identified.points.forEach(([x, y], i) => {
+                    const m = identified.names[i];
+                    if (!m) return;
+                    ctx.fillStyle = "#38bdf8";
+                    ctx.fillText(`${m.name} (${m.mag})`, x * w + 18, y * h + 4);
+                });
+            }
+        };
+        const loadAlignFrame = () => {
+            clearTimeout(alignTimer);
+            alignImg.src = `/api/live/snapshot.jpg?t=${Date.now()}`;
+        };
+        const loadAlignMask = async () => {
+            try {
+                const res = await fetch("/api/station/sky-mask");
+                if (res.ok) {
+                    const d = await res.json();
+                    maskPolys = { sky: d.sky || [], obstruction: d.obstruction || [] };
+                    drawAlign();
+                }
+            } catch (e) {}
+        };
+        const reset = () => { picks = []; identified = null; btnApply.disabled = true; drawAlign(); };
+        alignImg.addEventListener("error", () => {
+            if (alignRetries >= 8) return;
+            alignRetries++;
+            alignTimer = setTimeout(loadAlignFrame, Math.min(1000 * alignRetries, 5000));
+        });
+        alignImg.addEventListener("load", () => { alignRetries = 0; drawAlign(); });
+        window.addEventListener("resize", rafDebounced(drawAlign));
+        alignCanvas.addEventListener("click", (ev) => {
+            const r = alignCanvas.getBoundingClientRect();
+            picks.push([(ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height]);
+            identified = null;
+            btnApply.disabled = true;
+            drawAlign();
+        });
+        document.getElementById("align-refresh").addEventListener("click", () => { reset(); alignRetries = 0; loadAlignFrame(); });
+        document.getElementById("align-undo").addEventListener("click", () => { picks.pop(); identified = null; btnApply.disabled = true; drawAlign(); });
+        document.getElementById("align-clear").addEventListener("click", reset);
+
+        const callAlign = async (apply) => {
+            const res = await fetch("/api/station/star-align", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ points: picks, apply }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+            return data;
+        };
+        document.getElementById("align-identify").addEventListener("click", async () => {
+            if (picks.length < 4) {
+                showAlert(alignAlert, "❌ Click at least 4 stars first.", "error", true);
+                return;
+            }
+            try {
+                const data = await callAlign(false);
+                if (!data.success) {
+                    identified = null;
+                    btnApply.disabled = true;
+                    showAlert(alignAlert, `❌ ${data.error}. Check that each click is on a real star.`, "error", true);
+                    return;
+                }
+                picks = data.points;
+                const names = data.names;
+                identified = { ...data, names };
+                btnApply.disabled = false;
+                const list = data.matched_stars.map((m) => `${m.name} (${m.mag}, ${m.err_px}px)`).join(", ");
+                const p = data.pointing;
+                showAlert(alignAlert,
+                    `✅ ${data.matched_stars.length} of ${data.clicked} clicks identified: ${list}. RMS ${data.rms_px}px, ` +
+                    `Az ${p.pointing_az_deg}°, Alt ${p.pointing_alt_deg}°, roll ${p.roll_deg}°.` +
+                    (data.warning ? ` ⚠ ${data.warning}` : "") + " Press Apply to store it.", "success", true);
+                drawAlign();
+            } catch (err) {
+                showAlert(alignAlert, `❌ ${err.message}`, "error", true);
+            }
+        });
+        btnApply.addEventListener("click", async () => {
+            try {
+                const data = await callAlign(true);
+                if (!data.success || !data.applied) throw new Error(data.error || "not applied");
+                btnApply.disabled = true;
+                showAlert(alignAlert, `✅ Stored. ${data.message || ""}`, "success", true);
+                if (typeof loadStationConfig === "function") loadStationConfig();
+            } catch (err) {
+                showAlert(alignAlert, `❌ ${err.message}`, "error", true);
+            }
+        });
+        loadAlignFrame();
+        loadAlignMask();
+    }
+
     // ------------------------------------------------------------------
     // Live View Controls
     // ------------------------------------------------------------------

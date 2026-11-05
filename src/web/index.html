@@ -887,6 +887,24 @@
                     </div>
                     <div id="mask-alert" class="alert-box hidden mt-3"></div>
                 </details>
+                <details class="params-summary" id="star-align" open>
+                    <summary>Align by stars (when the automatic solve is wrong)</summary>
+                    <p class="field-note">Click 4 or more stars you can really see on the open sky (inside the green
+                        outline), spread over the frame, brightest first. The solver identifies them from their mutual
+                        angles, shows the result, and only stores it when you press Apply.</p>
+                    <div class="settings-actions">
+                        <button id="align-refresh" class="btn btn-sm btn-outline" type="button">⟳ New frame</button>
+                        <button id="align-undo" class="btn btn-sm btn-outline" type="button">↶ Undo star</button>
+                        <button id="align-clear" class="btn btn-sm btn-outline" type="button">🗑 Clear</button>
+                        <button id="align-identify" class="btn btn-sm btn-outline" type="button">🔍 Identify</button>
+                        <button id="align-apply" class="btn btn-sm btn-primary" type="button" disabled>✔ Apply</button>
+                    </div>
+                    <div class="mask-canvas-wrap">
+                        <img id="align-img" alt="Live frame for picking stars">
+                        <canvas id="align-canvas"></canvas>
+                    </div>
+                    <div id="align-alert" class="alert-box hidden mt-3"></div>
+                </details>
             </div>
 
             <!-- Integrations Card -->
@@ -1251,7 +1269,7 @@
 
     <!-- App JavaScript -->
     <script src="/static/sky_catalog.js"></script>
-    <script src="/app.js?v=20261105mask2"></script>
+    <script src="/app.js?v=20261105align1"></script>
     <script src="/static/activity.js?v=20261028ev9"></script>
     <script src="/static/focus.js?v=20261031lp1"></script>
     <script>

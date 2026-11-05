@@ -5063,7 +5063,10 @@ class AllSkyService:
         if res.get("mode") == "fixed_lens":
             return self._apply_fixed_lens_solution(res)
 
-        h, w = frame.shape[:2]
+        return self._apply_bright_star_solution(res, frame.shape[1], frame.shape[0])
+
+    def _apply_bright_star_solution(self, res: Dict[str, Any], w: int, h: int) -> Dict[str, Any]:
+        """Store a free-lens star solution (pointing and lens) made on a w x h frame in the station config."""
         sensor = self.station_config.get("camera_sensor") or {}
         pitch = float(sensor.get("pixel_pitch_um") or 2.0)
         # The solved frame may be downscaled to the output resolution; station optics use sensor pixels
@@ -5135,6 +5138,84 @@ class AllSkyService:
         )
         self.activity.success("station", msg)
         return {"success": True, "message": msg, "solution": res, "station_config": self.get_station_config()}
+
+    def manual_star_solve(self, points: List[List[float]], apply: bool = False,
+                          when: Optional[datetime] = None) -> Dict[str, Any]:
+        """Identify stars the user clicked on the live frame and (optionally) store the camera pointing.
+
+        points: [x, y] frame fractions on the displayed image. Each click snaps to the brightest spot nearby,
+        the clicked spots are matched to the bright-star catalog by their mutual angles, and with apply=True
+        the pointing and lens are stored like a normal solve. Needs 4 or more real stars.
+        """
+        from src.calibration import bright_star_solver as bss
+
+        frame = self.last_frame
+        if frame is None:
+            raise ValueError("No camera frame yet")
+        if len(points) < 4:
+            raise ValueError("Click at least 4 stars you can see in the frame")
+        h, w = frame.shape[:2]
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) if frame.ndim == 3 else frame
+        gray = gray.astype(np.float32)
+        tf = self.station_config.get("image_transform") or {}
+        rot = int(tf.get("rotate_deg", 0)) % 360 == 180
+        mirror_x, mirror_y = bool(tf.get("flip_horizontal")) != rot, bool(tf.get("flip_vertical")) != rot
+        reach = max(10, int(w * 0.012))
+        # Like every other solve, only stars on the open sky (your sky mask, minus obstructions) count
+        sky = bss.combined_sky_mask(frame, self.station_config.get("sky_mask"))
+        shown, native = [], []
+        for fx, fy in points:
+            cx, cy = int(round(float(fx) * w)), int(round(float(fy) * h))
+            x0, x1, y0, y1 = max(0, cx - reach), min(w, cx + reach + 1), max(0, cy - reach), min(h, cy + reach + 1)
+            if x1 - x0 < 5 or y1 - y0 < 5:
+                raise ValueError("A click lies outside the frame")
+            patch = cv2.GaussianBlur(gray[y0:y1, x0:x1], (0, 0), 1.5)
+            iy, ix = np.unravel_index(int(patch.argmax()), patch.shape)
+            px, py = x0 + ix, y0 + iy
+            a, b_, c_, d_ = max(0, px - 4), min(w, px + 5), max(0, py - 4), min(h, py + 5)
+            win = gray[c_:d_, a:b_]
+            wgt = np.clip(win - np.median(win), 0, None)
+            tot = float(wgt.sum())
+            if tot > 0:
+                xs, ys = np.meshgrid(np.arange(a, b_), np.arange(c_, d_))
+                px, py = float((wgt * xs).sum() / tot), float((wgt * ys).sum() / tot)
+            if sky is not None and not sky[min(h - 1, int(round(py))), min(w - 1, int(round(px)))]:
+                raise ValueError("A clicked star lies outside the sky mask: click only stars on the open sky "
+                                 "(or adjust the sky mask first)")
+            flux = float(max(1.0, patch.max() - np.median(patch)))
+            shown.append([round(px / w, 4), round(py / h, 4)])
+            native.append([w - 1 - px if mirror_x else px, h - 1 - py if mirror_y else py, flux])
+        det = np.array(native, dtype=np.float64)
+        det = det[np.argsort(-det[:, 2])]
+        lat = float(self.station_config.get("latitude_deg", 21.0285))
+        lon = float(self.station_config.get("longitude_deg", 105.8542))
+        res = bss.solve_bright_stars(
+            np.zeros((h, w, 3), np.uint8), lat, lon, when=when or datetime.now().astimezone(), projection="equidistant",
+            hfov_candidates_deg=range(160, 196, 2), max_mag=4.6, n_detections=len(det), n_seed_stars=70,
+            sep_tol_deg=1.0, min_matches=min(4, len(det)), max_residual_px=10.0, max_rms_px=8.0,
+            detections=det, sky_mask=np.ones((h, w), dtype=bool), min_completeness=0.0)
+        out: Dict[str, Any] = {"success": bool(res.get("success")), "points": shown, "clicked": len(det)}
+        if not res.get("success"):
+            out["error"] = res.get("error", "no consistent star pattern")
+            return out
+        out["matched_stars"] = res["matched_stars"]
+        out["names"] = []
+        for nx, ny, _ in native:
+            hit = next((m for m in res["matched_stars"] if abs(m["x"] - nx) < 1.0 and abs(m["y"] - ny) < 1.0), None)
+            out["names"].append({"name": hit["name"], "mag": hit["mag"]} if hit else None)
+        out["rms_px"] = res["rms_px"]
+        out["pointing"] = {k: res.get(k) for k in ("pointing_az_deg", "pointing_alt_deg", "roll_deg",
+                                                    "fov_horizontal_deg", "fov_vertical_deg")}
+        out["applied"] = False
+        if len(res["matched_stars"]) < max(4, len(det) - 1):
+            out["warning"] = (f"Only {len(res['matched_stars'])} of {len(det)} clicked stars matched; "
+                              "check that every click is on a real star")
+        if apply:
+            applied = self._apply_bright_star_solution(res, w, h)
+            self.station_config["solve_source"] = "manual star alignment"
+            self._save_station_config()
+            out.update({"applied": True, "message": applied.get("message")})
+        return out
 
     def _apply_fixed_lens_solution(self, res: Dict[str, Any]) -> Dict[str, Any]:
         """Store the pointing from a fixed-lens solve; the solved lens intrinsics stay as they are."""

@@ -26,6 +26,7 @@ from src.api.schemas import (
     StoragePolicyRequest,
     CloudConfigRequest,
     SkyMaskRequest,
+    ManualStarSolveRequest,
     FocusConfigRequest,
     LensRequest,
     LensAutofocusRequest,
@@ -849,6 +850,15 @@ def set_station_sky_mask(req: SkyMaskRequest, service: AllSkyService = Depends(g
     """Save sky/obstruction polygons (frame fractions); send both lists empty to clear the mask."""
     try:
         return service.set_sky_mask(sky=req.sky, obstruction=req.obstruction)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/api/station/star-align")
+def station_star_align(req: ManualStarSolveRequest, service: AllSkyService = Depends(get_service)):
+    """Identify 4+ stars clicked on the live frame and (apply=true) store the camera pointing from them."""
+    try:
+        return service.manual_star_solve(req.points, apply=req.apply)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
