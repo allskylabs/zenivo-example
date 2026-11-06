@@ -1484,32 +1484,59 @@
                     const s = rn > 1e-12 ? Math.sin(t) / rn : 1;
                     return [x * s, y * s, Math.cos(t)];
                 };
-                const toScene = ([x, y, z]) => {
-                    const v = [0, 1, 2].map((i) => R.right[i] * x + R.down[i] * y + R.axis[i] * z);
-                    const d = 12000 / Math.hypot(...v);
-                    const p = enuOffset(stationBasis, v[0] * d, v[1] * d, Math.max(v[2] * d, 0));   // rays below the horizon end on the ground
+                // Direction (ENU unit vector) for a frame offset; the frustum is drawn as a patch of a 12 km sphere,
+                // clipped at the horizon (a plain clamp folded the below-horizon part into vertical walls)
+                const R_KM = 12000;
+                const dirOf = (x, y) => {
+                    const [cx, cy, cz] = camRay(x, y);
+                    const v = [0, 1, 2].map((i) => R.right[i] * cx + R.down[i] * cy + R.axis[i] * cz);
+                    const m = Math.hypot(...v);
+                    return v.map((q) => q / m);
+                };
+                const toScene = (v) => {
+                    const p = enuOffset(stationBasis, v[0] * R_KM, v[1] * R_KM, Math.max(v[2] * R_KM, 0));
                     return new THREE.Vector3(s0[0] + p[0], s0[1] + p[1], s0[2] + p[2]);
                 };
-                // Frame outline, sampled along each edge so a fisheye's edges curve as they do on the sky
-                const N = fish ? 16 : 1, cornerXY = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]], ring = [];
+                const lerpDir = (a, b, t) => { const q = [0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * t); const m = Math.hypot(...q); return q.map((c) => c / m); };
+                // Clip a spherical triangle to u >= 0 (Sutherland-Hodgman on the up component), returns polygon of dirs
+                const clipUp = (poly) => {
+                    const out = [];
+                    for (let i = 0; i < poly.length; i++) {
+                        const a = poly[i], b = poly[(i + 1) % poly.length];
+                        const ain = a[2] >= 0, bin = b[2] >= 0;
+                        if (ain) out.push(a);
+                        if (ain !== bin) { const t = a[2] / (a[2] - b[2]); const q = [0, 1, 2].map((k) => a[k] + (b[k] - a[k]) * t); out.push([q[0], q[1], 0].map((c, k) => k === 2 ? 0 : c)); }
+                    }
+                    return out;
+                };
+                const NX = 28, NY = 20, grid = [];
+                for (let j = 0; j <= NY; j++) { grid.push([]); for (let i = 0; i <= NX; i++) grid[j].push(dirOf(-hw + 2 * hw * i / NX, -hh + 2 * hh * j / NY)); }
+                const tris = [];
+                const addTri = (a, b, c) => {
+                    const poly = clipUp([a, b, c]);
+                    for (let k = 1; k + 1 < poly.length; k++) tris.push(toScene(poly[0]), toScene(poly[k]), toScene(poly[k + 1]));
+                };
+                for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+                    const a = grid[j][i], b = grid[j][i + 1], c = grid[j + 1][i + 1], d = grid[j + 1][i];
+                    addTri(a, b, c); addTri(a, c, d);
+                }
+                const apex = new THREE.Vector3(...s0);
+                // Outline: frame edges (above the horizon only) + rays from the station to the frame corners
+                const N = 40, cornerXY = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]], pts = [];
                 for (let c = 0; c < 4; c++) {
                     const [ax, ay] = cornerXY[c], [bx, by] = cornerXY[(c + 1) % 4];
-                    for (let j = 0; j < N; j++) ring.push(toScene(camRay(ax + (bx - ax) * j / N, ay + (by - ay) * j / N)));
+                    let prev = dirOf(ax, ay);
+                    if (prev[2] >= 0) pts.push(apex, toScene(prev));
+                    for (let j = 1; j <= N; j++) {
+                        const cur = dirOf(ax + (bx - ax) * j / N, ay + (by - ay) * j / N);
+                        if (prev[2] >= 0 && cur[2] >= 0) pts.push(toScene(prev), toScene(cur));
+                        prev = cur;
+                    }
                 }
-                const apex = new THREE.Vector3(...s0), centre = toScene(camRay(0, 0));
-                const pts = [];
-                for (let c = 0; c < 4; c++) pts.push(apex, ring[c * N]);
-                for (let i = 0; i < ring.length; i++) pts.push(ring[i], ring[(i + 1) % ring.length]);
                 group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),
                     new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.7 })));
-                const tris = [];
-                for (let i = 0; i < ring.length; i++) {
-                    const a = ring[i], b = ring[(i + 1) % ring.length];
-                    tris.push(apex, a, b, centre, a, b);   // side wall and far cap
-                }
-                const face = new THREE.BufferGeometry().setFromPoints(tris);
-                group.add(new THREE.Mesh(face, new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.07,
-                    side: THREE.DoubleSide, depthWrite: false })));
+                group.add(new THREE.Mesh(new THREE.BufferGeometry().setFromPoints(tris), new THREE.MeshBasicMaterial({ color: 0x38bdf8,
+                    transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false })));
             }
             group.visible = layerOn.frustum;
             frustumGroup = group;

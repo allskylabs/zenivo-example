@@ -44,7 +44,7 @@ export function startAllskyBridge(core: SkyCore, api = ''): () => void {
   const pollAir = async (): Promise<void> => {
     const d = await getJson<{ aircraft?: Raw[] }>(`${api}/api/adsb/aircraft`);
     if (!d) return;
-    core.setMarkers('aircraft', track(core.markers.aircraft, (d.aircraft ?? []).filter(a => a.above_horizon !== false), (r, i) => {
+    core.setMarkers('aircraft', track(core.markers.aircraft, (d.aircraft ?? []).filter(a => a.above_horizon !== false && !(num(a.distance_km) !== undefined && num(a.distance_km)! > 100)), (r, i) => {
       const az = num(r.az_deg), alt = num(r.alt_deg); if (az === undefined || alt === undefined) return null;
       const name = String(r.callsign || r.icao || r.hex || '?').trim(); const am = num(r.altitude_m);
       return { id: String(r.icao ?? r.hex ?? r.callsign ?? i), label: name, az, alt, color: r.in_view ? '#fbbf24' : '#f472b6', shape: 'plane',

@@ -2916,6 +2916,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     // ---- ADS-B aircraft overlay: marks planes that fall inside the camera's field of view ----
+    const AIRCRAFT_MAX_KM = 100;   // farther aircraft are not drawn on the frame or the sky view
     let aircraftList = [];
     let aircraftFetchedAt = 0;
     let aircraftT = 0;       // server time of the positions in aircraftList
@@ -3073,6 +3074,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (showAircraft) aircraftList.forEach((a) => {
             if (!a.frame_xy) return;
+            if (a.distance_km != null && a.distance_km > AIRCRAFT_MAX_KM) return;   // too far to be a visible light: skip
             let fx = a.frame_xy[0], fy = a.frame_xy[1];
             if (a.frame_v) { fx += a.frame_v[0] * lag; fy += a.frame_v[1] * lag; }
             if (mirrorX) fx = 1 - fx;
