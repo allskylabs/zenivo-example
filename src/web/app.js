@@ -3884,9 +3884,19 @@ document.addEventListener("DOMContentLoaded", () => {
         const eventAt = (ts) => cloudEvents.find((e) => ts >= e.start_ts - 4 && ts <= Math.max(e.end_ts || 0, e.start_ts) + 4) || null;
 
         async function loadSpan(ts) {
-            const r = await fetch(`/api/frames/span?start=${Math.floor(ts - SPAN_BEFORE)}&end=${Math.ceil(ts + SPAN_AFTER)}&max=900`);
-            if (!r.ok) throw new Error("span");
-            return (await r.json()).frames || [];
+            // A service restart or a flaky phone link fails the first call: retry before giving up
+            let lastErr;
+            for (let attempt = 0; attempt < 4; attempt++) {
+                try {
+                    const r = await fetch(`/api/frames/span?start=${Math.floor(ts - SPAN_BEFORE)}&end=${Math.ceil(ts + SPAN_AFTER)}&max=900`);
+                    if (!r.ok) throw new Error("span");
+                    return (await r.json()).frames || [];
+                } catch (e) {
+                    lastErr = e;
+                    await new Promise((res) => setTimeout(res, 1200 * (attempt + 1)));
+                }
+            }
+            throw lastErr;
         }
         const nearestIdx = (frames, ts) => frames.reduce((bi, f, i) => (Math.abs(f.ts - ts) < Math.abs(frames[bi].ts - ts) ? i : bi), 0);
 
@@ -4055,6 +4065,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Jump to a moment: (re)load the frames around it unless it is already inside the loaded window
         async function openFrameAt(ts, ev) {
+            let fvLoadFailed = false;
             stopPlay();
             if (ev !== undefined) fvEvent = ev;
             fv.classList.remove("hidden");
@@ -4071,12 +4082,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     fvFrames = frames;
                 } catch (e) {
                     fvFrames = [];
+                    fvLoadFailed = true;
                 }
                 if (req !== fvReq) return;
             }
             if (!fvFrames.length) {
                 fvImg.classList.add("hidden");
-                fvMsg.textContent = "No archived frame near that time (frames are kept for a limited number of days).";
+                fvMsg.textContent = fvLoadFailed ? "Could not load the archived frames (the server did not answer). Tap the event again."
+                    : "No archived frame near that time (frames are kept for a limited number of days).";
                 fvMsg.classList.remove("hidden");
                 return;
             }
