@@ -48,8 +48,8 @@ class RTS5869CameraController(CameraDriverInterface):
 
     RAW10_EXPOSURE_THRESHOLD_S = 0.4
     # The RTS5869 ISP output (MJPG) carries a strong magenta cast in daylight; RAW10 with the software white
-    # balance is neutral at any exposure (>= 0.15 ms here). True: use RAW10 day and night.
-    PREFER_RAW10_ALWAYS = True
+    # balance is neutral at any exposure (>= 0.15 ms here). False: MJPG by day (RAW10 start-stream fails on some hosts); RAW10 at night and for long exposures.
+    PREFER_RAW10_ALWAYS = False
 
     def __init__(
         self,
