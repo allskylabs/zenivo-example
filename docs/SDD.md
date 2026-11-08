@@ -102,6 +102,12 @@ opens, it falls back to the simulator (unless told not to).
    - **Night or exposure ≥ 0.4 s:** RAW10 Bayer bypass (black level 52), demosaiced with
      optional 2×2 or 4×4 binning and gray-world white balance.
    - The stream stays on (persistent STREAMON) and is reset after errors.
+   - **Known host limit (minipc 192.168.6.15, 2026-11-08):** writing the Bayer route (`XDATA[0x8000..0x8007]`) stops
+     the stream on this unit (no frame, even after STREAMOFF/ON; only a USB reset recovers). `ALLSKY_DISABLE_RAW10=1`
+     keeps MJPG day and night there; the night RAW10 path is therefore not available on that host (root cause open).
+   - **MJPG colour:** `ALLSKY_ISP_WB_K=<kelvin>` locks the camera's own AWB (it drifts magenta under foliage).
+     The ISP's radial purple pedestal can be removed per pixel with `tools/isp_calibrate.py` (dark + flat capture
+     -> `data/calibration/isp_shading.npz`, applied in `apply_isp_shading`); without the file nothing is applied.
 2. **Pi CSI** (picamera2/libcamera)
    - Full field of view, 2×2-binned mode. AE is off.
    - Range 0 to 24 dB, 0.1 ms to 60 s, at most 5 fps (10 fps in focus mode).
@@ -276,7 +282,7 @@ data/
 | `orientation` | Azimuth, roll, CD matrix |
 | `image_transform` | Flip/rotate |
 | `output_resolution` | Output frame size |
-| `bright_star_solution` | Last local plate solve |
+| `bright_star_solution` | Last local plate solve. A hand edit of azimuth / altitude / tilt / north angle in Settings also rewrites its `pointing_az_deg`, `pointing_alt_deg`, `roll_deg` (and sets `manual_override`), because `/flights3d`, `/sky`, satellites and ADS-B overlays read the pointing from it; run a star solve to refine |
 | `camera_settings` | Saved manual mode |
 | `white_balance` | White balance mode and gains |
 | `sky_roi`, `sky_mask` | Sky region and polygons |
@@ -332,6 +338,7 @@ holds a few hours that are 2026-10-18 in local time.
 | Service | `deploy/allsky-ng.service`: user `pi`, group `video`, `.venv/bin/python run_allsky.py --host 127.0.0.1 --port 8095 --camera auto --sync-target http://127.0.0.1:3000 --sync-interval 60 --log-level warning --no-access-log --prune-dir …archive:3 --prune-dir …events:90`, `Restart=always`, `Nice=5`, `MemoryMax=700M` |
 | Web | `deploy/nginx-allsky.hoan.uk.conf`: :80 → 127.0.0.1:8095, WebSocket upgrade, `proxy_buffering off`, 3600 s timeouts. cloudflared maps allsky.hoan.uk → :80 and is never restarted for allsky |
 | Development instance | User service `allsky-web` on port 8080 from the repo checkout |
+| Current instance (2026-11-08) | minipc 192.168.6.15 (LAN) / `minipcv6.hoan.uk` (IPv6 SSH), user `hoan`, `/home/hoan/allsky-ng`, system service `allsky-web` on 127.0.0.1:8080, no sync target; cloudflared ingress `sky.hoan.uk -> 127.0.0.1:8080` (`/etc/cloudflared/config.yml`) |
 
 To deploy:
 
