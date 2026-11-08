@@ -823,10 +823,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 stationNameInput.value = nameVal;
             }
             if (stationLatInput && document.activeElement !== stationLatInput && latVal !== undefined) {
-                stationLatInput.value = Number(latVal).toFixed(4);
+                stationLatInput.value = Number(latVal).toFixed(5);
             }
             if (stationLonInput && document.activeElement !== stationLonInput && lonVal !== undefined) {
-                stationLonInput.value = Number(lonVal).toFixed(4);
+                stationLonInput.value = Number(lonVal).toFixed(5);
             }
             if (stationElevInput && document.activeElement !== stationElevInput && st.elevation_m !== undefined) {
                 stationElevInput.value = Math.round(Number(st.elevation_m));
@@ -910,7 +910,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const lat = Number(latVal !== undefined ? latVal : 21.0285);
             const lon = Number(lonVal !== undefined ? lonVal : 105.8542);
             const elev = Math.round(Number(st.elevation_m || 20));
-            stCoords.textContent = `${Math.abs(lat).toFixed(4)}°${lat >= 0 ? "N" : "S"}, ${Math.abs(lon).toFixed(4)}°${lon >= 0 ? "E" : "W"} (${elev}m)`;
+            stCoords.textContent = `${Math.abs(lat).toFixed(5)}°${lat >= 0 ? "N" : "S"}, ${Math.abs(lon).toFixed(5)}°${lon >= 0 ? "E" : "W"} (${elev}m)`;
         }
         if (stRadec) {
             if (ori.center_ra_hms && ori.center_ra_hms !== "--") {
@@ -1384,8 +1384,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         const elev = pos.coords.altitude !== null && !isNaN(pos.coords.altitude)
                             ? Math.round(pos.coords.altitude)
                             : Number(stationElevInput ? stationElevInput.value : 20);
-                        if (stationLatInput) stationLatInput.value = lat.toFixed(4);
-                        if (stationLonInput) stationLonInput.value = lon.toFixed(4);
+                        if (stationLatInput) stationLatInput.value = lat.toFixed(5);
+                        if (stationLonInput) stationLonInput.value = lon.toFixed(5);
                         if (stationElevInput) stationElevInput.value = elev;
                         try {
                             const res = await fetch("/api/station/location", {
@@ -1405,7 +1405,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             if (res.ok && st) {
                                 setStationFormDirty(false);
                                 updateStationUI(st);
-                                showAlert(stationAlert, `✅ Browser GPS coordinates: ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E (${elev}m).`, "success", true);
+                                showAlert(stationAlert, `✅ Browser GPS coordinates: ${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E (${elev}m).`, "success", true);
                             }
                         } catch (e) {
                             showAlert(stationAlert, `❌ Failed to save GPS coordinates: ${e.message}`, "error", true);
