@@ -12,6 +12,7 @@ Communicates directly with the Linux V4L2 kernel subsystem using ioctl system ca
 import ctypes
 import fcntl
 import io
+import logging
 import mmap
 import os
 import select
@@ -20,6 +21,8 @@ from typing import Tuple, Dict, Any, Optional, Callable
 import cv2
 import numpy as np
 from PIL import Image, ImageFile
+
+logger = logging.getLogger("imx335.hardware")
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -391,6 +394,30 @@ class V4L2MmapCaptureSession:
         # extra settle reads (6 for short MJPG exposures) and deliver frames at the stream rate
         self.fast_reads: bool = False
 
+    def _stall_error(self, msg: str, exposure_s: float, poll_timeout_s: float) -> TimeoutError:
+        """Log what the camera was doing when frames stopped arriving (so a stall can be diagnosed later)
+        and return the TimeoutError to raise."""
+        info: Dict[str, Any] = {
+            "exposure_s": round(float(exposure_s), 3),
+            "poll_timeout_s": round(float(poll_timeout_s), 1),
+            "raw10": self.raw10_mode,
+            "size": f"{self.width}x{self.height}",
+            "streaming": self.is_streaming,
+            "buffers": len(self.mm_bufs),
+            "last_frame_age_s": round(time.time() - self._last_ts, 1) if getattr(self, "_last_ts", None) else None,
+        }
+        try:  # USB power state of the video device ("active", "suspended", ...)
+            dev = os.path.basename(os.readlink(f"/proc/self/fd/{self.fd}"))
+            base = f"/sys/class/video4linux/{dev}/device/.."
+            info["device"] = dev
+            for name in ("power/runtime_status", "power/control", "authorized"):
+                with open(os.path.join(base, name)) as fh:
+                    info[name.split("/")[-1]] = fh.read().strip()
+        except Exception:
+            pass
+        logger.warning("V4L2 stall: %s | %s", msg, info)
+        return TimeoutError(msg)
+
     def configure_device(self):
         """Configure video resolution (2592x1944 YUYV for RAW10 or MJPG) and manual exposure."""
         fmt = V4L2Format()
@@ -581,7 +608,7 @@ class V4L2MmapCaptureSession:
             for step in range(14):
                 rlist, _, _ = select.select([self.fd], [], [], poll_timeout_s)
                 if not rlist:
-                    raise TimeoutError(f"V4L2 timeout ({poll_timeout_s:.1f}s) starting stream at step {step}")
+                    raise self._stall_error(f"V4L2 timeout ({poll_timeout_s:.1f}s) starting stream at step {step}", exposure_s, poll_timeout_s)
                 buf = V4L2Buffer(type=V4L2_BUF_TYPE_VIDEO_CAPTURE, memory=V4L2_MEMORY_MMAP)
                 fcntl.ioctl(self.fd, VIDIOC_DQBUF, buf)
                 ts = buf.timestamp.tv_sec + buf.timestamp.tv_usec * 1e-6
@@ -675,7 +702,7 @@ class V4L2MmapCaptureSession:
         for idx in range(max_reads):
             rlist, _, _ = select.select([self.fd], [], [], max(12.0, poll_timeout_s))
             if not rlist:
-                raise TimeoutError(f"V4L2 timeout ({poll_timeout_s:.1f}s) on active stream")
+                raise self._stall_error(f"V4L2 timeout ({poll_timeout_s:.1f}s) on active stream", exposure_s, poll_timeout_s)
             buf = V4L2Buffer(type=V4L2_BUF_TYPE_VIDEO_CAPTURE, memory=V4L2_MEMORY_MMAP)
             fcntl.ioctl(self.fd, VIDIOC_DQBUF, buf)
             ts = buf.timestamp.tv_sec + buf.timestamp.tv_usec * 1e-6
@@ -754,7 +781,7 @@ class V4L2MmapCaptureSession:
             while step < max_steps:
                 rlist, _, _ = select.select([self.fd], [], [], poll_timeout_s)
                 if not rlist:
-                    raise TimeoutError(f"V4L2 timeout ({poll_timeout_s:.1f}s) waiting for frame at step {step}")
+                    raise self._stall_error(f"V4L2 timeout ({poll_timeout_s:.1f}s) waiting for frame at step {step}", exposure_s, poll_timeout_s)
 
                 buf = V4L2Buffer(
                     type=V4L2_BUF_TYPE_VIDEO_CAPTURE,
@@ -831,7 +858,7 @@ class V4L2MmapCaptureSession:
             while len(results) < num_frames and step < max_steps:
                 rlist, _, _ = select.select([self.fd], [], [], poll_timeout_s)
                 if not rlist:
-                    raise TimeoutError(f"V4L2 timeout ({poll_timeout_s:.1f}s) waiting for stack frame at step {step}")
+                    raise self._stall_error(f"V4L2 timeout ({poll_timeout_s:.1f}s) waiting for stack frame at step {step}", exposure_s, poll_timeout_s)
 
                 buf = V4L2Buffer(
                     type=V4L2_BUF_TYPE_VIDEO_CAPTURE,

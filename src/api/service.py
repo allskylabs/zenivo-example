@@ -576,7 +576,11 @@ class AllSkyService:
                     self.activity.success("capture", "Camera capture recovered")
             except Exception as first_exc:
                 # Re-open hardware fd once before falling back to simulator
-                self.activity.warning("capture", f"Capture failed ({first_exc}); re-opening camera")
+                ctx = (f"exposure {getattr(self.camera, 'current_exposure_s', '?')} s, "
+                       f"gain {getattr(self.camera, 'current_gain_db', '?')} dB, "
+                       f"{time.time() - self.last_capture_time:.0f} s since last good frame, "
+                       f"calibration={self.calibration_status.get('state')}, focus={self.focus.active}")
+                self.activity.warning("capture", f"Capture failed ({type(first_exc).__name__}: {first_exc}; {ctx}); re-opening camera")
                 try:
                     self.camera.close()
                     self.camera.open()
@@ -584,7 +588,7 @@ class AllSkyService:
                     self.activity.success("capture", "Camera re-opened, capture OK")
                 except Exception as exc:
                     self._camera_failing = True
-                    self.activity.error("capture", f"Camera re-open failed: {exc}")
+                    self.activity.error("capture", f"Camera re-open failed ({type(exc).__name__}: {exc}; {ctx})")
                     if (
                         self.last_frame is not None
                         and not getattr(self.camera, "simulator", False)
