@@ -211,6 +211,48 @@ def _update_auto_wb(bgr_linear: np.ndarray, prefix: str = "auto", strength: floa
 _SRGB_GAMMA = 2.2
 
 
+_ISP_CAL_PATH = os.environ.get("ALLSKY_ISP_CAL") or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "..", "data", "calibration", "isp_shading.npz"
+)
+_isp_cal: Dict[str, Any] = {"loaded": False, "dark": None, "gain": None, "cache": {}}
+
+
+def _load_isp_cal() -> None:
+    """Load the per-pixel ISP shading calibration (dark pedestal + flat gain) once; absent file = no correction."""
+    _isp_cal["loaded"] = True
+    try:
+        if os.path.exists(_ISP_CAL_PATH):
+            with np.load(_ISP_CAL_PATH) as z:
+                _isp_cal["dark"] = z["dark"].astype(np.float32)
+                _isp_cal["gain"] = z["gain"].astype(np.float32)
+    except Exception:
+        _isp_cal["dark"] = _isp_cal["gain"] = None
+
+
+def reload_isp_cal() -> None:
+    _isp_cal["cache"] = {}
+    _load_isp_cal()
+
+
+def apply_isp_shading(bgr8: np.ndarray) -> np.ndarray:
+    """Remove the camera ISP's radial purple pedestal/shading: out = (in - dark) * gain, per pixel and channel."""
+    if os.environ.get("ALLSKY_ISP_CAL_OFF") == "1" or bgr8 is None or bgr8.ndim != 3:
+        return bgr8
+    if not _isp_cal["loaded"]:
+        _load_isp_cal()
+    if _isp_cal["gain"] is None:
+        return bgr8
+    h, w = bgr8.shape[:2]
+    maps = _isp_cal["cache"].get((h, w))
+    if maps is None:
+        d = cv2.resize(_isp_cal["dark"], (w, h), interpolation=cv2.INTER_LINEAR)
+        g = cv2.resize(_isp_cal["gain"], (w, h), interpolation=cv2.INTER_LINEAR)
+        maps = _isp_cal["cache"][(h, w)] = (d, g)
+    d, g = maps
+    out = (bgr8.astype(np.float32) - d) * g
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
 def apply_isp_white_balance(bgr8: np.ndarray) -> np.ndarray:
     """
     Gently correct the colour cast left by the camera ISP's own AWB (MJPG mode, daytime/twilight;
@@ -221,6 +263,7 @@ def apply_isp_white_balance(bgr8: np.ndarray) -> np.ndarray:
     _wb_state["active_path"] = "isp"
     if bgr8 is None or bgr8.ndim != 3:
         return bgr8
+    bgr8 = apply_isp_shading(bgr8)
     if _wb_state["mode"] == "auto":
         lin = np.power(bgr8[::4, ::4].astype(np.float32) / 255.0, _SRGB_GAMMA)
         # The ISP already ran its own AWB; apply only part of the gray-world correction on top
@@ -380,6 +423,12 @@ class V4L2MmapCaptureSession:
             (0x00980900, 0),   # brightness default = 0
             (0x00980901, 34),  # contrast default = 34
             (V4L2_CID_EXPOSURE_AUTO, V4L2_EXPOSURE_MANUAL),  # auto_exposure = 1 (Manual)
+            *(
+                # ALLSKY_ISP_WB_K=<kelvin>: lock the camera's own AWB (auto-WB drifts magenta under foliage)
+                ((0x0098090C, 0), (0x0098091A, int(os.environ["ALLSKY_ISP_WB_K"])))
+                if os.environ.get("ALLSKY_ISP_WB_K", "").isdigit()
+                else ()
+            ),
         ):
             ctrl = V4L2Control(id=cid, value=val)
             try:
