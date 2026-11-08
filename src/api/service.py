@@ -637,7 +637,10 @@ class AllSkyService:
             # Automatic Sunrise Overexposure & CMOS Solarization Guard:
             # If left in manual night exposure after daybreak, switch to auto (note: at >=0.25s in full daylight
             # solar_elev >= 2.0, Sony IMX335 CDS reset overflow solarizes/inverts the frame so p90 drops to ~130-160)
-            if not is_pytest and self.mode == "manual" and self.calibration_status.get("state") != "running":
+            # An exposure lock in auto mode (the "other knob follows the sky" lock) has the same problem: by day the
+            # free gain is already at 0 dB, so nothing can darken the frame and /live stays white.
+            exposure_locked_auto = self.mode == "auto" and self.auto_exposure.lock_exposure_s is not None
+            if not is_pytest and (self.mode == "manual" or exposure_locked_auto) and self.calibration_status.get("state") != "running":
                 try:
                     cur_exp_val = float(getattr(self.camera, "current_exposure_s", 0.1))
                     if cur_exp_val >= 0.08 and frame is not None and frame.shape[0] >= 200:
@@ -645,6 +648,11 @@ class AllSkyService:
                         solar_elev = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon)
                         p90_sample = float(np.percentile(frame[::16, ::16], 90))
                         if (solar_elev >= -2.0 and p90_sample >= 245.0) or (solar_elev >= 2.0 and cur_exp_val >= 0.25):
+                            if exposure_locked_auto:
+                                self.activity.info(
+                                    "camera",
+                                    f"Daylight: released the {self.auto_exposure.lock_exposure_s:.4g} s exposure lock "
+                                    f"(sun {solar_elev:.1f}°, frame p90 {p90_sample:.0f}) so auto exposure can darken the frame")
                             self.mode = "auto"
                             self.auto_exposure.lock_exposure_s = None
                             self.auto_exposure.lock_gain_db = None
