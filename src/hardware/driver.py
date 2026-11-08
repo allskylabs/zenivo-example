@@ -93,6 +93,9 @@ class RTS5869CameraController(CameraDriverInterface):
             or self._night_raw10
             or (exp_s >= self.RAW10_EXPOSURE_THRESHOLD_S)
         )
+        if os.environ.get("ALLSKY_DISABLE_RAW10") == "1":
+            # Some hosts (minipc 192.168.6.15) stop delivering frames once the Bayer RAW route is written.
+            desired_raw10 = False
         if desired_raw10 != self.raw10_mode:
             logger.info(
                 "Switching camera capture mode: %s -> %s (exposure=%.4fs)",
