@@ -424,6 +424,7 @@
         const nowS = () => performance.now() / 1000;
 
         let station = null, camera = null;
+        let stationSig = null;
         let origin = null, originSphere = null, stationBasis = null, mPerUnit = 1;
         const aircraft = new Map();         // icao -> state
         let selected = null, centering = false;
@@ -1652,8 +1653,15 @@
             const localTxt = d.connected ? `${d.in_view || 0} in view · ${d.local_count ?? d.total ?? 0} local` : "Local off";
             const frTxt = (layerOn.fr24 && d.fr24_count != null) ? ` · ${Number(d.fr24_count).toLocaleString()} FR24${d.fr24?.global_total ? ` (${Number(d.fr24.global_total).toLocaleString()} global)` : ""}` : "";
             $("status").textContent = localTxt + frTxt;
+            if (d.station && origin) {
+                // The station position or the camera pointing was edited in Settings: rebuild the scene around it
+                const c0 = d.camera || {};
+                const sig = [d.station.lat, d.station.lon, c0.az_deg, c0.alt_deg, c0.roll_deg].join("|");
+                if (stationSig && sig !== stationSig) { location.reload(); return; }
+            }
             if (d.station && !origin) {
                 station = d.station; camera = d.camera || null;
+                { const c0 = d.camera || {}; stationSig = [d.station.lat, d.station.lon, c0.az_deg, c0.alt_deg, c0.roll_deg].join("|"); }
                 updateCamFoot();
                 origin = maplibregl.MercatorCoordinate.fromLngLat([station.lon, station.lat], 0);
                 originSphere = llToUnitSphere(station.lon, station.lat, 0);

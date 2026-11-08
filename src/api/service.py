@@ -4818,6 +4818,17 @@ class AllSkyService:
                 orientation["north_position_angle_deg"] = npa
                 orientation["rotation_deg"] = npa
             self.station_config["solve_source"] = "manual_ui_settings"
+            # Overlays (/flights3d, /sky, satellites, ADS-B) read the camera pointing from the star solution:
+            # a hand-edited azimuth / altitude / north angle must reach it too, or they keep the old pointing.
+            sol = self.station_config.get("bright_star_solution")
+            if isinstance(sol, dict) and any(
+                manual_overrides.get(k) is not None
+                for k in ("azimuth_deg", "altitude_deg", "zenith_tilt_deg", "north_position_angle_deg")
+            ):
+                sol["pointing_az_deg"] = float(orientation.get("azimuth_deg", sol.get("pointing_az_deg", 0.0)))
+                sol["pointing_alt_deg"] = float(orientation.get("altitude_deg", sol.get("pointing_alt_deg", 90.0)))
+                sol["roll_deg"] = float(orientation.get("north_position_angle_deg", sol.get("roll_deg", 0.0)))
+                sol["manual_override"] = True
 
         self._save_station_config()
 
