@@ -423,8 +423,15 @@ class DayNightAutoExposure:
                     else:
                         self.exposure_s = min(0.25, next_exp)
                 else:
+                    if self.exposure_s < 4.0 and self.gain_db > 12.0:
+                        # Trade gain for shutter: drop up to 3 dB and lengthen the exposure by the same factor
+                        drop_db = min(3.0, self.gain_db - 12.0)
+                        self.gain_db = round(self.gain_db - drop_db, 1)
+                        next_exp *= 10.0 ** (drop_db / 20.0)
                     self.exposure_s = min(max_exp, next_exp)
-                    if effective_luma < 45.0 and self.gain_db < max_gain:
+                    # Exposure first, gain last: a still sky gains nothing from a short shutter, and every dB of gain
+                    # is visible grain (1 s at 25 dB looked very noisy at dusk). Gain only rises once exposure >= 4 s
+                    if effective_luma < 45.0 and self.gain_db < max_gain and self.exposure_s >= 4.0:
                         self.gain_db = min(max_gain, round(self.gain_db + 2.5, 1))
         else:
             # Standard profile-clamped feedback for synthetic test frames
