@@ -33,6 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const chkSkyOverlay = document.getElementById("chk-sky-overlay");
     const chkSkyLabels = document.getElementById("chk-sky-labels");
     const chkGridOverlay = document.getElementById("chk-grid-overlay");
+    const chkEqGrid = document.getElementById("chk-eq-grid");
     const chkAircraft = document.getElementById("chk-aircraft-overlay");
     const chkSatellite = document.getElementById("chk-satellite-overlay");
     const aircraftCanvas = document.getElementById("aircraft-canvas");
@@ -332,6 +333,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }).catch(() => {});
         });
     });
+
+    if (chkEqGrid) {
+        chkEqGrid.checked = !!prefs.eqGrid;
+        chkEqGrid.addEventListener("change", () => savePrefs({ eqGrid: chkEqGrid.checked }));
+    }
 
     if (chkSatellite) {
         chkSatellite.checked = !!prefs.satelliteOverlay;
@@ -2072,8 +2078,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const showSky = chkSkyOverlay ? chkSkyOverlay.checked : true;
         const showLabels = chkSkyLabels ? chkSkyLabels.checked : true;
         const showGrid = chkGridOverlay ? chkGridOverlay.checked : false;
+        const showEqGrid = chkEqGrid ? chkEqGrid.checked : false;
 
-        if (!showSky && !showLabels && !showGrid) return;
+        if (!showSky && !showLabels && !showGrid && !showEqGrid) return;
 
         // Read solved station, camera sensor, optics & orientation parameters
         const st = state.station || {};
@@ -2474,6 +2481,70 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         // Reserve the top-left summary badge so labels avoid it
         occupiedBoxes.push({ x1: offsetX, y1: offsetY, x2: offsetX + 560 * u, y2: offsetY + 36 * u });
+
+        // Equatorial coordinate grid: hour circles (right ascension, every 1 h) and parallels (declination, every 15°)
+        if (showEqGrid) {
+            ctx.save();
+            ctx.lineJoin = "round";
+            const fontPx = 10 * u;
+            ctx.font = `${fontPx}px monospace`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const eqLine = (pts, major, label) => {
+                // Split into runs of visible points so the line never jumps across the horizon or the frame edge
+                let run = [];
+                const runs = [];
+                pts.forEach((pt) => {
+                    if (pt && pt.visible) run.push(pt);
+                    else { if (run.length > 1) runs.push(run); run = []; }
+                });
+                if (run.length > 1) runs.push(run);
+                ctx.strokeStyle = major ? "rgba(251, 191, 36, 0.55)" : "rgba(251, 191, 36, 0.30)";
+                ctx.lineWidth = (major ? 1.3 : 1) * u;
+                ctx.setLineDash([5 * u, 4 * u]);
+                runs.forEach((r) => {
+                    ctx.beginPath();
+                    r.forEach((pt, i) => (i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y)));
+                    ctx.stroke();
+                });
+                ctx.setLineDash([]);
+                if (!label || !runs.length) return;
+                const best = runs.reduce((a, b) => (b.length > a.length ? b : a));
+                const mid = best[Math.floor(best.length / 2)];
+                const tw = ctx.measureText(label).width;
+                if (!placeBox(mid.x - tw / 2, mid.y - fontPx / 2, tw, fontPx)) return;
+                ctx.fillStyle = "rgba(251, 191, 36, 0.9)";
+                ctx.shadowColor = "rgba(2, 6, 23, 0.95)";
+                ctx.shadowBlur = 3 * u;
+                ctx.fillText(label, mid.x, mid.y);
+                ctx.shadowBlur = 0;
+            };
+            // Parallels of declination
+            for (let dec = -75; dec <= 75; dec += 15) {
+                const pts = [];
+                for (let ra = 0; ra <= 360; ra += 2) pts.push(projectRaDecToCanvas(ra, dec));
+                eqLine(pts, dec === 0, `${dec > 0 ? "+" : ""}${dec}°`);
+            }
+            // Hour circles of right ascension
+            for (let h = 0; h < 24; h++) {
+                const pts = [];
+                for (let dec = -88; dec <= 88; dec += 2) pts.push(projectRaDecToCanvas(h * 15, dec));
+                eqLine(pts, false, `${h}h`);
+            }
+            // Celestial poles
+            [[90, "NCP"], [-90, "SCP"]].forEach(([dec, name]) => {
+                const pt = projectRaDecToCanvas(0, dec);
+                if (!pt || !pt.visible) return;
+                ctx.strokeStyle = "rgba(251, 191, 36, 0.9)";
+                ctx.lineWidth = 1.4 * u;
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, 5 * u, 0, 2 * Math.PI);
+                ctx.stroke();
+                ctx.fillStyle = "rgba(251, 191, 36, 0.95)";
+                ctx.fillText(name, pt.x, pt.y - 11 * u);
+            });
+            ctx.restore();
+        }
 
         const roundedRect = (x, y, rw, rh, r) => {
             ctx.beginPath();
@@ -3118,6 +3189,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (chkSkyOverlay) chkSkyOverlay.addEventListener("change", drawReticle);
     if (chkSkyLabels) chkSkyLabels.addEventListener("change", drawReticle);
     if (chkGridOverlay) chkGridOverlay.addEventListener("change", drawReticle);
+    if (chkEqGrid) chkEqGrid.addEventListener("change", drawReticle);
     // Match the viewport box to the camera's real aspect ratio (4:3 IMX335, 16:9 IMX708, ...)
     function fitViewportToFrame() {
         if (!liveImg || !viewportContainer || !liveImg.naturalWidth || !liveImg.naturalHeight) return;
@@ -3155,7 +3227,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const anyOverlay =
             (chkSkyOverlay ? chkSkyOverlay.checked : true) ||
             (chkSkyLabels ? chkSkyLabels.checked : true) ||
-            (chkGridOverlay ? chkGridOverlay.checked : false);
+            (chkGridOverlay ? chkGridOverlay.checked : false) ||
+            (chkEqGrid ? chkEqGrid.checked : false);
         if (!anyOverlay) return;
         drawReticle();
     }, 5000);
