@@ -134,6 +134,7 @@ class SkyEventDetector:
         self.reset()
 
     METEOR_MIN_ELONGATION = 5.0
+    OUTSIDE_SENSITIVITY_DIV = 4     # brightening outside the sky mask is divided by this before every test
     BRIGHT_STREAK_PEAK_DN = 90.0    # streak peak (work-size DN above the previous frame) ...
     BRIGHT_STREAK_CONTRAST = 2.5    # ... and line mean at least this many times the mean beside it: skip the "thin" test
     CLOUDY_SPECKS = 8.0          # running mean of brightening specks per frame above which the sky counts as cloudy
@@ -269,11 +270,16 @@ class SkyEventDetector:
             h, w = shape
             m = sky_polygon_mask(shape, sky_polygons)
             m = np.full((h, w), 255, np.uint8) if m is None else m * 255
+            valid = np.full((h, w), 255, np.uint8)
             b = max(2, w // 100)  # frame edge: vignetting, sensor edge artefacts
-            m[:b, :] = 0
-            m[-b:, :] = 0
-            m[:, :b] = 0
-            m[:, -b:] = 0
+            for a in (valid, m):
+                a[:b, :] = 0
+                a[-b:, :] = 0
+                a[:, :b] = 0
+                a[:, -b:] = 0
+            # Houses / trees: still watched, but a streak there has to be several times brighter (wind-blown leaves)
+            self._outside = ((valid > 0) & (m == 0))
+            self._valid = valid
             self._mask_key, self._mask = key, m
         return self._mask
 
@@ -370,7 +376,10 @@ class SkyEventDetector:
 
         # Brightening only, against the dilated previous frame: drifting / twinkling stars cancel out
         diff = cv2.subtract(gray, cv2.dilate(prev, np.ones((3, 3), np.uint8)))
-        diff = cv2.bitwise_and(diff, mask)
+        diff = cv2.bitwise_and(diff, self._valid)
+        if self._outside.any():
+            # Outside the sky mask the brightening counts 1/K as much: only a very bright streak gets through
+            diff[self._outside] = (diff[self._outside] // self.OUTSIDE_SENSITIVITY_DIV).astype(np.uint8)
         d = gray[::4, ::4].astype(np.int16) - prev[::4, ::4].astype(np.int16)
         mad = float(np.median(np.abs(d - np.median(d))))
         thr = max(self.min_threshold_dn, self.noise_sigmas * 1.4826 * mad)

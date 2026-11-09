@@ -5091,7 +5091,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (st) {
             st.textContent = data.night
                 ? `Watching now: ${data.frames_compared} of ${data.frames_seen} frames compared tonight.`
-                : "Daytime: streak detection is idle.";
+                : "Daytime: only aircraft and flashes are watched (meteors and satellites need the dark).";
         }
     }
 

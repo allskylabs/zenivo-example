@@ -2281,6 +2281,7 @@ class AllSkyService:
     # ------------------------------------------------------------------
     EVENT_DEFAULTS: Dict[str, int] = {"meteor": 1, "plane": 1, "satellite": 1, "clouds": 0, "flash": 1}
     EVENT_NIGHT_SUN_ELEV = -2.0  # streak / moving-object / flash detection below civil sunset
+    EVENT_DAY_TYPES = {"plane", "flash"}  # event types that are also watched while the sun is up
     EVENT_KEEP_IN_MEMORY = 500
 
     def get_event_config(self) -> Dict[str, Any]:
@@ -2311,17 +2312,21 @@ class AllSkyService:
         return {"success": True, **self.get_event_config()}
 
     def _detect_sky_events(self, frame: np.ndarray, meta: Dict[str, Any], now: float) -> List[str]:
-        """Streak / flash detection on a new frame at night (a few ms on a ~640 px gray copy).
+        """Streak / flash detection on a new frame, day and night (a few ms on a ~640 px gray copy).
         Returns the types of the events found (their frame is archived)."""
         enabled = {k for k, v in self.get_event_config()["enabled"].items() if v and k != "clouds"}
         if now - self._events_sun_ts >= 60.0:
             from src.calibration.auto_exposure import calculate_solar_elevation
             self._events_sun_ts = now
             night = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon) < self.EVENT_NIGHT_SUN_ELEV
-            if self._events_night and not night:
-                self.sky_events.reset()  # daybreak: drop the reference frame, free its memory
+            if self._events_night != night:
+                self.sky_events.reset()  # dusk / dawn: the sky and exposure change completely, start a fresh reference
             self._events_night = night
-        if not enabled or not self._events_night:
+        if not self._events_night:
+            # By day only aircraft and flashes can show (meteors and satellites vanish in the glare); high aircraft
+            # often do not show at all against a bright sky, and cloud / rain are screened out by the usual guards
+            enabled &= self.EVENT_DAY_TYPES
+        if not enabled:
             return []
         events = self.sky_events.process(
             frame, enabled, ts=now,
@@ -2852,13 +2857,13 @@ class AllSkyService:
 
     def _adsb_wanted(self) -> bool:
         """Read the feed all the time by default ("record": the 3D map then has every aircraft's last 15
-        minutes the moment it opens); with recording off, only while aircraft events can happen (night,
-        plane detection on) or while the Flights panel is open (polled in the last 2 minutes)."""
+        minutes the moment it opens); with recording off, only while aircraft events can happen (plane
+        detection on) or while the Flights panel is open (polled in the last 2 minutes)."""
         if (self.station_config.get("adsb") or {}).get("record", 1):
             return True
         if time.time() - getattr(self, "_adsb_view_ts", 0.0) < 120.0:
             return True
-        return self._events_night and bool(self.get_event_config()["enabled"].get("plane"))
+        return bool(self.get_event_config()["enabled"].get("plane"))
 
     def start_adsb(self) -> None:
         """(Re)start the ADS-B reader from the station config; stops it when turned off."""

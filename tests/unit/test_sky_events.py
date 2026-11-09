@@ -282,3 +282,22 @@ def test_strobe_streak_on_overcast_sky_is_a_plane():
         out += det.process(img, ALL, ts=1000.0 + 33 * i, exposure_s=5.4, gain_db=14.9, sky_polygons=mask)
     out += det.process(img, ALL, ts=1000.0 + 99, exposure_s=5.4, gain_db=14.9, sky_polygons=mask)
     assert [e["type"] for e in out] == ["plane"]
+
+
+def _masked_run(streak_value, y):
+    """Sky mask = top half of the frame (the rest is houses / trees); a streak of the given brightness at height y."""
+    frames = [_sky(i, i * 0.5) for i in range(4)]
+    cv2.line(frames[2], (300, y), (520, y + 60), (streak_value,) * 3, 2, cv2.LINE_AA)
+    mask = {"sky": [[[0.0, 0.0], [1.0, 0.0], [1.0, 0.5], [0.0, 0.5]]]}
+    det = SkyEventDetector()
+    out = []
+    for i, f in enumerate(frames + [_sky(99, 2.0), _sky(98, 2.5)]):
+        out += det.process(f, ALL, ts=1000.0 + 15 * i, exposure_s=10.0, gain_db=30.0, sky_polygons=mask)
+    return out
+
+
+def test_faint_streak_outside_the_sky_mask_is_ignored_but_a_bright_one_is_kept():
+    in_sky = _masked_run(60, 100)           # top half: sky
+    assert [e["type"] for e in in_sky] == ["meteor"]
+    assert _masked_run(60, 700) == []       # same streak over the trees: very low sensitivity
+    assert [e["type"] for e in _masked_run(250, 700)] == ["meteor"]  # but a really bright one still counts
