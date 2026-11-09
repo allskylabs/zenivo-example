@@ -12,7 +12,7 @@ that differs from a slowly adapting background. The tracker works on a ~640 px g
 
 Rain is recognised from the drops smeared on the dome (soft, irregular, right in front of the lens): their fine
 structure stays exactly the same from frame to frame while sky texture keeps changing, so the band-pass picture of
-the sky correlates strongly with one taken ~30 s earlier (rain 0.85-0.94, dry 0.1-0.4 on real frames). While it
+the sky correlates strongly with one taken ~30 s earlier (rain 0.6-0.94, dry 0.1-0.4 on real frames). While it
 rains, tracks are not reported (drops and streaks would be false objects).
 
 The frame rate by day is set by `min_capture_interval_s` (2 s by default): that is enough for aircraft and large,
@@ -49,8 +49,8 @@ class DayObjectTracker:
     MAX_MISSES = 2
     # rain (drops smeared on the dome)
     RAIN_REF_GAP_S = 30.0        # compare the sky's fine structure with the picture this long ago
-    RAIN_CORR_ON = 0.8
-    RAIN_CORR_OFF = 0.6
+    RAIN_CORR_ON = 0.55
+    RAIN_CORR_OFF = 0.4
     RAIN_ON_COUNT = 3            # consecutive high correlations to declare rain
     RAIN_OFF_COUNT = 4           # consecutive low ones to declare it over
     RAIN_HOLD_S = 600.0          # also ends on its own this long after the last high correlation
