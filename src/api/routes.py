@@ -691,6 +691,22 @@ def get_adsb_aircraft(limit: int = Query(default=30, ge=1, le=6000),
     return service.get_aircraft_now(limit=limit, trail_s=trail, bounds=bounds, include_fr24=fr24, compact=compact)
 
 
+@router.get("/api/traffic")
+def get_traffic(t0: float = Query(description="start, epoch seconds"),
+                t1: float = Query(description="end, epoch seconds"),
+                limit: int = Query(default=2000, ge=1, le=20000),
+                service: AllSkyService = Depends(get_service)):
+    """Aircraft and satellites that were inside the camera view between t0 and t1 (replay / name an event's flight).
+    Rows: a = [icao, callsign, reg, type, lat, lon, alt_m, speed_kmh, heading, az, el, x, y], s = [norad, name, az, el, x, y, range_km, sunlit]."""
+    return {"samples": service.traffic_log().query(t0, t1, limit)}
+
+
+@router.get("/api/traffic/status")
+def get_traffic_status(service: AllSkyService = Depends(get_service)):
+    """Traffic log settings (retention days, size cap, interval) and how much is stored."""
+    return service.traffic_log().status()
+
+
 @router.get("/api/radiosondes")
 def get_radiosondes(limit: int = Query(default=40, ge=1, le=200),
                     service: AllSkyService = Depends(get_service)):

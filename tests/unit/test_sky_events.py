@@ -265,3 +265,20 @@ def test_short_exposure_twilight_strobe_and_ramp_is_plane():
         out += det.process(f, ALL, ts=2000.0 + 2.3 * i, exposure_s=0.20 * (1.05 ** i), gain_db=12.0)
     assert [e["type"] for e in out] == ["plane"]
 
+
+
+
+def test_strobe_streak_on_overcast_sky_is_a_plane():
+    """Real frames (sky.hoan.uk, 08 Nov 2026 19:31-19:33, 100% cloud): an aircraft strobe lit the overcast deck.
+    Glow around the dashes made the streak look fat and fuzzy; it was dropped as 'not a meteor'."""
+    import json
+    import os
+    d = os.path.join(os.path.dirname(__file__), "..", "fixtures", "strobe_overcast")
+    mask = json.load(open(os.path.join(d, "sky_mask.json")))
+    det = SkyEventDetector()
+    out = []
+    for i in range(3):
+        img = cv2.imread(os.path.join(d, f"f{i}.png"))
+        out += det.process(img, ALL, ts=1000.0 + 33 * i, exposure_s=5.4, gain_db=14.9, sky_polygons=mask)
+    out += det.process(img, ALL, ts=1000.0 + 99, exposure_s=5.4, gain_db=14.9, sky_polygons=mask)
+    assert [e["type"] for e in out] == ["plane"]

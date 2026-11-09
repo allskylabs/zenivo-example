@@ -134,6 +134,8 @@ class SkyEventDetector:
         self.reset()
 
     METEOR_MIN_ELONGATION = 5.0
+    BRIGHT_STREAK_PEAK_DN = 90.0    # streak peak (work-size DN above the previous frame) ...
+    BRIGHT_STREAK_CONTRAST = 2.5    # ... and line mean at least this many times the mean beside it: skip the "thin" test
     CLOUDY_SPECKS = 8.0          # running mean of brightening specks per frame above which the sky counts as cloudy
     REPEAT_RADIUS_FRAC = 0.03   # ~20 px at 640: a "meteor" again within this of an earlier one is a glint
     REPEAT_WINDOW_S = 3 * 3600.0
@@ -188,6 +190,7 @@ class SkyEventDetector:
         ev = p["event"]
         if self._cloudy(float(ev["ts"])):
             self.point_stats["meteors_rejected_cloudy_sky"] = self.point_stats.get("meteors_rejected_cloudy_sky", 0) + 1
+            p["reject"] = "cloudy"
             return False
         ln = p["line"]
         w = self._mask.shape[1] if self._mask is not None else self.work_width
@@ -209,8 +212,25 @@ class SkyEventDetector:
             return False
         if p.get("elong", 99.0) < self.METEOR_MIN_ELONGATION:
             self.point_stats["meteors_rejected_blob"] = self.point_stats.get("meteors_rejected_blob", 0) + 1
+            p["reject"] = "blob"
             return False
         return True
+
+    def _pending_event(self, p: Dict[str, Any], enabled: set) -> Optional[Dict[str, Any]]:
+        """Result of a single-frame streak that was not matched again: a meteor if it passes the checks.
+        A very bright but fuzzy one (aircraft strobe lighting a cloud deck: a halo around the dashes) is no
+        meteor, which is sharp, so it becomes an aircraft event."""
+        if "meteor" in enabled and self._meteor_ok(p):
+            return p["event"]
+        ev = p["event"]
+        if "plane" in enabled and int(ev.get("peak_dn", 0)) >= self.BRIGHT_STREAK_PEAK_DN:
+            fuzzy = p.get("elong", 99.0) < self.METEOR_MIN_ELONGATION
+            # Under cloud that only drifted along (not specks brightening everywhere) a fuzzy bright streak is still
+            # an aircraft lighting the deck; sharp ones stay rejected there (cloud edge / meteor hidden)
+            if p.get("reject") == "blob" or (p.get("reject") == "cloudy" and fuzzy and self._speck_ema < self.CLOUDY_SPECKS):
+                ev["type"] = "plane"
+                return ev
+        return None
 
     def reset(self) -> None:
         self.frames_seen = self.frames_compared = 0
@@ -269,7 +289,7 @@ class SkyEventDetector:
 
     def _flush(self, enabled: set, ts: float) -> List[Dict[str, Any]]:
         """Finish everything that has not continued into the current frame."""
-        out = [p["event"] for p in self._pending if "meteor" in enabled and self._meteor_ok(p)]
+        out = [ev for ev in (self._pending_event(p, enabled) for p in self._pending) if ev]
         for t in self._tracks:
             ev = self._finish_track(t, enabled)
             if ev:
@@ -421,8 +441,10 @@ class SkyEventDetector:
                 next_pending.append({"line": ln, "event": ev, "elong": f.get("elong", 99.0)})
 
         for i, p in enumerate(self._pending):
-            if i not in used_pending and "meteor" in enabled and self._meteor_ok(p):
-                events.append(p["event"])
+            if i not in used_pending:
+                ev = self._pending_event(p, enabled)
+                if ev:
+                    events.append(ev)
         for i, t in enumerate(self._tracks):
             if i not in used_tracks:
                 ev = self._finish_track(t, enabled)
@@ -771,7 +793,12 @@ class SkyEventDetector:
             if prev is not None:
                 prev_side.append(float(np.median(prev[sy, sx])))
         if side > 0.5 * fill:
-            return None
+            # A very bright, clearly sharper streak keeps its place even when the cloud / glow around it also
+            # brightened (aircraft strobe lighting overcast sky: line ~55 DN, surroundings ~18 DN, side 0.7)
+            v = diff[ys, xs][on]
+            if not (v.size and float(v.max()) >= self.BRIGHT_STREAK_PEAK_DN
+                    and float(v.mean()) >= self.BRIGHT_STREAK_CONTRAST * max(side_dn, 1.0)):
+                return None
         # Dashes: on-runs separated by gaps of 3+ samples (aircraft strobes); short gaps are noise
         runs, gap, in_run = 0, 99, False
         for v in on:

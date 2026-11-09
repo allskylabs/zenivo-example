@@ -4,6 +4,7 @@ Provides thread-safe camera hardware abstraction, analytics integration,
 and observational product management for the Edge Web API.
 """
 
+import logging
 import math
 import os
 import re
@@ -32,6 +33,8 @@ from src.calibration.dark import DarkCalibrationEngine
 from src.analytics.cloud_cover import CloudReference, analyze_cloud_cover
 from src.analytics.cloud_history import CloudHistory
 from src.analytics.sky_events import EVENT_TYPES, SkyEventDetector
+
+logger = logging.getLogger("imx335.api")
 from src.analytics.focus_tracker import SKY_MAX_DIOPTRES, FocusTracker, TempCompensation
 from src.analytics.focus import (
     analyse_sweep, find_focus_tiles,
@@ -300,6 +303,7 @@ class AllSkyService:
         if not os.environ.get("PYTEST_CURRENT_TEST"):
             threading.Thread(target=self._retention_worker, name="retention", daemon=True).start()
             threading.Thread(target=self._background_capture_worker, name="bg-capture", daemon=True).start()
+            threading.Thread(target=self._traffic_worker, name="traffic-log", daemon=True).start()
 
         # Initial capture to prime caches
         self._prime_cache()
@@ -2769,6 +2773,82 @@ class AllSkyService:
         """Basemap settings for the 3D flights map. Only Google Maps (Map Tiles API, key in station config
         "google_maps_key") is offered on top of the elevation-only terrain; no OpenStreetMap-based maps."""
         return {"google_maps_key": str(self.station_config.get("google_maps_key") or "")}
+
+    # ------------------------------------------------------------------
+    # Traffic log: aircraft and satellites inside the camera view, kept for replay (retention-limited)
+    # ------------------------------------------------------------------
+    def traffic_log(self):
+        """The on-disk log of what flew through the camera view (created on first use)."""
+        from src.analytics.traffic_log import TrafficLog
+        cfg = self.station_config.get("traffic_log") or {}
+        tl = getattr(self, "_traffic_log", None)
+        if tl is None:
+            tl = self._traffic_log = TrafficLog(os.path.join(self.output_dir, "traffic"), cfg)
+        else:
+            tl.configure(cfg)
+        return tl
+
+    def _traffic_sample(self, now: float) -> Dict[str, List[List[Any]]]:
+        """Aircraft (local ADS-B receiver first, Flightradar24 around the station otherwise) and sunlit satellites
+        that are above the horizon and inside the camera frame right now, as compact rows."""
+        from src.analytics.adsb import motion_fields, sky_position
+
+        sol = self._overlay_solution()
+        if not sol:
+            return {"a": [], "s": []}  # no star-solved pointing: nothing can be placed in the frame
+        station = self._overlay_station()
+        lat0, lon0 = float(station["latitude_deg"]), float(station["longitude_deg"])
+        rows: Dict[str, List[Any]] = {}
+
+        def add(icao, callsign, reg, typ, lat, lon, alt_m, spd, hdg):
+            pos = sky_position(station, float(lat), float(lon), float(alt_m), sol)
+            xy = pos.get("frame_xy")
+            if not xy or pos["alt_deg"] <= 0 or icao in rows:
+                return
+            rows[icao] = [icao, callsign or None, reg or None, typ or None, round(float(lat), 5), round(float(lon), 5),
+                          round(float(alt_m)), spd, hdg, pos["az_deg"], pos["alt_deg"], xy[0], xy[1]]
+
+        if self.adsb is not None:
+            try:
+                for a in self.adsb.current(at=now):
+                    mf = motion_fields(a)
+                    add(a["icao"], a.get("callsign"), None, None, a["lat"], a["lon"], a["altitude_m"],
+                        mf.get("speed_kmh"), mf.get("heading_deg"))
+            except Exception:
+                pass
+        fr = self._fr24()
+        if fr.enabled:
+            try:
+                bounds = f"{lat0 + 3.0:.3f},{lat0 - 3.0:.3f},{lon0 - 3.0:.3f},{lon0 + 3.0:.3f}"
+                for f in fr.current(bounds=bounds, station_lat=lat0, station_lon=lon0)[0]:
+                    add(f["icao"], f.get("callsign"), f.get("reg"), f.get("type"), f["lat"], f["lon"], f["altitude_m"],
+                        round(f["speed_kmh"]) if f.get("speed_kmh") is not None else None,
+                        round(f["heading_deg"]) if f.get("heading_deg") is not None else None)
+            except Exception:
+                pass
+        sats: List[List[Any]] = []
+        from src.calibration.auto_exposure import calculate_solar_elevation
+        if calculate_solar_elevation(lat0, lon0) < 0.0:  # a satellite is only a visible streak while the sky is dark
+            for r in self.get_satellites_now(limit=400).get("satellites", []):
+                xy = r.get("frame_xy")
+                if xy and r.get("above_horizon") and r.get("sunlit"):
+                    sats.append([r.get("norad"), r.get("name"), r.get("az_deg"), r.get("alt_deg"), xy[0], xy[1],
+                                 r.get("range_km"), 1])
+        return {"a": list(rows.values()), "s": sats}
+
+    def _traffic_worker(self) -> None:
+        """Every few seconds: store what is in the camera view. Never raises; ends with the service."""
+        stop = self._retention_stop
+        while not stop.wait(max(1.0, float(self.traffic_log().cfg["interval_s"]))):
+            try:
+                tl = self.traffic_log()
+                if not tl.cfg["enabled"]:
+                    continue
+                now = time.time()
+                smp = self._traffic_sample(now)
+                tl.append(now, smp["a"], smp["s"])
+            except Exception:
+                logger.debug("traffic log sample failed", exc_info=True)
 
     def _adsb_wanted(self) -> bool:
         """Read the feed all the time by default ("record": the 3D map then has every aircraft's last 15
