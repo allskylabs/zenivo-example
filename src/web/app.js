@@ -3391,15 +3391,17 @@ document.addEventListener("DOMContentLoaded", () => {
             telemSkyStatus.title = rainNow ? "Drops on the dome: daytime object tracking is paused" : "";
         }
         if (data.fps !== undefined) {
-            telemFps.textContent = data.fps.toFixed(1) + " fps";
+            // Rate at which new pictures really arrive (not the sensor's streaming rate)
+            const fpsTxt = !(data.fps > 0) ? "--" : data.fps >= 1 ? data.fps.toFixed(1) + " fps" : (1 / data.fps).toFixed(1) + " s/frame";
+            telemFps.textContent = fpsTxt;
             const nf = document.getElementById("nav-fps");
-            if (nf) nf.textContent = ` · ${data.fps.toFixed(1)} fps`;
+            if (nf) nf.textContent = data.fps > 0 ? ` · ${fpsTxt}` : "";
         }
         if (data.hw_frame_delta_ms !== undefined) {
-            hudHwDelta.textContent = data.hw_frame_delta_ms.toFixed(1) + " ms";
+            hudHwDelta.textContent = data.hw_frame_delta_ms > 0 ? "sensor " + data.hw_frame_delta_ms.toFixed(1) + " ms" : "";
         }
         if (data.sensor_temp_c !== undefined) {
-            telemTemp.textContent = data.sensor_temp_c.toFixed(1) + " °C";
+            telemTemp.textContent = Number.isFinite(data.sensor_temp_c) ? data.sensor_temp_c.toFixed(1) + " °C" : "n/a";
         }
         if (data.timestamp) {
             telemTimestamp.textContent = fmtLocalIso(data.timestamp, true);

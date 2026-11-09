@@ -178,11 +178,11 @@ def pack_asb1_binary_packet(
         float(capture_ts or time.time()),  # capture time of the JPEG, shown by the web overlay
         float(telem.get("exposure_s", 0.04)),
         float(telem.get("gain_db", 12.0)),
-        float(telem.get("hw_frame_delta_ms", 40.0)),
-        float(telem.get("fps", 1.0)),
+        float(telem.get("hw_frame_delta_ms") or 0.0),
+        float(telem.get("fps") or 0.0),
         int(telem.get("star_count", 0)),
         float(telem.get("cloud_cover_pct", 0.0)),
-        float(telem.get("sensor_temp_c", 24.5)),
+        float("nan" if telem.get("sensor_temp_c") is None else telem["sensor_temp_c"]),  # NaN: no sensor reading
         float(status.get("uptime_s", 0.0)),
         int(hw_regs.get("VMAX", 0)),
         int(hw_regs.get("HMAX", 0)),

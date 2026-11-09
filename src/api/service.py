@@ -637,6 +637,7 @@ class AllSkyService:
             self.last_frame = frame
             self.last_metadata = meta
             self.last_capture_time = time.time()
+            self._note_real_capture(self.last_capture_time)
 
             # Automatic Sunrise Overexposure & CMOS Solarization Guard:
             # If left in manual night exposure after daybreak, switch to auto (note: at >=0.25s in full daylight
@@ -846,9 +847,13 @@ class AllSkyService:
         if not info.get("has_registers", True):
             vmax = hmax = shr0 = pgc = 0
             actual_exp, actual_gain = float(exp_s), float(gain_db)
+        # Online only while pictures keep coming: a stall of several exposures means the camera is not delivering
+        age = time.time() - self.last_capture_time if self.last_capture_time else 0.0
+        stalled = bool(self.last_capture_time) and age > max(30.0, 3.0 * float(exp_s) + 15.0) \
+            and not self.focus.active and self.calibration_status.get("state") != "running"
         return {
-            "status": "online",
-            "camera_connected": True,
+            "status": "stalled" if stalled else "online",
+            "camera_connected": not stalled,
             "uptime_s": uptime_s,
             "simulator_mode": is_sim,
             "mode": self.mode,
@@ -971,6 +976,21 @@ class AllSkyService:
             },
         }
 
+    def _note_real_capture(self, t: float) -> None:
+        """Remember how often a new frame really arrives (what the viewers get): exponential average of the interval."""
+        prev = getattr(self, "_last_real_capture", None)
+        self._last_real_capture = t
+        if prev is not None and 0.0 < t - prev < 600.0:
+            ema = getattr(self, "_frame_interval_s", None)
+            self._frame_interval_s = (t - prev) if ema is None else 0.8 * ema + 0.2 * (t - prev)
+
+    def _cpu_load_pct(self) -> Optional[float]:
+        """1-minute load average of this machine as a percentage of its cores (None when the OS gives none)."""
+        try:
+            return round(100.0 * os.getloadavg()[0] / max(1, os.cpu_count() or 1), 1)
+        except (OSError, AttributeError):
+            return None
+
     def get_telemetry(self) -> Dict[str, Any]:
         """
         Compute and return live telemetry: exposure, gain, star count,
@@ -999,7 +1019,11 @@ class AllSkyService:
         hist = compute_fast_histogram(frame)
 
         hw_delta = meta.get("hw_frame_delta", round(meta.get("actual_exposure_s", 2.0) * 1000.0, 2))
-        fps = round(1000.0 / max(1.0, hw_delta), 2) if hw_delta > 0 else 1.0
+        # fps = how often a new picture really arrives (about one per exposure or per min_capture_interval_s);
+        # sensor_fps = the sensor's own streaming rate (1 / hardware frame period), which is not what viewers get
+        interval = getattr(self, "_frame_interval_s", None)
+        fps = round(1.0 / interval, 3) if interval else 0.0
+        sensor_fps = round(1000.0 / hw_delta, 2) if hw_delta and hw_delta > 0 else 0.0
 
         telem = {
             "timestamp": datetime.now().astimezone().isoformat(),
@@ -1010,14 +1034,15 @@ class AllSkyService:
             "gain_db": meta.get("gain_db", self.camera.current_gain_db),
             "hw_frame_delta_ms": hw_delta,
             "fps": fps,
+            "sensor_fps": sensor_fps,
             "star_count": sky_stats.get("star_count", 0),
             "cloud_cover_pct": sky_stats.get("cloud_cover_pct", 0.0),
             "cloud_cover": sky_stats.get("cloud_cover_pct", 0.0),
             "sky_status": sky_stats.get("status", "clear"),
             "histogram": hist,
-            "sensor_temp_c": meta.get("sensor_temp_c", 24.5),
-            "temperature": meta.get("sensor_temp_c", 24.5),
-            "cpu_load_pct": 14.8,
+            "sensor_temp_c": meta.get("sensor_temp_c"),  # None when the camera cannot report it (USB bridge)
+            "temperature": meta.get("sensor_temp_c"),
+            "cpu_load_pct": self._cpu_load_pct(),
             "mode": self.mode,
             "ae_lock": self.get_ae_lock(),
             "calibration": self.get_calibration_status(),
