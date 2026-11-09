@@ -71,6 +71,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const telemStars = document.getElementById("telem-stars");
     const telemClouds = document.getElementById("telem-clouds");
     const telemSkyStatus = document.getElementById("telem-sky-status");
+    // Rain (drops on the dome) is judged by the server from the frames; shown in place of the sky status
+    let rainNow = false;
+    async function pollRain() {
+        try {
+            const r = await fetch("/api/day-objects/status", { cache: "no-store" });
+            if (!r.ok) return;
+            const d = await r.json();
+            rainNow = !!(d.tracker && d.tracker.raining);
+            if (rainNow && telemSkyStatus) telemSkyStatus.textContent = "RAINING";
+        } catch (e) { /* offline: keep the last state */ }
+    }
+    pollRain();
+    setInterval(pollRain, 20000);
     const telemFps = document.getElementById("telem-fps");
     const telemTemp = document.getElementById("telem-temp");
     const telemUptime = document.getElementById("telem-uptime");
@@ -3374,7 +3387,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if (cn) cn.textContent = data.cloud_cover_pct.toFixed(0) + "%";
         }
         if (data.sky_status) {
-            telemSkyStatus.textContent = data.sky_status.toUpperCase();
+            telemSkyStatus.textContent = rainNow ? "RAINING" : data.sky_status.toUpperCase();
+            telemSkyStatus.title = rainNow ? "Drops on the dome: daytime object tracking is paused" : "";
         }
         if (data.fps !== undefined) {
             telemFps.textContent = data.fps.toFixed(1) + " fps";
