@@ -2320,12 +2320,16 @@ class AllSkyService:
             self._events_sun_ts = now
             night = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon) < self.EVENT_NIGHT_SUN_ELEV
             if self._events_night != night:
+                if getattr(self, "day_objects", None) is not None:
+                    self.day_objects.reset()
                 self.sky_events.reset()  # dusk / dawn: the sky and exposure change completely, start a fresh reference
             self._events_night = night
         if not self._events_night:
             # By day only aircraft and flashes can show (meteors and satellites vanish in the glare); high aircraft
             # often do not show at all against a bright sky, and cloud / rain are screened out by the usual guards
             enabled &= self.EVENT_DAY_TYPES
+        if not self._events_night:
+            self._track_day_objects(frame, now)
         if not enabled:
             return []
         events = self.sky_events.process(
@@ -2337,6 +2341,35 @@ class AllSkyService:
         for ev in events:
             self._record_sky_event(ev)
         return [str(ev.get("type")) for ev in events]
+
+    def day_object_log(self):
+        """The on-disk log of daytime flying objects (birds, insects, aircraft), created on first use."""
+        from src.analytics.traffic_log import TrafficLog
+        cfg = {"retention_days": 14, "max_mb": 50, **(self.station_config.get("day_objects") or {})}
+        dl = getattr(self, "_day_log", None)
+        if dl is None:
+            dl = self._day_log = TrafficLog(os.path.join(self.output_dir, "day_objects"), cfg)
+        else:
+            dl.configure(cfg)
+        return dl
+
+    def _track_day_objects(self, frame: np.ndarray, now: float) -> None:
+        """Daytime: follow small moving dots (birds, insects, aircraft) and store the finished tracks. While rain
+        drops sit on the dome nothing is stored."""
+        cfg = self.station_config.get("day_objects") or {}
+        if not int(cfg.get("enabled", 1)):
+            return
+        if getattr(self, "day_objects", None) is None:
+            from src.analytics.day_objects import DayObjectTracker
+            self.day_objects = DayObjectTracker()
+        was = self.day_objects.raining
+        tracks = self.day_objects.process(frame, now, self.station_config.get("sky_mask"))
+        if self.day_objects.raining != was:
+            self.activity.info("events", "Rain: drops on the dome, daytime object tracking paused" if not was
+                               else "Rain over: daytime object tracking resumed")
+        log = self.day_object_log()
+        for t in tracks:
+            log.append_record(float(t["t"]), t)
 
     def _cloud_event(self, frame: np.ndarray, cc: float, now: float) -> None:
         """Clouds arriving / clearing, from the (already sampled) cloud cover, with hysteresis."""

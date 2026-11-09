@@ -707,6 +707,23 @@ def get_traffic_status(service: AllSkyService = Depends(get_service)):
     return service.traffic_log().status()
 
 
+@router.get("/api/day-objects")
+def get_day_objects(t0: float = Query(description="start, epoch seconds"),
+                    t1: float = Query(description="end, epoch seconds"),
+                    limit: int = Query(default=2000, ge=1, le=20000),
+                    service: AllSkyService = Depends(get_service)):
+    """Birds, insects and aircraft followed by day: class, size, speed (frame widths/s), straightness and the
+    path as [seconds since start, x, y] frame fractions."""
+    return {"tracks": service.day_object_log().query(t0, t1, limit)}
+
+
+@router.get("/api/day-objects/status")
+def get_day_objects_status(service: AllSkyService = Depends(get_service)):
+    """Stored day-object tracks and the live tracker state (rain detected from drops on the dome, etc.)."""
+    tracker = getattr(service, "day_objects", None)
+    return {"log": service.day_object_log().status(), "tracker": tracker.status() if tracker is not None else None}
+
+
 @router.get("/api/radiosondes")
 def get_radiosondes(limit: int = Query(default=40, ge=1, le=200),
                     service: AllSkyService = Depends(get_service)):

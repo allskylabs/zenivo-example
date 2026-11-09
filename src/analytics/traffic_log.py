@@ -60,6 +60,17 @@ class TrafficLog:
                 self._prune(ts)
         return True
 
+    def append_record(self, ts: float, rec: Dict[str, Any]) -> None:
+        """Store one free-form record (it carries its own "t"); same retention as the samples."""
+        line = json.dumps(rec, separators=(",", ":"))
+        with self._lock:
+            os.makedirs(self.folder, exist_ok=True)
+            with open(self._path(ts), "a", encoding="utf-8") as fh:
+                fh.write(line + "\n")
+            if ts - self._last_prune >= PRUNE_EVERY_S:
+                self._last_prune = ts
+                self._prune(ts)
+
     def _files(self) -> List[str]:
         try:
             return sorted(f for f in os.listdir(self.folder) if f.endswith(".jsonl") and len(f) == 16)
