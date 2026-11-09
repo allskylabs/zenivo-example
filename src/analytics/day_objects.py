@@ -10,8 +10,10 @@ that differs from a slowly adapting background. The tracker works on a ~640 px g
   3. a finished track that really moved is classified from size, speed, straightness and size flicker
      (wing beats) as bird / insect / plane / object.
 
-Rain is recognised from the drops on the dome: many small round contrasty blobs that appear and then stay exactly
-where they are. While it rains, tracks are not reported (drops and streaks would be false objects).
+Rain is recognised from the drops smeared on the dome (soft, irregular, right in front of the lens): their fine
+structure stays exactly the same from frame to frame while sky texture keeps changing, so the band-pass picture of
+the sky correlates strongly with one taken ~30 s earlier (rain 0.85-0.94, dry 0.1-0.4 on real frames). While it
+rains, tracks are not reported (drops and streaks would be false objects).
 
 The frame rate by day is set by `min_capture_interval_s` (2 s by default): that is enough for aircraft and large,
 slow birds; insects and fast birds need ~0.4 s or less.
@@ -45,35 +47,36 @@ class DayObjectTracker:
     MIN_CONTRAST_DN = 18.0       # median peak difference from the background along the track
     MIN_SPEED_FRAC = 0.010       # frame widths per second (cloud drift is below this, aircraft / birds above)
     MAX_MISSES = 2
-    # rain (drops on the dome)
-    DROP_MIN_AREA, DROP_MAX_AREA = 8, 150
-    DROP_MIN_AGE_S = 8.0         # a sharp round blob that stays this long where it is counts as stuck to the dome
-    DROP_MIN_CONTRAST_DN = 12.0
-    DROP_MIN_ROUND = 0.6         # blob area / bounding-box area (a round drop is ~0.78, cloud texture is ragged)
-    DROP_NEW_WINDOW_S = 180.0    # drops first seen within this long ago are "new" (dirt on the dome is older)
-    RAIN_MIN_NEW_DROPS = 10
-    RAIN_HOLD_S = 600.0
+    # rain (drops smeared on the dome)
+    RAIN_REF_GAP_S = 30.0        # compare the sky's fine structure with the picture this long ago
+    RAIN_CORR_ON = 0.8
+    RAIN_CORR_OFF = 0.6
+    RAIN_ON_COUNT = 3            # consecutive high correlations to declare rain
+    RAIN_OFF_COUNT = 4           # consecutive low ones to declare it over
+    RAIN_HOLD_S = 600.0          # also ends on its own this long after the last high correlation
 
     def reset(self) -> None:
         self._bg: Optional[np.ndarray] = None
         self._prev_ts = 0.0
         self._tracks: List[Dict[str, Any]] = []
-        self._drops: List[Dict[str, Any]] = []
+        self._hp_ref: Optional[Tuple[float, np.ndarray]] = None
+        self._rain_hi = self._rain_lo = 0
+        self.rain_corr = 0.0
+        self._rain_on = False
         self._rain_until = 0.0
         self._mask_key: Any = None
         self._mask: Optional[np.ndarray] = None
         self.frames = 0
         self.skipped = 0
-        self.new_drops = 0
         self.stats: Dict[str, Any] = {}
 
     @property
     def raining(self) -> bool:
-        return self._prev_ts < self._rain_until
+        return self._rain_on and self._prev_ts < self._rain_until
 
     def status(self) -> Dict[str, Any]:
         return {"frames": self.frames, "skipped_changed": self.skipped, "tracks_open": len(self._tracks),
-                "raining": self.raining, "new_drops": self.new_drops, **self.stats}
+                "raining": self.raining, "rain_corr": round(self.rain_corr, 2), **self.stats}
 
     # ------------------------------------------------------------------
     def _work(self, frame: np.ndarray) -> Tuple[np.ndarray, float]:
@@ -111,17 +114,6 @@ class DayObjectTracker:
                             "dn": abs(float(signed[int(round(y)), int(round(x))]))})
         return out
 
-    def _round_blobs(self, binary: np.ndarray, signed: np.ndarray) -> List[Dict[str, float]]:
-        n, _, stats, cents = cv2.connectedComponentsWithStats(binary, connectivity=8)
-        out = []
-        for i in range(1, n):
-            a = int(stats[i, cv2.CC_STAT_AREA])
-            bw, bh = int(stats[i, cv2.CC_STAT_WIDTH]), int(stats[i, cv2.CC_STAT_HEIGHT])
-            if self.DROP_MIN_AREA <= a <= self.DROP_MAX_AREA and a >= self.DROP_MIN_ROUND * bw * bh \
-                    and 0.5 <= bw / float(max(1, bh)) <= 2.0:
-                out.append({"x": float(cents[i][0]), "y": float(cents[i][1]), "area": float(a)})
-        return out
-
     # ------------------------------------------------------------------
     def process(self, frame: np.ndarray, ts: float, sky_polygons: Optional[dict] = None) -> List[Dict[str, Any]]:
         """Feed one new frame; returns finished tracks (dicts, positions in frame fractions)."""
@@ -147,8 +139,8 @@ class DayObjectTracker:
         fg = ((np.abs(diff) > thr) & sky).astype(np.uint8)
         changed = float(fg.sum()) / max(1.0, float(sky.sum()))
 
-        # Drops stuck to the dome are tracked on every frame, also while the sky itself is changing
-        self._update_drops(g, sky, ts)
+        # Drops stuck to the dome are looked for on every frame, also while the sky itself is changing
+        self._update_rain(g, sky, ts)
 
         alpha = 1.0 - math.exp(-dt / self.BG_TAU_S)
         if changed > self.MAX_CHANGED_FRAC:
@@ -242,33 +234,34 @@ class DayObjectTracker:
                 "area_cv": round(cv_area, 2), "pts": pts}
 
     # ------------------------------------------------------------------
-    def _update_drops(self, g: np.ndarray, sky: np.ndarray, ts: float) -> None:
-        """Small round contrasty blobs (difference of Gaussians) that stay put: drops on the dome."""
-        dog = cv2.GaussianBlur(g, (0, 0), 1.0) - cv2.GaussianBlur(g, (0, 0), 3.5)
-        vals = dog[sky]
-        if vals.size == 0:
+    def _update_rain(self, g: np.ndarray, sky: np.ndarray, ts: float) -> None:
+        """Rain from drops on the dome: fine sky structure that does not change over ~30 s."""
+        hp = cv2.GaussianBlur(g, (0, 0), 2.0) - cv2.GaussianBlur(g, (0, 0), 6.0)
+        ref = self._hp_ref
+        if ref is None or hp.shape != ref[1].shape:
+            self._hp_ref = (ts, hp)
             return
-        noise = 1.4826 * float(np.median(np.abs(vals - np.median(vals))))
-        thr = max(self.DROP_MIN_CONTRAST_DN, 6.0 * noise)
-        binary = ((np.abs(dog) > thr) & sky).astype(np.uint8)
-        cur = self._round_blobs(binary, dog)[:400]
-        prev = self._drops
-        used = set()
-        nxt: List[Dict[str, Any]] = []
-        for b in cur:
-            m = None
-            for i, d in enumerate(prev):
-                if i not in used and abs(d["x"] - b["x"]) <= 2.0 and abs(d["y"] - b["y"]) <= 2.0:
-                    m = i
-                    break
-            if m is None:
-                nxt.append({"x": b["x"], "y": b["y"], "age": 1, "first": ts})
-            else:
-                used.add(m)
-                d = prev[m]
-                nxt.append({"x": b["x"], "y": b["y"], "age": d["age"] + 1, "first": d["first"]})
-        self._drops = nxt
-        new = sum(1 for d in nxt if self.DROP_MIN_AGE_S <= ts - d["first"] <= self.DROP_NEW_WINDOW_S)
-        self.new_drops = new
-        if new >= self.RAIN_MIN_NEW_DROPS:
+        if ts - ref[0] < self.RAIN_REF_GAP_S:
+            return
+        x, y = hp[sky], ref[1][sky]
+        if x.size == 0:
+            return
+        # One strong moving dot (a bird) must not outweigh the whole dome: clip both pictures at ~3 sigma
+        lim = 3.0 * 1.4826 * max(float(np.median(np.abs(x))), float(np.median(np.abs(y))), 0.5)
+        x, y = np.clip(x, -lim, lim), np.clip(y, -lim, lim)
+        x, y = x - x.mean(), y - y.mean()
+        c = float((x * y).sum() / math.sqrt(float((x * x).sum()) * float((y * y).sum()) + 1e-9))
+        self.rain_corr = c
+        self._hp_ref = (ts, hp)
+        if c >= self.RAIN_CORR_ON:
+            self._rain_hi += 1
+            self._rain_lo = 0
             self._rain_until = ts + self.RAIN_HOLD_S
+            if self._rain_hi >= self.RAIN_ON_COUNT:
+                self._rain_on = True
+        else:
+            self._rain_hi = 0
+            if c < self.RAIN_CORR_OFF:
+                self._rain_lo += 1
+                if self._rain_lo >= self.RAIN_OFF_COUNT:
+                    self._rain_on = False

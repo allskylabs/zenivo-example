@@ -67,18 +67,47 @@ def test_whole_frame_change_is_not_an_object():
     assert out == [] and tr.skipped >= 1
 
 
-def test_drops_on_the_dome_mean_rain_and_hide_tracks():
-    rng = np.random.default_rng(5)
-    spots = [(int(x), int(y)) for x, y in rng.uniform([40, 40], [W - 40, H - 40], (40, 2))]
+def _drop_layer(seed):
+    rng = np.random.default_rng(seed)
+    layer = np.zeros((H, W), np.float32)
+    yy, xx = np.ogrid[:H, :W]
+    for _ in range(60):  # soft smeared drops: bright centre, dark rim, no sharp edge
+        x, y, r, a = rng.uniform(40, W - 40), rng.uniform(40, H - 40), rng.uniform(10, 40), rng.uniform(-45, 45)
+        d2 = ((xx - x) ** 2 + (yy - y) ** 2) / float(r * r)
+        layer += a * (np.exp(-d2) - 0.5 * np.exp(-d2 / 2.5))
+    return layer
+
+
+def _wet(i, layer):
+    g = _sky(i)[..., 0].astype(np.float32) + layer
+    return cv2.cvtColor(np.clip(g, 0, 255).astype(np.uint8), cv2.COLOR_GRAY2BGR)
+
+
+def test_drops_smeared_on_the_dome_mean_rain_and_hide_tracks():
+    spots = _drop_layer(5)
     tr = DayObjectTracker()
     out = []
-    for i in range(60):
-        f = _sky(i)
-        for k, (x, y) in enumerate(spots):
-            if i >= 5 + k:  # drops arrive one after another and stay
-                cv2.circle(f, (x, y), 5, (150, 150, 150), -1)
-                cv2.circle(f, (x, y), 5, (110, 110, 110), 1)
-        cv2.circle(f, (30 + 9 * i, 60 + 2 * i), 4, (50, 50, 50), -1)  # a bird crossing during the rain
-        out += tr.process(f, 1000.0 + i)
-    assert tr.raining
+    for i in range(200):
+        f = _wet(i, spots)
+        cv2.circle(f, (30 + 3 * i, 60 + i // 2), 4, (50, 50, 50), -1)  # a bird crossing during the rain
+        out += tr.process(f, 1000.0 + 2.0 * i)
+    assert tr.raining and tr.rain_corr > 0.8
     assert out == []
+
+
+def test_rain_ends_when_the_dome_dries():
+    spots = _drop_layer(6)
+    tr = DayObjectTracker()
+    for i in range(120):
+        tr.process(_wet(i, spots), 1000.0 + 2.0 * i)
+    assert tr.raining
+    for i in range(120, 260):
+        tr.process(_sky(i), 1000.0 + 2.0 * i)
+    assert not tr.raining
+
+
+def test_dry_sky_is_not_rain():
+    tr = DayObjectTracker()
+    for i in range(150):
+        tr.process(_sky(i), 1000.0 + 2.0 * i)
+    assert not tr.raining
