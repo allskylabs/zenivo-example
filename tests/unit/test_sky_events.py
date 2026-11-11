@@ -307,3 +307,19 @@ def test_slow_drifting_star_is_not_a_plane():
     """A twinkling star (Pleiades) drifts ~0.1 px/s for a long time: the same dots as a plane, 50x slower."""
     path = [(200 + 3 * k, 800 - 1.5 * k) for k in range(24)]
     assert _run(_dots(26, path)) == []
+
+
+def test_strobe_dots_on_a_solid_trail_are_a_plane_not_a_meteor():
+    """Long exposure: the aircraft leaves a faint continuous line with a bright dot per strobe flash."""
+    frames = [_sky(i, i * 0.5) for i in range(4)]
+    cv2.line(frames[2], (400, 150), (800, 450), (110, 110, 110), 2, cv2.LINE_AA)
+    for k in range(14):
+        cv2.circle(frames[2], (400 + int(k * 400 / 13), 150 + int(k * 300 / 13)), 3, (235, 235, 235), -1)
+    assert [e["type"] for e in _run(frames)] == ["plane"]
+
+
+def test_smooth_streak_with_one_bright_spot_stays_a_meteor():
+    frames = [_sky(i, i * 0.5) for i in range(4)]
+    cv2.line(frames[2], (300, 200), (520, 330), (150, 150, 150), 2, cv2.LINE_AA)
+    cv2.circle(frames[2], (420, 271), 3, (240, 240, 240), -1)
+    assert [e["type"] for e in _run(frames)] == ["meteor"]

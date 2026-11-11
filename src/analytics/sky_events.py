@@ -831,6 +831,9 @@ class SkyEventDetector:
         if fill < 0.3 and runs < 4:
             return None  # sparse and not regularly dashed: chance alignment of specks
         vals = diff[ys, xs][on]
+        # Strobe dots on a trail that never drops below the threshold between them (long exposure: faint solid
+        # line with a bright dot per flash): count the regular peaks along the line instead of the gaps
+        pulses = self._strobe_pulses(diff, xs, ys, vals, thr)
         # Drifting cloud texture lines up by chance but barely clears the threshold: demand a clear edge
         if not vals.size or float(vals.mean()) - side_dn < 1.5 * thr:
             return None
@@ -860,12 +863,47 @@ class SkyEventDetector:
         return {
             "length": float(length),
             "fill": round(fill, 2),
-            "dashes": runs,
-            "dashed": runs >= 4 and fill < 0.85,
+            "dashes": max(runs, pulses),
+            "dashed": (runs >= 4 and fill < 0.85) or pulses >= self.STROBE_MIN_PULSES,
             "peak_dn": int(vals.max()) if vals.size else 0,
             "mean_dn": round(float(vals.mean()), 1) if vals.size else 0.0,
             "elong": self._elongation(ln, diff, thr),
         }
+
+    STROBE_MIN_PULSES = 5      # regular brightness peaks along a trail that make it an aircraft's strobe line
+    STROBE_MIN_DIP = 0.25      # a peak must stand this fraction of the trail's mean brightness above the dips
+    STROBE_MAX_SPACING_CV = 0.5
+    STROBE_MIN_LINE_PX = 120   # shorter trails: pixel-stair ripple of a thin line looks like pulses
+
+    def _strobe_pulses(self, diff: np.ndarray, xs: np.ndarray, ys: np.ndarray, vals: np.ndarray, thr: float) -> int:
+        """Number of evenly spaced brightness peaks along a trail (0 when irregular): the flashes of an aircraft's
+        strobe / beacon in one long exposure, or a meteor that flickers a few times, which stays irregular."""
+        if len(xs) < self.STROBE_MIN_LINE_PX or not vals.size:
+            return 0
+        h, w = diff.shape
+        prof = np.zeros(len(xs), np.float32)
+        for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)):
+            prof = np.maximum(prof, diff[np.clip(ys + dy, 0, h - 1), np.clip(xs + dx, 0, w - 1)].astype(np.float32))
+        prof = np.convolve(prof, np.ones(3, np.float32) / 3.0, mode="same")
+        need = self.STROBE_MIN_DIP * float(vals.mean())
+        # a peak counts once the profile has risen `need` above the last dip and then fallen `need` below the top
+        peaks, cand, low = [], None, float(prof[0])
+        for i, v in enumerate(prof.tolist()):
+            if cand is None:
+                low = min(low, v)
+                if v - low >= need:
+                    cand = (i, v)
+            elif v > cand[1]:
+                cand = (i, v)
+            elif cand[1] - v >= need:
+                peaks.append(cand[0])
+                cand, low = None, v
+        if len(peaks) < self.STROBE_MIN_PULSES:
+            return 0
+        gaps = np.diff(peaks).astype(np.float64)
+        if gaps.mean() <= 0 or float(gaps.std() / gaps.mean()) > self.STROBE_MAX_SPACING_CV:
+            return 0
+        return len(peaks)
 
     @staticmethod
     def _elongation(ln: Tuple[float, ...], diff: np.ndarray, thr: float) -> float:
