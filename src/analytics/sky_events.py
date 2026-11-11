@@ -478,6 +478,11 @@ class SkyEventDetector:
     DOT_FAINT_PEAK = 28        # brightest dot below this (DN above the sky) ...
     DOT_FAINT_MIN_POINTS = 6   # ... needs at least this many positions
     DOT_MAX_BG_TEXTURE = 5.0
+    # A star (Pleiades, Vega...) twinkles and drifts at the sidereal rate (~0.05 px/s at full resolution); an
+    # aircraft or satellite crosses the dome at several px/s and is gone in minutes. Slower or longer than this
+    # is a star, not a flyer.
+    DOT_MIN_SPEED_PX_S = 0.5
+    DOT_MAX_DURATION_S = 1200.0
     POINT_MAX_TRACKS = 120
 
     def _point_candidates(self, binary: np.ndarray, diff: np.ndarray, thr: float,
@@ -720,6 +725,11 @@ class SkyEventDetector:
         min_straight = 0.75 if len(pts) <= 3 else 0.6
         if net < min_net or net < min_straight * path_len:
             self.point_stats["tracks_rejected_static"] += 1
+            return None
+        # Sidereal drift: a twinkling star that wanders a few px over hours is not an aircraft
+        dur = max(1e-3, pts[-1][2] - pts[0][2])
+        if dur > self.DOT_MAX_DURATION_S or path_len / t["scale"] / dur < self.DOT_MIN_SPEED_PX_S:
+            self.point_stats["tracks_rejected_star"] = self.point_stats.get("tracks_rejected_star", 0) + 1
             return None
         # Moving with the wind alongside other tracks: drifting cloud
         vx, vy = self._velocity(pts)

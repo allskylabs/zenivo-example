@@ -301,3 +301,9 @@ def test_faint_streak_outside_the_sky_mask_is_ignored_but_a_bright_one_is_kept()
     assert [e["type"] for e in in_sky] == ["meteor"]
     assert _masked_run(60, 700) == []       # same streak over the trees: very low sensitivity
     assert [e["type"] for e in _masked_run(250, 700)] == ["meteor"]  # but a really bright one still counts
+
+
+def test_slow_drifting_star_is_not_a_plane():
+    """A twinkling star (Pleiades) drifts ~0.1 px/s for a long time: the same dots as a plane, 50x slower."""
+    path = [(200 + 3 * k, 800 - 1.5 * k) for k in range(24)]
+    assert _run(_dots(26, path)) == []
