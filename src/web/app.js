@@ -3258,10 +3258,17 @@ document.addEventListener("DOMContentLoaded", () => {
         const h = histCanvas.height;
         histCtx.clearRect(0, 0, w, h);
 
-        const r = histData.r;
-        const g = histData.g;
-        const b = histData.b;
-        const y = histData.y;
+        // Gain/WB stretch on 8-bit data leaves empty bins between populated ones
+        // (comb pattern); a small moving average shows the real distribution.
+        const smooth = (a, k = 3) => a.map((_, i) => {
+            let s = 0, n = 0;
+            for (let j = Math.max(0, i - k); j <= Math.min(255, i + k); j++) { s += a[j]; n++; }
+            return s / n;
+        });
+        const r = smooth(histData.r);
+        const g = smooth(histData.g);
+        const b = smooth(histData.b);
+        const y = smooth(histData.y);
 
         // Find max value across all channels
         let maxVal = 1;
