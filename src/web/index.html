@@ -410,7 +410,7 @@
                 </div>
                 <div id="gallery-alert" class="alert-box hidden mt-3"></div>
                 <div class="products-grid" id="products-grid">
-                    <!-- Injected dynamically via app.js -->
+                    <!-- injected dynamically via src/web/app/ -->
                 </div>
 
                 <div class="tl-builder card" id="timelapse-builder">
@@ -451,7 +451,7 @@
                     </div>
                 </div>
                 <div id="day-list" class="day-list">
-                    <!-- One block per day, injected via app.js -->
+                    <!-- One block per day, injected via src/web/app/ -->
                 </div>
                 </div>
             </div>
@@ -1273,9 +1273,16 @@
 
     <!-- App JavaScript -->
     <script src="/static/sky_catalog.js"></script>
-    <script src="/app.js?v=20261108eqgrid"></script>
     <script src="/static/activity.js?v=20261028ev9"></script>
     <script src="/static/focus.js?v=20261031lp1"></script>
+    <script defer src="/static/app/01-core.js?v=20261112split"></script>
+    <script defer src="/static/app/02-controls-calibration.js?v=20261112split"></script>
+    <script defer src="/static/app/03-station-settings.js?v=20261112split"></script>
+    <script defer src="/static/app/04-live-view.js?v=20261112split"></script>
+    <script defer src="/static/app/05-sky-overlay.js?v=20261112split"></script>
+    <script defer src="/static/app/06-telemetry.js?v=20261112split"></script>
+    <script defer src="/static/app/07-cloud.js?v=20261112split"></script>
+    <script defer src="/static/app/08-gallery-adsb.js?v=20261112split"></script>
     <script>
     // Settings sub-navigation: one section at a time, driven by the URL hash (/settings#detection)
     (function () {

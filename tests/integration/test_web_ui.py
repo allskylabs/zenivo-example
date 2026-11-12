@@ -41,7 +41,7 @@ class TestWebUIStaticAssets:
     def test_web_directory_files_exist(self):
         assert os.path.isfile(os.path.join(WEB_DIR, "index.html"))
         assert os.path.isfile(os.path.join(WEB_DIR, "style.css"))
-        assert os.path.isfile(os.path.join(WEB_DIR, "app.js"))
+        assert os.path.isdir(os.path.join(WEB_DIR, "app"))
 
     def test_serve_root_index_html(self, web_client):
         res = web_client.get("/")
@@ -66,14 +66,17 @@ class TestWebUIStaticAssets:
         assert "viewport-wrapper" in css
         assert "histogram-card" in css
 
-    def test_serve_app_js(self, web_client):
-        res = web_client.get("/app.js")
-        assert res.status_code == 200
-        assert "application/javascript" in res.headers["content-type"]
-        js = res.text
+    def test_serve_app_scripts(self, web_client):
+        import glob
+        js = ""
+        for path in sorted(glob.glob(os.path.join(WEB_DIR, "app", "*.js"))):
+            res = web_client.get("/static/app/" + os.path.basename(path))
+            assert res.status_code == 200
+            assert "javascript" in res.headers["content-type"]
+            js += res.text
         assert "drawHistogram" in js
-        assert "/api/telemetry" in js
-        assert "/api/camera/exposure" in js
+        assert "/ws/live" in js
+        assert "/api/camera/ae-lock" in js
 
     def test_static_mount_endpoint(self, web_client):
         res = web_client.get("/static/style.css")

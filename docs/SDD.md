@@ -44,7 +44,7 @@ the `/api/allsky/ingest/*` endpoints and the plate solver.
             │ src/analytics     cloud cover/history, sky events, focus, lens tracking │
             │ src/storage       retention                                             │
             │ src/api           FastAPI routes, WS/MJPEG/SSE streams, page shell       │
-            │ src/web           single-page UI (app.js, focus.js, activity.js)         │
+            │ src/web           single-page UI (app/*.js, focus.js, activity.js)         │
             │ _sync_worker ───► SyncClient ──► hoan.uk /api/allsky/ingest/*            │
             └───────────────────────────────────────────────────────────────────────────┘
  browser ◄── nginx :80 ◄── cloudflared (allsky.hoan.uk)      data/ (frames, products, logs, config)
@@ -139,7 +139,7 @@ opens, it falls back to the simulator (unless told not to).
    - Night (RAW10) frames use `rotate_deg` and the flips. Day (ISP) frames add `rotate_isp_180` on top.
    - **Coordinate spaces.** Solved optics (optical centre, roll, focal length, distortion) are stored in *native
      sensor* coordinates. The sky overlay projects stars in native coordinates and applies the current transform
-     itself (`toImgX/toImgY` in `app.js`), so changing the orientation needs no new solve. The plate solver therefore
+     itself (`toImgX/toImgY` in `src/web/app/`), so changing the orientation needs no new solve. The plate solver therefore
      un-transforms its input frames first (`_solve_bright_star_pattern`). The sky mask polygons are drawn on the
      displayed image, so they are stored in *display* fractions and are turned with the image whenever
      the orientation changes (`set_image_transform`). Anything in display space (archived frames, event
@@ -204,7 +204,7 @@ cloud events.
 ### 6.1 Web UI
 
 One page shell (`index.html`) is served at `/`, `/live`, `/gallery`, `/settings`, `/calibration`,
-`/logs` and `/focus`. The live viewport is pre-sized to the frame's aspect ratio. `app.js` holds
+`/logs` and `/focus`. The live viewport is pre-sized to the frame's aspect ratio. `src/web/app/*.js` hold
 the live view, histogram, client-side sky overlay, settings, master darks, cloud chart and
 gallery/events. `focus.js` and `activity.js` cover their own pages. `sky_catalog.js` holds the
 constellations, stars and Messier objects.

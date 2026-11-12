@@ -487,7 +487,7 @@ class TestAdversarialSecurityAndStatic:
             ("/", 200, "text/html"),
             ("/index.html", 200, "text/html"),
             ("/style.css", 200, "text/css"),
-            ("/app.js", 200, "application/javascript"),
+            ("/static/app/01-core.js", 200, "javascript"),
         ]
         for url, expected_code, expected_mime in assets:
             res = api_client.get(url)

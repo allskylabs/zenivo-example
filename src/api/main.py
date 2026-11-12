@@ -51,7 +51,7 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
     # Edge Web UI static files
     web_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))
     if os.path.isdir(web_dir):
-        # The page shell must revalidate so a new ?v= on app.js/style.css reaches browsers
+        # The page shell must revalidate so a new ?v= on app/*.js/style.css reaches browsers
         no_cache = {
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
@@ -139,10 +139,6 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         @app.get("/index.html")
         def serve_index_html():
             return page_shell()
-
-        @app.get("/app.js")
-        def serve_app_js():
-            return FileResponse(os.path.join(web_dir, "app.js"), media_type="application/javascript", headers=no_cache)
 
         @app.get("/style.css")
         def serve_style_css():
