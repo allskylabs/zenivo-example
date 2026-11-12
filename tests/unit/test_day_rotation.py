@@ -9,7 +9,8 @@ def _svc(monkeypatch, backend):
     AllSkyService.reset_instance()
     svc = AllSkyService.get_instance()
     monkeypatch.setattr(svc, "_save_station_config", lambda: None)
-    monkeypatch.setattr("src.api.service.describe_camera", lambda cam: {"backend": backend})
+    for mod in ("service", "station_mixin"):
+        monkeypatch.setattr(f"src.api.{mod}.describe_camera", lambda cam: {"backend": backend})
     svc.set_image_transform(flip_horizontal=False, flip_vertical=False, rotate_deg=0, rotate_isp_180=False)
     return svc
 
