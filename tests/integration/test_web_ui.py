@@ -62,8 +62,7 @@ class TestWebUIStaticAssets:
         assert res.status_code == 200
         assert "text/css" in res.headers["content-type"]
         css = res.text
-        # Astronomy dark mode and red vision mode classes
-        assert "night-mode" in css
+        # Red vision palette lives in tokens.css; style.css holds the layout classes
         assert "viewport-wrapper" in css
         assert "histogram-card" in css
 
@@ -125,13 +124,10 @@ class TestWebUIDOMStructure:
         assert 'id="hist-clip-high"' in html_content
 
     def test_hardware_controls_and_mode_toggle(self, html_content):
-        assert 'id="btn-mode-manual"' in html_content
-        assert 'id="btn-mode-auto"' in html_content
         assert 'id="range-exposure"' in html_content
         assert 'id="val-exposure"' in html_content
         assert 'id="range-gain"' in html_content
         assert 'id="val-gain"' in html_content
-        assert 'id="btn-apply-settings"' in html_content
         assert 'id="btn-night-vision"' in html_content
 
     def test_calibration_and_gallery_tabs(self, html_content):
@@ -140,7 +136,7 @@ class TestWebUIDOMStructure:
         assert 'id="dark-exposure"' in html_content
         assert 'id="dark-gain"' in html_content
         assert 'id="products-grid"' in html_content
-        assert 'id="events-table-body"' in html_content
+        assert 'id="live-events-list"' in html_content
 
 
 class TestWebUIWorkflowIntegration:

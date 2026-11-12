@@ -41,7 +41,8 @@
         t.appendChild(el("span", "", entry.message));
         t.addEventListener("click", () => t.remove());
         toastStack.appendChild(t);
-        while (toastStack.children.length > 4) toastStack.firstChild.remove();
+        const maxToasts = window.matchMedia("(max-width: 768px)").matches ? 2 : 4;
+        while (toastStack.children.length > maxToasts) toastStack.firstChild.remove();
         const ttl = entry.level === "error" ? 20000 : 8000;
         setTimeout(() => t.remove(), ttl);
     }
