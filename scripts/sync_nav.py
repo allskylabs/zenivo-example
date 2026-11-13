@@ -13,7 +13,8 @@ import re
 import sys
 
 WEB = os.path.join(os.path.dirname(__file__), "..", "src", "web")
-PAGES = {"index.html": None, "sky.html": "/sky", "flights3d.html": "/flights3d", "satellites3d.html": "/satellites3d"}
+PAGES = {"index.html": None, "sky.html": "/sky", "flights3d.html": "/flights3d", "satellites3d.html": "/satellites3d",
+         "community.html": "/community"}
 
 # Zenivo mark, inline so it follows the theme (ring = --accent, inner ring + star = --text-primary; see .brand-mark in style.css)
 BRAND = [
@@ -32,6 +33,7 @@ HEAD = {
     "sky.html": ("Sky view — Zenivo", "Interactive planetarium of the sky above your Zenivo all-sky station."),
     "flights3d.html": ("Flights 3D — Zenivo", "3D map of the aircraft your all-sky station hears over ADS-B."),
     "satellites3d.html": ("Satellites 3D — Zenivo", "3D map of the satellites above your all-sky station."),
+    "community.html": ("Community — Zenivo", "Map of the Zenivo all-sky stations that share themselves with the community."),
 }
 
 # (group title or None, items). item = (href, icon entity, label, kind, data-tab) ; kind: "tab" = page of index.html (app.js
@@ -40,7 +42,8 @@ NAV = [
     (None, [("/live", "&#9673;", "Live", "tab", "tab-live")]),
     ("Sky", [("/sky", "&#10024;", "Sky view", "link", ""),
              ("/flights3d", "&#9992;", "Flights 3D", "link", ""),
-             ("/satellites3d", "&#128752;", "Satellites 3D", "link", "")]),
+             ("/satellites3d", "&#128752;", "Satellites 3D", "link", ""),
+             ("/community", "&#127760;", "Community", "link", "")]),
     ("Archive", [("/gallery", "&#9638;", "Gallery &amp; Events", "tab", "tab-gallery"),
                  ("/logs", "&#8801;", "Activity Log", "tab", "tab-logs")]),
     ("Camera", [("/focus", "&#9678;", "Focus", "tab", "tab-focus"),
@@ -49,12 +52,12 @@ NAV = [
                    ("/obs", "&#8599;", "OBS Preview", "blank", "")]),
 ]
 SETTINGS = [("image", "Image Output"), ("detection", "Detection"), ("station", "Station &amp; Optics"),
-            ("skymask", "Sky Mask"), ("integrations", "Integrations")]
+            ("skymask", "Sky Mask"), ("integrations", "Integrations"), ("community", "Community")]
 # phone tab bar: 4 tabs + More (the rest lives in the sheet)
 MOBILE = [("/live", "&#9673;", "Live", "/live,/,/index.html"), ("/sky", "&#10024;", "Sky", "/sky"),
           ("/flights3d", "&#9992;", "Flights", "/flights3d"), ("/gallery", "&#9638;", "Archive", "/gallery,/logs")]
-MORE_PATHS = "/satellites3d,/focus,/calibration,/settings,/obs"
-SHEET = [("/satellites3d", "Satellites 3D"), ("/logs", "Activity Log"), ("/focus", "Focus"), ("/calibration", "Master Dark")]
+MORE_PATHS = "/satellites3d,/community,/focus,/calibration,/settings,/obs"
+SHEET = [("/satellites3d", "Satellites 3D"), ("/community", "Community"), ("/logs", "Activity Log"), ("/focus", "Focus"), ("/calibration", "Master Dark")]
 
 
 def render_brand():

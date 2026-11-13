@@ -3,9 +3,10 @@ FastAPI Router Definition for IMX335 Edge Web API.
 Implements all REST, streaming, and WebSocket endpoints conforming to F15-F17 and AC3.
 """
 
+import json
 import os
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, Query, WebSocket, status, Depends
+from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, status, Depends
 from fastapi.responses import Response, StreamingResponse
 
 from src.version import PRODUCT, __version__
@@ -32,6 +33,7 @@ from src.api.schemas import (
     LensRequest,
     LensAutofocusRequest,
     ObsOverlayRequest,
+    CommunitySettingsRequest,
 )
 from src.api.service import AllSkyService
 from src.storage import frame_codec
@@ -979,3 +981,85 @@ async def reload_obs_overlay():
         pass
     return {"success": True}
 
+
+
+# ----------------------------------------------------------------------
+# Community: opt-in sharing of a signed station card between Zenivo stations (docs/COMMUNITY.md)
+# ----------------------------------------------------------------------
+
+_COMMUNITY_MAX_BODY = 16 * 1024
+_COMMUNITY_CORS = {"Access-Control-Allow-Origin": "*", "Cache-Control": "no-store"}
+
+
+@router.get("/api/community/status")
+def get_community_status(service: AllSkyService = Depends(get_service)):
+    return service.community.status()
+
+
+@router.get("/api/community/settings")
+def get_community_settings(service: AllSkyService = Depends(get_service)):
+    return service.community.settings()
+
+
+@router.post("/api/community/settings")
+def set_community_settings(req: CommunitySettingsRequest, service: AllSkyService = Depends(get_service)):
+    """Save the settings; turning sharing on creates the station key, starts the gossip worker and runs a round."""
+    try:
+        return service.community.update_settings(req.model_dump(exclude_none=True))
+    except RuntimeError as exc:  # `cryptography` missing
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+
+
+@router.get("/api/community/card")
+def get_community_card(service: AllSkyService = Depends(get_service)):
+    card = service.community.own_card()
+    if card is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Community sharing is off")
+    return card
+
+
+@router.get("/api/community/peers")
+def get_community_peers(service: AllSkyService = Depends(get_service)):
+    """Own card plus every verified card we know. Open to any origin (no cookies) so other stations' pages can read it."""
+    return Response(content=json.dumps(service.community.peers_payload(), separators=(",", ":")),
+                    media_type="application/json", headers=_COMMUNITY_CORS)
+
+
+@router.post("/api/community/announce")
+async def announce_community_card(request: Request, service: AllSkyService = Depends(get_service)):
+    """Another station tells us its card. Accepted only when the signature verifies; its url is never fetched here."""
+    from src.community.card import CardError
+    from src.community.manager import RateLimited
+    if not service.community.enabled:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Community sharing is off")
+    length = request.headers.get("content-length")
+    if length is not None and length.isdigit() and int(length) > _COMMUNITY_MAX_BODY:
+        raise HTTPException(status_code=413, detail="Card too large")
+    body = await request.body()
+    if len(body) > _COMMUNITY_MAX_BODY:
+        raise HTTPException(status_code=413, detail="Card too large")
+    try:
+        card = json.loads(body.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Body is not JSON")
+    try:
+        service.community.accept_announce(card, request.client.host if request.client else "unknown")
+    except RateLimited:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many announces")
+    except CardError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Card rejected: {exc}")
+    return {"ok": True}
+
+
+@router.get("/api/community/thumb.jpg")
+def get_community_thumb(service: AllSkyService = Depends(get_service)):
+    """Latest frame, at most 320 px wide (JPEG q70), cached for a minute."""
+    try:
+        data = service.community.thumb_jpeg()
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Thumbnail failed: {exc}")
+    if data is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Preview sharing is off")
+    return Response(content=data, media_type="image/jpeg", headers={**_COMMUNITY_CORS, "Cache-Control": "public, max-age=60"})

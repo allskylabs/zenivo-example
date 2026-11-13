@@ -156,6 +156,11 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         def serve_satellites3d():
             return read_page("satellites3d.html")
 
+        # Map of the Zenivo stations that share themselves with the community (standalone page; loads Leaflet)
+        @app.get("/community")
+        def serve_community():
+            return read_page("community.html")
+
         # Interactive planetarium (standalone page; WebGL sky engine bundle under /static/sky, star data under /static/skydata)
         @app.get("/sky")
         def serve_sky():

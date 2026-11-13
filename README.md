@@ -28,6 +28,7 @@ is the main design constraint: heavy analysis is sampled, never done per frame.
   and autofocus for supported Raspberry Pi lenses.
 - **Plate solving**: local bright-star solver, with a remote blind-solve fallback; sky and obstruction mask.
 - **Sky pages**: observer sky view, Flights 3D and Satellites 3D, OBS browser source and dock.
+- **Community** (opt-in, off by default): share a signed station card with other Zenivo stations by gossip, no central server, and see them on a map; see [docs/COMMUNITY.md](docs/COMMUNITY.md).
 - **Storage**: AVIF frame archive, age and size based retention, extra directories to prune.
 - **Sync**: optional push of frames and telemetry to a hoan.uk server.
 

@@ -63,6 +63,7 @@
                 <a class="side-item side-link" href="/sky"><span class="side-ic">&#10024;</span><span class="side-txt">Sky view</span></a>
                 <a class="side-item side-link" href="/flights3d"><span class="side-ic">&#9992;</span><span class="side-txt">Flights 3D</span></a>
                 <a class="side-item side-link" href="/satellites3d"><span class="side-ic">&#128752;</span><span class="side-txt">Satellites 3D</span></a>
+                <a class="side-item side-link" href="/community"><span class="side-ic">&#127760;</span><span class="side-txt">Community</span></a>
             </div>
             <div class="side-group">
                 <div class="side-group-title">Archive</div>
@@ -88,6 +89,7 @@
                     <a class="side-sub" href="/settings#station" data-sub="station">Station &amp; Optics</a>
                     <a class="side-sub" href="/settings#skymask" data-sub="skymask">Sky Mask</a>
                     <a class="side-sub" href="/settings#integrations" data-sub="integrations">Integrations</a>
+                    <a class="side-sub" href="/settings#community" data-sub="community">Community</a>
                 </div>
             </div>
         </nav>
@@ -100,12 +102,13 @@
         <a class="m-tab" href="/sky" data-mpath="/sky"><span class="m-ic">&#10024;</span><span class="m-txt">Sky</span></a>
         <a class="m-tab" href="/flights3d" data-mpath="/flights3d"><span class="m-ic">&#9992;</span><span class="m-txt">Flights</span></a>
         <a class="m-tab" href="/gallery" data-mpath="/gallery,/logs"><span class="m-ic">&#9638;</span><span class="m-txt">Archive</span></a>
-        <button class="m-tab" type="button" id="m-more-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="m-more-sheet" data-mpath="/satellites3d,/focus,/calibration,/settings,/obs"><span class="m-ic">&#8943;</span><span class="m-txt">More</span></button>
+        <button class="m-tab" type="button" id="m-more-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="m-more-sheet" data-mpath="/satellites3d,/community,/focus,/calibration,/settings,/obs"><span class="m-ic">&#8943;</span><span class="m-txt">More</span></button>
     </nav>
     <div class="m-sheet-backdrop" id="m-sheet-backdrop" hidden></div>
     <div class="m-sheet" id="m-more-sheet" role="dialog" aria-label="More" hidden>
         <div class="m-sheet-grip" aria-hidden="true"></div>
         <a class="m-sheet-item" href="/satellites3d" data-mpath="/satellites3d">Satellites 3D</a>
+        <a class="m-sheet-item" href="/community" data-mpath="/community">Community</a>
         <a class="m-sheet-item" href="/logs" data-mpath="/logs">Activity Log</a>
         <a class="m-sheet-item" href="/focus" data-mpath="/focus">Focus</a>
         <a class="m-sheet-item" href="/calibration" data-mpath="/calibration">Master Dark</a>
@@ -115,6 +118,7 @@
         <a class="m-sheet-item" href="/settings#station">Station &amp; Optics</a>
         <a class="m-sheet-item" href="/settings#skymask">Sky Mask</a>
         <a class="m-sheet-item" href="/settings#integrations">Integrations</a>
+        <a class="m-sheet-item" href="/settings#community">Community</a>
         <div class="m-sheet-title">Broadcast</div>
         <a class="m-sheet-item" href="/obs/dock">OBS Dock</a>
         <a class="m-sheet-item" href="/obs" target="_blank" rel="noopener">OBS Preview</a>
@@ -484,6 +488,7 @@
                 <a href="/settings#station" data-sub="station">Station &amp; Optics</a>
                 <a href="/settings#skymask" data-sub="skymask">Sky Mask</a>
                 <a href="/settings#integrations" data-sub="integrations">Integrations</a>
+                <a href="/settings#community" data-sub="community">Community</a>
             </nav>
             <div class="card settings-card" id="settings-focus-card" data-sgroup="station">
                 <div class="card-header">
@@ -961,6 +966,55 @@
                     </fieldset>
                 </div>
             </div>
+
+            <!-- Community Card: opt-in station sharing (docs/COMMUNITY.md) -->
+            <div class="card settings-card" id="community-card" data-sgroup="community">
+                <div class="card-header">
+                    <h2>Community</h2>
+                    <a class="btn btn-sm btn-outline" href="/community">Open community map</a>
+                </div>
+                <div class="settings-grid">
+                    <fieldset class="settings-group">
+                        <legend>Share this station</legend>
+                        <div class="field">
+                            <label class="checkbox-label"><input type="checkbox" id="community-enabled" /> Share this station with the community</label>
+                        </div>
+                        <p class="field-note">
+                            Shares the station name, an approximate location and, if enabled, a small preview image with other Zenivo stations. Anyone can see it.
+                            It is off until you turn it on.
+                        </p>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="community-name">Station name</label>
+                                <input type="text" id="community-name" maxlength="60" placeholder="Defaults to the station location name" />
+                            </div>
+                            <div class="field">
+                                <label for="community-url">Public URL (optional, https)</label>
+                                <input type="url" id="community-url" maxlength="200" placeholder="https://sky.example.org" />
+                            </div>
+                            <div class="field">
+                                <label for="community-precision">Location precision</label>
+                                <select id="community-precision">
+                                    <option value="0.01">About 1 km</option>
+                                    <option value="0.1" selected>About 10 km</option>
+                                    <option value="1">About 100 km</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="community-thumb" checked /> Share a preview image</label>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="community-seeds">Seed stations (one URL per line)</label>
+                            <textarea id="community-seeds" rows="3" maxlength="2000" spellcheck="false" placeholder="https://sky.example.org"></textarea>
+                        </div>
+                        <div class="field">
+                            <button type="button" class="btn btn-sm btn-outline" id="btn-community-save">Save</button>
+                        </div>
+                        <p class="field-note" id="community-status" aria-live="polite">Loading&hellip;</p>
+                    </fieldset>
+                </div>
+            </div>
         </section>
 
         <!-- PAGE: Master Dark Calibration (/calibration) -->
@@ -1302,11 +1356,12 @@
     <script defer src="/static/app/06-telemetry.js?v=20261113opt"></script>
     <script defer src="/static/app/07-cloud.js?v=20261113opt"></script>
     <script defer src="/static/app/08-gallery-adsb.js?v=20261113opt"></script>
+    <script defer src="/static/app/09-community.js?v=20261113opt"></script>
     <script>
     // Settings sub-navigation: one section at a time, driven by the URL hash (/settings#detection)
     (function () {
         var sec = document.getElementById("tab-settings");
-        var subs = ["image", "detection", "station", "skymask", "integrations"];
+        var subs = ["image", "detection", "station", "skymask", "integrations", "community"];
         function apply() {
             var h = (location.hash || "").replace("#", "");
             var sub = subs.indexOf(h) >= 0 ? h : "image";

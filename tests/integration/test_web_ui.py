@@ -75,6 +75,12 @@ class TestWebUIStaticAssets:
         (tmp_path / "style.css").write_text("a{color:red}")
         assert stamp(html) != out  # a changed file changes the stamp
 
+    def test_community_page_has_nav(self, web_client):
+        res = web_client.get("/community")
+        assert res.status_code == 200
+        assert 'href="/community"' in res.text and 'aria-current="page"' in res.text
+        assert web_client.get("/static/community.js").status_code == 200
+
     def test_serve_index_html_direct(self, web_client):
         res = web_client.get("/index.html")
         assert res.status_code == 200

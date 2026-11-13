@@ -4,7 +4,7 @@ Adheres to PROJECT.md § Interface Contracts and AC3 verification specifications
 """
 
 from typing import Dict, Any, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ExposureControlRequest(BaseModel):
@@ -271,3 +271,60 @@ class ObsOverlayRequest(BaseModel):
     replay_label: Optional[str] = Field(None, max_length=300, description="Replay event description badge")
     replay_bbox: Optional[List[float]] = Field(None, max_length=4, description="Optional normalized line/bbox for highlight")
 
+
+
+class CommunitySettingsRequest(BaseModel):
+    """Community sharing settings; omitted fields keep their value."""
+    enabled: Optional[bool] = None
+    name: Optional[str] = Field(None, max_length=60, description="Station name shown on the community map (default: the station location name)")
+    public_url: Optional[str] = Field(None, max_length=200, description="https URL where this station can be reached from the internet, or empty")
+    precision_deg: Optional[float] = Field(None, description="Location grid: 0.01, 0.1 or 1.0 degree")
+    share_thumbnail: Optional[bool] = None
+    seeds: Optional[List[str]] = Field(None, max_length=10, description="Stations to ask first, one URL each (http allowed for a LAN)")
+
+    @field_validator("name")
+    @classmethod
+    def _name(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip() if v is not None else v
+
+    @field_validator("public_url")
+    @classmethod
+    def _public_url(cls, v: Optional[str]) -> Optional[str]:
+        from src.community.card import CardError, check_public_url
+        v = (v or "").strip() if v is not None else v
+        if v:
+            try:
+                check_public_url(v)
+            except CardError as exc:
+                raise ValueError(str(exc))
+        return v
+
+    @field_validator("precision_deg")
+    @classmethod
+    def _precision(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v not in (0.01, 0.1, 1.0):
+            raise ValueError("precision_deg must be 0.01, 0.1 or 1.0")
+        return v
+
+    @field_validator("seeds")
+    @classmethod
+    def _seeds(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is None:
+            return v
+        from urllib.parse import urlsplit
+        out: List[str] = []
+        for raw in v:
+            url = raw.strip()
+            if not url:
+                continue
+            try:
+                parts = urlsplit(url)
+                parts.port
+            except ValueError:
+                raise ValueError(f"invalid seed URL: {url[:60]}")
+            if (len(url) > 200 or parts.scheme not in ("http", "https") or not parts.hostname
+                    or parts.username is not None or parts.password is not None or any(c.isspace() for c in url)):
+                raise ValueError(f"invalid seed URL: {url[:60]}")
+            if url not in out:
+                out.append(url)
+        return out

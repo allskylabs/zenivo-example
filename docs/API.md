@@ -24,7 +24,7 @@ Contents: [Pages and static files](#pages-and-static-files) | [Version and statu
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/`, `/live`, `/gallery`, `/settings`, `/calibration`, `/logs`, `/focus` | Single-page UI shell (`index.html`) |
-| GET | `/sky`, `/flights3d`, `/satellites3d` | Separate pages: observer sky view, Flights 3D, Satellites 3D |
+| GET | `/sky`, `/flights3d`, `/satellites3d`, `/community` | Separate pages: observer sky view, Flights 3D, Satellites 3D, Community map |
 | GET, HEAD | `/full`, `/live/full`, `/obs` | Clean full-frame live page (OBS browser source) |
 | GET, HEAD | `/obs/dock`, `/obs/control`, `/dock` | OBS dock page |
 | GET | `/index.html`, `/style.css`, `/static/focus.js` | Shell and legacy asset aliases |
@@ -80,6 +80,19 @@ Contents: [Pages and static files](#pages-and-static-files) | [Version and statu
 | POST | `/api/station/star-align` | Identify stars from points picked by hand. Body `points` (4 to 80 `[x, y]` fractions), `apply` |
 | POST | `/api/station/calibration/reset` | Reset lens, sensor and mounting parameters to the camera defaults |
 | GET, POST | `/api/station/sky-mask` | Sky and obstruction polygons (`sky`, `obstruction`) |
+
+## Community
+
+Opt-in station sharing, see [COMMUNITY.md](COMMUNITY.md). All of it is off until `enabled` is set.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/community/status` | `{available, reason, enabled, id, known, last_round}` (`available` is false when the `cryptography` package is missing) |
+| GET, POST | `/api/community/settings` | `enabled` (default false), `name`, `public_url` (https or empty), `precision_deg` (0.01, 0.1 or 1.0), `share_thumbnail`, `seeds` (list of URLs). POST starts or stops the gossip worker and runs a round |
+| GET | `/api/community/card` | Own signed card; 404 while sharing is off |
+| GET | `/api/community/peers` | `{cards: [own card, ...known cards]}`; `{cards: []}` while off. Open to any origin (`Access-Control-Allow-Origin: *`) |
+| POST | `/api/community/announce` | Body: one card (max 16 KB). 200 `{ok: true}` when the signature verifies; 400 bad card, 403 sharing off, 413 too large, 429 over 30 per minute per client address |
+| GET | `/api/community/thumb.jpg` | Latest frame, at most 320 px wide, cached 60 s; 404 when off or preview sharing is off |
 
 ## Live images and streams
 

@@ -4,6 +4,17 @@ All notable changes to Zenivo are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-11-13
+
+### Added
+
+- Community (opt-in, off by default): stations share a signed station card (name, approximate location,
+  sensor, optional small preview) with each other by gossip over HTTP(S), with no central server.
+  Ed25519 identity in `data/community_key.pem`, signed and size-capped cards, SSRF-guarded fetching,
+  endpoints under `/api/community/`, a Community section in Settings and a `/community` map page (Leaflet).
+  See `docs/COMMUNITY.md`.
+- New dependency: `cryptography>=38` (without it Community reports itself unavailable and everything else works).
+
 ## [1.0.0] - 2026-11-13
 
 First release under the Zenivo name.

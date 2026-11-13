@@ -998,7 +998,9 @@ input[type="range"] {
 }
 
 .field input[type="number"],
-.field input[type="text"] {
+.field input[type="text"],
+.field input[type="url"],
+.field textarea {
     width: 100%;
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
@@ -1009,7 +1011,10 @@ input[type="range"] {
     font-size: 0.85rem;
 }
 
-.field input[type="text"] { font-family: var(--font-sans); }
+.field input[type="text"],
+.field input[type="url"],
+.field textarea { font-family: var(--font-sans); }
+.field textarea { resize: vertical; min-height: 4.5rem; }
 
 .field select {
     width: 100%;
@@ -2095,7 +2100,8 @@ body.no-scroll { overflow: hidden; }
 #tab-settings[data-sub="detection"] [data-sgroup]:not([data-sgroup~="detection"]),
 #tab-settings[data-sub="station"] [data-sgroup]:not([data-sgroup~="station"]),
 #tab-settings[data-sub="skymask"] [data-sgroup]:not([data-sgroup~="skymask"]),
-#tab-settings[data-sub="integrations"] [data-sgroup]:not([data-sgroup~="integrations"]) { display: none; }
+#tab-settings[data-sub="integrations"] [data-sgroup]:not([data-sgroup~="integrations"]),
+#tab-settings[data-sub="community"] [data-sgroup]:not([data-sgroup~="community"]) { display: none; }
 #tab-settings > .card { margin-bottom: var(--space-4, 16px); }
 
 /* Live: big viewport + right rail */

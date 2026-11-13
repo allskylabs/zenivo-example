@@ -46,6 +46,7 @@ from src.api.station_mixin import StationMixin
 from src.api.focus_mixin import FocusMixin
 from src.api.lens_mixin import LensMixin
 from src.api.plate_solve_mixin import PlateSolveMixin
+from src.community.manager import CommunityManager
 
 
 
@@ -295,10 +296,14 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
         storage_cfg = {k: v for k, v in (self.station_config.get("storage") or {}).items() if k != "extra_dirs"}
         self.retention = RetentionManager(self.output_dir, storage_cfg)
         self._retention_stop = threading.Event()
+        # Opt-in station sharing (src/community); creates no file and starts no thread until enabled in Settings
+        self.community = CommunityManager(self.output_dir, self._community_station, lambda: self.last_jpeg,
+                                          self.get_snapshot_jpeg)
         if not os.environ.get("PYTEST_CURRENT_TEST"):
             threading.Thread(target=self._retention_worker, name="retention", daemon=True).start()
             threading.Thread(target=self._background_capture_worker, name="bg-capture", daemon=True).start()
             threading.Thread(target=self._traffic_worker, name="traffic-log", daemon=True).start()
+            self.community.start()  # no-op while Community is off
 
         # Initial capture to prime caches
         self._prime_cache()
@@ -986,6 +991,13 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
         self.last_webp, self._webp_frame_ts = data, frame_ts
         return data
 
+    def _community_station(self) -> Dict[str, Any]:
+        """What the community card says about this station (name, coordinates, sensor)."""
+        cfg = self.station_config
+        sensor = str((cfg.get("camera_sensor") or {}).get("sensor_model") or "").strip()
+        return {"name": str(cfg.get("location_name") or "").strip(), "lat": cfg.get("latitude_deg", 0.0),
+                "lon": cfg.get("longitude_deg", 0.0), "camera": sensor or None}
+
     def get_snapshot_jpeg(self) -> bytes:
         """Return valid JPEG binary payload, refreshing via capture_frame() when TTL expires."""
         self.capture_frame()
@@ -1158,6 +1170,8 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
             self.adsb.save_trails(self._adsb_trails_path())
         if getattr(self, "aircraft_info", None) is not None:
             self.aircraft_info.stop()
+        if getattr(self, "community", None) is not None:
+            self.community.stop()
         for name in ("_retention_stop", "_camera_watchdog_stop"):
             stop = getattr(self, name, None)
             if stop is not None:
