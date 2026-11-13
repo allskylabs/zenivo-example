@@ -59,9 +59,21 @@ try {
 // one locked = Auto adjusts only the other, both locked = fixed (manual) exposure and gain
 const isLocked = (knob) => state.aeLock === knob || state.aeLock === "both";
 const lockName = (exp, gain) => (exp && gain ? "both" : exp ? "exposure" : gain ? "gain" : "none");
+// The click paints the new state at once (the server may answer only after the running exposure);
+// the button pulses until the server confirms, and falls back to the old state when the request fails
+const lockBusy = (on) => [btnLockExposure, btnLockGain, btnLockTarget].forEach((b) => {
+    b.classList.toggle("pending", on);
+    if (on) b.setAttribute("aria-busy", "true"); else b.removeAttribute("aria-busy");
+});
 async function setAeLock(lock) {
     const exposure_s = parseFloat(rangeExposure.value);
     const gain_db = parseFloat(rangeGain.value);
+    const before = state.aeLock;
+    const seq = (state.lockSeq = (state.lockSeq || 0) + 1);
+    state.lockPending = true;
+    state.aeLock = lock === "none" ? null : lock;
+    paintLocks();
+    lockBusy(true);
     try {
         const res = await fetch("/api/camera/ae-lock", {
             method: "POST",
@@ -70,10 +82,18 @@ async function setAeLock(lock) {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+        if (seq !== state.lockSeq) return;   // a newer click is on its way: its answer wins
+        state.lockPending = false;
         state.mode = data.mode;
         syncAeLock(data.ae_lock);
     } catch (err) {
+        if (seq !== state.lockSeq) return;
+        state.lockPending = false;
+        state.aeLock = before;
+        paintLocks();
         showAlert(controlAlert, `Could not change the lock: ${err.message}`, "error");
+    } finally {
+        if (seq === state.lockSeq) lockBusy(false);
     }
 }
 btnLockExposure.addEventListener("click", () => setAeLock(lockName(!isLocked("exposure"), isLocked("gain"))));
@@ -103,6 +123,12 @@ const paintTarget = () => {
     btnLockTarget.setAttribute("aria-pressed", state.targetLocked ? "true" : "false");
 };
 async function setTargetBrightness(value) {
+    const before = state.targetLocked;
+    const seq = (state.lockSeq = (state.lockSeq || 0) + 1);
+    state.lockPending = true;
+    state.targetLocked = value != null;
+    paintTarget();
+    lockBusy(true);
     try {
         const res = await fetch("/api/camera/target-brightness", {
             method: "POST",
@@ -111,9 +137,17 @@ async function setTargetBrightness(value) {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+        if (seq !== state.lockSeq) return;
+        state.lockPending = false;
         syncAeLock(data.ae_lock);
     } catch (err) {
+        if (seq !== state.lockSeq) return;
+        state.lockPending = false;
+        state.targetLocked = before;
+        paintTarget();
         showAlert(controlAlert, `Could not set the target brightness: ${err.message}`, "error");
+    } finally {
+        if (seq === state.lockSeq) lockBusy(false);
     }
 }
 rangeTarget.addEventListener("input", () => {

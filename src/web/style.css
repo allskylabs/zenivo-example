@@ -2258,6 +2258,9 @@ details.registers-box[open] > summary { margin-bottom: 0.3rem; }
 }
 .btn-lock.locked { color: var(--bg-primary); background: var(--accent); border-color: var(--accent); }
 [data-theme="red"] .btn-lock.locked { color: #1a0000; }
+.btn-lock.pending { animation: btn-lock-pending 0.9s ease-in-out infinite; cursor: progress; }
+@keyframes btn-lock-pending { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .btn-lock.pending { animation: none; opacity: 0.6; } }
 .btn-preset, .btn-preset-gain { font-size: 12px; min-height: 36px; padding: 0 10px; }
 @media (max-width: 760px) {
     #tab-live .live-pair { grid-template-columns: minmax(0, 1fr); }

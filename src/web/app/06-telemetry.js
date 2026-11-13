@@ -89,6 +89,8 @@ function syncModeButtons(modeStr) {
 }
 
 function syncAeLock(info) {
+    // A lock change is on its way to the server: older pushed/polled states must not undo the click
+    if (state.lockPending) return;
     state.aeLock = (info && info.lock) || null;
     // Show the held value on a locked slider (telemetry no longer moves it)
     if (isLocked("exposure") && info.exposure_s != null && document.activeElement !== rangeExposure) {
@@ -112,7 +114,7 @@ function updateTelemetryUI(data) {
     if (!data) return;
 
     if (data.ae_lock !== undefined) syncAeLock(data.ae_lock);
-    if (data.mode) {
+    if (data.mode && !state.lockPending) {
         syncModeButtons(data.mode);
     }
 
@@ -219,7 +221,7 @@ function updateStatusUI(data) {
     }
 
     if (data.ae_lock !== undefined) syncAeLock(data.ae_lock);
-    if (data.mode) {
+    if (data.mode && !state.lockPending) {
         syncModeButtons(data.mode);
     }
     if (data.calibration) {
@@ -428,7 +430,7 @@ function initWebSocket() {
                 // Lock state / brightness, pushed by the server only when it changes
                 try {
                     const msg = JSON.parse(event.data);
-                    if (msg.type === "ae_lock" && !state.dragging) {
+                    if (msg.type === "ae_lock" && !state.dragging && !state.lockPending) {
                         syncModeButtons(msg.mode);
                         syncAeLock(msg.ae_lock);
                     } else if (msg.type === "obs_overlay" && msg.settings) {
