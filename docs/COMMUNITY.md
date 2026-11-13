@@ -68,3 +68,10 @@ Behind a reverse proxy the announce rate limit sees the proxy address, so all an
   station's https URL.
 - **Key**: the private key lives in `data/community_key.pem` (mode 0600). Deleting it gives the station a new id.
 - Requires the `cryptography` package; without it Community reports "not available" and the rest of Zenivo is unaffected.
+
+## Basemap
+
+The community map draws its own basemap: coastlines only, from Natural Earth 1:50m land polygons (public domain,
+`src/web/geo/land.json`, coordinates rounded to 0.01 degrees), plus a 30-degree grid. It shows no borders and no place
+names and loads no third-party map tiles, so it takes no position on disputed territories and names. Leaflet is used
+only for panning, zooming and markers.

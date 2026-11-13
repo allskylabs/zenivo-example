@@ -46,14 +46,28 @@
     const countEl = document.getElementById("ccount");
     const noteEl = document.getElementById("cnote");
 
-    const map = L.map("cmap", { worldCopyJump: true, minZoom: 2 }).setView([20, 10], 2);
-    // The map box gets its final size after the shell lays out (and on rotation): tell Leaflet, or tiles land off-centre
+    // Neutral basemap drawn by the page itself: coastlines only (Natural Earth 1:50m land, public domain),
+    // no borders, no place names and no third-party tile server
+    const css = getComputedStyle(document.documentElement);
+    const tone = (name, fallback) => (css.getPropertyValue(name) || "").trim() || fallback;
+    const world = L.latLngBounds([-85, -180], [85, 180]);
+    const map = L.map("cmap", {
+        minZoom: 2, maxZoom: 9, preferCanvas: true, maxBounds: world.pad(0.1), maxBoundsViscosity: 0.8,
+        attributionControl: false,
+    }).setView([20, 10], 2);
+    L.control.attribution({ prefix: false }).addAttribution("Coastlines: Natural Earth (public domain)").addTo(map);
+    // The map box gets its final size after the shell lays out (and on rotation): tell Leaflet, or the map lands off-centre
     if (window.ResizeObserver) new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById("cmap"));
-    // Esri dark-grey canvas (same tile host as the Flights page): dark by design, with a separate label layer on top
-    const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas";
-    const esriAttr = 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors';
-    L.tileLayer(`${ESRI}/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 16, attribution: esriAttr }).addTo(map);
-    L.tileLayer(`${ESRI}/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 16 }).addTo(map);
+    const grid = [];
+    for (let lon = -180; lon <= 180; lon += 30) grid.push([[-85, lon], [85, lon]]);
+    for (let lat = -60; lat <= 60; lat += 30) grid.push([[lat, -180], [lat, 180]]);
+    L.polyline(grid, { color: tone("--text-muted", "#64748b"), weight: 1, opacity: 0.12, interactive: false }).addTo(map);
+    fetch("/static/geo/land.json").then((r) => r.json()).then((land) => {
+        L.geoJSON(land, {
+            interactive: false,
+            style: { color: tone("--text-muted", "#64748b"), weight: 0.8, opacity: 0.7, fillColor: tone("--border-color", "#1e293b"), fillOpacity: 1 },
+        }).addTo(map).bringToBack();
+    }).catch(() => { /* the stations still show on the plain grid */ });
     const layer = L.layerGroup().addTo(map);
     let stations = [];   // [{card, marker}]
     let ownId = null;
