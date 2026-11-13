@@ -89,3 +89,17 @@ exchanging cards when every seed is down, and a station that was switched off fo
 through a remembered address. A brand-new station still needs one reachable address: a built-in seed or any station URL
 typed into Settings. A station without a public URL cannot be contacted by others, so it depends on the stations it
 can reach.
+
+## What map visitors may do
+
+Three switches in Settings > Community decide what other people get from the community map (all need sharing on):
+
+| Setting | On (default) | Off |
+|---|---|---|
+| Share a preview image | A small image (320 px, or at most 8 KB inside the card without a public URL) | No image at all |
+| Let visitors enlarge the preview | Clicking the image opens `/api/community/preview.jpg` (up to 1280 px, refreshed once a minute); needs a public URL | Only the small image, scaled up |
+| Let the map link to this station's page | An "Open station" link to the public URL | No link (card field `open: false`) |
+
+Turning the link off only removes it from the map: the public URL is still part of the card (other stations need it
+to gossip), and whoever knows the address can open the station like any visitor. A station without a public URL can
+never be opened or enlarged from outside; it only shows its small embedded image.

@@ -29,6 +29,8 @@ MAX_SEEDS = 10
 
 DEFAULTS: Dict[str, Any] = {
     "enabled": False, "name": "", "public_url": "", "public_precision_deg": 0.1, "share_thumbnail": True, "seeds": [],
+    # Large preview for map visitors, and whether the map may link to this station's own page
+    "share_preview": True, "allow_open": True,
     # False until the owner saves a seed list: until then the built-in seeds are part of the list (and removable)
     "seeds_set": False,
 }
@@ -54,7 +56,9 @@ class CommunityManager:
         self._card: Optional[Dict[str, Any]] = None
         self._card_key: Any = None
         self._thumb_cache: Optional[tuple] = None
+        self._preview_cache: Optional[tuple] = None
         self._hits: Dict[str, Deque[float]] = {}
+        self._inbound: Deque[float] = deque(maxlen=500)  # times other stations announced themselves to us
         self.worker = GossipWorker(self)
 
     # -- paths / settings --------------------------------------------------
@@ -149,7 +153,9 @@ class CommunityManager:
         name = (s["name"] or st.get("name") or "Zenivo station").strip()[:cardmod.MAX_NAME] or "Zenivo station"
         url = s["public_url"] or None
         want_thumb = bool(s["share_thumbnail"]) and not url
-        key = (name, st.get("lat"), st.get("lon"), s["public_precision_deg"], url, st.get("camera"), want_thumb)
+        preview = bool(url) and bool(s["share_thumbnail"]) and bool(s["share_preview"])
+        key = (name, st.get("lat"), st.get("lon"), s["public_precision_deg"], url, st.get("camera"), want_thumb,
+               bool(s["allow_open"]), preview)
         now = time.time()
         with self._lock:
             c = self._card
@@ -164,7 +170,8 @@ class CommunityManager:
                     thumb = make_embedded(jpeg)
             self._card = cardmod.build_card(
                 self._identity, name=name, lat=float(st["lat"]), lon=float(st["lon"]), precision_deg=s["public_precision_deg"],
-                url=url, camera=(st.get("camera") or None), software=f"Zenivo {__version__}", thumb=thumb)
+                url=url, camera=(st.get("camera") or None), software=f"Zenivo {__version__}", thumb=thumb,
+                allow_open=bool(s["allow_open"]), preview=preview)
             self._card_key = key
             return self._card
 
@@ -206,7 +213,10 @@ class CommunityManager:
                 for k in [k for k, v in self._hits.items() if not v or v[-1] < now - 60]:
                     del self._hits[k]
         self._ensure()
-        self.merge_card(cardmod.verify(raw_card))
+        card = cardmod.verify(raw_card)
+        self.merge_card(card)
+        if self._identity is None or card.get("id") != self._identity.id:
+            self._inbound.append(now)  # proof that another station can reach this one
         self._registry.save()
 
     # -- thumbnail ---------------------------------------------------------
@@ -226,19 +236,67 @@ class CommunityManager:
                 self._thumb_cache = (now, data)
         return data
 
+    def preview_jpeg(self) -> Optional[bytes]:
+        """Latest frame, at most 1280 px wide, cached for a minute. None unless the owner shares the large preview."""
+        s = self.settings()
+        if not self.enabled or not s["share_thumbnail"] or not s["share_preview"]:
+            return None
+        now = time.time()
+        with self._lock:
+            if self._preview_cache and now - self._preview_cache[0] < THUMB_CACHE_S:
+                return self._preview_cache[1]
+        from src.community.thumb import make_preview
+        data = make_preview(self._snapshot_jpeg())
+        if data is not None:
+            with self._lock:
+                self._preview_cache = (now, data)
+        return data
+
     # -- status ------------------------------------------------------------
-    def status(self) -> Dict[str, Any]:
+    def network(self, enabled: bool) -> Dict[str, Any]:
+        """Is this station part of the network? Outbound = it reaches others; inbound = others reach it."""
+        now = time.time()
+        inbound_1h = sum(1 for t in self._inbound if t > now - 3600)
+        last_in = int(self._inbound[-1]) if self._inbound else None
+        r = self.worker.last_round
+        if not enabled:
+            state = "off"
+        elif not r:
+            state = "starting"
+        elif r.get("others_ok", 0) > 0 and last_in and last_in > now - 7200:
+            state = "connected"      # talks to others and others talk to it
+        elif r.get("others_ok", 0) > 0:
+            state = "outbound_only"  # reaches others; nobody has called in yet (normal without a public URL)
+        elif last_in and last_in > now - 7200:
+            state = "inbound_only"
+        else:
+            state = "isolated"
+        return {"state": state, "inbound_1h": inbound_1h, "last_inbound": last_in,
+                "known": self._registry.count() if self._registry is not None else 0}
+
+    def status(self, admin: bool = False) -> Dict[str, Any]:
         available, reason = idmod.availability()
         s = self.settings()
         if s["enabled"] and available:
             self._ensure()
-        return {
+        enabled = bool(s["enabled"]) and available
+        out = {
             "available": available,
             "reason": reason,
-            "enabled": bool(s["enabled"]) and available,
+            "enabled": enabled,
             "id": self._identity.id if self._identity is not None else None,
             "known": self._registry.count() if self._registry is not None else 0,
             "contacts": len(self.contacts()),
             "last_round": dict(self.worker.last_round),
+            "network": self.network(enabled),
             "default_seeds": list(DEFAULT_SEEDS),  # for the "restore built-in seeds" button in Settings
         }
+        if admin:  # addresses (possibly LAN seeds the owner typed) and their health are for the owner only
+            out["targets"] = [dict(t) for t in self.worker.last_targets]
+        return out
+
+    def check_now(self) -> None:
+        """Run a gossip round right away (Settings: "Check now")."""
+        if self.settings()["enabled"]:
+            self.worker.start()
+            self.worker.trigger()

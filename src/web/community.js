@@ -98,6 +98,31 @@
         return e;
     }
 
+    // Full-screen preview (Esc, the close button or a click outside the image closes it)
+    function openLightbox(src, fallback, title, note) {
+        const back = el("div", "cm-light");
+        back.setAttribute("role", "dialog");
+        back.setAttribute("aria-modal", "true");
+        back.setAttribute("aria-label", `Preview of ${title}`);
+        const fig = el("figure", "cm-light-fig");
+        const img = document.createElement("img");
+        img.alt = `Latest frame of ${title}`;
+        img.referrerPolicy = "no-referrer";
+        img.addEventListener("error", () => { if (img.src !== fallback) img.src = fallback; }, { once: true });
+        img.src = src;
+        const cap = el("figcaption", "", note ? `${title} \u2014 ${note}` : title);
+        const close = el("button", "cm-light-close", "Close");
+        close.type = "button";
+        const shut = () => { back.remove(); document.removeEventListener("keydown", onKey); };
+        const onKey = (ev) => { if (ev.key === "Escape") shut(); };
+        back.addEventListener("click", (ev) => { if (ev.target === back || ev.target === close) shut(); });
+        document.addEventListener("keydown", onKey);
+        fig.append(img, cap);
+        back.append(close, fig);
+        document.body.appendChild(back);
+        close.focus();
+    }
+
     function popupFor(card, isOwn) {
         const box = el("div", "cm-pop");
         if (isOwn) box.appendChild(el("div", "own", "This station"));
@@ -116,14 +141,27 @@
             img.referrerPolicy = "no-referrer";
             img.addEventListener("error", () => img.remove());
             img.src = src;
-            box.appendChild(img);
+            // Click to enlarge: the large preview when the station offers one, else the same small image scaled up
+            const large = base && card.preview === true ? base.replace(/\/+$/, "") + "/api/community/preview.jpg" : src;
+            const zoom = el("button", "cm-zoom");
+            zoom.type = "button";
+            zoom.title = "Enlarge";
+            zoom.setAttribute("aria-label", `Enlarge the preview of ${String(card.name || "the station")}`);
+            zoom.appendChild(img);
+            zoom.addEventListener("click", () => openLightbox(large, src, String(card.name || "Unnamed station"),
+                card.preview === true ? "" : "This station shares only a small preview."));
+            box.appendChild(zoom);
         }
-        if (base) {
+        if (base && card.open !== false) {
             const a = el("a", "open", "Open station");
             a.href = base;
             a.target = "_blank";
             a.rel = "noopener noreferrer";
             box.appendChild(a);
+        } else if (base) {
+            box.appendChild(el("div", "meta", "The owner does not link to this station's page."));
+        } else {
+            box.appendChild(el("div", "meta", "No public address: this station cannot be opened."));
         }
         return box;
     }
@@ -146,7 +184,7 @@
                 radius: isOwn ? 10 : 7, weight: isOwn ? 3 : 2, color: isOwn ? cssVar("--text-primary") : accent,
                 fillColor: isOwn ? accent : other, fillOpacity: 0.9,
             }).addTo(layer);
-            marker.bindPopup(() => popupFor(card, isOwn));
+            marker.bindPopup(() => popupFor(card, isOwn), { maxWidth: 340 });
             pts.push([card.lat, card.lon]);
             const item = el("li");
             const btn = el("button");

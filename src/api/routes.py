@@ -1015,8 +1015,17 @@ _COMMUNITY_CORS = {"Access-Control-Allow-Origin": "*", "Cache-Control": "no-stor
 
 
 @router.get("/api/community/status")
-def get_community_status(service: AllSkyService = Depends(get_service)):
-    return service.community.status()
+def get_community_status(request: Request, service: AllSkyService = Depends(get_service)):
+    """Public summary; the per-address health list (`targets`) is only added for the admin."""
+    from src.auth.middleware import is_admin
+    return service.community.status(admin=is_admin(request))
+
+
+@router.post("/api/community/check")
+def post_community_check(service: AllSkyService = Depends(get_service)):
+    """Admin: run a gossip round now."""
+    service.community.check_now()
+    return {"ok": True}
 
 
 @router.get("/api/community/settings")
@@ -1085,4 +1094,16 @@ def get_community_thumb(service: AllSkyService = Depends(get_service)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Thumbnail failed: {exc}")
     if data is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Preview sharing is off")
+    return Response(content=data, media_type="image/jpeg", headers={**_COMMUNITY_CORS, "Cache-Control": "public, max-age=60"})
+
+
+@router.get("/api/community/preview.jpg")
+def get_community_preview(service: AllSkyService = Depends(get_service)):
+    """Latest frame, at most 1280 px wide (JPEG q80), cached for a minute; only when the owner shares the large preview."""
+    try:
+        data = service.community.preview_jpeg()
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Preview failed")
+    if data is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="The large preview is not shared")
     return Response(content=data, media_type="image/jpeg", headers={**_COMMUNITY_CORS, "Cache-Control": "public, max-age=60"})

@@ -27,6 +27,11 @@ def make_thumb(jpeg: bytes, width: int = 320, quality: int = 70) -> Optional[byt
     return _encode(jpeg, width, quality)
 
 
+def make_preview(jpeg: bytes, width: int = 1280, quality: int = 80) -> Optional[bytes]:
+    """Served at /api/community/preview.jpg when the owner allows the large preview: at most `width` px wide."""
+    return _encode(jpeg, width, quality)
+
+
 def make_embedded(jpeg: bytes, limit: int = 8 * 1024) -> Optional[str]:
     """A data: URI of at most `limit` bytes of JPEG for the card of a station without a public URL, or None."""
     for width, quality in _EMBED_STEPS:

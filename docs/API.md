@@ -107,12 +107,14 @@ Opt-in station sharing, see [COMMUNITY.md](COMMUNITY.md). All of it is off until
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/community/status` | `{available, reason, enabled, id, known, last_round}` (`available` is false when the `cryptography` package is missing) |
-| GET, POST | `/api/community/settings` | **admin**. `enabled` (default false), `name`, `public_url` (https or empty), `public_precision_deg` (0, 0.01, 0.1 or 1.0; default 0.1; also what guests see of the station location; `precision_deg` is the old name), `share_thumbnail`, `seeds` (list of URLs). POST starts or stops the gossip worker and runs a round |
+| GET | `/api/community/status` | `{available, reason, enabled, id, known, contacts, last_round, network{state, inbound_1h, last_inbound}, default_seeds}`; the admin also gets `targets` (per address of the last round: ok, ms, cards, announced, error, streak) (`available` is false when the `cryptography` package is missing) |
+| GET, POST | `/api/community/settings` | **admin**. `enabled` (default false), `name`, `public_url` (https or empty), `public_precision_deg` (0, 0.01, 0.1 or 1.0; default 0.1; also what guests see of the station location; `precision_deg` is the old name), `share_thumbnail`, `share_preview`, `allow_open`, `seeds` (list of URLs). POST starts or stops the gossip worker and runs a round |
 | GET | `/api/community/card` | Own signed card; 404 while sharing is off |
 | GET | `/api/community/peers` | `{cards: [own card, ...known cards]}`; `{cards: []}` while off. Open to any origin (`Access-Control-Allow-Origin: *`) |
 | POST | `/api/community/announce` | Body: one card (max 16 KB). 200 `{ok: true}` when the signature verifies; 400 bad card, 403 sharing off, 413 too large, 429 over 30 per minute per client address |
 | GET | `/api/community/thumb.jpg` | Latest frame, at most 320 px wide, cached 60 s; 404 when off or preview sharing is off |
+| GET | `/api/community/preview.jpg` | Latest frame, at most 1280 px wide, cached 60 s; 404 unless the owner lets visitors enlarge the preview |
+| POST | `/api/community/check` | **admin**. Run a gossip round now |
 
 ## Live images and streams
 

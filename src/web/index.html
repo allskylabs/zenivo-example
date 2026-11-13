@@ -998,6 +998,13 @@
                             <div class="field">
                                 <label class="checkbox-label"><input type="checkbox" id="community-thumb" checked /> Share a preview image</label>
                             </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="community-preview" checked /> Let visitors enlarge the preview (up to 1280 px)</label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="community-open" checked /> Let the map link to this station's page</label>
+                                <p class="field-note">Both need a public URL. Turning the link off only removes it from the community map; whoever knows the address can still open the station, as before.</p>
+                            </div>
                         </div>
                         <div class="field">
                             <label for="community-seeds">Seed stations (one URL per line)</label>
@@ -1008,6 +1015,14 @@
                             <button type="button" class="btn btn-sm btn-outline" id="btn-community-save">Save</button>
                         </div>
                         <p class="field-note" id="community-status" aria-live="polite">Loading&hellip;</p>
+                        <div class="cm-health" id="community-health" hidden>
+                            <div class="cm-health-head">
+                                <span class="cm-net" id="community-net" data-state="off">Network</span>
+                                <button type="button" class="btn btn-sm btn-outline" id="btn-community-check">Check now</button>
+                            </div>
+                            <p class="field-note" id="community-net-note"></p>
+                            <ul class="cm-targets" id="community-targets" aria-label="Stations contacted in the last round"></ul>
+                        </div>
                     </fieldset>
                 </div>
             </div>

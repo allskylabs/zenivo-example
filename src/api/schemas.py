@@ -281,6 +281,8 @@ class CommunitySettingsRequest(BaseModel):
     public_precision_deg: Optional[float] = Field(None, description="Rounding grid for the station's public location (guests and the community card): 0 (exact), 0.01, 0.1 or 1.0 degree")
     precision_deg: Optional[float] = Field(None, description="Deprecated name of public_precision_deg")
     share_thumbnail: Optional[bool] = None
+    share_preview: Optional[bool] = Field(None, description="Let map visitors enlarge the preview (up to 1280 px); needs share_thumbnail and a public URL")
+    allow_open: Optional[bool] = Field(None, description="Let the community map link to this station's own page (public URL)")
     seeds: Optional[List[str]] = Field(None, max_length=10, description="Stations to ask first, one URL each (http allowed for a LAN)")
 
     @field_validator("name")

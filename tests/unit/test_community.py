@@ -203,3 +203,17 @@ def test_builtin_seeds_are_listed_and_removable(tmp_path):
     assert manager().settings()["seeds"] == list(DEFAULT_SEEDS) + ["https://mine.example.org"]  # saved before this rule
     (tmp_path / "community.json").write_text(json.dumps({"seeds": [], "seeds_set": True}))
     assert manager().settings()["seeds"] == []
+
+
+def test_card_visitor_permissions(ident):
+    """open/preview flags are only published for a station with a URL, are signed, and must be booleans."""
+    kw = dict(name="S", lat=1.0, lon=2.0, precision_deg=0.1, camera=None, software="Zenivo test")
+    plain = build_card(ident, url="https://s.example.org", **kw)
+    assert "open" not in plain and "preview" not in plain  # defaults: link yes, large preview no
+    card = build_card(ident, url="https://s.example.org", allow_open=False, preview=True, **kw)
+    assert card["open"] is False and card["preview"] is True and verify(card)
+    assert "open" not in build_card(ident, url=None, allow_open=False, preview=True, **kw)
+    with pytest.raises(CardError):
+        verify({**card, "open": True})  # flipping a flag breaks the signature
+    with pytest.raises(CardError):
+        verify({**card, "preview": "yes"})

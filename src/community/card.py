@@ -21,7 +21,7 @@ MAX_THUMB_BYTES = 8 * 1024
 FUTURE_SKEW_S = 600     # `updated` may be at most 10 minutes ahead of our clock
 PRECISIONS = (0.0, 0.01, 0.1, 1.0)  # 0 = exact
 THUMB_PREFIXES = ("data:image/jpeg;base64,", "data:image/webp;base64,")
-_FIELDS = {"v", "id", "pubkey", "name", "lat", "lon", "url", "camera", "software", "updated", "thumb", "sig"}
+_FIELDS = {"v", "id", "pubkey", "name", "lat", "lon", "url", "camera", "software", "updated", "thumb", "open", "preview", "sig"}
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _B64 = re.compile(r"^[A-Za-z0-9+/]*={0,2}$")
 
@@ -45,7 +45,7 @@ def snap(value: float, precision_deg: float) -> float:
 
 def build_card(identity: Identity, *, name: str, lat: float, lon: float, precision_deg: float, url: Optional[str],
                camera: Optional[str], software: str, thumb: Optional[str] = None,
-               updated: Optional[float] = None) -> Dict[str, Any]:
+               updated: Optional[float] = None, allow_open: bool = True, preview: bool = False) -> Dict[str, Any]:
     if precision_deg not in PRECISIONS:
         raise CardError("precision_deg must be 0, 0.01, 0.1 or 1.0")
     card: Dict[str, Any] = {
@@ -62,6 +62,11 @@ def build_card(identity: Identity, *, name: str, lat: float, lon: float, precisi
     }
     if thumb:
         card["thumb"] = thumb
+    # What the owner allows map visitors to do with a station that has a public URL (absent = open yes, preview no)
+    if url and not allow_open:
+        card["open"] = False     # do not offer an "Open station" link
+    if url and preview:
+        card["preview"] = True   # <url>/api/community/preview.jpg serves a large image
     card["sig"] = base64.b64encode(identity.sign(canonical(card))).decode("ascii")
     verify(card)  # never publish a card that other stations would reject
     return card
@@ -119,6 +124,9 @@ def verify(card: Any, now: Optional[float] = None) -> Dict[str, Any]:
         raise CardError("card is too large")
     if card.get("v") != CARD_VERSION or isinstance(card.get("v"), bool):
         raise CardError("unsupported version")
+    for flag in ("open", "preview"):
+        if flag in card and not isinstance(card[flag], bool):
+            raise CardError(f"{flag} must be true or false")
     _text(card, "name", MAX_NAME, True)
     _text(card, "camera", MAX_SHORT, False)
     _text(card, "software", MAX_SHORT, True)
