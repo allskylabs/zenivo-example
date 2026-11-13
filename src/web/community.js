@@ -55,19 +55,61 @@
         minZoom: 2, maxZoom: 9, preferCanvas: true, maxBounds: world.pad(0.1), maxBoundsViscosity: 0.8,
         attributionControl: false,
     }).setView([20, 10], 2);
-    L.control.attribution({ prefix: false }).addAttribution("Coastlines: Natural Earth (public domain)").addTo(map);
+    L.control.attribution({ prefix: false }).addAttribution("Land, lakes, rivers: Natural Earth (public domain)").addTo(map);
     // The map box gets its final size after the shell lays out (and on rotation): tell Leaflet, or the map lands off-centre
     if (window.ResizeObserver) new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById("cmap"));
-    const grid = [];
-    for (let lon = -180; lon <= 180; lon += 30) grid.push([[-85, lon], [85, lon]]);
-    for (let lat = -60; lat <= 60; lat += 30) grid.push([[lat, -180], [lat, 180]]);
-    L.polyline(grid, { color: tone("--text-muted", "#64748b"), weight: 1, opacity: 0.12, interactive: false }).addTo(map);
-    fetch("/static/geo/land.json").then((r) => r.json()).then((land) => {
-        L.geoJSON(land, {
-            interactive: false,
-            style: { color: tone("--text-muted", "#64748b"), weight: 0.8, opacity: 0.7, fillColor: tone("--border-color", "#1e293b"), fillOpacity: 1 },
-        }).addTo(map).bringToBack();
-    }).catch(() => { /* the stations still show on the plain grid */ });
+    const ink = tone("--text-muted", "#64748b"), landFill = tone("--border-color", "#1e293b");
+    const sea = tone("--bg-primary", "#0a0f1c");
+    const gridLines = (step, lim) => {
+        const g = [];
+        for (let lon = -180; lon <= 180; lon += step) g.push([[-85, lon], [85, lon]]);
+        for (let lat = -lim; lat <= lim; lat += step) g.push([[lat, -180], [lat, 180]]);
+        return L.polyline(g, { color: ink, weight: 1, opacity: 0.12, interactive: false });
+    };
+    const gridCoarse = gridLines(30, 60).addTo(map), gridFine = gridLines(10, 80);
+    // Neutral detail layers: land, lakes and rivers only (Natural Earth, public domain). The 1:10m set loads when zoomed in.
+    const mk = (kind) => ({
+        land: () => L.geoJSON(null, { interactive: false, style: { color: ink, weight: 0.8, opacity: 0.7, fillColor: landFill, fillOpacity: 1 } }),
+        lakes: () => L.geoJSON(null, { interactive: false, style: { color: ink, weight: 0.6, opacity: 0.55, fillColor: sea, fillOpacity: 1 } }),
+        rivers: () => L.geoJSON(null, { interactive: false, style: { color: ink, weight: 0.7, opacity: 0.45, fill: false } }),
+    })[kind]();
+    const sets = {
+        low: { land: mk("land"), lakes: mk("lakes"), rivers: mk("rivers") },
+        high: { land: mk("land"), lakes: mk("lakes"), rivers: mk("rivers") },
+    };
+    const files = {
+        low: { land: "land", lakes: "lakes", rivers: "rivers" },
+        high: { land: "land10", lakes: "lakes10", rivers: "rivers10" },
+    };
+    const loaded = {};
+    const load = (lvl) => {
+        if (loaded[lvl]) return;
+        loaded[lvl] = true;
+        for (const k of ["land", "lakes", "rivers"]) {
+            fetch(`/static/geo/${files[lvl][k]}.json`).then((r) => r.json()).then((g) => {
+                sets[lvl][k].addData(g);
+                applyLevel();
+            }).catch(() => { loaded[lvl] = false; /* the stations still show on the plain grid */ });
+        }
+    };
+    const order = ["land", "lakes", "rivers"];
+    function applyLevel() {
+        const hi = map.getZoom() >= 5 && sets.high.land.getLayers().length > 0;
+        for (const lvl of ["low", "high"]) {
+            const on = (lvl === "high") === hi;
+            for (const k of order) {
+                const lyr = sets[lvl][k];
+                if (on && !map.hasLayer(lyr)) lyr.addTo(map);
+                if (!on && map.hasLayer(lyr)) map.removeLayer(lyr);
+            }
+        }
+        for (const k of ["rivers", "lakes", "land"]) for (const lvl of ["low", "high"]) if (map.hasLayer(sets[lvl][k])) sets[lvl][k].bringToBack();
+        const fine = map.getZoom() >= 5;
+        if (fine && !map.hasLayer(gridFine)) { gridFine.addTo(map); map.removeLayer(gridCoarse); }
+        if (!fine && !map.hasLayer(gridCoarse)) { gridCoarse.addTo(map); map.removeLayer(gridFine); }
+    }
+    map.on("zoomend", () => { if (map.getZoom() >= 4) load("high"); applyLevel(); });
+    load("low");
     const layer = L.layerGroup().addTo(map);
     let stations = [];   // [{card, marker}]
     let ownId = null;
