@@ -57,7 +57,6 @@ def test_service_keeps_config_on_failed_solve(monkeypatch):
 
 
 def test_background_plate_solve_job_reports_failure(monkeypatch):
-    import time as _t
     from fastapi.testclient import TestClient
     from src.api.main import create_app
     from src.api.service import AllSkyService
@@ -71,11 +70,12 @@ def test_background_plate_solve_job_reports_failure(monkeypatch):
 
     start = client.post("/api/station/plate-solve/start").json()
     assert start["state"] in ("running", "failed")
-    for _ in range(100):
-        st = client.get("/api/station/plate-solve/status").json()
-        if st["state"] != "running":
-            break
-        _t.sleep(0.05)
+    # Wait on the job thread itself (the local capture + star match is real CPU work, so its duration depends on
+    # machine load); the generous timeout only bounds a hang, it is not a pacing sleep.
+    import threading
+    for th in [t for t in threading.enumerate() if t.name == "plate-solve"]:
+        th.join(timeout=120)
+    st = client.get("/api/station/plate-solve/status").json()
     assert st["state"] == "failed" and "no stars" in st["message"]
     assert "station_config" in st
     AllSkyService.reset_instance()

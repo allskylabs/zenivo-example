@@ -94,13 +94,15 @@ class TestAdversarialKeogramAndStartrails:
             generate_keogram([f1, f2])
 
     def test_keogram_generator_accumulator_dimension_mismatch(self):
-        """Streaming KeogramGenerator must raise ValueError when get_keogram combines mismatched heights."""
+        """Streaming KeogramGenerator skips a frame of another size (resolution change / wrong mode):
+        no crash, the strip keeps one consistent height and the timeline stays aligned."""
         gen = KeogramGenerator(slice_width=3)
         gen.add_frame(np.zeros((480, 640, 3), dtype=np.uint8))
         gen.add_frame(np.zeros((720, 1280, 3), dtype=np.uint8))
+        gen.add_frame(np.zeros((480, 640, 3), dtype=np.uint8))
 
-        with pytest.raises(ValueError):
-            gen.get_keogram()
+        assert len(gen.slices) == len(gen.timestamps) == 2
+        assert gen.get_keogram().shape == (480, 6, 3)
 
     def test_keogram_degenerate_luminance_extremes(self):
         """Test Keogram generation under all-black, all-white, and alternating high-contrast frames."""
@@ -143,7 +145,7 @@ class TestAdversarialKeogramAndStartrails:
             acc.add_frame(np.zeros((0, 0, 3), dtype=np.uint8))
 
     def test_startrails_dimension_mismatch(self):
-        """Startrails blending must raise ValueError when frame dimensions differ."""
+        """Batch startrails raises on mixed sizes; the streaming accumulator skips a wrong-size frame instead."""
         f1 = np.zeros((480, 640, 3), dtype=np.uint8)
         f2 = np.zeros((720, 1280, 3), dtype=np.uint8)
 
@@ -152,8 +154,10 @@ class TestAdversarialKeogramAndStartrails:
 
         acc = StartrailsAccumulator()
         acc.add_frame(f1)
-        with pytest.raises(ValueError, match="operands could not be broadcast together"):
-            acc.add_frame(f2)
+        out = acc.add_frame(f2)
+        assert out.shape == f1.shape
+        assert acc.frame_count == 1
+        assert acc.get_startrails().shape == f1.shape
 
     def test_startrails_mask_dimension_mismatch(self):
         """Mismatched mask dimensions must raise ValueError during broadcast/where."""
