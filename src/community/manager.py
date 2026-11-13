@@ -11,6 +11,7 @@ import time
 from collections import deque
 from typing import Any, Callable, Deque, Dict, List, Optional
 
+from src.community import DEFAULT_SEEDS
 from src.community import card as cardmod
 from src.community import identity as idmod
 from src.community.card import CardError, MAX_CARD_BYTES, PRECISIONS
@@ -223,4 +224,5 @@ class CommunityManager:
             "id": self._identity.id if self._identity is not None else None,
             "known": self._registry.count() if self._registry is not None else 0,
             "last_round": dict(self.worker.last_round),
+            "default_seeds": list(DEFAULT_SEEDS),  # always contacted, shown in Settings so the owner sees them
         }

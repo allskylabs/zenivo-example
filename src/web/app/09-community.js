@@ -24,6 +24,10 @@
             const round = r.time ? `Last round ${ago(r.time)}: ${r.ok} of ${r.contacted} stations answered.` : "First round runs shortly.";
             statusEl.textContent = `Station id ${String(st.id || "").slice(0, 8)}. ${st.known} other stations known. ${round}`;
         }
+        const ds = document.getElementById("community-default-seeds");
+        if (ds && Array.isArray(st.default_seeds) && st.default_seeds.length) {
+            ds.textContent = `Built-in seed stations (always contacted): ${st.default_seeds.join(", ")}. Add your own above only if you want more.`;
+        }
         box.disabled = !st.available;
     }
 
