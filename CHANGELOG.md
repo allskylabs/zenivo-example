@@ -8,6 +8,7 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Changed
 
+- Community: station cards are kept for 30 days and up to 50 addresses that answered are remembered without expiry, so the network keeps working when the seed stations are down.
 - CORS no longer allows credentials; the admin cookie is same-site only.
 - Station activity messages no longer contain coordinates.
 

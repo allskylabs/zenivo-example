@@ -78,7 +78,10 @@ class GossipWorker:
 
     # -- one round ---------------------------------------------------------
     def targets(self) -> List[Tuple[str, bool]]:
-        """(url, allow_private): all owner seeds (private allowed), the default seeds, then random known peers."""
+        """(url, allow_private): all owner seeds (private allowed), the default seeds, then random known peers.
+
+        Known peers = stations with a url in the registry plus the remembered addresses that answered before
+        (kept past the card expiry, so the network survives without the seeds)."""
         settings = self.manager.settings()
         own = _norm(settings.get("public_url") or "")
         out: List[Tuple[str, bool]] = []
@@ -91,7 +94,11 @@ class GossipWorker:
             if _norm(url) not in seen:
                 seen.add(_norm(url))
                 out.append((url, False))
-        peers = [c["url"] for c in self.manager.registry_cards() if c.get("url") and _norm(c["url"]) not in seen]
+        peers: List[str] = []
+        for u in [c.get("url") for c in self.manager.registry_cards()] + self.manager.contacts():
+            if u and _norm(u) not in seen:
+                seen.add(_norm(u))
+                peers.append(u)
         random.shuffle(peers)
         out += [(u, False) for u in peers[:max(MIN_RANDOM_PEERS, MAX_TARGETS - len(out))]]
         return out
@@ -115,6 +122,8 @@ class GossipWorker:
                         except CardError:
                             continue
                     ok += 1
+                    if not allow_private:  # owner seeds stay in the settings; only strictly checked addresses are remembered
+                        self.manager.note_contact(base)
                 except Exception as exc:
                     failed += 1
                     logger.debug("Community peer %s failed: %s", url, exc)

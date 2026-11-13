@@ -167,3 +167,20 @@ class TestNetguard:
         monkeypatch.setattr(netguard.socket, "getaddrinfo", boom)
         with pytest.raises(netguard.UnsafeURL):
             netguard.safe_url("https://nope.invalid")
+
+
+def test_registry_remembers_contacts_past_card_expiry(tmp_path):
+    """Addresses that answered are kept (newest first, capped) and survive a reload even when every card expired."""
+    from src.community.registry import MAX_CONTACTS
+    path = str(tmp_path / "peers.json")
+    reg = Registry(path)
+    for i in range(MAX_CONTACTS + 5):
+        reg.note_contact(f"https://s{i}.example.org", now=1000 + i)
+    reg.note_contact("", now=1)  # ignored
+    got = reg.contacts()
+    assert len(got) == MAX_CONTACTS and got[0] == f"https://s{MAX_CONTACTS + 4}.example.org"
+    assert "https://s0.example.org" not in got  # the oldest fell off the cap
+    reg.save()
+    again = Registry(path)
+    again.load(now=time.time() + 10 * MAX_AGE_S)  # long after any card would have expired
+    assert again.contacts() == got and again.count() == 0

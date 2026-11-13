@@ -163,6 +163,13 @@ class CommunityManager:
     def registry_cards(self) -> List[Dict[str, Any]]:
         return self._registry.cards() if self._registry is not None else []
 
+    def contacts(self) -> List[str]:
+        return self._registry.contacts() if self._registry is not None else []
+
+    def note_contact(self, url: str) -> None:
+        if self._registry is not None:
+            self._registry.note_contact(url)
+
     def peers_payload(self) -> Dict[str, Any]:
         own = self.own_card()
         if own is None:
@@ -223,6 +230,7 @@ class CommunityManager:
             "enabled": bool(s["enabled"]) and available,
             "id": self._identity.id if self._identity is not None else None,
             "known": self._registry.count() if self._registry is not None else 0,
+            "contacts": len(self.contacts()),
             "last_round": dict(self.worker.last_round),
             "default_seeds": list(DEFAULT_SEEDS),  # always contacted, shown in Settings so the owner sees them
         }

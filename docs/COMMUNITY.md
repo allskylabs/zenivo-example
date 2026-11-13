@@ -35,7 +35,7 @@ Every 15 minutes (first round about 20 seconds after start, timing varied by 20 
 3. for each target reads `GET <url>/api/community/peers`, verifies every card and keeps the newest per station;
 4. sends its own card with `POST <url>/api/community/announce`.
 
-A station that cannot be reached is skipped (counted in the status line, never an error). Cards older than 7 days
+A station that cannot be reached is skipped (counted in the status line, never an error). Cards older than 30 days
 are dropped and at most 2000 are kept. Known stations are stored in `data/community_peers.json`, settings in
 `data/community.json`.
 
@@ -62,7 +62,7 @@ Behind a reverse proxy the announce rate limit sees the proxy address, so all an
   DNS lookup), redirects are not followed, replies are JSON only, capped at 512 KB, with an 8 second timeout.
   An announced `url` is never fetched at announce time.
 - **Flooding**: announces are limited to 30 per minute per client address, bodies to 16 KB, fields have length caps
-  and the store is capped (2000 cards, 7 days).
+  and the store is capped (2000 cards, 30 days).
 - **Hostile content in the map**: card text is shown with DOM text APIs only; links open only for https URLs with
   `rel="noopener noreferrer"`; preview images are accepted only as `data:image/jpeg` or `data:image/webp` or from the
   station's https URL.
@@ -75,3 +75,16 @@ The community map draws its own basemap: coastlines only, from Natural Earth 1:5
 `src/web/geo/land.json`, coordinates rounded to 0.01 degrees), plus a 30-degree grid. It shows no borders and no place
 names and loads no third-party map tiles, so it takes no position on disputed territories and names. Leaflet is used
 only for panning, zooming and markers.
+
+## Working without the seed stations
+
+Seeds are only a starting point. Every station keeps what it learned in `data/community_peers.json`:
+
+- the cards of the stations it knows (kept for 30 days after their last update), and
+- up to 50 addresses that answered a gossip round, most recent first. These do not expire.
+
+Each round contacts the seeds plus a few random stations from both lists, so stations that have met once keep
+exchanging cards when every seed is down, and a station that was switched off for longer than 30 days can still rejoin
+through a remembered address. A brand-new station still needs one reachable address: a built-in seed or any station URL
+typed into Settings. A station without a public URL cannot be contacted by others, so it depends on the stations it
+can reach.
