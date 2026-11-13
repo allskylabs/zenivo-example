@@ -1201,7 +1201,55 @@ async def announce_community_card(request: Request, service: AllSkyService = Dep
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many announces")
     except CardError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Card rejected: {exc}")
+    return {"ok": True, "relay": service.community.relay_enabled()}   # senders without a public URL read `relay`
+
+
+_RELAY_MAX_BODY = 256 * 1024
+
+
+@router.post("/api/community/relay/{station_id}")
+async def post_community_relay(station_id: str, request: Request, service: AllSkyService = Depends(get_service)):
+    """A station without a public URL pushes its large preview (raw image/jpeg). Refused (404) unless the owner turned
+    `relay_previews` on. Checks run cheapest first: rate limit, size, known card without url, signature, interval,
+    then the image is re-encoded; see docs/COMMUNITY.md."""
+    from starlette.concurrency import run_in_threadpool
+    from src.auth.policy import client_key
+    from src.community.manager import RateLimited
+    from src.community.relay import RelayRefused
+    mgr = service.community
+    if not mgr.relay_enabled():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="This station does not relay previews")
+    key = client_key({k.lower(): v for k, v in request.headers.items()}, request.client.host if request.client else None)
+    try:
+        mgr.relay_rate(key)
+    except RateLimited:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many uploads")
+    length = request.headers.get("content-length")
+    if length is not None and length.isdigit() and int(length) > _RELAY_MAX_BODY:
+        raise HTTPException(status_code=413, detail="Image too large")
+    chunks, size = [], 0
+    async for chunk in request.stream():  # bounded read: a chunked body cannot skip the cap
+        size += len(chunk)
+        if size > _RELAY_MAX_BODY:
+            raise HTTPException(status_code=413, detail="Image too large")
+        chunks.append(chunk)
+    try:
+        await run_in_threadpool(mgr.accept_relay, station_id, request.headers.get("x-zenivo-time"),
+                                request.headers.get("x-zenivo-sig"), b"".join(chunks))
+    except RelayRefused as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail)
     return {"ok": True}
+
+
+@router.get("/api/community/relay/{station_file}")
+def get_community_relay(station_file: str, service: AllSkyService = Depends(get_service)):
+    """Public: the large preview this station holds for a station without a public URL (<id>.jpg)."""
+    data = service.community.relay_jpeg(station_file[:-4]) if station_file.endswith(".jpg") else None
+    if data is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No preview held for this station")
+    return Response(content=data, media_type="image/jpeg", headers={
+        "X-Content-Type-Options": "nosniff", "Cache-Control": "public, max-age=300",
+        "Cross-Origin-Resource-Policy": "cross-origin", "Access-Control-Allow-Origin": "*"})
 
 
 @router.get("/api/community/thumb.jpg")

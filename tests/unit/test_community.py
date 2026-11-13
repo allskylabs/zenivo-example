@@ -296,6 +296,8 @@ class _Mgr:
     def merge_card(self, c): self.merged.append(c["id"]); return True
     def note_contact(self, u): self.contacts_noted.append(u)
     def save_registry(self): pass
+    def relay_sweep(self): return 0
+    def relay_wanted(self): return False
 
 
 def test_round_counts_peers_that_know_us(tmp_path, ident):

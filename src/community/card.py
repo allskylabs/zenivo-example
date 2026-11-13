@@ -22,7 +22,13 @@ MAX_THUMB_BYTES = 8 * 1024
 FUTURE_SKEW_S = 120     # `updated` may be at most 2 minutes ahead of our clock
 PRECISIONS = (0.0, 0.01, 0.1, 1.0)  # 0 = exact
 THUMB_PREFIXES = ("data:image/jpeg;base64,", "data:image/webp;base64,")
-_FIELDS = {"v", "id", "pubkey", "name", "lat", "lon", "url", "camera", "software", "updated", "thumb", "open", "preview", "sig"}
+_FIELDS_V1 = {"v", "id", "pubkey", "name", "lat", "lon", "url", "camera", "software", "updated", "thumb", "open", "preview", "sig"}
+# Optional, signed, only for a station WITHOUT a public url that parks its large preview on relay stations. Stations
+# that predate these fields reject such a card ("unknown field"): the card is simply not shown by them.
+_RELAY_FIELDS = {"relays", "preview_sha", "preview_t"}
+_FIELDS = _FIELDS_V1 | _RELAY_FIELDS
+MAX_RELAYS = 3
+_SHA = re.compile(r"^[0-9a-f]{64}$")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _B64 = re.compile(r"^[A-Za-z0-9+/]*={0,2}$")
 
@@ -47,7 +53,9 @@ def snap(value: float, precision_deg: float) -> float:
 
 def build_card(identity: Identity, *, name: str, lat: float, lon: float, precision_deg: float, url: Optional[str],
                camera: Optional[str], software: str, thumb: Optional[str] = None,
-               updated: Optional[float] = None, allow_open: bool = True, preview: bool = False) -> Dict[str, Any]:
+               updated: Optional[float] = None, allow_open: bool = True, preview: bool = False,
+               relays: Optional[list] = None, preview_sha: Optional[str] = None,
+               preview_t: Optional[int] = None) -> Dict[str, Any]:
     if precision_deg not in PRECISIONS:
         raise CardError("precision_deg must be 0, 0.01, 0.1 or 1.0")
     card: Dict[str, Any] = {
@@ -69,6 +77,10 @@ def build_card(identity: Identity, *, name: str, lat: float, lon: float, precisi
         card["open"] = False     # do not offer an "Open station" link
     if url and preview:
         card["preview"] = True   # <url>/api/community/preview.jpg serves a large image
+    if not url and relays and preview_sha and preview_t:
+        card["relays"] = [to_origin(r) for r in relays][:MAX_RELAYS]   # stations that hold our large preview
+        card["preview_sha"] = preview_sha
+        card["preview_t"] = int(preview_t)
     card["sig"] = base64.b64encode(identity.sign(canonical(card))).decode("ascii")
     verify(card)  # never publish a card that other stations would reject
     return card
@@ -171,6 +183,22 @@ def verify(card: Any, now: Optional[float] = None) -> Dict[str, Any]:
         if not isinstance(url, str):
             raise CardError("url is invalid")
         check_public_url(url)
+    relays = card.get("relays")
+    if _RELAY_FIELDS & set(card):
+        if _RELAY_FIELDS - set(card) or url is not None:
+            raise CardError("relay fields need relays, preview_sha and preview_t, and no url")
+        if (not isinstance(relays, list) or not 1 <= len(relays) <= MAX_RELAYS
+                or len(set(relays)) != len(relays)):
+            raise CardError("relays is invalid")
+        for r in relays:
+            if not isinstance(r, str) or check_public_url(r) != r:
+                raise CardError("relays is invalid")
+        sha = card.get("preview_sha")
+        if not isinstance(sha, str) or not _SHA.match(sha):
+            raise CardError("preview_sha is invalid")
+        pt = card.get("preview_t")
+        if isinstance(pt, bool) or not isinstance(pt, int) or pt < 0 or pt > (time.time() if now is None else now) + FUTURE_SKEW_S:
+            raise CardError("preview_t is invalid")
     thumb = card.get("thumb")
     if thumb is not None:
         if (not isinstance(thumb, str) or not thumb.startswith(THUMB_PREFIXES)

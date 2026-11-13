@@ -159,6 +159,10 @@ class Registry:
                 self.version += 1
             return list(self._cards.values())
 
+    def get(self, cid: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            return self._cards.get(cid)
+
     def count(self) -> int:
         with self._lock:
             return len(self._cards)

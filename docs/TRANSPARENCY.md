@@ -178,6 +178,7 @@ switch in Settings, Community. Nothing below is sent while it is off.
 | `thumb` | Only if you have **no** public URL and preview sharing is on: a JPEG of at most 8 KB inside the card (`data:image/jpeg;base64,...`) |
 | `open` | Present as `false` only if you switched off the "Open station" link on the map |
 | `preview` | Present as `true` only if you have a public URL and allow the large preview |
+| `relays`, `preview_sha`, `preview_t` | Only if you have **no** public URL, preview sharing and the large preview are on and at least one relay station accepted your preview: up to 3 relay origins, SHA-256 of the uploaded image, upload time |
 | `sig` | Ed25519 signature over all other fields (canonical JSON: sorted keys, no spaces, UTF-8) |
 
 Rules and limits:
@@ -198,6 +199,16 @@ Rules and limits:
 - **Signatures**: Ed25519. The private key is created on first enable at `data/community_key.pem` (mode
   0600, `src/community/identity.py`). Deleting it gives the station a new id. Without the `cryptography`
   package the feature reports "not available" and everything else works.
+- **Preview relays** (`src/community/relay.py`, [COMMUNITY.md](COMMUNITY.md#preview-relays)). Sender, automatic when you have no
+  public URL and share the large preview: after announcing to a station that says `relay: true` this station uploads
+  its current frame (JPEG, at most 200 KB, at most 1280 px) to `POST <origin>/api/community/relay/<your id>`, signed with
+  your station key, at most once per 30 minutes per station and to 3 stations per round. Those stations are listed in your card and in
+  Settings. Receiver, **on by default** (`relay_previews`; turn it off under Settings, Community): a station with a reachable address stores and serves, publicly, by default,
+  large preview images that other stations (without a public URL) sent: re-encoded JPEG, at most 1280 px, up to 100 stations and
+  25 MB, each deleted after 24 hours, when the sender's card disappears or gets a URL, or when you turn the switch
+  off (which also makes the station answer 404 to uploads). A station with no reachable address never receives uploads. Honest note: a relay hosts images chosen by other stations. The risk is limited by the signature (only a known
+  station key can store, one image per station), the server-side re-encoding (no metadata or active content), the
+  caps, the 24 h lifetime and the switch.
 - The announce endpoint (`POST /api/community/announce`) is open to other stations without a session or a
   CSRF origin check (`NO_ORIGIN_CHECK` in `src/auth/policy.py`) and is rate limited to 30 per minute per client.
 
@@ -303,7 +314,9 @@ Everything else uses the process's default umask: protect the directory itself.
 | `admin_setup_code.txt` | One-time setup code. Exists only while no password is set | High | 0600 |
 | `community_key.pem` | Ed25519 private key of the station. Created only when community sharing is first enabled | High | 0600 |
 | `station_config.json` | Exact latitude and longitude, name, optics, sky mask, ADS-B receiver host and port, Flightradar24 e-mail and token (the FR24 password is never stored), `radiosondes_enabled`, `day_objects`, `google_maps_key`, `remote_solver_url`, retention and other settings | High | 0600 |
-| `community.json` | Community settings: switch, name, public URL, precision, preview switches, seed list. No secrets | Low | default |
+| `community.json` | Community settings: switch, name, public URL, precision, preview switches, `relay_previews`, seed list. No secrets | Low | default |
+| `community_relay/<station id>.jpg` | While "Relay previews" is on (the default; the folder only fills when a station uploads): large preview images pushed by other stations (re-encoded JPEG, at most 100 files / 25 MB, deleted after 24 h; the folder is emptied when the switch is turned off) | Low | default |
+| `community_relays.json` | Only for a station without a public URL: the relay stations that hold your preview (origin, last success, failures) | Low | default |
 | `community_peers.json` | Public cards of other stations and remembered station addresses | Low | default |
 | `frames/<date>/` | Archived sky frames (AVIF) and `telemetry.jsonl` (exposure, gain, star count, cloud cover). Kept 7 days by default | Medium | default |
 | `live/latest.webp` | Latest frame | Medium | default |

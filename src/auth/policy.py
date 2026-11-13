@@ -2,6 +2,7 @@
 (CSRF origin check, local-process test for machine ingest, safe `next` redirects, session cookie parsing)."""
 from __future__ import annotations
 
+import re
 from http.cookies import SimpleCookie
 from typing import Mapping, Optional
 from urllib.parse import urlsplit
@@ -13,6 +14,8 @@ SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 # Mutating requests that need no session. Everything else that is not GET/HEAD/OPTIONS requires the admin.
 OPEN_MUTATIONS = frozenset({"/api/auth/setup", "/api/auth/login", "/api/auth/logout", "/api/community/announce"})
+# Dynamic: POST /api/community/relay/<station id> (a station without a public URL pushes its preview; signed per request)
+_RELAY_POST = re.compile(r"^/api/community/relay/[0-9a-f]{32}$")
 # Other stations call this without a browser, so it has neither a session nor the CSRF origin check.
 NO_ORIGIN_CHECK = frozenset({"/api/community/announce"})
 # Machine-to-machine ingest routes a local process may POST without a session (loopback peer, no proxy headers).
@@ -51,7 +54,7 @@ def classify(method: str, path: str, headers: Mapping[str, str], peer: Optional[
         if path in ADMIN_PAGES:
             return PAGE
         return PUBLIC
-    if path in OPEN_MUTATIONS:
+    if path in OPEN_MUTATIONS or _RELAY_POST.match(path):
         return PUBLIC
     if path in LOCAL_INGEST and is_local_process(peer, headers):
         return PUBLIC
@@ -87,7 +90,7 @@ def ws_action_allowed(action: object, is_admin_and_origin_ok: bool) -> bool:
 
 
 def needs_origin_check(method: str, path: str) -> bool:
-    return method.upper() not in SAFE_METHODS and path not in NO_ORIGIN_CHECK
+    return method.upper() not in SAFE_METHODS and path not in NO_ORIGIN_CHECK and not _RELAY_POST.match(path)
 
 
 def session_token(headers: Mapping[str, str]) -> Optional[str]:

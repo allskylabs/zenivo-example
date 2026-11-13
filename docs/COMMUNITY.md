@@ -24,6 +24,7 @@ A card is one JSON object of at most 16 KB:
 | `camera`, `software` | Sensor name and `Zenivo <version>` |
 | `updated` | Unix time the card was signed |
 | `thumb` | Optional preview of at most 8 KB, only for stations without a public URL and only when preview sharing is on |
+| `relays`, `preview_sha`, `preview_t` | Optional, only for a station without a public URL whose large preview is held by relay stations: up to 3 https origins, the SHA-256 of the image that was uploaded and the upload time. Stations that predate these fields reject such a card as having an unknown field, so they do not show that station; cards without these fields are unchanged |
 | `sig` | Ed25519 signature over the card without `sig` (canonical JSON: sorted keys, no spaces, UTF-8) |
 
 Anyone who can reach a station that shares can read its card, and so can every station it exchanges cards with.
@@ -45,6 +46,35 @@ A station that cannot be reached is skipped (counted in the status line, never a
 are dropped and at most 500 are kept (when full, ids that never refreshed their card and were first seen last go first, so a flood of new ids cannot push out long-known stations; `first_seen` is local metadata in the file, never part of a card or the `/peers` payload). A card's `url` must be an origin (`https://host[:port]`, no path, query, fragment or credentials); a path or trailing slash typed in Settings is dropped. Known stations are stored in `data/community_peers.json`, settings in
 `data/community.json`.
 
+## Preview relays
+
+A station without a public URL (behind NAT, outbound only) cannot be asked for its large preview, so it parks the
+preview on stations that offer to store it. Store-and-forward, no new server:
+
+- **Receiver** (**on by default**; turn it off under Settings, Community, "Relay previews for stations without a public address",
+  `relay_previews`: that deletes what is held and answers 404). `GET /api/community/status` and the answer to an announce then say `relay: true`. The station
+  accepts `POST /api/community/relay/<station id>` (raw `image/jpeg`, 256 KB at most) and serves the stored image at
+  `GET /api/community/relay/<station id>.jpg` (public, `image/jpeg`, `nosniff`, `Cache-Control: public, max-age=300`,
+  `Cross-Origin-Resource-Policy: cross-origin`). Checks, cheapest first: 6 uploads per client per hour (120 in
+  total), size, the station must have a card we know with **no** `url` (and not be us), headers `X-Zenivo-Time`
+  (within 300 s) and `X-Zenivo-Sig` (Ed25519 by the card's key over `zenivo-relay-v1\n<id>\n<time>\n<sha256 of the body>`),
+  at most one upload per station per 10 minutes. The image is then decoded and **re-encoded** here (JPEG only,
+  header checked before decoding so a decompression bomb is refused, 64 px minimum, 24 megapixels at most, then at most 1280 px
+  on the long side, quality 80, no metadata) and stored in `data/community_relay/<id>.jpg`.
+- **Limits**: 100 stations, 25 MB in total (the least recently updated goes first), 24 hours. A sweep in every gossip round deletes
+  files older than 24 h and those whose card vanished or got a url. Turning the switch off deletes everything held.
+  `GET /api/community/peers` adds a top-level `relayed` map (`{id: time}`) for the previews this station holds; it is
+  outside the signed cards.
+- **Sender** (automatic): sharing on, "Share a preview image" and "Let visitors enlarge the preview" on, and no public URL.
+  After announcing to a station that says `relay: true` it uploads the current preview (re-compressed to 200 KB at
+  most) through the same SSRF guard (https, public addresses, pinned, no redirects): at most once per 30 minutes per
+  target and to 3 targets per round, those that accepted before first. A relay is dropped after 3 failures in a
+  row or 24 h without a success. The accepted origins are kept in `data/community_relays.json` and put in the card
+  (`relays`, `preview_sha`, `preview_t`); with a public URL nothing is uploaded and the fields are absent. Per-target
+  results ("preview relayed", "relay refused: ...") show in Settings under the network health list.
+- **Map**: the large preview comes from `<url>/api/community/preview.jpg` if the card has a url, else from the station
+  you are on when it holds the image, else from the first reachable origin in `relays`, else the 8 KB thumbnail.
+
 ## Seeds
 
 Seeds are the first stations a new station asks. The built-in ones are `https://sky.hoan.uk` and
@@ -57,8 +87,8 @@ learned from other stations never can.
 ## Limits
 
 A station without a public URL (behind NAT, no port forwarding) can reach out to others and appears on the map
-through the cards it announces, but nobody can open it or fetch its preview from the URL; its preview travels inside the card
-instead. Only stations with a public https URL are asked by others during gossip.
+through the cards it announces, but nobody can open it or fetch its preview from the station; its small preview travels inside the card
+and its large preview goes to [relay stations](#preview-relays). Only stations with a public https URL are asked by others during gossip.
 Behind a reverse proxy the announce rate limit sees the proxy address, so all announces share one limit.
 
 ## Threat model
@@ -75,6 +105,11 @@ Behind a reverse proxy the announce rate limit sees the proxy address, so all an
 - **Hostile content in the map**: card text is shown with DOM text APIs only; links open only for https URLs with
   `rel="noopener noreferrer"`; preview images are accepted only as `data:image/jpeg` or `data:image/webp` or from the
   station's https URL.
+- **Relay abuse**: a relay hosts images chosen by other stations. Mitigations: only a station whose card we know and whose
+  key signs the upload (bound to the exact bytes and the time) can store, one image per station, every image is
+  decoded and re-encoded here (no metadata, no active content, at most 1280 px), 100 stations / 25 MB / 24 h caps,
+  rate limits before any work, and the owner can turn it off (default) and that deletes everything. Anyone can still create
+  new identities, so a relay can briefly host an unwanted picture: it is gone within 24 h.
 - **Key**: the private key lives in `data/community_key.pem` (mode 0600). Deleting it gives the station a new id.
 - Requires the `cryptography` package; without it Community reports "not available" and the rest of Zenivo is unaffected.
 

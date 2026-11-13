@@ -8,6 +8,7 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Added
 
+- Community preview relay: a station without a public URL pushes its large preview (signed upload, at most 200 KB) to stations that opted in; those re-encode it (JPEG, at most 1280 px), keep it 24 h (100 stations / 25 MB) and serve it at `GET /api/community/relay/<id>.jpg`. New setting `relay_previews` (default on; turning it off deletes what is held and refuses uploads), `POST /api/community/relay/<id>`, optional signed card fields `relays`, `preview_sha`, `preview_t` (stations that predate them do not show such a card), `relay` in status and announce replies, `relayed` map in `/peers`. The map falls back from the card url to the held copy, to the card's relays, to the embedded thumbnail. See docs/COMMUNITY.md.
 - Settings: every card saves automatically on change and shows a status chip; buttons remain only for actions.
 - Settings, Integrations: Flightradar24 block (switch, e-mail, password, token) and a "Weather balloons (SondeHub)" switch (`radiosondes_enabled`, saved through `POST /api/adsb`; `GET /api/radiosondes` returns `enabled`, and the Live page shows "turned off" and re-checks every 5 minutes).
 - Settings, Detection: daytime object (birds, insects, aircraft) settings, `GET`/`POST /api/day-objects/config`; `GET /api/day-objects/status` also returns `config`, `classes` and `presets`.

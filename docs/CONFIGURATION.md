@@ -172,6 +172,10 @@ displayed frame and turn with the image when you change the orientation.
 - **Public location precision**: `0` (exact), `0.01` (about 1 km), `0.1` (about 10 km, default) or `1.0` (about 100 km).
   Guests and the community card see the station location rounded to this grid; you see it exact. Stored as
   `public_precision_deg` in `data/community.json`.
+- **Relay previews** (Settings, Community): `relay_previews` in `data/community.json`, default on (turn it off under Settings, Community). While on, this station stores and serves
+  large previews of stations without a public address (up to 100 stations / 25 MB, 24 h; see [COMMUNITY.md](COMMUNITY.md#preview-relays)).
+  A station without a public URL needs no setting: it sends its preview to relays automatically while "Share a preview image" and
+  "Let visitors enlarge the preview" are on.
 - **Password**: change it (signs out other browsers) or sign out everywhere. Files: `data/admin.json`,
   `data/admin_sessions.json`, `data/admin_setup_code.txt` (first start only). See [SECURITY.md](SECURITY.md).
 

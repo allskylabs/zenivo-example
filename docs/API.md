@@ -109,13 +109,15 @@ Opt-in station sharing, see [COMMUNITY.md](COMMUNITY.md). All of it is off until
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/community/status` | `{available, reason, enabled, id, known, contacts, last_round, network{state, inbound_1h, last_inbound}, default_seeds}`; the admin also gets `targets` (per address of the last round: ok, ms, cards, announced, error, streak) (`available` is false when the `cryptography` package is missing) |
-| GET, POST | `/api/community/settings` | **admin**. `enabled` (default false), `name`, `public_url` (https or empty), `public_precision_deg` (0, 0.01, 0.1 or 1.0; default 0.1; also what guests see of the station location; `precision_deg` is the old name), `share_thumbnail`, `share_preview`, `allow_open`, `seeds` (list of URLs). POST starts or stops the gossip worker and runs a round |
+| GET | `/api/community/status` | `{available, reason, enabled, id, known, contacts, last_round, network{state, inbound_1h, last_inbound}, default_seeds, relay, relays}` (`relay`: this station stores large previews for others; `relays`: stations that hold ours); the admin also gets `targets` (per address of the last round: ok, ms, cards, announced, error, streak) (`available` is false when the `cryptography` package is missing) |
+| GET, POST | `/api/community/settings` | **admin**. `enabled` (default false), `name`, `public_url` (https or empty), `public_precision_deg` (0, 0.01, 0.1 or 1.0; default 0.1; also what guests see of the station location; `precision_deg` is the old name), `share_thumbnail`, `share_preview`, `allow_open`, `relay_previews` (default true: store and serve large previews of stations without a public URL; turning it off deletes them), `seeds` (list of URLs). POST starts or stops the gossip worker and runs a round |
 | GET | `/api/community/card` | Own signed card; 404 while sharing is off |
-| GET | `/api/community/peers` | `{cards: [own card, ...known cards]}`; `{cards: []}` while off. Open to any origin (`Access-Control-Allow-Origin: *`) |
-| POST | `/api/community/announce` | Body: one card (max 16 KB). 200 `{ok: true}` when the signature verifies; 400 bad card, 403 sharing off, 413 too large, 429 over 30 per minute per client address |
+| GET | `/api/community/peers` | `{cards: [own card, ...known cards]}`; `{cards: []}` while off; a top-level `relayed` map `{station id: unix time}` lists previews this station holds (outside the signed cards). Open to any origin (`Access-Control-Allow-Origin: *`) |
+| POST | `/api/community/announce` | Body: one card (max 16 KB). 200 `{ok: true, relay: <bool>}` when the signature verifies (`relay`: this station accepts relay uploads); 400 bad card, 403 sharing off, 413 too large, 429 over 30 per minute per client address |
 | GET | `/api/community/thumb.jpg` | Latest frame, at most 320 px wide, cached 60 s; 404 when off or preview sharing is off |
 | GET | `/api/community/preview.jpg` | Latest frame, at most 1280 px wide, cached 60 s; 404 unless the owner lets visitors enlarge the preview |
+| POST | `/api/community/relay/{station_id}` | Open (signed per request). Raw `image/jpeg` body, 256 KB at most, headers `X-Zenivo-Time` and `X-Zenivo-Sig` (see [COMMUNITY.md](COMMUNITY.md#preview-relays)). 200 `{ok: true}`; 404 relay off, 403 unknown station / station with a public URL / bad or stale signature, 413 too large, 422 not a usable JPEG, 429 rate limit or less than 10 minutes since the last upload |
+| GET | `/api/community/relay/{station_id}.jpg` | The stored large preview (re-encoded JPEG, `Cross-Origin-Resource-Policy: cross-origin`, cached 300 s); 404 when relay is off or nothing is held |
 | POST | `/api/community/check` | **admin**. Run a gossip round now |
 
 ## Live images and streams

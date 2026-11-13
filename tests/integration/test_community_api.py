@@ -50,7 +50,7 @@ class TestCommunityAPI:
         own = client.get("/api/community/card").json()
         assert verify(own)["name"] == "My sky"
 
-        assert client.post("/api/community/announce", json=foreign).json() == {"ok": True}
+        assert client.post("/api/community/announce", json=foreign).json() == {"ok": True, "relay": True}
         res = client.get("/api/community/peers")
         assert res.headers["access-control-allow-origin"] == "*"
         ids = [c["id"] for c in res.json()["cards"]]
@@ -63,7 +63,7 @@ class TestCommunityAPI:
         card = build_card(other, name="Second", lat=1.0, lon=2.0, precision_deg=0.1, url="https://second.example.org/some/path",
                           camera=None, software="Zenivo 1.1.0")
         assert card["url"] == "https://second.example.org"  # origin only
-        assert client.post("/api/community/announce", json=card).json() == {"ok": True}
+        assert client.post("/api/community/announce", json=card).json() == {"ok": True, "relay": True}
         after = [c["id"] for c in client.get("/api/community/peers").json()["cards"]]  # not the cached 5 s body
         assert after == before + [card["id"]]
 

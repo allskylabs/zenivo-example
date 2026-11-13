@@ -106,13 +106,16 @@ def _connection(scheme: str, host: str, port: int, ip: str, timeout: float):
 
 
 def fetch_json(url: str, *, allow_private: bool = False, method: str = "GET", payload: Optional[Any] = None,
-               timeout: float = TIMEOUT_S, max_bytes: int = MAX_RESPONSE) -> Any:
-    """GET/POST `url` and return the decoded JSON body. Raises UnsafeURL or OSError/ValueError on any failure."""
+               timeout: float = TIMEOUT_S, max_bytes: int = MAX_RESPONSE, data: Optional[bytes] = None,
+               content_type: Optional[str] = None, headers: Optional[dict] = None) -> Any:
+    """GET/POST `url` and return the decoded JSON body. Raises UnsafeURL or OSError/ValueError on any failure.
+    `data` (+ `content_type`, extra `headers`) sends raw bytes instead of a JSON `payload` (relay upload)."""
     scheme, host, port, addrs, path = resolve(url, allow_private)
-    body = json.dumps(payload, separators=(",", ":"), allow_nan=False).encode("utf-8") if payload is not None else None
-    headers = {"Accept": "application/json", "User-Agent": f"Zenivo/{__version__} community"}
+    body = data if data is not None else (
+        json.dumps(payload, separators=(",", ":"), allow_nan=False).encode("utf-8") if payload is not None else None)
+    headers = {**(headers or {}), "Accept": "application/json", "User-Agent": f"Zenivo/{__version__} community"}
     if body is not None:
-        headers["Content-Type"] = "application/json"
+        headers["Content-Type"] = content_type or "application/json"
     last: Optional[Exception] = None
     for ip in addrs:
         conn = _connection(scheme, host, port, ip, timeout)
@@ -123,10 +126,10 @@ def fetch_json(url: str, *, allow_private: bool = False, method: str = "GET", pa
                 raise OSError(f"HTTP {resp.status}")
             if "json" not in (resp.getheader("Content-Type") or "").lower():
                 raise ValueError("response is not JSON")
-            data = resp.read(max_bytes + 1)
-            if len(data) > max_bytes:
+            raw = resp.read(max_bytes + 1)
+            if len(raw) > max_bytes:
                 raise ValueError("response is too large")
-            return json.loads(data.decode("utf-8"), parse_constant=_no_constant)
+            return json.loads(raw.decode("utf-8"), parse_constant=_no_constant)
         except (OSError, http.client.HTTPException) as exc:
             last = exc
         finally:

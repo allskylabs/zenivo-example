@@ -7,6 +7,7 @@
     const thumbEl = document.getElementById("community-thumb");
     const previewEl = document.getElementById("community-preview");
     const openEl = document.getElementById("community-open");
+    const relayEl = document.getElementById("community-relay");
     const seedsEl = document.getElementById("community-seeds");
     const statusEl = document.getElementById("community-status");
 
@@ -24,7 +25,9 @@
         seedsEl.dispatchEvent(new Event("change"));
     });
 
+    let lastStatus = null;
     function showStatus(st) {
+        lastStatus = st;
         if (!st.available) {
             statusEl.textContent = `Not available: ${st.reason}`;
         } else if (!st.enabled) {
@@ -37,6 +40,7 @@
         defaultSeeds = Array.isArray(st.default_seeds) ? st.default_seeds : defaultSeeds;
         showHealth(st);
         box.disabled = !st.available;
+        updateUrlHint();
     }
 
     // Network health: is this station part of the network, and how did each seed/station answer in the last round
@@ -64,6 +68,12 @@
         const calls = net.inbound_1h ? ` Other stations called in ${net.inbound_1h} time(s) in the last hour.` : "";
         netNote.textContent = st.enabled ? `${note}${calls} ${st.contacts || 0} address(es) remembered for when the seeds are down.` : note;
         checkBtn.disabled = !st.enabled;
+        if (st.enabled) {
+            const bits = [];
+            if (st.relay) bits.push(`This station relays previews${typeof st.relay_held === "number" ? ` and holds ${st.relay_held}` : ""}.`);
+            if ((st.relays || []).length) bits.push(`Your large preview is held by ${st.relays.join(", ")}.`);
+            if (bits.length) netNote.textContent += " " + bits.join(" ");
+        }
         targetsEl.replaceChildren();
         for (const t of st.targets || []) {
             const li = document.createElement("li");
@@ -84,7 +94,7 @@
                 const sent = t.announced ? "our card was accepted" : `our card was not accepted${t.error ? ` (${t.error})` : ""}`;
                 info.textContent = t.self
                     ? `Answered in ${t.ms} ms. This is this station's own address, so it does not count as another station.${rate}`
-                    : `Answered in ${t.ms} ms, sent ${t.cards} station card(s); ${sent}.${rate}`;
+                    : `Answered in ${t.ms} ms, sent ${t.cards} station card(s); ${sent}.${t.relay ? ` Large preview: ${t.relay}.` : ""}${rate}`;
             } else {
                 const last = t.last_ok ? ` Last answer ${ago(t.last_ok)}.` : " Never answered since start.";
                 info.textContent = `No answer: ${t.error || "unknown error"}. ${t.streak} failed round(s) in a row.${last}${rate}`;
@@ -125,7 +135,9 @@
         urlHint.hidden = !missing;
         if (!missing) return;
         const span = document.createElement("span");
-        span.textContent = "No public URL is set, so other people only get the small preview and cannot open this station.";
+        const held = lastStatus && Array.isArray(lastStatus.relays) ? lastStatus.relays : [];
+        span.textContent = "No public URL is set, so this station cannot be opened. The large preview is sent to stations that relay previews instead"
+            + (held.length ? ` (held now by ${held.join(", ")})` : " (none holds it yet)") + "; the card carries a small 8 KB preview as a fallback.";
         urlHint.appendChild(span);
         const host = location.hostname;
         const isPublicName = location.protocol === "https:" && host.includes(".") && !/^[0-9.]+$/.test(host) && !host.includes(":");
@@ -161,6 +173,7 @@
             thumbEl.checked = !!s.share_thumbnail;
             previewEl.checked = s.share_preview !== false;
             openEl.checked = s.allow_open !== false;
+            relayEl.checked = s.relay_previews !== false;
             seedsEl.value = (s.seeds || []).join("\n");
             updateUrlHint();
         } catch (err) { /* optional feature */ }
@@ -176,6 +189,7 @@
             share_thumbnail: thumbEl.checked,
             share_preview: previewEl.checked,
             allow_open: openEl.checked,
+            relay_previews: relayEl.checked,
             seeds: seedsEl.value.split("\n").map((l) => l.trim()).filter(Boolean),
         });
         setTimeout(loadStatus, 1500);

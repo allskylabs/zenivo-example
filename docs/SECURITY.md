@@ -22,6 +22,7 @@ security model.
 | `GET /api/adsb` receiver address and Flightradar24 account e-mail | blank | shown |
 | Flightradar24 token and password | never returned | never returned (write-only: `GET /api/adsb` gives only `fr24_has_token`; `/api/station/config` strips both; the password is kept in memory only) |
 | `POST /api/community/announce` (other stations) | open (signature checked, rate limited) | open |
+| `POST /api/community/relay/<id>` (stations without a public URL; 404 when `relay_previews` is off) | open (rate limited, Ed25519 signature over the body, size and decode checks) | open |
 | `POST /api/auth/setup`, `/login`, `/logout` | open (throttled) | open |
 
 The rule is **default deny**: a request that is not `GET`, `HEAD` or `OPTIONS` needs an admin session
@@ -71,7 +72,7 @@ ignored and the peer address is used. The key is used only for throttling, never
 
 ## Cross-site requests
 
-Every state-changing request (except `/api/community/announce`, which other stations send without a
+Every state-changing request (except `/api/community/announce` and `/api/community/relay/<id>`, which other stations send without a
 browser) is refused with 403 when it carries an `Origin` header whose host:port differs from the `Host`
 header. `SameSite=Lax` covers requests without an Origin. WebSocket commands get the same check on the
 handshake. CORS is open for reads without credentials, so another site can never use your session.
@@ -116,6 +117,7 @@ HTTPS so the cookie is `Secure`. Keep passing the original `Host` header (the CS
 - The SSRF guard also refuses IPv6 forms that carry an IPv4 address (NAT64 `64:ff9b::/96` and `64:ff9b:1::/48`, 6to4 `2002::/16`, Teredo `2001::/32`, IPv4-compatible `::a.b.c.d`).
 - At most 500 cards are kept; when over the cap, ids that never refreshed their card and were first seen last are dropped, so known stations survive a flood. A new id may be at most 60 s ahead of the clock, a card at most 120 s.
 - Remembered contacts: at most 2 per registrable host suffix, 180 days without an answer, never a replacement for the seeds.
+- Relay uploads (`POST /api/community/relay/<id>`, on by default, the owner can turn off `relay_previews`): 6 per client per hour and 120 in total, counted first; 256 KB cap on a bounded stream; the card must be known, have no url and sign `zenivo-relay-v1`, id, time (+-300 s) and the body hash; one per station per 10 min; the image is decoded (header dimensions and pixel cap checked first) and re-encoded to a plain JPEG of at most 1280 px in a threadpool; stored under a strict `[0-9a-f]{32}` name, 100 stations / 25 MB / 24 h. The public GET serves it with `nosniff` and `Cross-Origin-Resource-Policy: cross-origin`.
 - Announces count against a per-client bucket before the signature is verified; the registry is saved at most every 30 s. `/api/community/peers` is served from a 5 s cache.
 - Throttling: the global login/setup net pauses for a flat 60 s after 30 failures in 5 min (it cannot lock the admin out for long); per-client state idle for 15 min is purged and the table holds at most 5000 keys.
 - WebSocket guests may only send the read-only actions in `policy.WS_GUEST_ACTIONS`; `policy.ws_action_allowed` is the allow-list (default deny).

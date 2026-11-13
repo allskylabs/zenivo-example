@@ -23,6 +23,7 @@ JITTER = 0.2
 MAX_TARGETS = 5
 MIN_RANDOM_PEERS = 2
 MAX_CARDS_PER_REPLY = 2000
+MAX_RELAY_UPLOADS = 3    # large-preview uploads per round
 
 
 def _norm(url: str) -> str:
@@ -121,13 +122,64 @@ class GossipWorker:
                 del self.health[k]
         return h
 
+    def _push_relays(self, own: Optional[Dict[str, Any]], offers: List[Tuple[str, Dict[str, Any]]]) -> None:
+        """Station without a public URL: park the large preview on up to 3 stations that relay (those that accepted
+        before first), at most once per 30 min each, through the same SSRF guard as every other contact."""
+        m = self.manager
+        if own is None or not m.relay_wanted():
+            return
+        for base, res in offers:   # a relay that stopped offering counts as a failure (dropped after 3)
+            if not res.get("relay_offered") and m.relay_known(base):
+                m.relay_result(base, False)
+                res["relay"] = "relay refused: relaying is switched off there"
+        cands = [(b, r) for b, r in offers if r.get("relay_offered")]
+        cands.sort(key=lambda c: not m.relay_known(c[0]))
+        payload = None
+        done: List[str] = []
+        attempts = 0
+        for base, res in cands:
+            if attempts >= MAX_RELAY_UPLOADS:
+                res["relay"] = "relay available (enough relays this round)"
+                continue
+            if not m.relay_try_due(base):
+                res["relay"] = "preview relayed (next upload in a while)"
+                continue
+            payload = payload or m.relay_upload_payload()
+            if payload is None:
+                res["relay"] = "no preview image to relay yet"
+                break
+            data, sha = payload
+            attempts += 1
+            try:
+                self._fetch(f"{base}/api/community/relay/{own['id']}", allow_private=False, method="POST", data=data,
+                            content_type="image/jpeg", headers=m.relay_headers(data), timeout=20.0)
+                m.relay_result(base, True, sha)
+                res["relay"] = "preview relayed"
+                done.append(base)
+            except Exception as exc:
+                m.relay_result(base, False)
+                res["relay"] = ("relay refused: " + (str(exc) or exc.__class__.__name__))[:120]
+                logger.debug("Community relay %s refused: %s", base, exc)
+        if done:   # tell the relays (and the rest of the network, next rounds) about the card that now names them
+            card = m.own_card()
+            for base in done:
+                try:
+                    self._fetch(base + "/api/community/announce", allow_private=False, method="POST", payload=card)
+                except Exception:
+                    pass
+
     def run_round(self) -> Dict[str, Any]:
         with self._running_round:
+            try:
+                self.manager.relay_sweep()   # old or orphaned relayed previews (a no-op unless this station relays)
+            except Exception:
+                logger.exception("Relay sweep failed")
             own = self.manager.own_card()
             own_id = own.get("id") if own else None
             seeds = {_norm(u) for u in self.manager.settings().get("seeds") or []}
             contacted = ok = failed = new = 0
             results: List[Dict[str, Any]] = []
+            offers: List[Tuple[str, Dict[str, Any]]] = []   # announced targets that said they relay previews
             for url, allow_private in self.targets():
                 contacted += 1
                 try:
@@ -168,8 +220,11 @@ class GossipWorker:
                     logger.debug("Community peer %s failed: %s", url, exc)
                 if res["ok"] and own is not None:
                     try:
-                        self._fetch(base + "/api/community/announce", allow_private=allow_private, method="POST", payload=own)
+                        reply = self._fetch(base + "/api/community/announce", allow_private=allow_private, method="POST", payload=own)
                         res["announced"] = True
+                        res["relay_offered"] = bool(isinstance(reply, dict) and reply.get("relay") is True)
+                        if base.startswith("https://"):   # the upload itself never allows private addresses
+                            offers.append((base, res))
                     except Exception as exc:
                         res["error"] = ("announce: " + (str(exc) or exc.__class__.__name__))[:120]
                         logger.debug("Community announce to %s failed: %s", url, exc)
@@ -177,6 +232,10 @@ class GossipWorker:
                 h = self._note(base, res["ok"], now)
                 res.update(time=now, total_ok=h["ok"], total_failed=h["failed"], streak=h["streak"], last_ok=h["last_ok"])
                 results.append(res)
+            try:
+                self._push_relays(own, offers)
+            except Exception:
+                logger.exception("Relay upload failed")
             self.manager.save_registry()
             self.last_targets = results
             others = sum(1 for r in results if r["ok"] and not r["self"])

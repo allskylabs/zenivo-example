@@ -141,7 +141,8 @@
     }
 
     // Full-screen preview (Esc, the close button or a click outside the image closes it)
-    function openLightbox(src, fallback, title, note) {
+    // `sources`: image URLs tried in order when one fails to load
+    function openLightbox(sources, title, note) {
         const back = el("div", "cm-light");
         back.setAttribute("role", "dialog");
         back.setAttribute("aria-modal", "true");
@@ -150,8 +151,9 @@
         const img = document.createElement("img");
         img.alt = `Latest frame of ${title}`;
         img.referrerPolicy = "no-referrer";
-        img.addEventListener("error", () => { if (img.src !== fallback) img.src = fallback; }, { once: true });
-        img.src = src;
+        let next = 1;
+        img.addEventListener("error", () => { if (next < sources.length) img.src = sources[next++]; });
+        img.src = sources[0];
         const cap = el("figcaption", "", note ? `${title} \u2014 ${note}` : title);
         const close = el("button", "cm-light-close", "Close");
         close.type = "button";
@@ -163,6 +165,22 @@
         back.append(close, fig);
         document.body.appendChild(back);
         close.focus();
+    }
+
+    // Large-preview candidates for a station without a public address: the copy this station holds, then its relays
+    let relayed = {};
+    const STATION_ID = /^[0-9a-f]{32}$/;
+    function relaySources(card) {
+        const out = [];
+        if (!STATION_ID.test(String(card.id))) return out;
+        if (relayed && finite(relayed[card.id])) out.push({ url: `/api/community/relay/${card.id}.jpg`, host: location.host });
+        for (const r of Array.isArray(card.relays) ? card.relays.slice(0, 3) : []) {
+            const o = httpsUrl(r);
+            if (!o) continue;
+            const origin = new URL(o).origin;
+            out.push({ url: `${origin}/api/community/relay/${card.id}.jpg`, host: new URL(o).host });
+        }
+        return out;
     }
 
     function popupFor(card, isOwn) {
@@ -184,15 +202,19 @@
             img.addEventListener("error", () => img.remove());
             img.src = src;
             // Click to enlarge: the large preview when the station offers one, else the same small image scaled up
-            const large = base && card.preview === true ? base.replace(/\/+$/, "") + "/api/community/preview.jpg" : src;
+            const relays = base ? [] : relaySources(card);
+            const larges = base && card.preview === true ? [base.replace(/\/+$/, "") + "/api/community/preview.jpg"]
+                : relays.map((r) => r.url);
+            const relayNote = relays.length ? `Preview relayed by ${relays[0].host}: this station has no public address.` : "";
             const zoom = el("button", "cm-zoom");
             zoom.type = "button";
             zoom.title = "Enlarge";
             zoom.setAttribute("aria-label", `Enlarge the preview of ${String(card.name || "the station")}`);
             zoom.appendChild(img);
-            zoom.addEventListener("click", () => openLightbox(large, src, String(card.name || "Unnamed station"),
-                card.preview === true ? "" : "This station shares only a small preview."));
+            zoom.addEventListener("click", () => openLightbox(larges.concat([src]), String(card.name || "Unnamed station"),
+                relayNote || (card.preview === true ? "" : "This station shares only a small preview.")));
             box.appendChild(zoom);
+            if (relayNote) box.appendChild(el("div", "meta", relayNote));
         }
         if (base && card.open !== false) {
             const a = el("a", "open", "Open station");
@@ -202,8 +224,8 @@
             box.appendChild(a);
         } else if (base) {
             box.appendChild(el("div", "meta", "The owner does not link to this station's page."));
-        } else {
-            box.appendChild(el("div", "meta", "The owner has not set a public address yet, so only this small preview is available."));
+        } else if (!(card.relays || relayed[card.id])) {
+            box.appendChild(el("div", "meta", "This station has no public address, so it cannot be opened and shares only a small preview."));
         }
         return box;
     }
@@ -278,6 +300,7 @@
             const res = await fetch("/api/community/peers");
             const data = res.ok ? await res.json() : { cards: [] };
             cards = Array.isArray(data.cards) ? data.cards : [];
+            relayed = data.relayed && typeof data.relayed === "object" ? data.relayed : {};
             if (!popupOpen) drawMarkers();
         } catch (err) {
             showEmpty("unavailable", "Could not load the stations. Retrying.");

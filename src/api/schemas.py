@@ -298,6 +298,7 @@ class CommunitySettingsRequest(BaseModel):
     share_thumbnail: Optional[bool] = None
     share_preview: Optional[bool] = Field(None, description="Let map visitors enlarge the preview (up to 1280 px); needs share_thumbnail and a public URL")
     allow_open: Optional[bool] = Field(None, description="Let the community map link to this station's own page (public URL)")
+    relay_previews: Optional[bool] = Field(None, description="Store and serve large previews pushed by stations without a public URL (default true; re-encoded JPEG, 1280 px, 100 stations / 25 MB, 24 h)")
     seeds: Optional[List[str]] = Field(None, max_length=10, description="Stations to ask first, one URL each (http allowed for a LAN)")
 
     @field_validator("name")
