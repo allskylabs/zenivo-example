@@ -137,8 +137,8 @@ def parse_args():
     parser.add_argument(
         "--sync-target",
         type=str,
-        default="http://localhost:3005",
-        help="Target hoan.uk server URL for live frame/telemetry sync (default: http://localhost:3005)",
+        default="",
+        help="Optional sync server URL for live frame/telemetry upload (default: empty = sync OFF, nothing is uploaded)",
     )
     parser.add_argument(
         "--sync-interval",
@@ -317,7 +317,7 @@ def main():
         service.configure_storage(persist=False, extra_dirs=extra)
         logger.info(f"Extra retention directories: {extra}")
 
-    # Start background sync thread pushing live frames & telemetry to hoan.uk
+    # Optional background sync thread (only when --sync-target is set; OFF by default)
     import threading
     stop_sync = threading.Event()
     if args.sync_target:
@@ -373,7 +373,7 @@ def main():
 
         sync_thread = threading.Thread(target=_sync_worker, daemon=True)
         sync_thread.start()
-        logger.info(f"Background sync active -> {args.sync_target}")
+        logger.info(f"Sync is ENABLED: frames + telemetry are uploaded to {args.sync_target} every {args.sync_interval:g}s (--sync-target '' turns it off)")
 
     logger.info("Starting AllSky Observatory Web Server (FastAPI + Uvicorn)...")
     try:
@@ -386,7 +386,7 @@ def main():
             # Live packets are mostly JPEG already: per-message deflate only burns CPU on both ends
             ws_per_message_deflate=False,
             proxy_headers=True,
-            forwarded_allow_ips="*",
+            forwarded_allow_ips="127.0.0.1",
         )
     except (KeyboardInterrupt, SystemExit):
         logger.info("Received termination signal. Shutting down AllSky service...")

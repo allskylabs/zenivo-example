@@ -89,6 +89,10 @@ class TestDefaultDeny:
         assert guest_client.get("/live", follow_redirects=False).status_code == 200
         assert guest_client.get("/login", follow_redirects=False).status_code == 200
 
+    @pytest.mark.parametrize("path", ["/api/focus", "/api/focus/frame", "/api/storage", "/docs", "/openapi.json"])
+    def test_newly_admin_only_gets_refuse_guests(self, guest_client, path):
+        assert guest_client.get(path).status_code == 401
+
     def test_community_announce_stays_open(self, guest_client):
         # reaches the route (sharing is off -> 403 from the route itself, not 401 from the gate)
         r = guest_client.post("/api/community/announce", json={})

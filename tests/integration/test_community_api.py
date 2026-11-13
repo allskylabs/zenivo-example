@@ -57,6 +57,20 @@ class TestCommunityAPI:
         assert ids == [own["id"], foreign["id"]]
         assert client.get("/api/community/status").json()["known"] == 1
 
+    def test_peers_cache_follows_new_cards(self, client, foreign, tmp_path):
+        before = [c["id"] for c in client.get("/api/community/peers").json()["cards"]]
+        other = Identity(str(tmp_path / "k2.pem"))
+        card = build_card(other, name="Second", lat=1.0, lon=2.0, precision_deg=0.1, url="https://second.example.org/some/path",
+                          camera=None, software="Zenivo 1.1.0")
+        assert card["url"] == "https://second.example.org"  # origin only
+        assert client.post("/api/community/announce", json=card).json() == {"ok": True}
+        after = [c["id"] for c in client.get("/api/community/peers").json()["cards"]]  # not the cached 5 s body
+        assert after == before + [card["id"]]
+
+    @pytest.mark.parametrize("body", [b'{"lat": NaN}', b'{"lat": Infinity}', b'[1e999999]'])
+    def test_non_finite_json_rejected(self, client, body):
+        assert client.post("/api/community/announce", content=body).status_code == 400
+
     def test_bad_cards_rejected(self, client, foreign):
         tampered = dict(foreign, name="Hijacked")
         assert client.post("/api/community/announce", json=tampered).status_code == 400

@@ -159,7 +159,7 @@ function renderGallery(data) {
             `;
         } else {
             mediaHtml = `
-                <a href="${mediaUrl}" data-viewer="${escapeHtml(item.title || item.type)}" title="Click to view full size" style="width:100%;height:100%;display:block;">
+                <a href="${escapeHtml(mediaUrl)}" data-viewer="${escapeHtml(item.title || item.type)}" title="Click to view full size" style="width:100%;height:100%;display:block;">
                     <img src="${escapeHtml(mediaUrl)}" alt="${escapeHtml(item.title || item.type)}" loading="lazy" />
                 </a>
             `;

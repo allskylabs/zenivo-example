@@ -25,6 +25,8 @@ class StationMixin:
                     saved = json.load(f)
                 if isinstance(saved, dict):
                     default_cfg.update(saved)
+                    if "hoan.uk" in str(default_cfg.get("plate_solver_endpoint") or ""):
+                        default_cfg["plate_solver_endpoint"] = ""  # old hard-wired default, no longer used
         except Exception:
             pass
         return default_cfg
@@ -44,7 +46,8 @@ class StationMixin:
             "elevation_m": default_elev,
             "location_name": "Hanoi, Vietnam",
             "geo_source": "default",
-            "plate_solver_endpoint": "https://hoan.uk/astronomy/plate-solving",
+            "plate_solver_endpoint": "",
+            "remote_solver_url": "",
             "solve_source": "not_solved_yet",
             "solved_at": None,
             "camera_sensor": IMX335_SPEC,
@@ -89,11 +92,24 @@ class StationMixin:
     def _save_station_config(self) -> None:
         """Persist station configuration and solved optical parameters to disk."""
         import json
+        import logging
+        path = self.station_config_path
+        tmp = f"{path}.tmp"
         try:
-            with open(self.station_config_path, "w", encoding="utf-8") as f:
+            # Atomic (temp file + rename) and owner-only (0600): the file can hold the FR24 login and map API key
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(self.station_config, f, indent=2, ensure_ascii=False)
-        except Exception:
-            pass
+                f.flush()
+                os.fsync(f.fileno())
+            os.chmod(tmp, 0o600)
+            os.replace(tmp, path)
+        except Exception as exc:
+            logging.getLogger(__name__).warning("Could not save %s: %s", path, exc)
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
 
     def _sync_decode_reduce(self) -> None:
         """Let the RTS5869 MJPG decoder work at the largest 1/2^n size that still covers the output width."""

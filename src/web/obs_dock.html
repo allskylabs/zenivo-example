@@ -648,6 +648,15 @@
                 } catch (e) { return iso || ""; }
             }
 
+            function escHtml(v) {
+                return String(v === undefined || v === null ? "" : v)
+                    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+            }
+            // Only same-origin paths may be used as an image address (blocks javascript:, data: and cross-site URLs)
+            function safeLocalUrl(u) {
+                return typeof u === "string" && u.startsWith("/") && !u.startsWith("//") ? u : "";
+            }
+
             function selectEventForObs(idx, autoZoom) {
                 if (idx < 0 || idx >= eventsList.length) return;
                 selectedEventIdx = idx;
@@ -690,7 +699,7 @@
                         return;
                     }
                     container.innerHTML = adsbList.map((a, i) => {
-                        const call = a.callsign || a.icao || "UNKNOWN";
+                        const call = escHtml(a.callsign || a.icao || "UNKNOWN");
                         const alt = a.altitude_m ? `${a.altitude_m}m` : "--m";
                         const spd = a.speed_kmh ? `${a.speed_kmh}km/h` : "";
                         const dist = a.distance_km ? `${a.distance_km}km` : "";
@@ -735,11 +744,12 @@
                 container.innerHTML = eventsList.map((ev, i) => {
                     const isMeteor = ev.type === "meteor";
                     const fl = ev.flight || ev.nearest_flight;
-                    const badge = isMeteor ? "Meteor" : ev.type === "satellite" ? "🛰️ Satellite" : `✈️ ${fl ? (fl.callsign || fl.icao) : "Aircraft"}`;
+                    const badge = isMeteor ? "Meteor" : ev.type === "satellite" ? "🛰️ Satellite" : `✈️ ${fl ? escHtml(fl.callsign || fl.icao) : "Aircraft"}`;
                     const detail = fl
                         ? `Alt ${fl.altitude_m || "--"}m • Dist ${fl.distance_km || "--"}km`
                         : `Length ${Math.round(ev.length_px || 0)}px • ${ev.frames || 1} frames`;
-                    const thumb = ev.thumbnail_url ? `<img class="ev-thumb" src="${ev.thumbnail_url}" loading="lazy" />` : "";
+                    const thumbUrl = safeLocalUrl(ev.thumbnail_url);
+                    const thumb = thumbUrl ? `<img class="ev-thumb" src="${escHtml(thumbUrl)}" loading="lazy" />` : "";
                     return `<div class="ev-item ${i === selectedEventIdx ? "active" : ""}" data-idx="${i}">
                         ${thumb}
                         <div class="ev-info">

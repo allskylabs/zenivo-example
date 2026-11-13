@@ -12,7 +12,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.community import DEFAULT_SEEDS
-from src.community.card import CardError, verify
+from src.community.card import CardError, seed_origin, verify
 from src.community.netguard import fetch_json
 
 logger = logging.getLogger("imx335.community")
@@ -26,7 +26,11 @@ MAX_CARDS_PER_REPLY = 2000
 
 
 def _norm(url: str) -> str:
-    return url.strip().rstrip("/").lower()
+    """Comparison form of an address: its origin, lower-case (anything unparsable is compared as typed)."""
+    try:
+        return seed_origin(url.strip())
+    except CardError:
+        return url.strip().rstrip("/").lower()
 
 
 class GossipWorker:
@@ -126,7 +130,10 @@ class GossipWorker:
             results: List[Dict[str, Any]] = []
             for url, allow_private in self.targets():
                 contacted += 1
-                base = url.rstrip("/")
+                try:
+                    base = seed_origin(url)  # gossip targets are origins: never a path the owner or a peer smuggled in
+                except CardError:
+                    base = url.rstrip("/")
                 res: Dict[str, Any] = {"url": base, "role": "seed" if _norm(url) in seeds else "station", "ok": False,
                                        "self": False, "cards": 0, "announced": False, "error": "", "ms": None}
                 t0 = time.monotonic()
@@ -136,14 +143,18 @@ class GossipWorker:
                     cards = reply.get("cards") if isinstance(reply, dict) else None
                     if not isinstance(cards, list):
                         raise ValueError("no cards")
+                    first = True
                     for card in cards[:MAX_CARDS_PER_REPLY]:
                         try:
                             good = verify(card)
                         except CardError:
                             continue
                         res["cards"] += 1
-                        if own_id and good.get("id") == own_id:
+                        # The first card of a reply is the replying station's own card; every peer that knows us
+                        # also carries OUR card further down, which says nothing about who answered.
+                        if first and own_id and good.get("id") == own_id:
                             res["self"] = True  # this address is this very station (its own public URL)
+                        first = False
                         if self.manager.merge_card(good):
                             new += 1
                     ok += 1

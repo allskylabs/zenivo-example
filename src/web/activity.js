@@ -92,8 +92,12 @@
         updateBadge(c);
     }
 
+    // The sign-in state arrives a moment after load: fetch the admin-only storage line once it says "admin"
+    document.addEventListener("zenivo-auth", (ev) => { if (ev.detail && ev.detail.admin) loadStorage(); });
+
     async function loadStorage() {
         if (!storageEl) return;
+        if (!(window.zenivoAuth && window.zenivoAuth.admin)) return;  // storage details are admin-only
         try {
             const res = await fetch("/api/storage");
             if (!res.ok) return;

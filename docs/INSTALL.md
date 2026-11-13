@@ -18,7 +18,7 @@ Contents: [Requirements](#requirements) | [Install with install.sh](#install-wit
 | Disk | 8 GB free for the default retention policy (`max_data_gb` 8, `min_free_gb` 3) |
 | Packages | `python3-venv`, `python3-pip`, `git` or `rsync`, `ffmpeg` (timelapse), `curl` |
 | Pi CSI camera | `python3-picamera2` (apt) |
-| Network | Outbound HTTPS for satellite TLEs, aircraft data and the optional hoan.uk sync |
+| Network | Outbound HTTPS for satellite TLEs, aircraft data and the optional sync target and remote plate solver (both off by default) |
 
 ## Install with install.sh
 
@@ -61,7 +61,7 @@ Contents: [Requirements](#requirements) | [Install with install.sh](#install-wit
    |--------|---------|---------|
    | `--dir PATH` | the repo directory | Install directory (must contain `run_allsky.py`) |
    | `--port N` | `8080` | Port of the web UI and API |
-   | `--host ADDR` | `0.0.0.0` | Bind address. Use `127.0.0.1` behind a reverse proxy |
+   | `--host ADDR` | `127.0.0.1` | Bind address of the installed service. Use `0.0.0.0` to open it on the LAN (plain HTTP sends the admin password unencrypted: prefer a TLS reverse proxy) |
    | `--camera NAME` | `auto` | `auto`, `rts5869`, `picamera`, `v4l2` or `simulator` |
    | `--user NAME` | current user | User that runs the service |
    | `--service-name NAME` | `zenivo` | systemd unit name |
@@ -108,7 +108,7 @@ python3 -m venv .venv                # or: python3 -m venv --system-site-package
     fastapi uvicorn websockets opencv-python-headless requests httpx
 ```
 
-`requirements.txt` lists numpy, Pillow, pillow-avif-plugin, sgp4, urllib3 and pytest. The web
+`requirements.txt` lists numpy, Pillow, pillow-avif-plugin, sgp4, urllib3 (and cryptography). Test tools are in `requirements-dev.txt`. The web
 framework, the WebSocket library and OpenCV are installed separately. Zenivo opens no GUI windows,
 so the headless OpenCV build is enough.
 
@@ -156,7 +156,7 @@ sudo systemctl restart zenivo
 ```
 
 The unit runs with `Nice=5` and `MemoryMax=700M`. Raise `MemoryMax` on hosts with more RAM. The
-template starts with `--sync-target ""`, which turns off the push to a hoan.uk server; see
+template starts with `--sync-target ""` (sync is off by default anyway); see
 [CONFIGURATION.md](CONFIGURATION.md#command-line-flags).
 
 ## nginx reverse proxy
@@ -249,17 +249,17 @@ Two hosts already run Zenivo. Since 2026-11-13 their units are named `zenivo` an
 | Host | Unit | Folder | Port | Camera |
 |------|------|--------|------|--------|
 | Raspberry Pi 4 (1.8 GB) | `zenivo` | `/home/pi/zenivo` | 8095 (behind nginx) | IMX708 through picamera2 |
-| Mini-PC | `zenivo` | `/home/hoan/zenivo` | 8080 | IMX335 USB |
+| Mini-PC | `zenivo` | `/home/<user>/zenivo` | 8080 | IMX335 USB |
 
 Upgrade them with the rsync flow above, then restart the existing unit, for example:
 
 ```bash
 rsync -ac --exclude data/ --exclude __pycache__ --exclude '*.pyc' \
-    ./src ./run_allsky.py pi@192.168.3.24:/home/pi/zenivo/
-ssh pi@192.168.3.24 'sudo systemctl restart zenivo'
+    ./src ./run_allsky.py pi@<pi-host>:/home/pi/zenivo/
+ssh pi@<pi-host> 'sudo systemctl restart zenivo'
 ```
 
-For the mini-PC, use `hoan@192.168.6.15:/home/hoan/zenivo/` and `sudo systemctl restart zenivo`.
+For the mini-PC, use `<user>@<minipc-host>:/home/<user>/zenivo/` and `sudo systemctl restart zenivo`.
 
 `install.sh` never stops or restarts a unit with a different name. If a host still has an older
 `allsky-ng` or `allsky-web` unit, the installer warns about it and leaves it untouched: stop and

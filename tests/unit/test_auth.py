@@ -104,6 +104,27 @@ class TestThrottle:
         assert th.retry_after("a") == 0
 
 
+def test_throttle_global_is_flat_and_state_is_bounded():
+    clock = Clock()
+    glob = Throttle(limit=30, clock=clock, double=False)
+    for _ in range(30):
+        glob.fail("*")
+    assert 59 <= glob.retry_after("*") <= 61
+    clock.t += 61
+    for _ in range(30):
+        glob.fail("*")
+    assert glob.retry_after("*") <= 61                       # second lockout: still 60 s, no doubling
+    th = Throttle(clock=clock)
+    th.fail("idle")
+    clock.t += Throttle.IDLE_S + 120
+    th.fail("fresh")
+    assert "idle" not in th._state                           # idle for over 15 min: purged
+    for i in range(Throttle.MAX_KEYS + 50):
+        th.fail(f"k{i}")
+        clock.t += 0.001
+    assert len(th._state) <= Throttle.MAX_KEYS and "k%d" % (Throttle.MAX_KEYS + 49) in th._state
+
+
 class TestPolicy:
     @pytest.mark.parametrize("method,path,expect", [
         ("GET", "/api/status", policy.PUBLIC),
@@ -112,6 +133,13 @@ class TestPolicy:
         ("GET", "/api/logs", policy.ADMIN),
         ("GET", "/api/logs/download", policy.ADMIN),
         ("GET", "/api/community/settings", policy.ADMIN),
+        ("GET", "/api/focus", policy.ADMIN),
+        ("GET", "/api/focus/frame", policy.ADMIN),
+        ("GET", "/api/focus/overview.jpg", policy.ADMIN),
+        ("GET", "/api/storage", policy.ADMIN),
+        ("GET", "/docs", policy.ADMIN),
+        ("GET", "/redoc", policy.ADMIN),
+        ("GET", "/openapi.json", policy.ADMIN),
         ("GET", "/settings", policy.PAGE),
         ("GET", "/logs", policy.PAGE),
         ("GET", "/live", policy.PUBLIC),
@@ -146,18 +174,40 @@ class TestPolicy:
     def test_origin_check(self, headers, ok):
         assert policy.origin_ok(headers) is ok
 
+    @pytest.mark.parametrize("peer,ok", [("127.0.0.1", True), ("203.0.113.9", False), (None, False)])
+    def test_forwarded_host_trusted_only_from_a_local_proxy(self, peer, ok):
+        h = {"origin": "https://sky.example", "host": "127.0.0.1:8000", "x-forwarded-host": "sky.example"}
+        assert policy.origin_ok(h, peer) is ok
+
+    @pytest.mark.parametrize("peer,secure", [("::1", True), ("203.0.113.9", False)])
+    def test_forwarded_proto_trusted_only_from_a_local_proxy(self, peer, secure):
+        assert policy.forwarded_https({"x-forwarded-proto": "https"}, peer) is secure
+
     @pytest.mark.parametrize("value,expect", [
         ("/settings", "/settings"), ("/gallery?x=1", "/gallery?x=1"), ("//evil.example", "/"), ("https://evil.example", "/"),
         ("/\\evil", "/"), ("", "/"), (None, "/"), ("/login", "/"), ("/a\nb", "/")])
     def test_safe_next(self, value, expect):
         assert policy.safe_next(value) == expect
 
-    def test_client_key_and_cookie(self):
-        assert policy.client_key({"cf-connecting-ip": "1.1.1.1", "x-forwarded-for": "2.2.2.2"}, "127.0.0.1") == "1.1.1.1"
-        assert policy.client_key({"x-forwarded-for": "2.2.2.2, 3.3.3.3"}, "127.0.0.1") == "2.2.2.2"
-        assert policy.client_key({}, "10.0.0.5") == "10.0.0.5"
+    @pytest.mark.parametrize("headers,peer,key", [
+        ({"cf-connecting-ip": "1.1.1.1", "x-forwarded-for": "2.2.2.2"}, "127.0.0.1", "1.1.1.1"),
+        ({"x-forwarded-for": "9.9.9.9, 3.3.3.3"}, "127.0.0.1", "3.3.3.3"),      # right-most: appended by the local proxy
+        ({"x-forwarded-for": "2.2.2.2", "cf-connecting-ip": "1.1.1.1"}, "10.0.0.5", "10.0.0.5"),  # client-written: ignored
+        ({}, "10.0.0.5", "10.0.0.5"), ({}, None, "unknown")])
+    def test_client_key(self, headers, peer, key):
+        assert policy.client_key(headers, peer) == key
+
+    def test_cookie(self):
         assert policy.session_token({"cookie": "a=b; zenivo_session=tok"}) == "tok"
         assert policy.session_token({}) is None
+
+    @pytest.mark.parametrize("action,admin,ok", [
+        ("ping", False, True), ("get_telemetry", False, True), ("get_status", False, True),
+        ("set_exposure", False, False), ("anything_new", False, False), ("", False, False),
+        (None, False, False), (["ping"], True, False), (5, True, False),
+        ("set_exposure", True, True)])
+    def test_ws_action_allow_list(self, action, admin, ok):
+        assert policy.ws_action_allowed(action, admin) is ok
 
 
 class TestGuestRounding:

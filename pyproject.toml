@@ -15,6 +15,13 @@ dependencies = [
     "cryptography>=38",
     "pillow-avif-plugin>=1.5.0",
     "urllib3>=1.26",
+    "sgp4>=2.23",
+    "fastapi",
+    "uvicorn",
+    "websockets",
+    "opencv-python-headless",
+    "requests",
+    "httpx",
 ]
 
 [project.optional-dependencies]

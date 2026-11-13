@@ -8,6 +8,7 @@ import time
 import urllib.request
 
 from src.net import urlopen as net_urlopen
+from src.version import __version__
 from datetime import datetime
 from typing import Any, Dict, List
 
@@ -30,7 +31,7 @@ class RadiosondeFeed:
     def _fetch(self, lat: float, lon: float) -> None:
         try:
             req = urllib.request.Request(SONDEHUB_URL.format(lat=lat, lon=lon, dist=self.radius_m),
-                                         headers={"User-Agent": "allsky-ng"})
+                                         headers={"User-Agent": f"Zenivo/{__version__}"})
             with net_urlopen(req, timeout=15) as r:
                 raw = json.loads(r.read().decode("utf-8"))
             out = []

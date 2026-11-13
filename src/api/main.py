@@ -25,6 +25,49 @@ from src.version import PRODUCT, __version__
 _ASSET_URL = re.compile(r'((?:src|href)=")(/static/[^"?#]+|/style\.css)\?v=[^"]*(")')
 
 
+# CSP is Report-Only on purpose: it lists what the pages load today (self + the CDNs/tile servers they use,
+# inline scripts/styles included) and only reports; nothing is blocked. See docs/SECURITY.md.
+_CSP_REPORT_ONLY = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://unpkg.com; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unpkg.com; "
+    "font-src 'self' data: https://fonts.gstatic.com; "
+    "img-src 'self' data: blob: https://server.arcgisonline.com https://s3.amazonaws.com https://tile.googleapis.com "
+    "https://flagcdn.com https://pics.avs.io; "
+    "connect-src 'self' ws: wss: https://server.arcgisonline.com https://s3.amazonaws.com https://tile.googleapis.com "
+    "https://cdn.jsdelivr.net https://unpkg.com; "
+    "worker-src 'self' blob:; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'"
+)
+SECURITY_HEADERS = (
+    (b"x-content-type-options", b"nosniff"),
+    (b"referrer-policy", b"strict-origin-when-cross-origin"),
+    (b"x-frame-options", b"SAMEORIGIN"),
+    (b"permissions-policy", b"geolocation=(self), camera=(), microphone=()"),  # settings page uses browser GPS
+    (b"content-security-policy-report-only", _CSP_REPORT_ONLY.encode("ascii")),
+)
+
+
+class SecurityHeadersMiddleware:
+    """Adds the fixed security headers to every HTTP response (pure ASGI: safe for streaming and WebSockets)."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                have = {k.lower() for k, _ in message.get("headers", [])}
+                message = dict(message)
+                message["headers"] = list(message.get("headers", [])) + [h for h in SECURITY_HEADERS if h[0] not in have]
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
 def make_asset_stamper(web_dir: str):
     """Return stamp(html): rewrite ?v=<anything> on local /static/... and /style.css URLs so a changed file busts the cache.
     The per-file stamp is recomputed only when its (mtime, size) changes (one stat per asset per page view)."""
@@ -71,8 +114,8 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=["*"],
         allow_credentials=False,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "HEAD", "OPTIONS"],
+        allow_headers=["Content-Type"],
     )
 
     # Initialize AllSkyService singleton
@@ -80,6 +123,7 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
 
     # Default-deny admin enforcement (src/auth/policy.py decides); outermost, so it also sees the WebSocket handshake
     app.add_middleware(AuthMiddleware, auth_fn=lambda: AllSkyService.get_instance().auth)
+    app.add_middleware(SecurityHeadersMiddleware)
 
     # Include REST and streaming routes
     app.include_router(router)

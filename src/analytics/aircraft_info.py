@@ -23,7 +23,8 @@ from typing import Any, Dict, Optional, Tuple
 
 HEXDB = "https://hexdb.io"
 AIRLINES_URL = "https://raw.githubusercontent.com/jpatokal/openflights/master/data/airlines.dat"
-USER_AGENT = "allsky-ng (+https://allsky.hoan.uk)"
+from src.version import __version__
+USER_AGENT = f"Zenivo/{__version__}"
 ROUTE_TTL_S = 12 * 3600.0
 MISS_TTL_S = 7 * 24 * 3600.0  # unknown hex: ask again after a week
 CALLSIGN_RE = re.compile(r"^([A-Z]{3})\d")

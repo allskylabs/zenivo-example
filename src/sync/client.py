@@ -1,5 +1,5 @@
 """
-HTTP client for communicating with hoan.uk AllSky ingestion endpoints.
+HTTP client for an optional AllSky ingestion server (sync is off unless a target URL is configured).
 Supports multipart frames, JSON telemetry, meteor events, and summary products.
 """
 
@@ -9,21 +9,27 @@ from typing import Dict, Any, Optional, Union
 import requests
 
 
+def default_device_id() -> str:
+    """Neutral device id: ZENIVO_DEVICE_ID env var, else "zenivo-<hostname>"."""
+    import socket
+    return os.environ.get("ZENIVO_DEVICE_ID") or f"zenivo-{socket.gethostname()}"
+
+
 class SyncClient:
     """
-    HTTP client for pushing frames, telemetry, events, and summaries to hoan.uk.
+    HTTP client for pushing frames, telemetry, events, and summaries to a configured ingestion server.
     """
 
     def __init__(
         self,
-        base_url: str = "http://192.168.3.24:3000",
-        device_id: str = "hoan-uk-hanoi",
+        base_url: str = "",
+        device_id: Optional[str] = None,
         device_token: Optional[str] = None,
         timeout: float = 15.0,
         session: Optional[requests.Session] = None,
     ):
         self.base_url = base_url.rstrip("/")
-        self.device_id = device_id
+        self.device_id = device_id or default_device_id()
         self.device_token = device_token
         self.timeout = timeout
         self.session = session or requests.Session()

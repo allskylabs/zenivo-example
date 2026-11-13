@@ -66,13 +66,29 @@ class TestCard:
         ("url", "https://" + "a" * 200 + ".org"),
         ("camera", "c" * 61), ("software", None), ("v", 2), ("extra", 1),
         ("thumb", "data:text/html;base64,AAAA"), ("thumb", "data:image/jpeg;base64," + "A" * 20000),
-        ("updated", time.time() + 3600), ("updated", -1),
+        ("updated", time.time() + 3600), ("updated", time.time() + 300), ("updated", -1),
+        ("url", "https://sky.example.org/gallery"), ("url", "https://sky.example.org?x=1"), ("url", "https://sky.example.org#f"),
     ])
     def test_invalid_fields_rejected(self, ident, field, value):
         card = make(ident)
         card[field] = value
         with pytest.raises(CardError):
             verify(resign(ident, card))
+
+    @pytest.mark.parametrize("field", ["lat", "lon", "updated"])
+    @pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+    def test_non_finite_numbers_rejected(self, ident, field, bad):
+        card = make(ident)
+        card[field] = bad  # cannot even be signed (canonical forbids NaN); an attacker's unsigned card is refused too
+        with pytest.raises(CardError):
+            verify(card)
+
+    @pytest.mark.parametrize("typed,origin", [
+        ("https://Sky.Example.org/", "https://sky.example.org"), ("https://sky.example.org/a/b?x=1#f", "https://sky.example.org"),
+        ("https://sky.example.org:8443", "https://sky.example.org:8443"), ("https://sky.example.org:443", "https://sky.example.org")])
+    def test_url_is_an_origin(self, ident, typed, origin):
+        assert make(ident, url=typed)["url"] == origin  # the owner's path/slash is stripped, not an error
+        assert cardmod.seed_origin(typed.replace("https", "http")).startswith("http://sky.example.org")
 
     def test_oversized_card_rejected(self, ident):
         card = make(ident)
@@ -114,14 +130,41 @@ class TestRegistry:
         assert reg.count() == 1
         assert reg.cards(now + 60) == []                         # ages out later
 
-    def test_cap_drops_oldest(self, tmp_path):
+    def test_cap_keeps_known_and_refreshed_ids(self, tmp_path):
+        """A flood of new ids cannot push out stations that have been known longer or that refreshed their card."""
         reg = Registry(str(tmp_path / "p.json"))
-        now = time.time()
+        t0 = time.time() - 5000
+        reg.merge(fake("old", t0 - 100), t0)
+        reg.merge(fake("old", t0 - 50), t0 + 1)                  # refreshed once
         for i in range(MAX_CARDS + 5):
-            reg.merge(fake(f"s{i}", now - 10000 + i), now)
+            reg.merge(fake(f"s{i}", t0), t0 + 10 + i)            # first seen later and later
+        now = t0 + 1000
         assert reg.count() == MAX_CARDS
         ids = {c["id"] for c in reg.cards(now)}
-        assert "s0" not in ids and f"s{MAX_CARDS + 4}" in ids
+        assert "old" in ids and "s0" in ids and f"s{MAX_CARDS + 4}" not in ids  # newest-first-seen are dropped first
+        reg.save()
+        assert json.loads((tmp_path / "p.json").read_text())["first_seen"]["old"] == int(t0)  # local metadata persisted
+
+    def test_new_id_from_the_future_refused(self, tmp_path):
+        reg = Registry(str(tmp_path / "p.json"))
+        now = time.time()
+        assert not reg.merge(fake("f", now + 90), now) and reg.merge(fake("f", now + 30), now)
+
+    def test_save_is_rate_limited_and_rejects_nan(self, tmp_path):
+        reg = Registry(str(tmp_path / "p.json"))
+        reg.merge(fake("a", 100), 100.0)
+        reg.save(force=False, now=1000.0)
+        assert (tmp_path / "p.json").exists()
+        (tmp_path / "p.json").unlink()
+        reg.merge(fake("b", 200), 200.0)
+        reg.save(force=False, now=1010.0)                        # less than 30 s since the last write: skipped
+        assert not (tmp_path / "p.json").exists()
+        reg.save(force=False, now=1031.0)
+        assert (tmp_path / "p.json").exists()
+        (tmp_path / "p.json").write_text('{"cards":[{"id":"x","updated":NaN}]}')
+        loaded = Registry(str(tmp_path / "p.json"))
+        loaded.load()
+        assert loaded.count() == 0  # NaN token: the file is ignored, no crash
 
 
 def resolves_to(monkeypatch, *addrs):
@@ -170,20 +213,25 @@ class TestNetguard:
 
 
 def test_registry_remembers_contacts_past_card_expiry(tmp_path):
-    """Addresses that answered are kept (newest first, capped) and survive a reload even when every card expired."""
-    from src.community.registry import MAX_CONTACTS
+    """Origins that answered are kept (newest first, capped, 2 per host suffix, 180 days) and survive a reload."""
+    from src.community.registry import CONTACT_MAX_AGE_S, MAX_CONTACTS
     path = str(tmp_path / "peers.json")
     reg = Registry(path)
+    now = time.time()
     for i in range(MAX_CONTACTS + 5):
-        reg.note_contact(f"https://s{i}.example.org", now=1000 + i)
-    reg.note_contact("", now=1)  # ignored
-    got = reg.contacts()
-    assert len(got) == MAX_CONTACTS and got[0] == f"https://s{MAX_CONTACTS + 4}.example.org"
-    assert "https://s0.example.org" not in got  # the oldest fell off the cap
+        reg.note_contact(f"https://s.site{i}.example/x/", now=now - 1000 + i)  # a path is reduced to the origin
+    reg.note_contact("", now=now)  # ignored
+    got = reg.contacts(now)
+    assert len(got) == MAX_CONTACTS and got[0] == f"https://s.site{MAX_CONTACTS + 4}.example"
+    assert "https://s.site0.example" not in got  # the oldest fell off the cap
+    for i in range(4):  # one domain cannot fill the list: only 2 per registrable suffix
+        reg.note_contact(f"https://n{i}.flood.test", now=now)
+    assert sum(1 for u in reg.contacts(now) if u.endswith("flood.test")) == 2
     reg.save()
     again = Registry(path)
-    again.load(now=time.time() + 10 * MAX_AGE_S)  # long after any card would have expired
-    assert again.contacts() == got and again.count() == 0
+    again.load(now=now + 5 * MAX_AGE_S)  # 150 days on: every card expired, contacts last 180 days
+    assert again.contacts(now + 5 * MAX_AGE_S) != [] and again.count() == 0
+    assert again.contacts(now + CONTACT_MAX_AGE_S + 2000) == []  # then they expire too
 
 
 def test_builtin_seeds_are_listed_and_removable(tmp_path):
@@ -217,3 +265,53 @@ def test_card_visitor_permissions(ident):
         verify({**card, "open": True})  # flipping a flag breaks the signature
     with pytest.raises(CardError):
         verify({**card, "preview": "yes"})
+
+
+class TestNetguardAddresses:
+    @pytest.mark.parametrize("ip,public", [
+        ("93.184.216.34", True), ("2606:4700:4700::1111", True), ("::ffff:93.184.216.34", True),
+        ("::ffff:10.0.0.1", False), ("::10.0.0.1", False), ("::127.0.0.1", False),
+        ("64:ff9b::a00:1", False), ("64:ff9b::5db8:d822", False), ("64:ff9b:1::1", False),
+        ("2002:c000:204::1", False), ("2001:0:4136:e378:8000:63bf:3fff:fdd2", False),
+        ("fd00::1", False), ("fe80::1", False)])
+    def test_public(self, ip, public):
+        import ipaddress
+        assert netguard._public(ipaddress.ip_address(ip)) is public
+
+    def test_nan_tokens_refused(self):
+        with pytest.raises(ValueError):
+            json.loads('{"a":NaN}', parse_constant=netguard._no_constant)
+
+
+class _Mgr:
+    """Just enough manager for GossipWorker.run_round."""
+
+    def __init__(self, own):
+        self.own, self.merged, self.contacts_noted = own, [], []
+
+    def own_card(self): return self.own
+    def settings(self): return {"seeds": ["https://peer.example.org/ignored/path"], "public_url": ""}
+    def registry_cards(self): return []
+    def contacts(self): return []
+    def merge_card(self, c): self.merged.append(c["id"]); return True
+    def note_contact(self, u): self.contacts_noted.append(u)
+    def save_registry(self): pass
+
+
+def test_round_counts_peers_that_know_us(tmp_path, ident):
+    """Every peer that knows us returns our card too; only a reply that STARTS with our card is ourselves."""
+    from src.community.gossip import GossipWorker
+    other = Identity(str(tmp_path / "o.pem"))
+    mine, theirs = make(ident), make(other, url="https://peer.example.org")
+    urls = []
+
+    def knows_us(url, **kw):
+        urls.append(url)
+        return {"cards": [theirs, mine]} if url.endswith("/peers") else {"ok": True}
+
+    w = GossipWorker(_Mgr(mine), fetch=knows_us)
+    r = w.run_round()
+    assert r["others_ok"] == 1 and w.last_targets[0]["self"] is False
+    assert urls[0] == "https://peer.example.org/api/community/peers"  # origin only, the typed path is gone
+    w2 = GossipWorker(_Mgr(mine), fetch=lambda url, **kw: {"cards": [mine, theirs]})
+    assert w2.run_round()["others_ok"] == 0 and w2.last_targets[0]["self"] is True  # we dialled ourselves

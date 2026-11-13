@@ -37,7 +37,7 @@ Every 15 minutes (first round about 20 seconds after start, timing varied by 20 
 4. sends its own card with `POST <url>/api/community/announce`.
 
 A station that cannot be reached is skipped (counted in the status line, never an error). Cards older than 30 days
-are dropped and at most 2000 are kept. Known stations are stored in `data/community_peers.json`, settings in
+are dropped and at most 500 are kept (when full, ids that never refreshed their card and were first seen last go first, so a flood of new ids cannot push out long-known stations; `first_seen` is local metadata in the file, never part of a card or the `/peers` payload). A card's `url` must be an origin (`https://host[:port]`, no path, query, fragment or credentials); a path or trailing slash typed in Settings is dropped. Known stations are stored in `data/community_peers.json`, settings in
 `data/community.json`.
 
 ## Seeds
@@ -62,8 +62,8 @@ Behind a reverse proxy the announce rate limit sees the proxy address, so all an
   carry no credentials and resolve only to public addresses; the connection goes to the checked address (no second
   DNS lookup), redirects are not followed, replies are JSON only, capped at 512 KB, with an 8 second timeout.
   An announced `url` is never fetched at announce time.
-- **Flooding**: announces are limited to 30 per minute per client address, bodies to 16 KB, fields have length caps
-  and the store is capped (2000 cards, 30 days).
+- **Flooding**: announces are limited to 30 per minute per client address (the real client behind a local proxy; one shared bucket with a wider limit when the address is loopback or unknown), counted before the signature is checked; bodies to 16 KB, fields have length caps
+  and the store is capped (500 cards, 30 days). NaN/Infinity are refused everywhere and the registry file is written at most every 30 s.
 - **Hostile content in the map**: card text is shown with DOM text APIs only; links open only for https URLs with
   `rel="noopener noreferrer"`; preview images are accepted only as `data:image/jpeg` or `data:image/webp` or from the
   station's https URL.
@@ -82,10 +82,10 @@ only for panning, zooming and markers.
 Seeds are only a starting point. Every station keeps what it learned in `data/community_peers.json`:
 
 - the cards of the stations it knows (kept for 30 days after their last update), and
-- up to 50 addresses that answered a gossip round, most recent first. These do not expire.
+- up to 50 addresses that answered a gossip round, most recent first, origins only, at most 2 per registrable host suffix so one domain cannot fill the list. They expire after 180 days without an answer, and never replace the seeds.
 
 Each round contacts the seeds plus a few random stations from both lists, so stations that have met once keep
-exchanging cards when every seed is down, and a station that was switched off for longer than 30 days can still rejoin
+exchanging cards when every seed is down, and a station that was switched off for longer than 30 days (up to 180) can still rejoin
 through a remembered address. A brand-new station still needs one reachable address: a built-in seed or any station URL
 typed into Settings. A station without a public URL cannot be contacted by others, so it depends on the stations it
 can reach.

@@ -158,7 +158,7 @@ if (cloudChart && currentPage === "tab-live") {
         if (at.ev) {   // snapped onto an event
             const cx = g.x(at.ev.start_ts);
             svgEl("line", { class: "crosshair", x1: cx, x2: cx, y1: g.m.t, y2: g.laneY + g.LANE - 3 }, svg);
-            tip.innerHTML = `<strong>${EV_NAMES[at.ev.type] || at.ev.type}${at.ev.label ? " " + at.ev.label : ""}</strong><br>${fmtTime(at.ev.start_ts, true)} ${tzLabel}<br>click to view`;
+            tip.innerHTML = `<strong>${escapeHtml(EV_NAMES[at.ev.type] || at.ev.type)}${at.ev.label ? " " + escapeHtml(at.ev.label) : ""}</strong><br>${fmtTime(at.ev.start_ts, true)} ${tzLabel}<br>click to view`;
             placeTip(tip, rect, cx, g.W);
             return;
         }
@@ -256,7 +256,7 @@ if (cloudChart && currentPage === "tab-live") {
         const d = stationDate(new Date(f.ts * 1000));
         document.getElementById("fv-meta").innerHTML =
             `<span><strong>${fmtTime(f.ts, true)}:${sec(d.getUTCSeconds())}</strong> ${tzLabel}</span>` +
-            `<span>frame ${fvIdx + 1} / ${fvFrames.length}</span>${cc ? `<span>${cc}</span>` : ""}` +
+            `<span>frame ${fvIdx + 1} / ${fvFrames.length}</span>${cc ? `<span>${escapeHtml(cc)}</span>` : ""}` +
             (ev && ev.end_ts ? `<span>event lasts ${Math.max(1, Math.round(ev.end_ts - ev.start_ts))} s</span>` : "");
         document.getElementById("fv-open").href = f.url;
         const crop = document.getElementById("fv-crop");

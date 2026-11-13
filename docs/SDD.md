@@ -4,14 +4,14 @@
 |---|---|
 | Document version | 1.0.0 (2026-11-13), describes Zenivo 1.0.0 |
 | Repository | `github.com/hoanb1/zenivo` (private) |
-| Production | https://allsky.hoan.uk (Raspberry Pi 4, `/home/pi/zenivo`, systemd `zenivo`; legacy symlink `/home/pi/allsky-ng` kept) |
+| Production | https://station.example.org (Raspberry Pi 4, `/home/pi/zenivo`, systemd `zenivo`; legacy symlink `/home/pi/allsky-ng` kept) |
 
 ## 1. Purpose and scope
 
 Zenivo (all-sky observatory software) is the edge software for one all-sky camera. It captures frames and runs auto-exposure
 and dark calibration. It builds the observing products (keogram, startrails, timelapse),
 estimates cloud cover, detects sky events, assists focusing, plate-solves the camera pointing,
-serves a web UI and pushes frames and telemetry to hoan.uk.
+serves a web UI and optionally pushes frames and telemetry to a configured ingestion server (off by default).
 
 This document covers the edge station only. The hoan.uk server is a separate project. It provides
 the `/api/allsky/ingest/*` endpoints and the plate solver.
@@ -56,7 +56,7 @@ and [API.md](API.md).
             │ src/web           UI (index.html + app/01..08-*.js, focus.js, ...)     │
             │ _sync_worker ───► SyncClient ──► hoan.uk /api/allsky/ingest/*            │
             └───────────────────────────────────────────────────────────────────────────┘
- browser ◄── nginx :80 ◄── cloudflared (allsky.hoan.uk)      data/ (frames, products, logs, config)
+ browser ◄── nginx :80 ◄── cloudflared (station.example.org)      data/ (frames, products, logs, config)
 ```
 
 ### 2.1 Modules
@@ -116,7 +116,7 @@ opens, it falls back to the simulator (unless told not to).
    - **Night or exposure ≥ 0.4 s:** RAW10 Bayer bypass (black level 52), demosaiced with
      optional 2×2 or 4×4 binning and gray-world white balance.
    - The stream stays on (persistent STREAMON) and is reset after errors.
-   - **Known host limit (minipc 192.168.6.15, 2026-11-08):** writing the Bayer route (`XDATA[0x8000..0x8007]`) stops
+   - **Known host limit (minipc `<minipc-host>`, 2026-11-08):** writing the Bayer route (`XDATA[0x8000..0x8007]`) stops
      the stream on this unit (no frame, even after STREAMOFF/ON; only a USB reset recovers). `ALLSKY_DISABLE_RAW10=1`
      keeps MJPG day and night there; the night RAW10 path is therefore not available on that host (root cause open).
    - **MJPG colour:** `ALLSKY_ISP_WB_K=<kelvin>` locks the camera's own AWB (it drifts magenta under foliage).
@@ -267,7 +267,7 @@ to `--sync-max-width` (1600 px, JPEG q82) and sends:
 - `POST /api/allsky/ingest/frame`: multipart `image`, with headers `X-Exposure-Sec` and `X-Gain-Db`
 - `POST /api/allsky/ingest/telemetry`: JSON
 
-The client sends the header `X-Device-Id: hoan-uk-hanoi`. There is no retry: the next round
+The client sends the header `X-Device-Id: zenivo-<hostname>` (override with `ZENIVO_DEVICE_ID`). There is no retry: the next round
 simply tries again. Failures and recoveries are written to the activity log.
 
 `SyncQueue` (SQLite WAL, priorities, exponential backoff with jitter, retry times in local time)
@@ -364,18 +364,18 @@ holds a few hours that are 2026-10-18 in local time.
 
 | Item | Value |
 |---|---|
-| Host | Raspberry Pi 4, 192.168.3.24, Wi-Fi. hoan.uk runs on the same Pi on :3000 (sync target and plate solver) |
+| Host | Raspberry Pi 4 (`<pi-host>`), Wi-Fi. An optional ingestion/plate-solver service may run on the same Pi on :3000 |
 | Service | `deploy/zenivo-pi.service` (live unit `zenivo`; new installs use the `deploy/zenivo.service` template through `install.sh`): user `pi`, group `video`, `.venv/bin/python run_allsky.py --host 127.0.0.1 --port 8095 --camera auto --sync-target http://127.0.0.1:3000 --sync-interval 60 --log-level warning --no-access-log --prune-dir …archive:3 --prune-dir …events:90`, `Restart=always`, `Nice=5`, `MemoryMax=700M` |
-| Web | `deploy/nginx-allsky.hoan.uk.conf`: :80 → 127.0.0.1:8095, WebSocket upgrade, `proxy_buffering off`, 3600 s timeouts. cloudflared maps allsky.hoan.uk → :80 and is never restarted for allsky |
+| Web | `deploy/nginx-allsky.hoan.uk.conf` (the author's example): :80 → 127.0.0.1:8095, WebSocket upgrade, `proxy_buffering off`, 3600 s timeouts. cloudflared maps station.example.org → :80 and is never restarted for allsky |
 | Development instance | Service `zenivo` on port 8080 from the repo checkout |
 | New installs | `./install.sh` creates `.venv`, installs the dependencies and a `zenivo` unit; see [INSTALL.md](INSTALL.md) |
-| Current instance (2026-11-08) | minipc 192.168.6.15 (LAN) / `minipcv6.hoan.uk` (IPv6 SSH), user `hoan`, `/home/hoan/zenivo`, system service `zenivo` on 127.0.0.1:8080 (`ALLSKY_DISABLE_RAW10=1`, `ALLSKY_ISP_WB_K=5000`, output appended to `data/allsky.log`), no sync target; cloudflared ingress `sky.hoan.uk -> 127.0.0.1:8080` (`/etc/cloudflared/config.yml`) |
+| Current instance (2026-11-08) | minipc `<minipc-host>` (LAN) / `minipc.example.org` (IPv6 SSH), user `<user>`, `/home/<user>/zenivo`, system service `zenivo` on 127.0.0.1:8080 (`ALLSKY_DISABLE_RAW10=1`, `ALLSKY_ISP_WB_K=5000`, output appended to `data/allsky.log`), no sync target; cloudflared ingress `station.example.org -> 127.0.0.1:8080` (`/etc/cloudflared/config.yml`) |
 
 To deploy:
 
 ```bash
-rsync -ac --exclude data/ --exclude __pycache__ --exclude '*.pyc' ./src ./run_allsky.py pi@192.168.3.24:/home/pi/zenivo/
-ssh pi@192.168.3.24 'sudo systemctl restart zenivo'
+rsync -ac --exclude data/ --exclude __pycache__ --exclude '*.pyc' ./src ./run_allsky.py pi@<pi-host>:/home/pi/zenivo/
+ssh pi@<pi-host> 'sudo systemctl restart zenivo'
 ```
 
 Restart the service once per deploy, and run long installs on the Pi with `nohup`.
@@ -399,4 +399,4 @@ single test files while iterating.
   used by the live service.
 - The `--reload` flag is parsed but not passed to uvicorn.
 - The `--min-capture-interval` help text says the default is 1.0 s, but the code default is 2.0 s.
-- The default `--sync-target` is `http://localhost:3005`, which does not exist on a standalone install; pass `--sync-target ""` to turn the sync worker off.
+- `--sync-target` defaults to empty (sync off); the sync worker only starts when a URL is given.

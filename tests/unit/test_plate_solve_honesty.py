@@ -67,6 +67,7 @@ def test_background_plate_solve_job_reports_failure(monkeypatch):
     svc = AllSkyService.get_instance()
     monkeypatch.setattr(svc, "_save_station_config", lambda: None)
     monkeypatch.setattr(ss, "_multipart_post_solve", lambda *a, **k: {"success": False, "error": "no stars"})
+    svc.station_config["remote_solver_url"] = "https://solver.example"  # the remote solver is opt-in
 
     start = client.post("/api/station/plate-solve/start").json()
     assert start["state"] in ("running", "failed")

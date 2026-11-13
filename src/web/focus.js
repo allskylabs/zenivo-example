@@ -64,8 +64,10 @@
         let focusInflight = null;
         const getFocusState = () => {
             if (!focusInflight) {
-                focusInflight = fetch("/api/focus", { cache: "no-store" })
-                    .then((res) => (res.ok ? res.json() : null))
+                // Focus state is admin-only: guests do not ask (the server would answer 401)
+                focusInflight = (window.zenivoAuth && window.zenivoAuth.admin
+                    ? fetch("/api/focus", { cache: "no-store" }).then((res) => (res.ok ? res.json() : null))
+                    : Promise.resolve(null))
                     .finally(() => { focusInflight = null; });
             }
             return focusInflight;

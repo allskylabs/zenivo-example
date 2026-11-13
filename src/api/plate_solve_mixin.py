@@ -30,7 +30,8 @@ class PlateSolveMixin:
         manual_overrides: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Update station GPS coordinates and/or manual camera/lens/orientation settings on the Web UI.
+        Update station GPS coordinates and/or manual camera/lens/orientation settings on the Web UI
+        (manual_overrides may also carry `remote_solver_url`, the opt-in remote plate solver).
         Does NOT automatically capture or plate-solve unless auto_plate_solve=True is explicitly requested.
         """
         if latitude_deg is not None:
@@ -48,6 +49,11 @@ class PlateSolveMixin:
             self.station_config["geo_source"] = geo_source
 
         # Apply manual optical/orientation parameter adjustments from Web UI
+        if manual_overrides and manual_overrides.get("remote_solver_url") is not None:
+            ru = str(manual_overrides["remote_solver_url"]).strip()
+            if ru and not (ru.startswith("http://") or ru.startswith("https://")):
+                ru = ""
+            self.station_config["remote_solver_url"] = ru[:300]
         if manual_overrides:
             optics = self.station_config.setdefault("optics", {})
             orientation = self.station_config.setdefault("orientation", {})
@@ -440,7 +446,7 @@ class PlateSolveMixin:
             self.activity.warning("station", f"Bright-star solve crashed: {exc}")
             return None
         if not res.get("success"):
-            self.activity.info("station", f"Bright-star solve: {res.get('error')}; trying the hoan.uk plate solver")
+            self.activity.info("station", f"Bright-star solve: {res.get('error')}; trying the remote solver if one is configured")
             self._last_bright_error = str(res.get("error") or "")
             return None
         if res.get("mode") == "fixed_lens":
@@ -657,7 +663,7 @@ class PlateSolveMixin:
 
     def run_station_plate_solve(self, fov_hint: str = "auto", deep: bool = False) -> Dict[str, Any]:
         """
-        Capture/fetch frame and invoke https://hoan.uk/astronomy/plate-solving when user clicks Plate-Solve on Web UI.
+        Capture/fetch a frame and solve it (local first; optional remote solver) when the user clicks Plate-Solve on the Web UI.
 
         deep: re-read the sensor geometry from the camera and re-measure the lens (focal length, distortion,
         optical centre) from the tracking series instead of reusing the solved lens.
@@ -701,10 +707,14 @@ class PlateSolveMixin:
         if frame.ndim == 2:
             frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
-        # 2. Full blind solve on the hoan.uk plate solver (needs many stars, takes minutes)
-        self._ps_progress("online", "Bright-star match not sure enough: full blind solve on hoan.uk (up to 3 min)",
-                          eta_s=180.0)
+        # 2. Optional blind solve on an operator-configured remote solver (needs many stars, takes minutes).
+        # Opt-in: without `remote_solver_url` nothing leaves this host.
+        remote_url = str(self.station_config.get("remote_solver_url") or "").strip()
+        if remote_url:
+            self._ps_progress("online", "Bright-star match not sure enough: full blind solve on the configured remote solver (up to 3 min)",
+                              eta_s=180.0)
         solved = solve_station_parameters(
+            plate_solving_base_url=remote_url,
             frame_bgr=frame,
             latitude_deg=lat,
             longitude_deg=lon,

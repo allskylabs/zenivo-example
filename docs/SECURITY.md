@@ -101,3 +101,96 @@ activity log (which is admin only) no longer writes coordinates into its message
 Bind to `127.0.0.1` when a proxy or tunnel on the same host is the only way in. Serve the public side over
 HTTPS so the cookie is `Secure`. Keep passing the original `Host` header (the CSRF check compares it with
 `Origin`).
+
+## Community hardening
+
+- Card `lat`, `lon` and `updated` must be finite numbers; NaN and Infinity are refused when parsing (announce body, peer replies, the registry file) and never written (`allow_nan=False`).
+- A card `url` is an origin only (`https://host[:port]`). Gossip targets and remembered contacts are origins as well, so a peer cannot smuggle a path into the requests this station makes.
+- The SSRF guard also refuses IPv6 forms that carry an IPv4 address (NAT64 `64:ff9b::/96` and `64:ff9b:1::/48`, 6to4 `2002::/16`, Teredo `2001::/32`, IPv4-compatible `::a.b.c.d`).
+- At most 500 cards are kept; when over the cap, ids that never refreshed their card and were first seen last are dropped, so known stations survive a flood. A new id may be at most 60 s ahead of the clock, a card at most 120 s.
+- Remembered contacts: at most 2 per registrable host suffix, 180 days without an answer, never a replacement for the seeds.
+- Announces count against a per-client bucket before the signature is verified; the registry is saved at most every 30 s. `/api/community/peers` is served from a 5 s cache.
+- Throttling: the global login/setup net pauses for a flat 60 s after 30 failures in 5 min (it cannot lock the admin out for long); per-client state idle for 15 min is purged and the table holds at most 5000 keys.
+- WebSocket guests may only send the read-only actions in `policy.WS_GUEST_ACTIONS`; `policy.ws_action_allowed` is the allow-list (default deny).
+- `/api/focus*`, `/api/storage`, `/docs`, `/redoc` and `/openapi.json` are admin only.
+
+## Proxy headers
+
+`CF-Connecting-IP`, `X-Forwarded-For`, `X-Forwarded-Host` and `X-Forwarded-Proto` are believed only when the TCP peer is loopback (a proxy or tunnel on the same host); from any other peer they are written by the client and ignored. Behind a loopback proxy the client address is `CF-Connecting-IP`, else the right-most `X-Forwarded-For` hop (the one your proxy appended). Bind to `127.0.0.1` when a local proxy is the only way in; if the service listens on a LAN address, direct clients cannot spoof these headers, but a proxy on another host is not trusted either and all its clients share its address.
+
+## Outbound connections
+
+Everything Zenivo itself (the Python service) connects to. Nothing else is contacted: there is no telemetry,
+no update check and no call home to the authors. The service reads no remote configuration.
+
+| Target | What is sent | When | Default | Turn off |
+|---|---|---|---|---|
+| Sync target (`--sync-target URL`) | Live frame (JPEG), telemetry, device id `zenivo-<hostname>` | Every `--sync-interval` seconds | **Off** (empty). One info line at start names the target when enabled | Leave `--sync-target ""` |
+| Remote plate solver (station setting `remote_solver_url`) | A frame, the station latitude/longitude and the time | Only when the local star match is not confident, during a plate-solve | **Off** (empty: the solver reports "local solve not confident; no remote solver configured") | Clear the field in Settings, Station & Optics |
+| IP geolocation (`ipwho.is`, `ipapi.co`, https only) | The public IP of this host (implicit in the request) | Only when an admin presses "Locate via GPS / IP" and browser GPS is unavailable | Admin button only | Do not press it; enter coordinates by hand |
+| Flightradar24 (`data-cloud.flightradar24.com`, `data-live.flightradar24.com`) | A map box (about +-3 degrees around the station for the traffic log, or the box a viewer asks for on the 3D map), optionally the FR24 account token. The request looks like a browser request because the endpoints are not an official API | Traffic log sampling (every 5 s, only once the camera has a star-solved pointing) and when someone opens the 3D flights map | **On** (`fr24_enabled` defaults to 1) | Settings, ADS-B: switch Flightradar24 off |
+| `hexdb.io`, `raw.githubusercontent.com` (OpenFlights airline list) | Aircraft ICAO hex codes of aircraft heard by a local ADS-B receiver | When a new aircraft is heard; cached on disk | Only active with an ADS-B receiver or FR24 traffic | Switch the ADS-B receiver / FR24 off |
+| OurAirports (`davidmegginson.github.io`) | Nothing about the station (plain file download) | Monthly refresh for the 3D map | On, cached 30 days | Do not open the 3D map |
+| `celestrak.org` | A group name (satellite TLE download) | Daily refresh | On | Do not use satellite features |
+| `api.v2.sondehub.org` | Station latitude/longitude and a search radius | While radiosonde data is requested (viewer or overlay), refreshed every 20 s | On when requested | Leave radiosonde overlays unused |
+| Community seeds and peers | Station card (name, rounded location, public URL) | Only after the owner joins the community network | **Off** | Community section of Settings |
+| Local ADS-B receiver (SBS-1 TCP port 30003) | Nothing (the service only reads) | Continuous when a host is configured | Off until a host is set | Clear the receiver host |
+| `tools/adsb_feeder.py` | Aircraft rows to the URL in `VLAB_URL` with `VLAB_KEY` | Only if the separate `zenivo-adsb-feeder` unit is installed and configured | Not installed by `install.sh` | Do not install or disable the unit |
+
+Browser-side third parties (loaded by the visitor's browser, not by the service): Google Fonts
+(`fonts.googleapis.com`, `fonts.gstatic.com`), jsDelivr (`cdn.jsdelivr.net`: MapLibre, three.js), unpkg
+(`unpkg.com`), Esri World Imagery (`server.arcgisonline.com`), AWS terrain tiles (`s3.amazonaws.com`),
+Google photorealistic tiles (`tile.googleapis.com`, only with a Google Maps key configured), `flagcdn.com` and
+`pics.avs.io` (aircraft photos and logos). Each one sees the visitor's IP address and the page that asked.
+Self-host the assets to avoid that. Residual: the three.js import map entries cannot carry Subresource
+Integrity; the MapLibre script and stylesheet on `/flights3d` are pinned with SRI hashes.
+
+The Google Maps key returned by `/api/map/config` is meant for the browser, so it is visible to anyone who can
+open the 3D map. Restrict it in the Google Cloud console to HTTP referrers (your site) and to the Map Tiles
+API only. Guests do not receive it in `/api/station/config`, status, SSE or WebSocket payloads.
+
+## No backdoor
+
+Facts, checkable in the source:
+
+- No remote configuration, no remote command channel and no auto-update. The service never downloads code.
+- No default password. Until an admin password is set nothing can change settings; the setup code is a random
+  value written to `data/admin_setup_code.txt` on the machine.
+- No bypass header or hidden route. Admin decisions come from one place, `src/auth/policy.py`.
+- Every outbound connection is listed above and each can be switched off or is off by default.
+- The only third-party code a browser runs is the CDN list above.
+
+To verify: `grep -rn "urlopen\|requests\.\|httpx\|http://\|https://" src --include=*.py` lists every network call;
+`grep -rn "hoan.uk" src deploy` shows only example/default text of the author's own deployment (see the
+community seed list and `deploy/*hoan.uk*` examples); `grep -rn "X-Forwarded\|CF-Connecting" src` shows the only
+headers read for client addresses (used for throttling, never for authorisation).
+
+## Location rounding limits
+
+The "public location precision" setting rounds the station's own coordinates for guests. It hides the address
+from casual viewers only. Aircraft, radiosonde and satellite rows carry their own position plus the azimuth,
+elevation and distance from the station, and the live image shows where they appear in the sky. Someone
+determined can combine several of these to place the station well inside the rounding grid. These fields are
+deliberately not removed, because they are the product.
+
+## Guest abuse limits
+
+- Live streams (`/api/stream/mjpeg`, `/api/live/mjpeg`, `/api/stream/sse`, `/api/sse`, `/ws/live`): at most 40
+  concurrent streams in total and 6 per client address; over that, HTTP 429 or WebSocket close code 1013. Guests'
+  MJPEG is limited to 10 fps and 1280 px, and guest streams end after 10 minutes (clients reconnect). Admins are
+  not limited. The client address is only a throttling key (`src.auth.policy.client_key`).
+- WebSocket text commands: unknown actions are refused for guests; state-changing actions need an admin session.
+- Flightradar24 proxy: bounded caches, flight ids must be lower-case hex, at least 2 s between outbound requests,
+  guest map boxes are snapped to a 1-degree grid and must lie within 500 km of the station (else HTTP 400).
+- Expensive public GETs (`/api/satellites`, `/api/traffic`, `/api/day-objects`, `/api/frames/near`,
+  `/api/calibration/dark-preview`) use short shared caches. Guest limits: 50 satellite ids, 600 s trails, 24 h
+  time ranges; invalid timestamps return 400.
+- `/api/storage` hides absolute server paths from non-admins.
+
+## Response headers
+
+Every response carries `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
+`X-Frame-Options: SAMEORIGIN` and `Permissions-Policy: geolocation=(self), camera=(), microphone=()` (the
+settings page uses browser GPS). `Content-Security-Policy-Report-Only` lists what the pages load today (inline
+scripts and the CDNs above); it only reports and blocks nothing. CORS allows any origin for `GET`, `HEAD` and
+`OPTIONS` only, never with credentials.

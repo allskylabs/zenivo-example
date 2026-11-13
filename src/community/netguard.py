@@ -16,6 +16,10 @@ from urllib.parse import urlsplit
 from src.net import ssl_context
 from src.version import __version__
 
+def _no_constant(name: str) -> Any:
+    raise ValueError(f"{name} is not valid JSON")
+
+
 TIMEOUT_S = 8.0
 MAX_RESPONSE = 512 * 1024
 MAX_URL = 300
@@ -25,9 +29,18 @@ class UnsafeURL(ValueError):
     """The URL is not allowed to be contacted."""
 
 
+_TRANSLATED = tuple(ipaddress.ip_network(n) for n in (
+    "64:ff9b::/96", "64:ff9b:1::/48", "2002::/16", "2001::/32"))  # NAT64, local NAT64, 6to4, Teredo
+
+
 def _public(ip: Any) -> bool:
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
-        ip = ip.ipv4_mapped
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped is not None:
+            ip = ip.ipv4_mapped
+        elif any(ip in net for net in _TRANSLATED):
+            return False  # an IPv4 address (possibly private) tunnelled inside IPv6: not worth the risk
+        elif int(ip) >> 32 == 0 and int(ip) > 1:  # IPv4-compatible ::a.b.c.d
+            ip = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
     return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved
                 or ip.is_unspecified) and ip.is_global
 
@@ -96,7 +109,7 @@ def fetch_json(url: str, *, allow_private: bool = False, method: str = "GET", pa
                timeout: float = TIMEOUT_S, max_bytes: int = MAX_RESPONSE) -> Any:
     """GET/POST `url` and return the decoded JSON body. Raises UnsafeURL or OSError/ValueError on any failure."""
     scheme, host, port, addrs, path = resolve(url, allow_private)
-    body = json.dumps(payload, separators=(",", ":")).encode("utf-8") if payload is not None else None
+    body = json.dumps(payload, separators=(",", ":"), allow_nan=False).encode("utf-8") if payload is not None else None
     headers = {"Accept": "application/json", "User-Agent": f"Zenivo/{__version__} community"}
     if body is not None:
         headers["Content-Type"] = "application/json"
@@ -113,7 +126,7 @@ def fetch_json(url: str, *, allow_private: bool = False, method: str = "GET", pa
             data = resp.read(max_bytes + 1)
             if len(data) > max_bytes:
                 raise ValueError("response is too large")
-            return json.loads(data.decode("utf-8"))
+            return json.loads(data.decode("utf-8"), parse_constant=_no_constant)
         except (OSError, http.client.HTTPException) as exc:
             last = exc
         finally:

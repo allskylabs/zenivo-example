@@ -14,7 +14,7 @@ from typing import Any, Callable, Deque, Dict, List, Optional
 from src.community import DEFAULT_SEEDS
 from src.community import card as cardmod
 from src.community import identity as idmod
-from src.community.card import CardError, MAX_CARD_BYTES, PRECISIONS
+from src.community.card import CardError, MAX_CARD_BYTES, PRECISIONS, seed_origin, to_origin
 from src.community.gossip import GossipWorker
 from src.community.registry import Registry
 from src.version import __version__
@@ -25,6 +25,10 @@ CARD_MAX_AGE_S = 6 * 3600
 THUMB_RETRY_S = 300
 THUMB_CACHE_S = 60
 ANNOUNCES_PER_MIN = 30
+# Behind a local proxy/tunnel every client can share one key (loopback) or none (unknown): that bucket gets a wider net
+ANNOUNCES_PER_MIN_SHARED = 300
+SHARED_KEYS = frozenset({"127.0.0.1", "::1", "::ffff:127.0.0.1", "localhost", "unknown", ""})
+PEERS_CACHE_S = 5
 MAX_SEEDS = 10
 
 DEFAULTS: Dict[str, Any] = {
@@ -57,6 +61,7 @@ class CommunityManager:
         self._card_key: Any = None
         self._thumb_cache: Optional[tuple] = None
         self._preview_cache: Optional[tuple] = None
+        self._peers_cache: Optional[tuple] = None  # (time, registry version, own card signature, JSON bytes)
         self._hits: Dict[str, Deque[float]] = {}
         self._inbound: Deque[float] = deque(maxlen=500)  # times other stations announced themselves to us
         self.worker = GossipWorker(self)
@@ -94,6 +99,12 @@ class CommunityManager:
                 patch.setdefault("public_precision_deg", patch["precision_deg"])
             patch.pop("seeds_set", None)
             cur.update({k: v for k, v in patch.items() if k in DEFAULTS and v is not None})
+            try:  # addresses are origins only: a path, query or trailing slash the owner typed is dropped
+                if cur["public_url"]:
+                    cur["public_url"] = to_origin(cur["public_url"])
+                cur["seeds"] = list(dict.fromkeys(seed_origin(u) for u in cur["seeds"] if isinstance(u, str) and u.strip()))
+            except CardError as exc:
+                raise ValueError(str(exc))
             if patch.get("seeds") is not None:
                 cur["seeds_set"] = True  # from now on the list is exactly what the owner saved, even when empty
             if cur["public_precision_deg"] not in PRECISIONS:
@@ -191,6 +202,21 @@ class CommunityManager:
             return {"cards": []}
         return {"cards": [own] + self.registry_cards()}
 
+    def peers_json(self) -> bytes:
+        """The /peers body, serialised once and reused for 5 s (until a card is merged or our own card changes)."""
+        own = self.own_card()
+        version = self._registry.version if self._registry is not None else 0
+        sig = own.get("sig") if own else None
+        now = time.monotonic()
+        with self._lock:
+            c = self._peers_cache
+            if c is not None and now - c[0] < PEERS_CACHE_S and c[1] == version and c[2] == sig:
+                return c[3]
+        body = json.dumps(self.peers_payload(), separators=(",", ":"), allow_nan=False).encode("utf-8")
+        with self._lock:
+            self._peers_cache = (now, self._registry.version if self._registry is not None else 0, sig, body)
+        return body
+
     def merge_card(self, card: Dict[str, Any]) -> bool:
         """Merge an already verified card."""
         return self._registry.merge(card) if self._registry is not None else False
@@ -200,13 +226,16 @@ class CommunityManager:
             self._registry.save()
 
     def accept_announce(self, raw_card: Any, client: str) -> None:
-        """Rate-limit, verify and store a card announced by another station. Raises RateLimited or CardError."""
+        """Rate-limit, verify and store a card announced by another station. Raises RateLimited or CardError.
+        `client` is the throttling key from src.auth.policy.client_key (the real client behind a local proxy).
+        Attempts count before verification (it costs CPU); the registry file is written at most every 30 s."""
         now = time.time()
+        limit = ANNOUNCES_PER_MIN_SHARED if client in SHARED_KEYS else ANNOUNCES_PER_MIN
         with self._lock:
             hits = self._hits.setdefault(client, deque())
             while hits and hits[0] < now - 60:
                 hits.popleft()
-            if len(hits) >= ANNOUNCES_PER_MIN:
+            if len(hits) >= limit:
                 raise RateLimited()
             hits.append(now)
             if len(self._hits) > 1000:  # bound memory against many source addresses
@@ -217,7 +246,7 @@ class CommunityManager:
         self.merge_card(card)
         if self._identity is None or card.get("id") != self._identity.id:
             self._inbound.append(now)  # proof that another station can reach this one
-        self._registry.save()
+        self._registry.save(force=False)  # cheap: a no-op unless something changed and 30 s have passed
 
     # -- thumbnail ---------------------------------------------------------
     def thumb_jpeg(self) -> Optional[bytes]:

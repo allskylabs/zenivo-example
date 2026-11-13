@@ -1,0 +1,9 @@
+# Development and test tools (not needed to run Zenivo)
+-r requirements.txt
+fastapi
+uvicorn
+websockets
+opencv-python-headless
+requests
+httpx
+pytest>=7.0.0

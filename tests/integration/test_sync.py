@@ -114,13 +114,13 @@ class TestSyncClient:
         mock_resp.json.return_value = {"success": True, "url": "/uploads/allsky/current/image.webp"}
         mock_post.return_value = mock_resp
 
-        client = SyncClient(base_url="http://192.168.3.24:3000", device_token="secret_tok_123")
+        client = SyncClient(base_url="http://sync.example:3000", device_id="test-device", device_token="secret_tok_123")
         res = client.send_frame(image_data=b"\xff\xd8\xff\xd9", exposure_sec=4.0, gain_db=36.0)
 
         assert res["success"] is True
         assert mock_post.called
         call_kwargs = mock_post.call_args[1]
-        assert call_kwargs["headers"]["X-Device-Id"] == "hoan-uk-hanoi"
+        assert call_kwargs["headers"]["X-Device-Id"] == "test-device"
         assert call_kwargs["headers"]["X-Device-Token"] == "secret_tok_123"
         assert call_kwargs["headers"]["X-Exposure-Sec"] == "4.00"
         assert call_kwargs["headers"]["X-Gain-Db"] == "36.0"
@@ -132,13 +132,13 @@ class TestSyncClient:
         mock_resp.json.return_value = {"success": True}
         mock_post.return_value = mock_resp
 
-        client = SyncClient(base_url="http://192.168.3.24:3000")
+        client = SyncClient(base_url="http://sync.example:3000", device_id="test-device")
         payload = {"star_count": 142, "cloud_cover_pct": 12.0}
         res = client.send_telemetry(payload)
 
         assert res["success"] is True
         call_kwargs = mock_post.call_args[1]
-        assert call_kwargs["json"]["deviceId"] == "hoan-uk-hanoi"
+        assert call_kwargs["json"]["deviceId"] == "test-device"
         assert call_kwargs["json"]["star_count"] == 142
 
     @patch("requests.Session.post")
@@ -148,7 +148,7 @@ class TestSyncClient:
         mock_resp.json.return_value = {"success": True, "event_id": "meteor_001"}
         mock_post.return_value = mock_resp
 
-        client = SyncClient(base_url="http://192.168.3.24:3000")
+        client = SyncClient(base_url="http://sync.example:3000", device_id="test-device")
         meta = {"event_id": "meteor_001", "aspect_ratio": 5.2}
         res = client.send_event(metadata=meta, image_data=b"\xff\xd8\xff\xd9")
 
@@ -162,7 +162,7 @@ class TestSyncClient:
         mock_resp.json.return_value = {"success": True, "url": "/uploads/allsky/keograms/2026-10-14.jpg"}
         mock_post.return_value = mock_resp
 
-        client = SyncClient(base_url="http://192.168.3.24:3000")
+        client = SyncClient(base_url="http://sync.example:3000", device_id="test-device")
         res = client.send_summary("keogram", "2026-10-14", b"\xff\xd8\xff\xd9")
 
         assert res["success"] is True

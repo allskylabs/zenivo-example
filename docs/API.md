@@ -17,7 +17,7 @@ Contents: [Pages and static files](#pages-and-static-files) | [Version and statu
 [Authentication](#authentication) | [Camera](#camera) | [Calibration](#calibration) | [Station](#station) | [Live images and streams](#live-images-and-streams) |
 [Focus](#focus) | [Products and events](#products-and-events) | [Frames](#frames) | [Traffic](#traffic-aircraft-satellites-radiosondes) |
 [Sky and clouds](#sky-and-clouds) | [Storage and logs](#storage-and-logs) | [OBS](#obs) |
-[WebSocket](#websocket-wslive) | [Sync API](#sync-api-on-the-hoanuk-server)
+[WebSocket](#websocket-wslive) | [Sync API](#sync-api-optional-ingestion-server)
 
 ## Authentication
 
@@ -235,7 +235,7 @@ answers with a message whose `type` is `pong`, `telemetry`, `status`, `exposure_
 `GET /api/stream/sse` (alias `/api/sse`) sends telemetry as `text/event-stream` every `interval`
 seconds. Behind nginx, disable buffering (see [INSTALL.md](INSTALL.md#nginx-reverse-proxy)).
 
-## Sync API on the hoan.uk server
+## Sync API (optional ingestion server)
 
 Zenivo itself is the client of these endpoints; it does not serve them. Each push round, the sync
 worker sends:
@@ -245,4 +245,4 @@ worker sends:
 | POST | `/api/allsky/ingest/frame` | Multipart `image`, headers `X-Exposure-Sec` and `X-Gain-Db` |
 | POST | `/api/allsky/ingest/telemetry` | Telemetry JSON |
 
-The client identifies itself with the header `X-Device-Id: hoan-uk-hanoi`.
+The client identifies itself with the header `X-Device-Id: zenivo-<hostname>` (override with `ZENIVO_DEVICE_ID`).

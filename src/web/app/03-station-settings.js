@@ -85,6 +85,10 @@ function updateStationUI(st) {
         if (oriTiltInput && document.activeElement !== oriTiltInput && ori.zenith_tilt_deg !== undefined) {
             oriTiltInput.value = Number(ori.zenith_tilt_deg).toFixed(2);
         }
+        const remoteSolverInput = document.getElementById("station-remote-solver");
+        if (remoteSolverInput && document.activeElement !== remoteSolverInput && st.remote_solver_url !== undefined) {
+            remoteSolverInput.value = st.remote_solver_url || "";
+        }
         if (oriNpaInput && document.activeElement !== oriNpaInput && ori.north_position_angle_deg !== undefined) {
             oriNpaInput.value = Number(ori.north_position_angle_deg).toFixed(2);
         }

@@ -1,6 +1,6 @@
 """
 Station Configuration, Geolocation, and Astrometric Plate-Solving Calibration Engine.
-Integrates with https://hoan.uk/astronomy/plate-solving (POST /api/platesolve/solve)
+Integrates with an optional, operator-configured remote plate solver (POST <remote_solver_url>/api/platesolve/solve)
 to determine all camera, lens, optical center, FOV, tilt, azimuth, and WCS parameters.
 """
 
@@ -14,6 +14,7 @@ import time
 import urllib.request
 
 from src.net import urlopen as net_urlopen
+from src.version import __version__
 import urllib.error
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -90,15 +91,15 @@ def radec_to_az_alt(
 def auto_detect_ip_location() -> Dict[str, Any]:
     """
     Auto-detect station GPS coordinates via public IP geolocation APIs when browser GPS is unavailable.
+    Only called when an admin presses the button: the public IP of this host is sent to the (https-only) services below.
     """
     endpoints = [
         ("https://ipwho.is/", "latitude", "longitude", "city", "country"),
-        ("http://ip-api.com/json/", "lat", "lon", "city", "country"),
         ("https://ipapi.co/json/", "latitude", "longitude", "city", "country_name"),
     ]
     for url, lat_k, lon_k, city_k, country_k in endpoints:
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "IMX335-AllSky-Observatory/1.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": f"Zenivo/{__version__}"})
             with net_urlopen(req, timeout=4.0) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 lat = data.get(lat_k)
@@ -135,7 +136,7 @@ def _multipart_post_solve(
     timeout_s: float = 45.0,
 ) -> Optional[Dict[str, Any]]:
     """
-    Send multipart/form-data or JSON request to hoan.uk /api/platesolve/solve.
+    Send multipart/form-data or JSON request to the configured remote solver /api/platesolve/solve.
     """
     boundary = f"----AllSkyPlateSolveBoundary{int(time.time() * 1000)}"
     body = io.BytesIO()
@@ -164,7 +165,7 @@ def _multipart_post_solve(
         data=payload,
         headers={
             "Content-Type": f"multipart/form-data; boundary={boundary}",
-            "User-Agent": "IMX335-AllSky-Edge/1.0",
+            "User-Agent": f"Zenivo/{__version__}",
         },
         method="POST",
     )
@@ -191,14 +192,16 @@ def solve_station_parameters(
     longitude_deg: float,
     elevation_m: float = 20.0,
     fov_hint: str = "auto",
-    plate_solving_base_url: str = "https://hoan.uk",
+    plate_solving_base_url: str = "",
     sensor_spec: Optional[Dict[str, Any]] = None,
     endpoints: Optional[List[str]] = None,
     timeout_s: float = 180.0,
 ) -> Dict[str, Any]:
     """
     Solve camera, lens, optical center, FOV (horizontal/vertical/diagonal), focal length,
-    azimuth, altitude, zenith tilt, and WCS parameters using https://hoan.uk/astronomy/plate-solving.
+    azimuth, altitude, zenith tilt, and WCS parameters using the operator-configured remote solver
+    (station setting `remote_solver_url`). Uploads a frame, the coordinates and the time to that address.
+    With no URL (and no explicit endpoints) nothing is sent and the call fails with a clear message.
     """
     now_dt = datetime.now(timezone.utc)
     obs_time_iso = now_dt.isoformat()
@@ -206,10 +209,18 @@ def solve_station_parameters(
     ret, jpeg_buf = cv2.imencode(".jpg", frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 92])
     jpeg_bytes = jpeg_buf.tobytes() if ret else None
 
-    candidate_endpoints = list(endpoints) if endpoints else [
-        "http://127.0.0.1:3000/api/platesolve/solve",  # hoan.uk running on the same Pi
-        f"{plate_solving_base_url.rstrip('/')}/api/platesolve/solve",
-    ]
+    base = (plate_solving_base_url or "").strip().rstrip("/")
+    if endpoints:
+        candidate_endpoints = list(endpoints)
+    elif base:
+        candidate_endpoints = [f"{base}/api/platesolve/solve"]
+    else:
+        return {
+            "success": False,
+            "solved_at": obs_time_iso,
+            "error": "local solve not confident; no remote solver configured",
+            "attempts": [],
+        }
 
     raw_result: Optional[Dict[str, Any]] = None
     solve_source = "live_camera_frame"
@@ -327,7 +338,7 @@ def solve_station_parameters(
 
     return {
         "success": True,
-        "plate_solver_endpoint": "https://hoan.uk/astronomy/plate-solving",
+        "plate_solver_endpoint": base or "custom endpoints",
         "solve_source": solve_source,
         "solved_at": obs_time_iso,
         "station": {

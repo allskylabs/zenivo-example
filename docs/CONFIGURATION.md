@@ -24,7 +24,7 @@ Run `python3 run_allsky.py --help` for the flags of the version you have install
 | `--exposure` | `0.2` | Starting exposure in seconds before auto-exposure takes over. If the sun is at or above -2 degrees and the defaults are unchanged, the start is 0.6 ms / 0 dB |
 | `--gain` | `12.0` | Starting gain in dB before auto-exposure takes over |
 | `--log-level` | `info` | `debug`, `info`, `warning`, `error` |
-| `--sync-target` | `http://localhost:3005` | hoan.uk server that receives frames and telemetry. Pass an empty string (`--sync-target ""`) to disable the sync worker |
+| `--sync-target` | empty (sync OFF) | URL of an optional ingestion server that receives frames and telemetry. Empty means nothing is uploaded. When set, one info line at start names the target. The device id sent is `$ZENIVO_DEVICE_ID` or `zenivo-<hostname>` |
 | `--sync-interval` | `60` | Seconds between pushes (minimum 0.25) |
 | `--sync-max-width` | `1600` | Downscale pushed frames to at most this width in pixels |
 | `--min-capture-interval` | the saved setting (2.0) | Minimum seconds between captures while viewers are connected. Overrides the Performance setting for this run only |
@@ -36,9 +36,8 @@ Notes:
 
 - With `--camera` other than `simulator` and without `--simulator`, Zenivo keeps retrying the real
   camera in the background if it was not usable at startup. It runs on the simulator meanwhile.
-- The default `--sync-target` points at `localhost:3005`, where nothing listens on a standalone
-  install. Each push then fails and is recorded in the activity log. Pass `--sync-target ""` unless
-  you run a compatible hoan.uk server. The shipped `deploy/zenivo.service` does this.
+- Sync is off by default (`--sync-target` is empty). Set it only if you run a compatible ingestion
+  server; see [SECURITY.md](SECURITY.md#outbound-connections) for every outbound connection.
 - The sync protocol (`/api/allsky/ingest/frame` and `/api/allsky/ingest/telemetry`) keeps its
   original name. Pushes are not queued: a missed round is not re-sent.
 
@@ -89,7 +88,8 @@ Factory defaults (Hanoi, IMX335 sensor, 1.65 mm fisheye pointing at the zenith):
 |-----|----------|
 | `latitude_deg`, `longitude_deg`, `elevation_m` | Station position. Defaults 21.0285, 105.8542, 20.0 |
 | `location_name`, `geo_source` | Display name and where the coordinates came from (`default`, `manual`, `browser_gps`, `ip_geolocation`) |
-| `plate_solver_endpoint` | Remote blind plate solver (default `https://hoan.uk/astronomy/plate-solving`) |
+| `remote_solver_url` | Opt-in remote blind plate solver base URL (default empty = never upload). When set, a frame, the station coordinates and the time are sent to it if the local solve is not confident. Settable in Settings, Station & Optics, or `POST /api/station/settings` |
+| `plate_solver_endpoint` | Informational: which solver produced the last solution |
 | `solve_source`, `solved_at`, `matched_stars_count`, `constellations_in_fov` | Result bookkeeping of the last plate solve |
 | `camera_sensor` | Sensor specification (size in pixels, pixel pitch) |
 | `optics` | Lens model, projection, focal length in mm, field of view, optical centre in pixels, 90-degree horizon radius in pixels, pixel scale |

@@ -738,8 +738,7 @@
                     </div>
                 </div>
                 <p class="description">
-                    <a href="https://hoan.uk/astronomy/plate-solving" target="_blank" rel="noopener">Plate-solving</a>
-                    on a starry night measures the lens and mounting parameters and saves them automatically, as does
+                    Plate-solving on a starry night measures the lens and mounting parameters and saves them automatically, as does
                     <strong>Locate via GPS / IP</strong> for the coordinates. <strong>Save changes</strong> is enabled
                     after you edit a field by hand; <strong>Reset</strong> reloads the saved values.
                 </p>
@@ -766,7 +765,13 @@
                                 <input type="number" id="station-elev" min="-500" max="9000" step="1" value="20" />
                             </div>
                             <div class="field field-end">
-                                <button id="btn-station-auto-gps" class="btn btn-sm btn-outline" type="button">📍 Locate via GPS / IP</button>
+                                <button id="btn-station-auto-gps" class="btn btn-sm btn-outline" type="button" title="Uses browser GPS if allowed; otherwise your public IP address is sent to a third-party geolocation service (ipwho.is or ipapi.co)">📍 Locate via GPS / IP</button>
+                                <small class="field-note">Without GPS, your public IP address is sent to a geolocation service.</small>
+                            </div>
+                            <div class="field field-wide">
+                                <label for="station-remote-solver">Remote plate solver URL (optional)</label>
+                                <input type="url" id="station-remote-solver" placeholder="empty = never upload" maxlength="300" autocomplete="off" />
+                                <small class="field-note">When set, a frame, the station coordinates and the time are sent to this address to solve the plate.</small>
                             </div>
                         </div>
                     </fieldset>
@@ -1399,7 +1404,7 @@
     <!-- Footer -->
     <footer class="footer">
         <span>Zenivo · all-sky observatory edge station</span>
-        <span>Platform Synchronization: hoan.uk (192.168.3.24)</span>
+        <span>Platform Synchronization</span>
     </footer>
 
     <!-- App JavaScript -->

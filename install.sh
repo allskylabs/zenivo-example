@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 INSTALL_DIR="$SCRIPT_DIR"
 PORT=8080
-HOST="0.0.0.0"
+HOST="127.0.0.1"
 CAMERA="auto"
 RUN_USER="${SUDO_USER:-$(id -un)}"
 SERVICE_NAME="zenivo"
@@ -25,7 +25,7 @@ unless told otherwise, as a systemd service.
 Options:
   --dir PATH            Install directory containing run_allsky.py (default: the directory of this script)
   --port N              TCP port of the web UI and API (default: 8080)
-  --host ADDR           Bind address (default: 0.0.0.0; use 127.0.0.1 behind a reverse proxy)
+  --host ADDR           Bind address (default: 127.0.0.1, this machine only; use 0.0.0.0 to open it on the LAN, or keep 127.0.0.1 behind a reverse proxy)
   --camera NAME         auto | rts5869 | picamera | v4l2 | simulator (default: auto)
   --user NAME           Linux user that runs the service (default: the current user)
   --service-name NAME   systemd unit name without ".service" (default: zenivo)
@@ -185,6 +185,10 @@ if [ "$HOST" = "0.0.0.0" ]; then
     [ -n "$SHOW_HOST" ] || SHOW_HOST="localhost"
 fi
 echo "Web UI:     http://$SHOW_HOST:$PORT/"
+if [ "$HOST" = "127.0.0.1" ]; then
+    echo "Network:    listening on this machine only. To open it on the LAN re-run with --host 0.0.0.0, or put a reverse proxy (nginx + TLS) in front."
+    echo "            Plain HTTP on a LAN sends the admin password unencrypted: use HTTPS (see deploy/nginx-zenivo.example.conf) before exposing it."
+fi
 echo "Version:    curl http://localhost:$PORT/api/version"
 if [ "$USE_SYSTEMD" -eq 1 ]; then
     echo "Status:     systemctl status $SERVICE_NAME"

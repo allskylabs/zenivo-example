@@ -32,7 +32,9 @@ def _auth():
 
 
 def _secure(request: Request) -> bool:
-    return request.url.scheme == "https" or request.headers.get("x-forwarded-proto", "").split(",")[0].strip() == "https"
+    """Cookie Secure flag: https directly, or https at a local proxy/tunnel (X-Forwarded-Proto only from a loopback peer)."""
+    return request.url.scheme == "https" or policy.forwarded_https(
+        {k.lower(): v for k, v in request.headers.items()}, request.client.host if request.client else None)
 
 
 def _reply(request: Request, body: dict, token: str = None, clear: bool = False, status_code: int = 200) -> JSONResponse:

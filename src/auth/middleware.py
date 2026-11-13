@@ -46,7 +46,7 @@ class AuthMiddleware:
         state = scope.setdefault("state", {})
         auth = self._auth_fn()
         state["is_admin"] = bool(auth.session_valid(policy.session_token(headers)))
-        state["origin_ok"] = policy.origin_ok(headers)
+        state["origin_ok"] = policy.origin_ok(headers, peer)
         if scope["type"] == "websocket":  # mutating messages are gated inside the handler
             return await self.app(scope, receive, send)
 

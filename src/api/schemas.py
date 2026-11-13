@@ -184,6 +184,7 @@ class StationLocationRequest(BaseModel):
     altitude_deg: Optional[float] = None
     zenith_tilt_deg: Optional[float] = None
     north_position_angle_deg: Optional[float] = None
+    remote_solver_url: Optional[str] = Field(default=None, max_length=300, description="Opt-in remote plate solver base URL (empty = never upload)")
 
 
 class HistogramStats(BaseModel):
@@ -293,10 +294,11 @@ class CommunitySettingsRequest(BaseModel):
     @field_validator("public_url")
     @classmethod
     def _public_url(cls, v: Optional[str]) -> Optional[str]:
-        from src.community.card import CardError, check_public_url
+        from src.community.card import CardError, check_public_url, to_origin
         v = (v or "").strip() if v is not None else v
         if v:
             try:
+                v = to_origin(v) or v  # a typed path or trailing slash is stripped, not an error
                 check_public_url(v)
             except CardError as exc:
                 raise ValueError(str(exc))

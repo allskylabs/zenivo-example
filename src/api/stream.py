@@ -19,6 +19,7 @@ from fastapi.responses import StreamingResponse
 from src.api.service import AllSkyService
 from src.auth.middleware import can_mutate, is_admin
 from src.auth.rounding import view_for
+from src.api.guest_view import guest_view
 
 # 92-byte Little-Endian Binary Header ("ASB1") + 4096-byte uint32[4][256] Histogram + Raw JPEG
 ASB1_HEADER_STRUCT = struct.Struct("<4sBBBBdffffIfffIIIIfffffHHI")
@@ -79,11 +80,65 @@ class WebSocketConnectionManager:
 ws_manager = WebSocketConnectionManager()
 
 
+class StreamLimiter:
+    """In-memory cap on concurrent live streams (MJPEG, SSE, WebSocket): a global total and a per-client count."""
+
+    def __init__(self, total: int = 40, per_client: int = 6):
+        self.total = total
+        self.per_client = per_client
+        self._counts: Dict[str, int] = {}
+        self._n = 0
+
+    def acquire(self, key: str) -> bool:
+        if self._n >= self.total or self._counts.get(key, 0) >= self.per_client:
+            return False
+        self._counts[key] = self._counts.get(key, 0) + 1
+        self._n += 1
+        return True
+
+    def release(self, key: str) -> None:
+        c = self._counts.get(key, 0)
+        if c <= 1:
+            self._counts.pop(key, None)
+        else:
+            self._counts[key] = c - 1
+        if c > 0:
+            self._n = max(0, self._n - 1)
+
+
+stream_limiter = StreamLimiter()
+GUEST_STREAM_MAX_S = 600.0  # guest streams end after 10 min; the browser reconnects
+GUEST_MJPEG_MAX_FPS = 10.0
+GUEST_MJPEG_MAX_WIDTH = 1280
+
+
+def stream_client_key(conn) -> str:
+    """Throttling key of a Request/WebSocket (see src.auth.policy.client_key)."""
+    from src.auth.policy import client_key
+    peer = conn.client.host if getattr(conn, "client", None) else None
+    return client_key(conn.headers, peer)
+
+
+async def guarded_stream(gen, key: Optional[str]):
+    """Yield from `gen`; release the limiter slot of `key` (None = not counted) when the stream ends or is dropped."""
+    try:
+        async for chunk in gen:
+            yield chunk
+    finally:
+        try:
+            await gen.aclose()
+        except Exception:
+            pass
+        if key is not None:
+            stream_limiter.release(key)
+
+
 async def mjpeg_frame_generator(
     service: AllSkyService,
     fps: float = 5.0,
     downscale_width: int = 960,
     max_frames: Optional[int] = None,
+    max_seconds: Optional[float] = None,
 ):
     """
     Asynchronous generator yielding multipart JPEG frames for browser video streaming.
@@ -91,8 +146,11 @@ async def mjpeg_frame_generator(
     """
     interval = 1.0 / max(0.5, fps)
     frames_sent = 0
+    started = time.monotonic()
     while True:
         if max_frames is not None and frames_sent >= max_frames:
+            break
+        if max_seconds is not None and time.monotonic() - started >= max_seconds:
             break
         t_start = time.perf_counter()
         try:
@@ -210,6 +268,17 @@ def pack_asb1_binary_packet(
     return header_bytes + hist_bytes + jpeg_payload
 
 
+def resolve_uploads_path(output_dir: str, replay_url: str) -> Optional[str]:
+    """Map a `/uploads/...` URL to a file under `<output_dir>/uploads`; None if it escapes that folder (.. or symlink)."""
+    import os
+    rel = replay_url.lstrip("/").split("?")[0]
+    root = os.path.realpath(os.path.join(output_dir, "uploads"))
+    cand = os.path.realpath(os.path.join(output_dir, rel))
+    if cand != root and not cand.startswith(root + os.sep):
+        return None
+    return cand if os.path.isfile(cand) else None
+
+
 def _apply_obs_transform_fallback(frame: np.ndarray, service: AllSkyService) -> Optional[bytes]:
     """
     Apply OBS zoom, pan, rotate, flip, brightness/contrast, title banner, ADS-B radar,
@@ -265,10 +334,7 @@ def _apply_obs_transform_fallback(frame: np.ndarray, service: AllSkyService) -> 
             if len(parts) >= 6:
                 local_path = service.event_image_path(parts[4], parts[5].split("?")[0])
         elif replay_url.startswith("/uploads/"):
-            rel = replay_url.lstrip("/").split("?")[0]
-            cand = os.path.join(service.output_dir, rel)
-            if os.path.isfile(cand):
-                local_path = cand
+            local_path = resolve_uploads_path(service.output_dir, replay_url)
         if local_path and os.path.isfile(local_path) and not local_path.endswith(".mp4"):
             loaded = cv2.imread(local_path, cv2.IMREAD_COLOR)
             if loaded is not None and loaded.size > 0:
@@ -427,17 +493,22 @@ _stream_jpeg_cache: list = [None, -1.0, b""]
 
 # WebSocket messages that change state: only a signed-in admin (cookie from the handshake) may send them
 WS_MUTATING_ACTIONS = frozenset({"set_exposure", "set_gain", "set_mode", "trigger_master_dark"})
+WS_GUEST_ACTIONS = frozenset({"ping", "get_telemetry", "get_status"})
 WS_MUTATING_COMMANDS = frozenset({1, 2})  # ASC1 binary: 1 = set_mode, 2 = set_exposure + gain
 WS_AUTH_ERROR = {"type": "error", "code": "auth", "message": "Sign in as admin"}
 
 
-async def sse_event_generator(service: AllSkyService, interval: float = 1.0, view=None):
+async def sse_event_generator(service: AllSkyService, interval: float = 1.0, view=None,
+                              max_seconds: Optional[float] = None):
     """
     Server-Sent Events (SSE) generator yielding real-time telemetry and status pushes
     without client HTTP fetch polling. `view` filters the payload for the caller (guests get rounded coordinates).
     """
     view = view or (lambda p: p)
+    started = time.monotonic()
     while True:
+        if max_seconds is not None and time.monotonic() - started >= max_seconds:
+            break
         try:
             status_payload = await asyncio.to_thread(service.get_status)
             telem_payload = await asyncio.to_thread(service.get_telemetry)
@@ -462,11 +533,40 @@ async def handle_live_websocket(websocket: WebSocket, service: AllSkyService):
     - When ?full=1 is also passed: sends full native resolution JPEG (service.last_jpeg) instead of stream_max_width.
     - When ?binary=1 is omitted: legacy JSON mode for unit/E2E test compatibility.
     """
+    slot_key: Optional[str] = None
+    if not is_admin(websocket):
+        slot_key = stream_client_key(websocket)
+        if not stream_limiter.acquire(slot_key):
+            await websocket.accept()
+            await websocket.close(code=1013)  # try again later: too many live streams
+            return
+    try:
+        await _live_websocket_session(websocket, service)
+    finally:
+        if slot_key is not None:
+            stream_limiter.release(slot_key)
+
+
+def _ws_action_ok(action: str, may_change: bool) -> bool:
+    """Gate for text commands: the auth policy decides when available; fallback = mutating actions need admin and
+    guests only get the read-only ones."""
+    try:
+        from src.auth.policy import ws_action_allowed
+        return bool(ws_action_allowed(action, may_change))
+    except (ImportError, AttributeError):
+        if action in WS_MUTATING_ACTIONS:
+            return may_change
+        return may_change or action in WS_GUEST_ACTIONS
+
+
+async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
     await ws_manager.connect(websocket)
     binary_mode = websocket.query_params.get("binary", "0") in ("1", "true", "yes")
     full_res = websocket.query_params.get("full", "0") in ("1", "true", "yes")
     client_v2 = websocket.query_params.get("v", "") == "2"
     view = view_for(is_admin(websocket), service.public_precision)  # guests get rounded station coordinates
+    if not is_admin(websocket):
+        view = guest_view(view)
     may_change = can_mutate(websocket)  # admin session from the handshake cookie + same-site Origin
     try:
         if binary_mode:
@@ -546,8 +646,11 @@ async def handle_live_websocket(websocket: WebSocket, service: AllSkyService):
                     continue
                 try:
                     cmd = json.loads(data_text)
-                    action = cmd.get("action", "")
-                    if action in WS_MUTATING_ACTIONS and not may_change:
+                    if not isinstance(cmd, dict):
+                        continue
+                    raw_action = cmd.get("action", "")
+                    action = raw_action if isinstance(raw_action, str) else ""
+                    if not _ws_action_ok(action, may_change):
                         await websocket.send_json(WS_AUTH_ERROR)
                         continue
 

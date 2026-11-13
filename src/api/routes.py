@@ -10,6 +10,8 @@ from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, status,
 from fastapi.responses import Response, StreamingResponse
 
 from src.version import PRODUCT, __version__
+from src.api.ttl_cache import TTLCache
+from src.api.guest_view import guest_view, strip_keys
 from src.api.schemas import (
     ExposureControlRequest,
     GainControlRequest,
@@ -37,10 +39,42 @@ from src.api.schemas import (
 )
 from src.api.service import AllSkyService
 from src.storage import frame_codec
-from src.api.stream import mjpeg_frame_generator, handle_live_websocket, sse_event_generator
+from src.api.stream import (
+    mjpeg_frame_generator, handle_live_websocket, sse_event_generator, guarded_stream, stream_limiter,
+    stream_client_key, GUEST_MJPEG_MAX_FPS, GUEST_MJPEG_MAX_WIDTH, GUEST_STREAM_MAX_S,
+)
 from src.auth.rounding import view_for
 
 router = APIRouter()
+
+# Shared short-lived caches for expensive public GETs (the raw result is cached; each caller's view is applied after)
+_sat_cache = TTLCache(ttl_s=5.0, max_size=64)
+_traffic_cache = TTLCache(ttl_s=15.0, max_size=64)
+_dayobj_cache = TTLCache(ttl_s=15.0, max_size=64)
+_frame_near_cache = TTLCache(ttl_s=10.0, max_size=128)
+_dark_preview_cache = TTLCache(ttl_s=30.0, max_size=16)
+
+GUEST_MAX_RANGE_S = 24 * 3600.0
+GUEST_MAX_SAT_IDS = 50
+GUEST_MAX_TRAIL_S = 600.0
+_TS_MIN, _TS_MAX = 0.0, 4102444800.0  # 1970 .. 2100
+
+
+def _check_ts(**values: float) -> None:
+    """HTTP 400 for NaN/inf/out-of-range epoch timestamps (they used to raise a 500 deep in the log queries)."""
+    import math
+    for name, v in values.items():
+        if not (math.isfinite(v) and _TS_MIN <= v <= _TS_MAX):
+            raise HTTPException(status_code=400, detail=f"{name} is not a valid epoch timestamp")
+
+
+def _check_range(request, t0: float, t1: float) -> None:
+    from src.auth.middleware import is_admin
+    _check_ts(t0=t0, t1=t1)
+    if t1 < t0:
+        raise HTTPException(status_code=400, detail="t1 must not be before t0")
+    if request is not None and not is_admin(request) and t1 - t0 > GUEST_MAX_RANGE_S:
+        raise HTTPException(status_code=400, detail="time range is limited to 24 hours")
 
 
 def get_service() -> AllSkyService:
@@ -50,14 +84,18 @@ def get_service() -> AllSkyService:
 
 def _view_for_request(request, service: AllSkyService):
     from src.auth.middleware import is_admin
-    return view_for(is_admin(request), service.public_precision)
+    admin = is_admin(request)
+    view = view_for(admin, service.public_precision)
+    return view if admin else guest_view(view)
 
 
 def public_view(request, service: AllSkyService, payload):
     """Payload as the caller may see it: exact for the admin, station coordinates rounded and ADS-B secrets removed
     for guests (src/auth/rounding.py). Server-side computations always keep the exact coordinates."""
     from src.auth.middleware import is_admin
-    return view_for(is_admin(request), service.public_precision)(payload)
+    admin = is_admin(request)
+    out = view_for(admin, service.public_precision)(payload)
+    return out if admin else strip_keys(out)
 
 
 # ----------------------------------------------------------------------
@@ -300,7 +338,7 @@ def get_dark_preview(
     service: AllSkyService = Depends(get_service),
 ):
     """Contrast-stretched PNG preview (or stats JSON with stats=1) of a saved RAW10 master dark."""
-    res = service.get_dark_preview(file)
+    res = _dark_preview_cache.get_or_compute(file, lambda: service.get_dark_preview(file))
     if res is None:
         raise HTTPException(status_code=404, detail="dark not found")
     png, st = res
@@ -335,7 +373,7 @@ def trigger_master_dark(
 
 
 # ----------------------------------------------------------------------
-# Station Setup & Astrometric Plate-Solving Endpoints (hoan.uk/astronomy/plate-solving)
+# Station Setup & Astrometric Plate-Solving Endpoints
 # ----------------------------------------------------------------------
 
 @router.get("/api/station/config")
@@ -379,6 +417,7 @@ def update_station_location(
             "altitude_deg",
             "zenith_tilt_deg",
             "north_position_angle_deg",
+            "remote_solver_url",
         )
         if getattr(req, k) is not None
     }
@@ -413,7 +452,7 @@ def run_station_plate_solve(
 ):
     """
     Capture a live frame and solve all camera, lens, FOV, focal length, optical center,
-    orientation, tilt, and azimuth parameters via https://hoan.uk/astronomy/plate-solving.
+    orientation, tilt, and azimuth parameters (local solver first; optional remote solver if configured).
     """
     return service.run_station_plate_solve(fov_hint=fov_hint)
 
@@ -657,7 +696,8 @@ def get_meteor_events(
 @router.get("/api/frames/near")
 def get_frame_near(ts: float = Query(..., description="epoch seconds"), service: AllSkyService = Depends(get_service)):
     """The archived frame closest to a moment, for stepping back through the night."""
-    res = service.frame_near(ts)
+    _check_ts(ts=ts)
+    res = _frame_near_cache.get_or_compute(int(ts), lambda: service.frame_near(ts))
     if res is None:
         raise HTTPException(status_code=404, detail="No archived frame near that time")
     return res
@@ -667,6 +707,7 @@ def get_frame_near(ts: float = Query(..., description="epoch seconds"), service:
 def get_frames_span(start: float = Query(...), end: float = Query(...), max: int = Query(default=600, ge=1, le=1500),
                     service: AllSkyService = Depends(get_service)):
     """Archived frames between two moments (epoch seconds), for playback."""
+    _check_ts(start=start, end=end)
     if end < start or end - start > 12 * 3600:
         raise HTTPException(status_code=400, detail="end must follow start by at most 12 hours")
     return {"frames": service.frames_span(start, end, max_n=max)}
@@ -715,7 +756,16 @@ def get_adsb_aircraft(limit: int = Query(default=30, ge=1, le=6000),
                       service: AllSkyService = Depends(get_service)):
     """Aircraft heard right now (local ADS-B + Flightradar24 global feed): flight, altitude, speed, heading,
     distance, direction, in camera view. trail=<seconds> adds lat/lon and each aircraft's recent path (3D map);
-    bounds=north,south,west,east or 'global' queries Flightradar24 for that region or the whole globe."""
+    bounds=north,south,west,east or 'global' queries Flightradar24 for that region or the whole globe.
+    For guests a box is snapped to a 1-degree grid and must lie within 500 km of the station (else 400)."""
+    from src.auth.middleware import is_admin
+    if bounds and not is_admin(request):
+        from src.analytics.fr24 import normalize_guest_bounds
+        try:
+            bounds = normalize_guest_bounds(bounds, float(service.station_config.get("latitude_deg", 0.0)),
+                                            float(service.station_config.get("longitude_deg", 0.0)))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
     return public_view(request, service, service.get_aircraft_now(
         limit=limit, trail_s=trail, bounds=bounds, include_fr24=fr24, compact=compact))
 
@@ -724,10 +774,14 @@ def get_adsb_aircraft(limit: int = Query(default=30, ge=1, le=6000),
 def get_traffic(t0: float = Query(description="start, epoch seconds"),
                 t1: float = Query(description="end, epoch seconds"),
                 limit: int = Query(default=2000, ge=1, le=20000),
+                request: Request = None,
                 service: AllSkyService = Depends(get_service)):
     """Aircraft and satellites that were inside the camera view between t0 and t1 (replay / name an event's flight).
     Rows: a = [icao, callsign, reg, type, lat, lon, alt_m, speed_kmh, heading, az, el, x, y], s = [norad, name, az, el, x, y, range_km, sunlit]."""
-    return {"samples": service.traffic_log().query(t0, t1, limit)}
+    _check_range(request, t0, t1)
+    samples = _traffic_cache.get_or_compute((int(t0 // 10), int(t1 // 10), limit),
+                                            lambda: service.traffic_log().query(t0, t1, limit))
+    return public_view(request, service, {"samples": samples})
 
 
 @router.get("/api/traffic/status")
@@ -740,10 +794,14 @@ def get_traffic_status(service: AllSkyService = Depends(get_service)):
 def get_day_objects(t0: float = Query(description="start, epoch seconds"),
                     t1: float = Query(description="end, epoch seconds"),
                     limit: int = Query(default=2000, ge=1, le=20000),
+                    request: Request = None,
                     service: AllSkyService = Depends(get_service)):
     """Birds, insects and aircraft followed by day: class, size, speed (frame widths/s), straightness and the
     path as [seconds since start, x, y] frame fractions."""
-    return {"tracks": service.day_object_log().query(t0, t1, limit)}
+    _check_range(request, t0, t1)
+    tracks = _dayobj_cache.get_or_compute((int(t0 // 10), int(t1 // 10), limit),
+                                          lambda: service.day_object_log().query(t0, t1, limit))
+    return {"tracks": tracks}
 
 
 @router.get("/api/day-objects/status")
@@ -755,9 +813,10 @@ def get_day_objects_status(service: AllSkyService = Depends(get_service)):
 
 @router.get("/api/radiosondes")
 def get_radiosondes(limit: int = Query(default=40, ge=1, le=200),
+                    request: Request = None,
                     service: AllSkyService = Depends(get_service)):
     """Weather balloons (SondeHub radiosondes) near the station: altitude, climb, distance, direction, in camera view."""
-    return service.get_radiosondes_now(limit=limit)
+    return public_view(request, service, service.get_radiosondes_now(limit=limit))
 
 
 @router.get("/api/adsb/flight/{fr24_id}")
@@ -780,9 +839,17 @@ def get_satellites(track: float = Query(default=0.0, ge=0.0, le=120.0),
     """Large satellites above the horizon now: az/alt, range, sunlit, lat/lon/height and position in the camera
     frame. track=<minutes> adds each of the highest ones' path (5 min back, <minutes> ahead); below=true also
     lists those under the horizon (3D map); ids=<norad,...> also tracks those."""
-    return public_view(request, service, service.get_satellites_now(
-        track_min=track, below=below, limit=limit, trail_s=trail,
-        track_ids={int(i) for i in ids.split(",") if i.strip().isdigit()}))
+    from src.auth.middleware import is_admin
+    id_list = [int(i) for i in ids.split(",") if i.strip().isdigit()]
+    if not is_admin(request):
+        id_list = id_list[:GUEST_MAX_SAT_IDS]
+        trail = min(trail, GUEST_MAX_TRAIL_S)
+    track_ids = frozenset(id_list)
+    raw = _sat_cache.get_or_compute(
+        (round(track, 1), below, limit, tuple(sorted(track_ids)), round(trail, 0)),
+        lambda: service.get_satellites_now(track_min=track, below=below, limit=limit, trail_s=trail,
+                                           track_ids=set(track_ids)))
+    return public_view(request, service, raw)
 
 
 @router.get("/api/map/config")
@@ -824,6 +891,7 @@ def get_event_image(day: str, name: str, service: AllSkyService = Depends(get_se
 @router.get("/api/stream/mjpeg")
 @router.get("/api/live/mjpeg")
 def get_mjpeg_stream(
+    request: Request,
     fps: float = Query(default=5.0, ge=0.5, le=30.0),
     downscale: int = Query(default=960, ge=320, le=2592),
     limit: Optional[int] = Query(default=None, ge=1),
@@ -832,8 +900,20 @@ def get_mjpeg_stream(
     """
     Multipart MJPEG video stream for live browser video preview.
     """
+    from src.auth.middleware import is_admin
+    key, max_s = None, None
+    if not is_admin(request):
+        key = stream_client_key(request)
+        if not stream_limiter.acquire(key):
+            raise HTTPException(status_code=429, detail="Too many live streams, try again shortly",
+                                headers={"Retry-After": "10"})
+        fps = min(fps, GUEST_MJPEG_MAX_FPS)
+        downscale = min(downscale, GUEST_MJPEG_MAX_WIDTH)
+        max_s = GUEST_STREAM_MAX_S
+        limit = min(limit, int(fps * max_s)) if limit else None
+    gen = mjpeg_frame_generator(service, fps=fps, downscale_width=downscale, max_frames=limit, max_seconds=max_s)
     return StreamingResponse(
-        mjpeg_frame_generator(service, fps=fps, downscale_width=downscale, max_frames=limit),
+        guarded_stream(gen, key),
         media_type="multipart/x-mixed-replace; boundary=frame",
     )
 
@@ -848,8 +928,17 @@ def get_sse_stream(
     """
     Server-Sent Events (SSE) push stream for real-time telemetry and status updates.
     """
+    from src.auth.middleware import is_admin
+    key, max_s = None, None
+    if not is_admin(request):
+        key = stream_client_key(request)
+        if not stream_limiter.acquire(key):
+            raise HTTPException(status_code=429, detail="Too many live streams, try again shortly",
+                                headers={"Retry-After": "10"})
+        max_s = GUEST_STREAM_MAX_S
     return StreamingResponse(
-        sse_event_generator(service, interval=interval, view=_view_for_request(request, service)),
+        guarded_stream(sse_event_generator(service, interval=interval, view=_view_for_request(request, service),
+                                           max_seconds=max_s), key),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -874,9 +963,12 @@ async def websocket_live_stream(
 # Storage / retention
 # ----------------------------------------------------------------------
 @router.get("/api/storage")
-def get_storage_status(service: AllSkyService = Depends(get_service)):
-    """Disk usage of the data directory, archived frame days and the active retention policy."""
-    return service.get_storage_status()
+def get_storage_status(request: Request, service: AllSkyService = Depends(get_service)):
+    """Disk usage of the data directory, archived frame days and the active retention policy
+    (absolute server paths are removed for non-admins)."""
+    from src.auth.middleware import is_admin
+    res = service.get_storage_status()
+    return res if is_admin(request) else strip_keys(res, ("data_dir", "extra_dirs"))
 
 
 @router.post("/api/storage/cleanup")
@@ -1055,13 +1147,13 @@ def get_community_card(service: AllSkyService = Depends(get_service)):
 @router.get("/api/community/peers")
 def get_community_peers(service: AllSkyService = Depends(get_service)):
     """Own card plus every verified card we know. Open to any origin (no cookies) so other stations' pages can read it."""
-    return Response(content=json.dumps(service.community.peers_payload(), separators=(",", ":")),
-                    media_type="application/json", headers=_COMMUNITY_CORS)
+    return Response(content=service.community.peers_json(), media_type="application/json", headers=_COMMUNITY_CORS)
 
 
 @router.post("/api/community/announce")
 async def announce_community_card(request: Request, service: AllSkyService = Depends(get_service)):
     """Another station tells us its card. Accepted only when the signature verifies; its url is never fetched here."""
+    from starlette.concurrency import run_in_threadpool
     from src.community.card import CardError
     from src.community.manager import RateLimited
     if not service.community.enabled:
@@ -1069,15 +1161,24 @@ async def announce_community_card(request: Request, service: AllSkyService = Dep
     length = request.headers.get("content-length")
     if length is not None and length.isdigit() and int(length) > _COMMUNITY_MAX_BODY:
         raise HTTPException(status_code=413, detail="Card too large")
-    body = await request.body()
-    if len(body) > _COMMUNITY_MAX_BODY:
-        raise HTTPException(status_code=413, detail="Card too large")
-    try:
-        card = json.loads(body.decode("utf-8"))
-    except (ValueError, UnicodeDecodeError):
+    chunks, size = [], 0
+    async for chunk in request.stream():  # bounded read: a chunked body cannot skip the size cap
+        size += len(chunk)
+        if size > _COMMUNITY_MAX_BODY:
+            raise HTTPException(status_code=413, detail="Card too large")
+        chunks.append(chunk)
+
+    def _no_constant(name):
+        raise ValueError(name)
+
+    try:  # NaN / Infinity are not JSON: refuse them here, before any card logic sees them
+        card = json.loads(b"".join(chunks).decode("utf-8"), parse_constant=_no_constant)
+    except (ValueError, UnicodeDecodeError, RecursionError):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Body is not JSON")
-    try:
-        service.community.accept_announce(card, request.client.host if request.client else "unknown")
+    from src.auth.policy import client_key
+    key = client_key({k.lower(): v for k, v in request.headers.items()}, request.client.host if request.client else None)
+    try:  # verification and the registry work are blocking: off the event loop
+        await run_in_threadpool(service.community.accept_announce, card, key)
     except RateLimited:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many announces")
     except CardError as exc:

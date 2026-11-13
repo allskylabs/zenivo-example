@@ -77,13 +77,20 @@ def hash_token(token: str) -> str:
 
 
 class Throttle:
-    """Failed-attempt limiter: `limit` failures within `window_s` lock the key for 60 s, doubling per repeated lockout
-    up to 15 min. One instance per kind of attempt (login, setup code, password change)."""
+    """Failed-attempt limiter: `limit` failures within `window_s` lock the key for `base_s` (60 s), doubling per repeated
+    lockout up to `max_s` (15 min) unless `double=False` (the global net: a flat pause, so an anonymous client cannot
+    keep the admin locked out). One instance per kind of attempt (login, setup code, password change).
+    State idle for 15 min is purged and the table never holds more than 5000 keys."""
+
+    IDLE_S = 900.0
+    MAX_KEYS = 5000
 
     def __init__(self, limit: int = 5, window_s: float = 300.0, base_s: float = 60.0, max_s: float = 900.0,
-                 clock=time.time):
+                 clock=time.time, double: bool = True):
         self.limit, self.window_s, self.base_s, self.max_s, self._clock = limit, window_s, base_s, max_s, clock
+        self.double = double
         self._state: Dict[str, Dict[str, Any]] = {}
+        self._last_purge = 0.0
         self._lock = threading.Lock()
 
     def retry_after(self, key: str) -> int:
@@ -93,20 +100,27 @@ class Throttle:
             left = (st["until"] - self._clock()) if st else 0.0
             return int(left) + 1 if left > 0 else 0
 
+    def _purge(self, now: float) -> None:
+        self._last_purge = now
+        for k in [k for k, s in self._state.items() if s["touched"] < now - self.IDLE_S and s["until"] < now]:
+            del self._state[k]
+        while len(self._state) >= self.MAX_KEYS:  # still full: drop the least recently touched
+            del self._state[min(self._state, key=lambda k: self._state[k]["touched"])]
+
     def fail(self, key: str) -> None:
         now = self._clock()
         with self._lock:
-            if len(self._state) > 1000:  # bound memory against many source addresses
-                for k in [k for k, s in self._state.items() if s["until"] < now and not s["fails"]]:
-                    del self._state[k]
-            st = self._state.setdefault(key, {"fails": deque(), "until": 0.0, "level": 0})
+            if now - self._last_purge >= 60 or len(self._state) >= self.MAX_KEYS:
+                self._purge(now)
+            st = self._state.setdefault(key, {"fails": deque(), "until": 0.0, "level": 0, "touched": now})
+            st["touched"] = now
             fails: Deque[float] = st["fails"]
             while fails and fails[0] < now - self.window_s:
                 fails.popleft()
             fails.append(now)
             if len(fails) >= self.limit:
                 st["level"] += 1
-                st["until"] = now + min(self.base_s * 2 ** (st["level"] - 1), self.max_s)
+                st["until"] = now + (min(self.base_s * 2 ** (st["level"] - 1), self.max_s) if self.double else self.base_s)
                 fails.clear()
 
     def ok(self, key: str) -> None:
@@ -125,9 +139,9 @@ class AuthManager:
         self._warned = False
         # per client key (login, setup code, password change) and global (a wider net against many addresses)
         self.login_throttle = Throttle(clock=clock)
-        self.login_global = Throttle(limit=20, clock=clock)
+        self.login_global = Throttle(limit=30, clock=clock, double=False)
         self.setup_throttle = Throttle(clock=clock)
-        self.setup_global = Throttle(limit=20, clock=clock)
+        self.setup_global = Throttle(limit=30, clock=clock, double=False)
 
     # -- paths ---------------------------------------------------------
     def _path(self, name: str) -> str:

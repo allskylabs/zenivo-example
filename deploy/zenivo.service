@@ -16,7 +16,7 @@ User=@USER@
 # The camera nodes (/dev/video*) belong to the "video" group on Raspberry Pi OS, Debian and Ubuntu.
 SupplementaryGroups=video
 WorkingDirectory=@INSTALL_DIR@
-# --sync-target "" disables the push to a hoan.uk server. Set a URL to enable it, and add
+# --sync-target "" keeps the optional frame/telemetry upload off (also the default). Set a URL to enable it, and add
 # --prune-dir PATH:DAYS lines for extra directories that the retention job should clean.
 ExecStart=@INSTALL_DIR@/.venv/bin/python run_allsky.py --host @HOST@ --port @PORT@ --camera @CAMERA@ --sync-target "" --log-level warning --no-access-log
 Restart=always
@@ -25,6 +25,13 @@ RestartSec=10
 # Raise MemoryMax on hosts with more memory.
 Nice=5
 MemoryMax=700M
+# Hardening that keeps the camera/video devices usable (no PrivateDevices, no ProtectHome: data/ lives in the checkout)
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
 Environment=PYTHONUNBUFFERED=1
 Environment=OMP_NUM_THREADS=2
 Environment=LIBCAMERA_LOG_LEVELS=*:WARN

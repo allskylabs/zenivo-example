@@ -7,7 +7,9 @@ sub-second local antenna precision around the observatory.
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from collections import deque
+from collections import OrderedDict, deque
+import math
+import re
 import gzip
 import http.cookiejar
 import json
@@ -47,6 +49,47 @@ GLOBAL_ZONES = [
     ("eur_mea", "72,-38,-25,65"),
     ("americas", "72,-58,-175,-25"),
 ]
+
+
+FR24_ID_RE = re.compile(r"^[0-9a-f]{1,16}$")  # FR24 flight ids are lower-case hex (e.g. "3f9a12b4")
+CACHE_MAX = 64          # feed boxes kept
+DETAIL_CACHE_MAX = 256  # flight details kept
+MIN_REQUEST_INTERVAL_S = 2.0  # global floor between outbound FR24 requests, whoever asks
+
+
+def _lru_put(cache: "OrderedDict", key: Any, value: Any, cap: int) -> None:
+    cache[key] = value
+    cache.move_to_end(key)
+    while len(cache) > cap:
+        cache.popitem(last=False)
+
+
+def normalize_guest_bounds(bounds: str, station_lat: float, station_lon: float,
+                           max_km: float = 500.0, max_span_deg: float = 12.0) -> str:
+    """Snap a guest-supplied 'north,south,west,east' box outward to a 1-degree grid and require its centre to lie
+    within `max_km` of the station. 'global' passes through. Raises ValueError for anything else."""
+    b = (bounds or "").strip()
+    if b.lower() == "global":
+        return "global"
+    try:
+        n, s_, w, e = [float(x) for x in b.split(",")]
+    except ValueError:
+        raise ValueError("bounds must be 'north,south,west,east' or 'global'")
+    if not all(math.isfinite(v) for v in (n, s_, w, e)):
+        raise ValueError("bounds must be finite numbers")
+    if n < s_:
+        n, s_ = s_, n
+    n, s_ = math.ceil(max(-85.0, min(85.0, n))), math.floor(max(-85.0, min(85.0, s_)))
+    w, e = math.floor(max(-180.0, min(180.0, w))), math.ceil(max(-180.0, min(180.0, e)))
+    if n - s_ > max_span_deg or e - w > max_span_deg or e <= w:
+        raise ValueError("bounds box too large")
+    clat, clon = (n + s_) / 2.0, (e + w) / 2.0
+    dlat = math.radians(clat - station_lat)
+    dlon = math.radians(((clon - station_lon + 180.0) % 360.0) - 180.0)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(clat)) * math.cos(math.radians(station_lat)) * math.sin(dlon / 2) ** 2
+    if 6371.0 * 2 * math.asin(min(1.0, math.sqrt(a))) > max_km:
+        raise ValueError("bounds box too far from the station")
+    return f"{n},{s_},{w},{e}"
 
 
 def _http_json(url: str, timeout: float = 8.0, data: Optional[bytes] = None,
@@ -100,8 +143,10 @@ class Fr24Feed:
         self.global_total: int = 0
         self._lock = threading.Lock()
         self._refreshing: set = set()
-        self._cache: Dict[str, Tuple[float, List[Dict[str, Any]], int]] = {}
-        self._detail_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+        self._cache: "OrderedDict[str, Tuple[float, List[Dict[str, Any]], int]]" = OrderedDict()
+        self._detail_cache: "OrderedDict[str, Tuple[float, Dict[str, Any]]]" = OrderedDict()
+        self._last_request_ts: float = 0.0
+        self._slot_lock = threading.Lock()
         self._trails: Dict[str, Deque[Tuple[float, float, float, float]]] = {}
         self._full_trails: Dict[str, Tuple[float, List[List[float]]]] = {}
 
@@ -254,7 +299,16 @@ class Fr24Feed:
                 flights.append(parsed)
         return flights, full_count
 
+    def _wait_for_slot(self) -> None:
+        """Global minimum interval between outbound FR24 requests (feed refreshes and flight details)."""
+        with self._slot_lock:
+            wait = self._last_request_ts + MIN_REQUEST_INTERVAL_S - time.time()
+            if wait > 0:
+                time.sleep(wait)
+            self._last_request_ts = time.time()
+
     def _do_fetch(self, q_bounds: str, is_global: bool, station_lat: float, station_lon: float) -> Tuple[List[Dict[str, Any]], int]:
+        self._wait_for_slot()
         now = time.time()
         if is_global:
             local_box = f"{min(85.0, round(station_lat + 14, 1))},{max(-85.0, round(station_lat - 14, 1))},{max(-180.0, round(station_lon - 18, 1))},{min(180.0, round(station_lon + 18, 1))}"
@@ -283,7 +337,7 @@ class Fr24Feed:
             if full_count > 0:
                 self.global_total = full_count
             self._update_trails_locked(flights, now, station_lat, station_lon, is_global)
-            self._cache[q_bounds] = (now, flights, self.global_total)
+            _lru_put(self._cache, q_bounds, (now, flights, self.global_total), CACHE_MAX)
             return flights, self.global_total
 
     def _refresh_bg(self, q_bounds: str, is_global: bool, station_lat: float, station_lon: float) -> None:
@@ -402,7 +456,7 @@ class Fr24Feed:
     def flight_detail(self, fr24_id: str) -> Dict[str, Any]:
         """Fetch full Flightradar24 flight details + complete historical trail from departure airport."""
         fid = (fr24_id or "").strip()
-        if not fid or not fid.isalnum():
+        if not FR24_ID_RE.fullmatch(fid):
             raise ValueError("Invalid Flightradar24 flight ID")
         now = time.time()
         with self._lock:
@@ -410,6 +464,7 @@ class Fr24Feed:
             if cached and now - cached[0] < self.DETAIL_TTL_S:
                 return cached[1]
 
+        self._wait_for_slot()
         params: Dict[str, str] = {"version": "1.5", "flight": fid}
         if self.subscription_key:
             params["enc"] = self.subscription_key
@@ -475,7 +530,7 @@ class Fr24Feed:
             "trail": trail,
         }
         with self._lock:
-            self._detail_cache[fid] = (now, result)
+            _lru_put(self._detail_cache, fid, (now, result), DETAIL_CACHE_MAX)
             if icao and trail:
                 self._full_trails[icao] = (now, trail)
         return result

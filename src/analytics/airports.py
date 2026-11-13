@@ -19,7 +19,8 @@ from src.net import urlopen as net_urlopen
 from typing import Any, Dict, List, Optional
 
 BASE = "https://davidmegginson.github.io/ourairports-data"
-USER_AGENT = "allsky-ng (+https://allsky.hoan.uk)"
+from src.version import __version__
+USER_AGENT = f"Zenivo/{__version__}"
 RADIUS_KM = 450.0
 MAX_AGE_S = 30 * 24 * 3600.0
 TYPES = {"large_airport", "medium_airport", "small_airport"}
