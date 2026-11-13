@@ -184,3 +184,22 @@ def test_registry_remembers_contacts_past_card_expiry(tmp_path):
     again = Registry(path)
     again.load(now=time.time() + 10 * MAX_AGE_S)  # long after any card would have expired
     assert again.contacts() == got and again.count() == 0
+
+
+def test_builtin_seeds_are_listed_and_removable(tmp_path):
+    """A fresh station lists the built-in seeds; once the owner saves a list it is used as is, even when empty."""
+    from src.community import DEFAULT_SEEDS
+    from src.community.manager import CommunityManager
+
+    def manager():
+        m = CommunityManager.__new__(CommunityManager)
+        m.__dict__.update(data_dir=str(tmp_path), _settings=None, _card=None)
+        import threading
+        m._lock = threading.RLock()
+        return m
+
+    assert manager().settings()["seeds"] == list(DEFAULT_SEEDS)
+    (tmp_path / "community.json").write_text(json.dumps({"seeds": ["https://mine.example.org"]}))
+    assert manager().settings()["seeds"] == list(DEFAULT_SEEDS) + ["https://mine.example.org"]  # saved before this rule
+    (tmp_path / "community.json").write_text(json.dumps({"seeds": [], "seeds_set": True}))
+    assert manager().settings()["seeds"] == []

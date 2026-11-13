@@ -30,8 +30,9 @@ cached for a minute); switch "Share a preview image" off to stop serving it.
 Every 15 minutes (first round about 20 seconds after start, timing varied by 20 %) a station:
 
 1. re-signs its own card if the content changed or it is older than 6 hours;
-2. picks up to 5 targets: every seed you typed, the built-in seeds (`DEFAULT_SEEDS` in `src/community/__init__.py`)
-   and a few random known stations that have a public URL;
+2. picks up to 5 targets: every seed in the Settings list and a few random known stations that have a public
+   URL. The list starts with the built-in seeds (`DEFAULT_SEEDS` in `src/community/__init__.py`); the owner can
+   remove them, and "Restore built-in" puts them back;
 3. for each target reads `GET <url>/api/community/peers`, verifies every card and keeps the newest per station;
 4. sends its own card with `POST <url>/api/community/announce`.
 

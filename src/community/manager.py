@@ -29,6 +29,8 @@ MAX_SEEDS = 10
 
 DEFAULTS: Dict[str, Any] = {
     "enabled": False, "name": "", "public_url": "", "public_precision_deg": 0.1, "share_thumbnail": True, "seeds": [],
+    # False until the owner saves a seed list: until then the built-in seeds are part of the list (and removable)
+    "seeds_set": False,
 }
 
 
@@ -73,6 +75,9 @@ class CommunityManager:
                     data["public_precision_deg"] = data["precision_deg"]  # older key
                 merged = dict(DEFAULTS)
                 merged.update({k: v for k, v in data.items() if k in DEFAULTS})
+                if not merged["seeds_set"]:
+                    seeds = [u for u in merged["seeds"] if isinstance(u, str)]
+                    merged["seeds"] = (list(DEFAULT_SEEDS) + [u for u in seeds if u not in DEFAULT_SEEDS])[:MAX_SEEDS]
                 self._settings = merged
             return dict(self._settings)
 
@@ -83,7 +88,10 @@ class CommunityManager:
             patch = dict(patch)
             if patch.get("precision_deg") is not None:  # older name of public_precision_deg
                 patch.setdefault("public_precision_deg", patch["precision_deg"])
+            patch.pop("seeds_set", None)
             cur.update({k: v for k, v in patch.items() if k in DEFAULTS and v is not None})
+            if patch.get("seeds") is not None:
+                cur["seeds_set"] = True  # from now on the list is exactly what the owner saved, even when empty
             if cur["public_precision_deg"] not in PRECISIONS:
                 raise ValueError("public_precision_deg must be 0, 0.01, 0.1 or 1.0")
             if cur["enabled"]:
@@ -232,5 +240,5 @@ class CommunityManager:
             "known": self._registry.count() if self._registry is not None else 0,
             "contacts": len(self.contacts()),
             "last_round": dict(self.worker.last_round),
-            "default_seeds": list(DEFAULT_SEEDS),  # always contacted, shown in Settings so the owner sees them
+            "default_seeds": list(DEFAULT_SEEDS),  # for the "restore built-in seeds" button in Settings
         }

@@ -78,7 +78,7 @@ class GossipWorker:
 
     # -- one round ---------------------------------------------------------
     def targets(self) -> List[Tuple[str, bool]]:
-        """(url, allow_private): all owner seeds (private allowed), the default seeds, then random known peers.
+        """(url, allow_private): the seed list from the settings, then random known peers.
 
         Known peers = stations with a url in the registry plus the remembered addresses that answered before
         (kept past the card expiry, so the network survives without the seeds)."""
@@ -86,14 +86,10 @@ class GossipWorker:
         own = _norm(settings.get("public_url") or "")
         out: List[Tuple[str, bool]] = []
         seen = {own} if own else set()
-        for url in settings.get("seeds") or []:
+        for url in settings.get("seeds") or []:  # the owner's list; it starts with the built-in seeds, which can be removed
             if _norm(url) not in seen:
                 seen.add(_norm(url))
-                out.append((url, True))
-        for url in DEFAULT_SEEDS:
-            if _norm(url) not in seen:
-                seen.add(_norm(url))
-                out.append((url, False))
+                out.append((url, url not in DEFAULT_SEEDS))  # typed addresses may be private (LAN); built-in ones are checked strictly
         peers: List[str] = []
         for u in [c.get("url") for c in self.manager.registry_cards()] + self.manager.contacts():
             if u and _norm(u) not in seen:
