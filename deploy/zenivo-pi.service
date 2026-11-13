@@ -1,13 +1,13 @@
 [Unit]
-Description=AllSky Observatory (allsky-ng, multi-camera)
+Description=Zenivo all-sky observatory
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 User=pi
 Group=video
-WorkingDirectory=/home/pi/allsky-ng
-ExecStart=/home/pi/allsky-ng/.venv/bin/python run_allsky.py --host 127.0.0.1 --port 8095 --camera auto --sync-target http://127.0.0.1:3000 --sync-interval 60 --log-level warning --no-access-log \
+WorkingDirectory=/home/pi/zenivo
+ExecStart=/home/pi/zenivo/.venv/bin/python run_allsky.py --host 127.0.0.1 --port 8095 --camera auto --sync-target http://127.0.0.1:3000 --sync-interval 60 --log-level warning --no-access-log \
     --prune-dir /home/pi/hoan.uk/uploads/allsky/archive:3 \
     --prune-dir /home/pi/hoan.uk/uploads/allsky/events:90
 Restart=always

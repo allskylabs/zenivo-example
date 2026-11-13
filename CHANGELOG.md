@@ -26,6 +26,7 @@ First release under the Zenivo name.
 
 ### Changed
 
+- Host services, install folders and the GitHub repository renamed to zenivo (legacy `~/allsky-ng` symlink kept).
 - Menu reorganised into Live / Sky / Archive / Camera / Broadcast / Settings. On phones the tab bar
   shows 4 tabs and a More sheet.
 - `AllSkyService` (5.6k lines) split into focused mixins: calibration, products, events, traffic,

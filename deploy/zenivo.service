@@ -5,7 +5,7 @@
 #   @HOST@         bind address: 0.0.0.0 (all interfaces) or 127.0.0.1 (behind a reverse proxy)
 #   @PORT@         TCP port of the web UI and API
 #   @CAMERA@       auto | rts5869 | picamera | v4l2 | simulator
-# Based on the production unit deploy/allsky-ng.service.
+# Based on the production unit deploy/zenivo-pi.service.
 [Unit]
 Description=Zenivo - all-sky observatory software
 After=network-online.target

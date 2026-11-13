@@ -54,7 +54,7 @@ is the main design constraint: heavy analysis is sampled, never done per frame.
 With the simulator (no camera needed):
 
 ```bash
-git clone https://github.com/hoanb1/imx335-allsky.git zenivo
+git clone https://github.com/hoanb1/zenivo.git zenivo
 cd zenivo
 ./install.sh --no-systemd --camera simulator
 .venv/bin/python run_allsky.py --camera simulator --port 8080
@@ -130,7 +130,7 @@ The Python code is documented in [docs/SDD.md](docs/SDD.md).
 Some identifiers keep the original "allsky" name for compatibility with running installs and with
 the hoan.uk server. They are not renamed: logger names `allsky.*`, the browser storage key
 `allsky.ui.prefs.v1`, upload paths `/uploads/allsky/...`, the sync API `/api/allsky/ingest/*`,
-environment variables `ALLSKY_*`, and the unit names `allsky-ng` and `allsky-web` on existing hosts.
+environment variables `ALLSKY_*` and the script name `run_allsky.py`. Live hosts use the unit `zenivo` and the folder `~/zenivo`; a legacy symlink `~/allsky-ng` is kept for old scripts.
 
 ## Versioning
 

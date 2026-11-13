@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | Document version | 1.0.0 (2026-11-13), describes Zenivo 1.0.0 |
-| Repository | `github.com/hoanb1/imx335-allsky` |
-| Production | https://allsky.hoan.uk (Raspberry Pi 4, `/home/pi/allsky-ng`, systemd `allsky-ng`). The folder and unit names predate the Zenivo name and are unchanged |
+| Repository | `github.com/hoanb1/zenivo` (private) |
+| Production | https://allsky.hoan.uk (Raspberry Pi 4, `/home/pi/zenivo`, systemd `zenivo`; legacy symlink `/home/pi/allsky-ng` kept) |
 
 ## 1. Purpose and scope
 
@@ -19,7 +19,7 @@ the `/api/allsky/ingest/*` endpoints and the plate solver.
 **Names.** The product is Zenivo (see [BRAND.md](BRAND.md)). Internal identifiers keep the original
 name and are not renamed: logger names `allsky.*`, the browser storage key `allsky.ui.prefs.v1`,
 upload paths `/uploads/allsky/...`, the sync API `/api/allsky/ingest/*`, the `ALLSKY_*` environment
-variables, the class `AllSkyService` and the unit names `allsky-ng` and `allsky-web`. The version
+variables, the class `AllSkyService` and the script name `run_allsky.py`. Live units are named `zenivo` and install folders `~/zenivo` (legacy symlink `~/allsky-ng`). The version
 has one source, `src/version.py` (`__version__`), exposed by `--version`, `GET /api/version` and the UI.
 Installation, configuration and the API are in [INSTALL.md](INSTALL.md), [CONFIGURATION.md](CONFIGURATION.md)
 and [API.md](API.md).
@@ -365,17 +365,17 @@ holds a few hours that are 2026-10-18 in local time.
 | Item | Value |
 |---|---|
 | Host | Raspberry Pi 4, 192.168.3.24, Wi-Fi. hoan.uk runs on the same Pi on :3000 (sync target and plate solver) |
-| Service | `deploy/allsky-ng.service` (live unit; new installs use the `deploy/zenivo.service` template through `install.sh`): user `pi`, group `video`, `.venv/bin/python run_allsky.py --host 127.0.0.1 --port 8095 --camera auto --sync-target http://127.0.0.1:3000 --sync-interval 60 --log-level warning --no-access-log --prune-dir …archive:3 --prune-dir …events:90`, `Restart=always`, `Nice=5`, `MemoryMax=700M` |
+| Service | `deploy/zenivo-pi.service` (live unit `zenivo`; new installs use the `deploy/zenivo.service` template through `install.sh`): user `pi`, group `video`, `.venv/bin/python run_allsky.py --host 127.0.0.1 --port 8095 --camera auto --sync-target http://127.0.0.1:3000 --sync-interval 60 --log-level warning --no-access-log --prune-dir …archive:3 --prune-dir …events:90`, `Restart=always`, `Nice=5`, `MemoryMax=700M` |
 | Web | `deploy/nginx-allsky.hoan.uk.conf`: :80 → 127.0.0.1:8095, WebSocket upgrade, `proxy_buffering off`, 3600 s timeouts. cloudflared maps allsky.hoan.uk → :80 and is never restarted for allsky |
-| Development instance | User service `allsky-web` on port 8080 from the repo checkout |
+| Development instance | Service `zenivo` on port 8080 from the repo checkout |
 | New installs | `./install.sh` creates `.venv`, installs the dependencies and a `zenivo` unit; see [INSTALL.md](INSTALL.md) |
-| Current instance (2026-11-08) | minipc 192.168.6.15 (LAN) / `minipcv6.hoan.uk` (IPv6 SSH), user `hoan`, `/home/hoan/allsky-ng`, system service `allsky-web` on 127.0.0.1:8080, no sync target; cloudflared ingress `sky.hoan.uk -> 127.0.0.1:8080` (`/etc/cloudflared/config.yml`) |
+| Current instance (2026-11-08) | minipc 192.168.6.15 (LAN) / `minipcv6.hoan.uk` (IPv6 SSH), user `hoan`, `/home/hoan/zenivo`, system service `zenivo` on 127.0.0.1:8080 (`ALLSKY_DISABLE_RAW10=1`, `ALLSKY_ISP_WB_K=5000`, output appended to `data/allsky.log`), no sync target; cloudflared ingress `sky.hoan.uk -> 127.0.0.1:8080` (`/etc/cloudflared/config.yml`) |
 
 To deploy:
 
 ```bash
-rsync -ac --exclude data/ --exclude __pycache__ --exclude '*.pyc' ./src ./run_allsky.py pi@192.168.3.24:/home/pi/allsky-ng/
-ssh pi@192.168.3.24 'sudo systemctl restart allsky-ng'
+rsync -ac --exclude data/ --exclude __pycache__ --exclude '*.pyc' ./src ./run_allsky.py pi@192.168.3.24:/home/pi/zenivo/
+ssh pi@192.168.3.24 'sudo systemctl restart zenivo'
 ```
 
 Restart the service once per deploy, and run long installs on the Pi with `nohup`.
@@ -387,7 +387,7 @@ Restart the service once per deploy, and run long installs on the Pi with `nohup
 
 Caveat: `test_hardware.py::test_live_camera_capture_if_available` opens a real camera. Modules
 that import `src.api.main` build a service at collection time, which detects the real camera and
-starts threads against `data/`. Stop `allsky-web` or `allsky-ng` before a full run, and run
+starts threads against `data/`. Stop the `zenivo` service before a full run, and run
 single test files while iterating.
 
 ## 11. Known gaps

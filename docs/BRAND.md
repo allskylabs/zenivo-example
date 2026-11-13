@@ -12,7 +12,7 @@ tokens in `src/web/tokens.css` are the single source for colours in the product.
 - "all-sky" is the generic term for the camera and the sky view and is spelled with a hyphen.
   Internal identifiers keep the old name and are not rebranded: logger names `allsky.*`, the
   browser storage key `allsky.ui.prefs.v1`, `/uploads/allsky/...`, `/api/allsky/ingest/*`, the
-  `ALLSKY_*` environment variables and the unit names `allsky-ng` and `allsky-web` on existing hosts.
+  `ALLSKY_*` environment variables and the script name `run_allsky.py`.
 
 ## Logo
 

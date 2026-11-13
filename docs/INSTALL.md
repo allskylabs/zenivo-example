@@ -43,7 +43,7 @@ Contents: [Requirements](#requirements) | [Install with install.sh](#install-wit
 3. Get the code.
 
    ```bash
-   git clone https://github.com/hoanb1/imx335-allsky.git ~/zenivo
+   git clone https://github.com/hoanb1/zenivo.git ~/zenivo
    cd ~/zenivo
    ```
 
@@ -188,14 +188,14 @@ virtuallab3d endpoint every few seconds.
    nano ~/zenivo/feeder.env      # VLAB_URL, VLAB_KEY, VLAB_INTERVAL
    ```
 
-2. Adapt `deploy/allsky-adsb-feeder.service` (it is the Pi's live unit): replace `/home/pi/allsky-ng`
-   with your install directory, `User=pi` with your user, and `After=allsky-ng.service` with your
+2. Adapt `deploy/zenivo-adsb-feeder.service` (it is the Pi's live unit): replace `/home/pi/zenivo`
+   with your install directory, `User=pi` with your user, and `After=zenivo.service` with your
    service name. Set `ALLSKY_URL` in `feeder.env` if Zenivo does not listen on `http://127.0.0.1:8095`.
 
 3. Install and start it.
 
    ```bash
-   sudo cp deploy/allsky-adsb-feeder.service /etc/systemd/system/zenivo-adsb-feeder.service
+   sudo cp deploy/zenivo-adsb-feeder.service /etc/systemd/system/zenivo-adsb-feeder.service
    sudo systemctl daemon-reload
    sudo systemctl enable --now zenivo-adsb-feeder
    ```
@@ -234,26 +234,28 @@ file, so browsers pick up the new files without a hard refresh. Restart the unit
 
 ## Existing installs
 
-Two hosts run Zenivo under the names it had before the rename. Their unit names, folders and
-ports are unchanged on purpose and keep working:
+Two hosts already run Zenivo. Since 2026-11-13 their units are named `zenivo` and their folders are
+`~/zenivo`. A legacy symlink `~/allsky-ng` -> `zenivo` is kept for old scripts. Ports are unchanged:
 
 | Host | Unit | Folder | Port | Camera |
 |------|------|--------|------|--------|
-| Raspberry Pi 4 (1.8 GB) | `allsky-ng` | `/home/pi/allsky-ng` | 8095 (behind nginx) | IMX708 through picamera2 |
-| Mini-PC | `allsky-web` | `/home/hoan/allsky-ng` | 8080 | IMX335 USB |
+| Raspberry Pi 4 (1.8 GB) | `zenivo` | `/home/pi/zenivo` | 8095 (behind nginx) | IMX708 through picamera2 |
+| Mini-PC | `zenivo` | `/home/hoan/zenivo` | 8080 | IMX335 USB |
 
 Upgrade them with the rsync flow above, then restart the existing unit, for example:
 
 ```bash
 rsync -ac --exclude data/ --exclude __pycache__ --exclude '*.pyc' \
-    ./src ./run_allsky.py pi@192.168.3.24:/home/pi/allsky-ng/
-ssh pi@192.168.3.24 'sudo systemctl restart allsky-ng'
+    ./src ./run_allsky.py pi@192.168.3.24:/home/pi/zenivo/
+ssh pi@192.168.3.24 'sudo systemctl restart zenivo'
 ```
 
-`install.sh` never stops or restarts a unit with a different name, so running it on one of these
-hosts with the default `--service-name zenivo` adds a second unit. Stop the old one yourself if both
-would use the same port or camera. To migrate, stop and disable the old unit, run `install.sh`
-with `--dir` pointing at the existing folder (this keeps `data/`), and check the new unit.
+For the mini-PC, use `hoan@192.168.6.15:/home/hoan/zenivo/` and `sudo systemctl restart zenivo`.
+
+`install.sh` never stops or restarts a unit with a different name. If a host still has an older
+`allsky-ng` or `allsky-web` unit, the installer warns about it and leaves it untouched: stop and
+disable it yourself if it uses the same port or camera, and run `install.sh` with `--dir` pointing
+at the existing folder (this keeps `data/`).
 
 Internal identifiers keep the old "allsky" name: logger names `allsky.*`, the browser storage key
 `allsky.ui.prefs.v1`, upload paths `/uploads/allsky/...`, the sync API `/api/allsky/ingest/*` and

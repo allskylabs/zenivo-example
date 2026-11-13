@@ -1,0 +1,18 @@
+[Unit]
+Description=Zenivo ADS-B feeder to virtuallab3d
+After=zenivo.service network-online.target
+Wants=network-online.target
+# Starts only once the key file exists (the user creates it on the Pi, never in git)
+ConditionPathExists=/home/pi/zenivo/feeder.env
+
+[Service]
+User=pi
+EnvironmentFile=/home/pi/zenivo/feeder.env
+ExecStart=/home/pi/zenivo/.venv/bin/python /home/pi/zenivo/tools/adsb_feeder.py
+Restart=always
+RestartSec=10
+Nice=10
+MemoryMax=64M
+
+[Install]
+WantedBy=multi-user.target
