@@ -116,6 +116,33 @@
         }
     });
 
+    // Without a public URL nobody can load the large preview or open the station: say so, and offer the address in use
+    const urlHint = document.getElementById("community-url-hint");
+    function updateUrlHint() {
+        if (!urlHint) return;
+        urlHint.textContent = "";
+        const missing = !urlEl.value.trim() && (previewEl.checked || openEl.checked);
+        urlHint.hidden = !missing;
+        if (!missing) return;
+        const span = document.createElement("span");
+        span.textContent = "No public URL is set, so other people only get the small preview and cannot open this station.";
+        urlHint.appendChild(span);
+        const host = location.hostname;
+        const isPublicName = location.protocol === "https:" && host.includes(".") && !/^[0-9.]+$/.test(host) && !host.includes(":");
+        if (isPublicName) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "btn btn-sm btn-outline";
+            btn.textContent = "Use " + location.origin;
+            btn.addEventListener("click", () => {
+                urlEl.value = location.origin;
+                urlEl.dispatchEvent(new Event("change", { bubbles: true }));
+            });
+            urlHint.appendChild(btn);
+        }
+    }
+    [urlEl, previewEl, openEl].forEach((e) => e.addEventListener("change", updateUrlHint));
+
     async function loadStatus() {
         try {
             const res = await fetch("/api/community/status");
@@ -135,6 +162,7 @@
             previewEl.checked = s.share_preview !== false;
             openEl.checked = s.allow_open !== false;
             seedsEl.value = (s.seeds || []).join("\n");
+            updateUrlHint();
         } catch (err) { /* optional feature */ }
         loadStatus();
     }

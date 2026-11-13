@@ -203,7 +203,7 @@
         } else if (base) {
             box.appendChild(el("div", "meta", "The owner does not link to this station's page."));
         } else {
-            box.appendChild(el("div", "meta", "No public address: this station cannot be opened."));
+            box.appendChild(el("div", "meta", "The owner has not set a public address yet, so only this small preview is available."));
         }
         return box;
     }
