@@ -1,6 +1,20 @@
 /* AllSky dashboard (part of the former app.js): Shared state and DOM refs, clock and Red Vision, UI prefs, page routing.
  * Classic script: top-level declarations are shared with the other src/web/app/*.js files; load order is fixed in index.html. */
 
+// Page routing basics first: the initial data loads below are gated on the page that shows them
+const PAGES = {
+    "/": "tab-live",
+    "/live": "tab-live",
+    "/index.html": "tab-live",
+    "/gallery": "tab-gallery",
+    "/settings": "tab-settings",
+    "/calibration": "tab-calibration",
+    "/logs": "tab-logs",
+    "/focus": "tab-focus",
+};
+const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
+const currentPage = PAGES[currentPath] || "tab-live";
+
 const state = {
     mode: "auto",
     exposure_s: 0.04,
@@ -77,8 +91,10 @@ async function pollRain() {
         if (rainNow && telemSkyStatus) telemSkyStatus.textContent = "RAINING";
     } catch (e) { /* offline: keep the last state */ }
 }
-pollRain();
-setInterval(pollRain, 20000);
+if (currentPage === "tab-live") {
+    pollRain();
+    setInterval(pollRain, 20000);
+}
 const telemFps = document.getElementById("telem-fps");
 const telemTemp = document.getElementById("telem-temp");
 const telemUptime = document.getElementById("telem-uptime");
@@ -372,7 +388,7 @@ if (chkAircraft) {
 }
 
 // Initialize with synchronized OBS overlay state if available
-fetch("/api/obs/overlay")
+if (currentPage === "tab-live") fetch("/api/obs/overlay")
     .then((r) => r.json())
     .then((data) => {
         if (data && typeof data === "object") {
@@ -387,16 +403,6 @@ fetch("/api/obs/overlay")
 // ------------------------------------------------------------------
 // Page Routing: every section has its own URL (/live, /gallery, /settings, /calibration)
 // ------------------------------------------------------------------
-const PAGES = {
-    "/": "tab-live",
-    "/live": "tab-live",
-    "/index.html": "tab-live",
-    "/gallery": "tab-gallery",
-    "/settings": "tab-settings",
-    "/calibration": "tab-calibration",
-    "/logs": "tab-logs",
-    "/focus": "tab-focus",
-};
 const PAGE_TITLES = {
     "tab-live": "Live Observatory",
     "tab-gallery": "Gallery & Events",
@@ -405,8 +411,6 @@ const PAGE_TITLES = {
     "tab-logs": "Activity Log",
     "tab-focus": "Focus",
 };
-const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
-const currentPage = PAGES[currentPath] || "tab-live";
 document.querySelectorAll(".tab-content").forEach((c) => c.classList.toggle("active", c.id === currentPage));
 document.querySelectorAll(".tab-btn").forEach((b) => {
     const isActive = b.getAttribute("data-tab") === currentPage;

@@ -57,8 +57,10 @@ function loadPlanets() {
         if (Array.isArray(list)) window.ALLSKY_PLANETS = list;
     }).catch(() => {});
 }
-loadPlanets();
-setInterval(loadPlanets, 600000);
+if (currentPage === "tab-live") {
+    loadPlanets();
+    setInterval(loadPlanets, 600000);
+}
 setTimeout(updateAstroTiles, 0);
 
 function computeLmstDeg(lonDeg, dateObj) {
@@ -1049,7 +1051,7 @@ function refreshSondes() {
         })
         .catch(() => {});
 }
-if (chkSonde) {
+if (chkSonde && currentPage === "tab-live") {
     setInterval(refreshSondes, 3000);
     setTimeout(refreshSondes, 600);
 }
@@ -1198,12 +1200,12 @@ function drawAircraft() {
     ctx.restore();
 }
 
-if (chkAircraft) {
+if (chkAircraft && currentPage === "tab-live") {
     setInterval(refreshAircraft, 1500);
     window.addEventListener("resize", drawAircraft);
     setTimeout(refreshAircraft, 400);
 }
-if (chkSatellite) {
+if (chkSatellite && currentPage === "tab-live") {
     setInterval(refreshSatellites, 1500)  /* LEO satellites move up to ~1 deg/s */;
     setTimeout(refreshSatellites, 600);
 }

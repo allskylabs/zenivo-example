@@ -325,6 +325,17 @@ if (btnStationSolve) {
         runStationSolve(btnStationSolve, chkStationDeep && chkStationDeep.checked ? "deep" : "auto"));
 }
 
+// One in-flight GET /api/station/sky-mask shared by the mask editor and the star-align panel (both load together)
+let skyMaskInflight = null;
+function fetchSkyMask() {
+    if (!skyMaskInflight) {
+        skyMaskInflight = fetch("/api/station/sky-mask")
+            .then((res) => (res.ok ? res.json() : null))
+            .finally(() => { skyMaskInflight = null; });
+    }
+    return skyMaskInflight;
+}
+
 // Plate-solve sky mask editor: polygons stored as frame fractions in station_config.sky_mask
 const maskEditor = document.getElementById("sky-mask-editor");
 if (maskEditor) {
@@ -384,9 +395,8 @@ if (maskEditor) {
         maskRetries = 0;
         loadMaskFrame();
         try {
-            const res = await fetch("/api/station/sky-mask");
-            if (res.ok) {
-                const data = await res.json();
+            const data = await fetchSkyMask();
+            if (data) {
                 mask.sky = data.sky || [];
                 mask.obstruction = data.obstruction || [];
                 current = { kind: "sky", pts: [] };
@@ -396,7 +406,7 @@ if (maskEditor) {
     };
     maskEditor.addEventListener("toggle", () => { if (maskEditor.open) loadMask(); });
     // <details open> fires its toggle event before this script runs, so load once now as well
-    if (maskEditor.open) loadMask();
+    if (maskEditor.open && currentPage === "tab-settings") loadMask();
     maskImg.addEventListener("load", () => { maskRetries = 0; drawMask(); });
     window.addEventListener("resize", rafDebounced(drawMask));
     maskCanvas.addEventListener("click", (ev) => {
@@ -499,9 +509,8 @@ if (alignBox) {
     };
     const loadAlignMask = async () => {
         try {
-            const res = await fetch("/api/station/sky-mask");
-            if (res.ok) {
-                const d = await res.json();
+            const d = await fetchSkyMask();
+            if (d) {
                 maskPolys = { sky: d.sky || [], obstruction: d.obstruction || [] };
                 drawAlign();
             }
@@ -578,8 +587,10 @@ if (alignBox) {
             showAlert(alignAlert, `❌ ${err.message}`, "error", true);
         }
     });
-    loadAlignFrame();
-    loadAlignMask();
+    if (currentPage === "tab-settings") {
+        loadAlignFrame();
+        loadAlignMask();
+    }
 }
 
 // ------------------------------------------------------------------

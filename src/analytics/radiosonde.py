@@ -6,6 +6,8 @@ import math
 import threading
 import time
 import urllib.request
+
+from src.net import urlopen as net_urlopen
 from datetime import datetime
 from typing import Any, Dict, List
 
@@ -29,7 +31,7 @@ class RadiosondeFeed:
         try:
             req = urllib.request.Request(SONDEHUB_URL.format(lat=lat, lon=lon, dist=self.radius_m),
                                          headers={"User-Agent": "allsky-ng"})
-            with urllib.request.urlopen(req, timeout=15) as r:
+            with net_urlopen(req, timeout=15) as r:
                 raw = json.loads(r.read().decode("utf-8"))
             out = []
             for s in raw.values():

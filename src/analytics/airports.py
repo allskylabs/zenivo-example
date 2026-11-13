@@ -14,6 +14,8 @@ import os
 import threading
 import time
 import urllib.request
+
+from src.net import urlopen as net_urlopen
 from typing import Any, Dict, List, Optional
 
 BASE = "https://davidmegginson.github.io/ourairports-data"
@@ -96,7 +98,7 @@ class Airports:
             texts = []
             for name in ("airports.csv", "runways.csv"):
                 req = urllib.request.Request(f"{BASE}/{name}", headers={"User-Agent": USER_AGENT})
-                with urllib.request.urlopen(req, timeout=60) as r:
+                with net_urlopen(req, timeout=60) as r:
                     texts.append(r.read().decode("utf-8", "replace"))
             d = build(texts[0], texts[1], lat0, lon0)
             d.update(station=[round(lat0, 3), round(lon0, 3)], ts=round(time.time()))

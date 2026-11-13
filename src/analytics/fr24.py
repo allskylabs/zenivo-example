@@ -17,6 +17,8 @@ import threading
 import urllib.error
 import urllib.parse
 import urllib.request
+
+from src.net import https_handler, pooled_get
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -53,8 +55,17 @@ def _http_json(url: str, timeout: float = 8.0, data: Optional[bytes] = None,
     headers = dict(FR24_HEADERS)
     if extra_headers:
         headers.update(extra_headers)
+    if cookie_jar is None and data is None:
+        # hot path (feed / click-handler GETs): shared SSL context + keep-alive pool
+        _, raw, _h = pooled_get(url, headers, timeout)
+        if raw[:2] == b"\x1f\x8b":
+            raw = gzip.decompress(raw)
+        return json.loads(raw.decode("utf-8", "replace")), {}
     req = urllib.request.Request(url, data=data, headers=headers, method="POST" if data is not None else "GET")
-    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar)) if cookie_jar is not None else urllib.request.build_opener()
+    handlers = [https_handler()]
+    if cookie_jar is not None:
+        handlers.append(urllib.request.HTTPCookieProcessor(cookie_jar))
+    opener = urllib.request.build_opener(*handlers)
     with opener.open(req, timeout=timeout) as resp:
         raw = resp.read()
         if resp.headers.get("Content-Encoding", "").lower() == "gzip" or raw[:2] == b"\x1f\x8b":

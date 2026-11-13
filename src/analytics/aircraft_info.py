@@ -17,6 +17,8 @@ import re
 import threading
 import time
 import urllib.request
+
+from src.net import urlopen as net_urlopen
 from typing import Any, Dict, Optional, Tuple
 
 HEXDB = "https://hexdb.io"
@@ -35,7 +37,7 @@ AIRLINE_OVERRIDES = {
 def _get(url: str, timeout: float = 8.0) -> Optional[bytes]:
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with net_urlopen(req, timeout=timeout) as r:
             return r.read()
     except Exception:
         return None

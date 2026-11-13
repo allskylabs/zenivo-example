@@ -12,6 +12,8 @@ import subprocess
 import tempfile
 import time
 import urllib.request
+
+from src.net import urlopen as net_urlopen
 import urllib.error
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -97,7 +99,7 @@ def auto_detect_ip_location() -> Dict[str, Any]:
     for url, lat_k, lon_k, city_k, country_k in endpoints:
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "IMX335-AllSky-Observatory/1.0"})
-            with urllib.request.urlopen(req, timeout=4.0) as resp:
+            with net_urlopen(req, timeout=4.0) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 lat = data.get(lat_k)
                 lon = data.get(lon_k)
@@ -167,7 +169,7 @@ def _multipart_post_solve(
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+        with net_urlopen(req, timeout=timeout_s) as resp:
             raw = resp.read().decode("utf-8")
             return json.loads(raw)
     except urllib.error.HTTPError as exc:

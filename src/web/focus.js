@@ -60,13 +60,22 @@
     }
 
     if (!onFocusPage) {
+        // One in-flight GET /api/focus shared by the history list and the banner check (both run at load)
+        let focusInflight = null;
+        const getFocusState = () => {
+            if (!focusInflight) {
+                focusInflight = fetch("/api/focus", { cache: "no-store" })
+                    .then((res) => (res.ok ? res.json() : null))
+                    .finally(() => { focusInflight = null; });
+            }
+            return focusInflight;
+        };
         const settingsHist = document.getElementById("settings-focus-history");
-        if (settingsHist) {
+        if (settingsHist && (window.location.pathname.replace(/\/+$/, "") || "/") === "/settings") {
             const load = async () => {
                 try {
-                    const res = await fetch("/api/focus", { cache: "no-store" });
-                    if (!res.ok) return;
-                    const s = await res.json();
+                    const s = await getFocusState();
+                    if (!s) return;
                     renderHistory(settingsHist, s.history_records, async (i) => { if (await useRecord(i)) load(); });
                 } catch (e) { /* offline */ }
             };
@@ -92,9 +101,8 @@
         });
         const check = async () => {
             try {
-                const res = await fetch("/api/focus", { cache: "no-store" });
-                if (!res.ok) return;
-                const s = await res.json();
+                const s = await getFocusState();
+                if (!s) return;
                 if (typeof s.active !== "boolean") return;
                 bar.hidden = !s.active;
             } catch (e) { /* offline: keep the last state */ }

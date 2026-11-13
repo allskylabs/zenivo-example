@@ -13,6 +13,8 @@ import os
 import threading
 import time
 import urllib.request
+
+from src.net import urlopen as net_urlopen
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -92,7 +94,7 @@ class SatelliteTracker:
         try:
             tles: List[Dict[str, str]] = []
             for g in GROUPS:
-                with urllib.request.urlopen(TLE_URL.format(group=g), timeout=20) as r:
+                with net_urlopen(TLE_URL.format(group=g), timeout=20) as r:
                     tles += _parse_tle(r.read().decode("ascii", "replace"), g)
             if tles:
                 now = time.time()

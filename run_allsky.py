@@ -265,9 +265,9 @@ def main():
         logger.info(f"Extra retention directories: {extra}")
 
     # Start background sync thread pushing live frames & telemetry to hoan.uk
-    stop_sync = False
+    import threading
+    stop_sync = threading.Event()
     if args.sync_target:
-        import threading
         from src.sync.client import SyncClient
 
         import cv2
@@ -288,7 +288,7 @@ def main():
             ever_ok = False
             ok_count = 0
             last_summary = time.time()
-            while not stop_sync:
+            while not stop_sync.is_set():
                 try:
                     jpeg_bytes = _sync_jpeg()
                     telem = service.get_telemetry()
@@ -316,10 +316,7 @@ def main():
                         activity.info("sync", f"{ok_count} frame + telemetry uploads to {args.sync_target} in the last hour")
                     ok_count = 0
                     last_summary = time.time()
-                for _ in range(max(1, int(args.sync_interval / 0.25))):
-                    if stop_sync:
-                        break
-                    time.sleep(0.25)
+                stop_sync.wait(max(0.25, args.sync_interval))
 
         sync_thread = threading.Thread(target=_sync_worker, daemon=True)
         sync_thread.start()
@@ -345,7 +342,7 @@ def main():
         raise
     finally:
         activity.info("system", "AllSky service stopped")
-        stop_sync = True
+        stop_sync.set()
         service.close()
         logger.info("Clean shutdown complete.")
 

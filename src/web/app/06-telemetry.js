@@ -498,11 +498,15 @@ if (currentPage === "tab-live") {
     }, 5000);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshStatus(); });
 }
-pollCalibrationStatus();
-loadStationConfig();
-// A plate-solve run from another tab changes the lens/pointing the sky overlay uses: pick it up
-setInterval(() => { if (!document.hidden) loadStationConfig(); }, 60000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) loadStationConfig(); });
+// Calibration state is shown on the calibration page only (the status pill on other pages comes from /api/status)
+if (currentPage === "tab-calibration") pollCalibrationStatus();
+// Station config feeds the sky overlay / astro tiles (live) and the station form (settings); other pages get the station name from /api/status
+if (currentPage === "tab-live" || currentPage === "tab-settings") {
+    loadStationConfig();
+    // A plate-solve run from another tab changes the lens/pointing the sky overlay uses: pick it up
+    setInterval(() => { if (!document.hidden) loadStationConfig(); }, 60000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) loadStationConfig(); });
+}
 if (currentPage === "tab-settings") {
     loadResolutionOptions();
     loadStarBoost();

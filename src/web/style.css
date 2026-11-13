@@ -1327,7 +1327,7 @@ a.tab-btn {
 .cloud-empty.hidden, .cloud-tooltip.hidden { display: none; }
 @media (max-width: 700px) {
     #cloud-chart { height: 200px; }
-    .cloud-legend { margin-left: 0; }
+    .cloud-legend { margin-left: 0; flex-wrap: wrap; row-gap: 0.25rem; max-width: 100%; }
 }
 
 /* Focus assistant (/focus) */
