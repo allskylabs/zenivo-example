@@ -25,7 +25,7 @@ Contents: [Pages and static files](#pages-and-static-files) | [Version and statu
 Default deny: any request that is not `GET`/`HEAD`/`OPTIONS` needs an admin session, except the open routes below.
 Admin-only reads: `/api/logs`, `/api/logs/download`, `/api/community/settings`, `/api/focus`, `/api/focus/frame`,
 `/api/focus/overview.jpg`, `/api/storage`, `/docs`, `/redoc`, `/openapi.json`. Admin pages: `/settings`,
-`/calibration`, `/focus`, `/logs` (guests are redirected to `/login?next=<path>`). A state-changing request with an
+`/calibration`, `/focus`, `/logs`, `/obs/dock` (guests are redirected to `/login?next=<path>`). A state-changing request with an
 `Origin` header that differs from `Host` gets 403.
 
 | Method | Path | Purpose |
@@ -48,7 +48,7 @@ object of `/api/adsb/aircraft` and `/api/satellites`; the ADS-B receiver address
 | GET | `/`, `/live`, `/gallery`, `/settings`, `/calibration`, `/logs`, `/focus` | Single-page UI shell (`index.html`) |
 | GET | `/sky`, `/flights3d`, `/satellites3d`, `/community` | Separate pages: observer sky view, Flights 3D, Satellites 3D, Community map |
 | GET, HEAD | `/full`, `/live/full`, `/obs` | Clean full-frame live page (OBS browser source) |
-| GET, HEAD | `/obs/dock`, `/obs/control`, `/dock` | OBS dock page |
+| GET, HEAD | `/obs/dock`, `/obs/control`, `/dock` | OBS dock page (admin: redirects to `/login`) |
 | GET | `/index.html`, `/style.css`, `/static/focus.js` | Shell and legacy asset aliases |
 | GET | `/favicon.ico`, `/site.webmanifest` | Brand assets |
 | GET | `/static/...` | Files of `src/web/` (scripts, styles, `brand/`, `skydata/`, `sky/`) |

@@ -54,7 +54,7 @@ NAV = [
                    ("/obs", "&#8599;", "OBS Preview", "blank", "")]),
 ]
 # Items only the admin sees (hidden for guests via data-admin; the server enforces the same list)
-ADMIN_HREFS = {"/logs", "/focus", "/calibration"}
+ADMIN_HREFS = {"/logs", "/focus", "/calibration", "/obs/dock"}
 SETTINGS = [("image", "Image Output"), ("detection", "Detection"), ("station", "Station &amp; Optics"),
             ("skymask", "Sky Mask"), ("integrations", "Integrations"), ("community", "Community"),
             ("admin", "Admin")]
@@ -129,7 +129,7 @@ def render(current, is_index):
           for h, t in SHEET]
     o.append('        <div class="m-sheet-title" data-admin>Settings</div>')
     o += [f'        <a class="m-sheet-item" href="/settings#{k}" data-admin>{t}</a>' for k, t in SETTINGS]
-    o += ['        <div class="m-sheet-title">Broadcast</div>', '        <a class="m-sheet-item" href="/obs/dock">OBS Dock</a>',
+    o += ['        <div class="m-sheet-title">Broadcast</div>', '        <a class="m-sheet-item" href="/obs/dock" data-admin>OBS Dock</a>',
           '        <a class="m-sheet-item" href="/obs" target="_blank" rel="noopener">OBS Preview</a>',
           '        <button class="m-sheet-item m-sheet-rv" type="button" id="m-rv-toggle" role="switch" aria-checked="false">'
           '<span>Red Vision</span><span class="rv-track"><span class="rv-knob"></span></span></button>',

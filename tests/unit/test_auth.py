@@ -233,3 +233,10 @@ class TestGuestRounding:
     def test_exact_precision_adds_no_flag(self):
         out = guest_view({"latitude_deg": 21.0285, "longitude_deg": 105.8542}, 0)
         assert out == {"latitude_deg": 21.0285, "longitude_deg": 105.8542}
+
+
+def test_obs_dock_is_an_admin_page_and_obs_preview_is_public():
+    from src.auth import policy
+    for path in ("/obs/dock", "/obs/control", "/dock"):
+        assert policy.classify("GET", path, {}, "127.0.0.1") == policy.PAGE
+    assert policy.classify("GET", "/obs", {}, "127.0.0.1") == policy.PUBLIC

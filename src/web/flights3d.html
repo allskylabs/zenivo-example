@@ -194,7 +194,7 @@
             </div>
             <div class="side-group">
                 <div class="side-group-title">Broadcast</div>
-                <a class="side-item side-link" href="/obs/dock"><span class="side-ic">&#9635;</span><span class="side-txt">OBS Dock</span></a>
+                <a class="side-item side-link" href="/obs/dock" data-admin><span class="side-ic">&#9635;</span><span class="side-txt">OBS Dock</span></a>
                 <a class="side-item side-link" href="/obs" target="_blank" rel="noopener"><span class="side-ic">&#8599;</span><span class="side-txt">OBS Preview</span></a>
             </div>
             <div class="side-group side-group-settings" data-admin>
@@ -239,7 +239,7 @@
         <a class="m-sheet-item" href="/settings#community" data-admin>Community</a>
         <a class="m-sheet-item" href="/settings#admin" data-admin>Admin</a>
         <div class="m-sheet-title">Broadcast</div>
-        <a class="m-sheet-item" href="/obs/dock">OBS Dock</a>
+        <a class="m-sheet-item" href="/obs/dock" data-admin>OBS Dock</a>
         <a class="m-sheet-item" href="/obs" target="_blank" rel="noopener">OBS Preview</a>
         <button class="m-sheet-item m-sheet-rv" type="button" id="m-rv-toggle" role="switch" aria-checked="false"><span>Red Vision</span><span class="rv-track"><span class="rv-knob"></span></span></button>
         <div class="m-sheet-foot"><a class="side-auth" href="/login" data-auth-link>Sign in</a><span id="app-version-m" data-app-version>Zenivo</span></div>
@@ -337,11 +337,11 @@
         </label>
         <div class="field">
             <span>Enterprise Account Email</span>
-            <input type="email" id="fr24-email" placeholder="you@company.com" autocomplete="username">
+            <input type="email" id="fr24-email" name="fr24-account" placeholder="you@company.com" autocomplete="off">
         </div>
         <div class="field">
             <span>Enterprise Password (used once to obtain token)</span>
-            <input type="password" id="fr24-password" placeholder="••••••••••••" autocomplete="current-password">
+            <input type="password" id="fr24-password" placeholder="••••••••••••" autocomplete="new-password">
         </div>
         <div class="field">
             <span>Or Subscription Key / Token (_frPl)</span>

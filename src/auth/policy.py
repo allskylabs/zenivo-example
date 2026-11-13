@@ -28,7 +28,7 @@ ADMIN_GET = frozenset({"/api/logs", "/api/logs/download", "/api/community/settin
 # WebSocket text actions a guest may send (they only read). Everything else needs the admin session + same-site origin.
 WS_GUEST_ACTIONS = frozenset({"ping", "get_telemetry", "get_status"})
 # Pages of the web UI that are only for the admin (guests are redirected to /login).
-ADMIN_PAGES = frozenset({"/settings", "/calibration", "/focus", "/logs"})
+ADMIN_PAGES = frozenset({"/settings", "/calibration", "/focus", "/logs", "/obs/dock", "/obs/control", "/dock"})
 # A request carrying any of these came through a proxy/tunnel: its peer address (127.0.0.1) says nothing about the client.
 PROXY_HEADERS = ("x-forwarded-for", "x-real-ip", "forwarded", "cf-connecting-ip", "cf-ray")
 _LOOPBACK = frozenset({"127.0.0.1", "::1", "::ffff:127.0.0.1"})

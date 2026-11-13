@@ -116,7 +116,8 @@ class AdsbConfigRequest(BaseModel):
     port: Optional[int] = Field(default=None, ge=1, le=65535)
     enabled: Optional[bool] = None
     fr24_enabled: Optional[bool] = None
-    fr24_email: Optional[str] = Field(default=None, max_length=254)
+    fr24_email: Optional[str] = Field(default=None, max_length=254, pattern=r"^$|^[^@\s]+@[^@\s]+\.[^@\s]+$",
+                                      description="Flightradar24 account e-mail (empty clears it); anything that is not an e-mail address is refused")
     fr24_password: Optional[str] = Field(default=None, max_length=254)
     fr24_token: Optional[str] = Field(default=None, max_length=1024)
     radiosondes_enabled: Optional[bool] = Field(default=None, description="Weather balloons (SondeHub) on the Live page")

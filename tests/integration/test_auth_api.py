@@ -188,3 +188,9 @@ class TestDayObjectsConfig:
         assert "me@example.org" not in guest and "SECRET-TOKEN" not in guest
         c.post("/api/auth/login", json={"password": PW})
         c.post("/api/adsb", json={"fr24_enabled": False, "fr24_token": ""})
+
+
+def test_fr24_email_must_be_an_email_address(guest_client, fresh_auth):
+    """A browser autofilling "admin" into the account field must never be stored or used for a sign-in."""
+    setup_admin(guest_client, fresh_auth)
+    assert guest_client.post("/api/adsb", json={"fr24_email": "admin", "fr24_password": "x" * 12}).status_code == 422

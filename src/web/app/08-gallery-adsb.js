@@ -845,7 +845,12 @@ function syncFr24UI(d) {
 }
 
 async function saveFr24(withSecrets) {
-    const body = { fr24_enabled: fr24Enabled.checked, fr24_email: fr24Email.value.trim() };
+    const body = { fr24_enabled: fr24Enabled.checked };
+    if (withSecrets) {
+        const em = fr24Email.value.trim();
+        if (em && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) throw new Error("that is not an e-mail address");
+        body.fr24_email = em;
+    }
     // The password and token leave this page only on the explicit button (never on autosave: a browser's
     // password manager can fill these fields by itself, and a filled field must not be sent anywhere)
     const pw = withSecrets ? fr24Password.value : "";
@@ -867,7 +872,6 @@ if (fr24Enabled) {
     autosave(fr24Enabled.closest("fieldset"), () => saveFr24(false));
     const fr24Signin = document.getElementById("btn-fr24-signin");
     if (fr24Signin) fr24Signin.addEventListener("click", async () => {
-        if (!fr24Password.value && !fr24Token.value.trim()) return;
         await settingsSave(fr24Signin, () => saveFr24(true));
     });
     fr24Clear.addEventListener("click", async () => {
