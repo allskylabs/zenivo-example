@@ -16,6 +16,7 @@ from src.pipeline.timelapse import compile_timelapse, select_timelapse_frames
 from src.storage import frame_codec
 from src.pipeline.overlay import stamp_info_box
 from src.api.service_consts import ARCHIVE_WIDTH
+from src.defaults import DEFAULT_STATION_NAME
 
 class ProductsMixin:
 
@@ -399,7 +400,7 @@ class ProductsMixin:
                     compile_ts = [t for t in timestamps for _ in range(repeat)]
                     compile_telem = [tl for tl in telemetry_list for _ in range(repeat)]
 
-                station_name = str(self.station_config.get("location_name", "AllSky Hanoi"))
+                station_name = str(self.station_config.get("location_name", DEFAULT_STATION_NAME))
                 latest_mp4 = os.path.join(self.timelapses_dir, "latest.mp4")
                 dated_mp4 = os.path.join(self.timelapses_dir, f"{target_day}.mp4")
                 out_mp4 = latest_mp4 if is_today else dated_mp4
@@ -498,7 +499,7 @@ class ProductsMixin:
             compile_timelapse(
                 sel, output_path=out, fps=float(fps), fourcc_str="avc1", add_overlay=bool(overlay),
                 telemetry_list=telem, timestamps=stamps,
-                station_name=str(self.station_config.get("location_name", "AllSky Hanoi")),
+                station_name=str(self.station_config.get("location_name", DEFAULT_STATION_NAME)),
                 target_size=size,
             )
         return {

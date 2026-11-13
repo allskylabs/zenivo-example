@@ -24,6 +24,7 @@ from src.analytics.cloud_cover import MIN_TEMPLATE_SAMPLES, CloudReference, anal
 from src.analytics.cloud_history import CloudHistory
 from src.storage import frame_codec
 from src.calibration.auto_exposure import calculate_solar_elevation
+from src.defaults import DEFAULT_LAT, DEFAULT_LON
 
 DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data"))
 
@@ -44,7 +45,7 @@ def main() -> int:
             cfg = json.load(fp)
     except (OSError, ValueError):
         pass
-    lat, lon = float(cfg.get("latitude_deg", 21.0285)), float(cfg.get("longitude_deg", 105.8542))
+    lat, lon = float(cfg.get("latitude_deg", DEFAULT_LAT)), float(cfg.get("longitude_deg", DEFAULT_LON))
     roi = cfg.get("sky_roi") or [0.0, 0.0, 1.0, 1.0]
     perf = cfg.get("performance") or {}
     every = args.every or float(perf.get("analysis_interval_s", 300.0))

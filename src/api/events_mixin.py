@@ -72,7 +72,8 @@ class EventsMixin:
     def day_object_log(self):
         """The on-disk log of daytime flying objects (birds, insects, aircraft), created on first use."""
         from src.analytics.traffic_log import TrafficLog
-        cfg = {"retention_days": 14, "max_mb": 50, **(self.station_config.get("day_objects") or {})}
+        from src.analytics.day_objects import normalize_config
+        cfg = normalize_config(self.station_config.get("day_objects"))
         dl = getattr(self, "_day_log", None)
         if dl is None:
             dl = self._day_log = TrafficLog(os.path.join(self.output_dir, "day_objects"), cfg)
@@ -83,20 +84,37 @@ class EventsMixin:
     def _track_day_objects(self, frame: np.ndarray, now: float) -> None:
         """Daytime: follow small moving dots (birds, insects, aircraft) and store the finished tracks. While rain
         drops sit on the dome nothing is stored."""
-        cfg = self.station_config.get("day_objects") or {}
-        if not int(cfg.get("enabled", 1)):
+        from src.analytics.day_objects import DayObjectTracker, keep_classes, normalize_config
+        cfg = normalize_config(self.station_config.get("day_objects"))
+        if not cfg["enabled"]:
             return
         if getattr(self, "day_objects", None) is None:
-            from src.analytics.day_objects import DayObjectTracker
-            self.day_objects = DayObjectTracker()
+            self.day_objects = DayObjectTracker(config=cfg)
         was = self.day_objects.raining
         tracks = self.day_objects.process(frame, now, self.station_config.get("sky_mask"))
         if self.day_objects.raining != was:
             self.activity.info("events", "Rain: drops on the dome, daytime object tracking paused" if not was
                                else "Rain over: daytime object tracking resumed")
         log = self.day_object_log()
-        for t in tracks:
+        for t in keep_classes(tracks, cfg["classes"]):
             log.append_record(float(t["t"]), t)
+
+    def get_day_objects_config(self) -> Dict[str, Any]:
+        from src.analytics.day_objects import CLASSES, SENSITIVITY, normalize_config
+        return {"config": normalize_config(self.station_config.get("day_objects")),
+                "classes": list(CLASSES), "presets": SENSITIVITY}
+
+    def set_day_objects_config(self, **fields: Any) -> Dict[str, Any]:
+        """Merge the given fields into the saved config, validate/clamp, persist and apply to the live tracker and log.
+        A min_contrast_dn of None (explicit) goes back to the sensitivity preset."""
+        from src.analytics.day_objects import normalize_config
+        merged = {**(self.station_config.get("day_objects") or {}), **fields}
+        self.station_config["day_objects"] = cfg = normalize_config(merged)
+        self._save_station_config()
+        if getattr(self, "day_objects", None) is not None:
+            self.day_objects.configure(cfg)
+        self.day_object_log()  # re-applies retention and size cap
+        return {"success": True, **self.get_day_objects_config()}
 
     def _cloud_event(self, frame: np.ndarray, cc: float, now: float) -> None:
         """Clouds arriving / clearing, from the (already sampled) cloud cover, with hysteresis."""

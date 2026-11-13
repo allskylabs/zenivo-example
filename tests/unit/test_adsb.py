@@ -200,3 +200,26 @@ def test_fr24_row_parsing_and_status():
     assert round(ac["climb_m_min"]) == round(640 * 0.3048)
     assert len(ac["trail"]) == 1
 
+
+
+def test_radiosonde_position_is_snapped_and_switch_stops_fetching():
+    from types import SimpleNamespace
+    from src.api.traffic_mixin import TrafficMixin
+
+    calls = []
+
+    class FakeFeed:
+        def current(self, lat, lon, at=None):
+            calls.append((lat, lon))
+            return {"sondes": [], "error": ""}
+
+    svc = SimpleNamespace(
+        station_config={}, _sonde_feed=FakeFeed(),
+        _overlay_station=lambda: {"latitude_deg": 21.0285, "longitude_deg": 105.8542, "elevation_m": 20.0},
+        _overlay_solution=lambda: None)
+    res = TrafficMixin.get_radiosondes_now(svc)
+    assert res["enabled"] is True and calls and set(calls) == {(21.0, 106.0)}
+    calls.clear()
+    svc.station_config["radiosondes_enabled"] = 0
+    res = TrafficMixin.get_radiosondes_now(svc)
+    assert res["enabled"] is False and res["sondes"] == [] and not calls

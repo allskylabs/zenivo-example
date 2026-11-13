@@ -230,7 +230,7 @@ class TestDayNightAutoExposureEngine:
         assert profile == DayNightProfile.NIGHT
 
     def test_closed_loop_luminance_feedback(self):
-        ae = DayNightAutoExposure()
+        ae = DayNightAutoExposure(latitude_deg=21.0285, longitude_deg=105.8542)
         ae.current_profile = DayNightProfile.NIGHT
         ae.exposure_s = 5.0
         ae.gain_db = 30.0

@@ -5,6 +5,10 @@ anything or read logs and settings. The service is meant to be safe behind a pub
 (for example cloudflared on the same host), so it never treats a request as trusted because it
 comes from `127.0.0.1` or the LAN.
 
+For the full list of what Zenivo sends, loads, stores and exposes (every outbound host, third-party browser
+loads, files on disk, built-in community seeds), see [TRANSPARENCY.md](TRANSPARENCY.md). This page is the
+security model.
+
 ## Who may do what
 
 | What | Guest | Admin |
@@ -13,9 +17,10 @@ comes from `127.0.0.1` or the LAN.
 | WebSocket `/ws/live`: connect, frames, telemetry, `ping`, `get_*` | yes | yes |
 | WebSocket commands that change state (`set_exposure`, `set_gain`, `set_mode`, `trigger_master_dark`, ASC1 commands) | refused: `{"type":"error","code":"auth","message":"Sign in as admin"}` | yes |
 | Every `POST`/`PUT`/`DELETE` under `/api/` | refused with 401 | yes |
-| `GET /api/logs`, `/api/logs/download`, `/api/community/settings` | 401 | yes |
+| `GET /api/logs`, `/api/logs/download`, `/api/community/settings`, `/api/focus`, `/api/focus/frame`, `/api/focus/overview.jpg`, `/api/storage`, `/docs`, `/redoc`, `/openapi.json` | 401 | yes (`ADMIN_GET` in `src/auth/policy.py`) |
 | Pages `/settings`, `/calibration`, `/focus`, `/logs` | redirect to `/login?next=...` | yes |
 | `GET /api/adsb` receiver address and Flightradar24 account e-mail | blank | shown |
+| Flightradar24 token and password | never returned | never returned (write-only: `GET /api/adsb` gives only `fr24_has_token`; `/api/station/config` strips both; the password is kept in memory only) |
 | `POST /api/community/announce` (other stations) | open (signature checked, rate limited) | open |
 | `POST /api/auth/setup`, `/login`, `/logout` | open (throttled) | open |
 
@@ -58,9 +63,11 @@ and restart the service.
 ## Brute force
 
 Five wrong passwords (or setup codes) from one client within 5 minutes lock that client for 60 s, doubling
-on repeated lockouts up to 15 min (`429` with `Retry-After`). A global limit of 20 failures in 5 minutes
-guards against many addresses. The client key is `CF-Connecting-IP`, else the first `X-Forwarded-For`
-hop, else the peer address; it is used only for throttling, never for authorisation.
+on repeated lockouts up to 15 min (`429` with `Retry-After`). A global net guards against many addresses: 30
+failures in 5 minutes pause login for everybody for a flat 60 s (it does not double, so an anonymous client
+cannot keep the admin locked out). The client key is `CF-Connecting-IP`, else the right-most `X-Forwarded-For`
+hop, but only when the TCP peer is loopback (a local proxy or tunnel); from any other peer those headers are
+ignored and the peer address is used. The key is used only for throttling, never for authorisation.
 
 ## Cross-site requests
 
@@ -75,7 +82,7 @@ handshake. CORS is open for reads without credentials, so another site can never
 qualifies only when the TCP peer is loopback **and** it carries none of `X-Forwarded-For`, `X-Real-IP`,
 `Forwarded`, `CF-Connecting-IP`, `CF-Ray` (a tunnelled client always has some of them). The list is empty:
 the ADS-B feeder (`tools/adsb_feeder.py`) only reads `GET /api/adsb/aircraft`, and the sync client
-(`/api/allsky/ingest/*`) pushes out to a hoan.uk server rather than receiving.
+(`/api/allsky/ingest/*`) pushes out to a remote server rather than receiving.
 
 ## What guests see of the station location
 
@@ -118,52 +125,34 @@ HTTPS so the cookie is `Secure`. Keep passing the original `Host` header (the CS
 
 `CF-Connecting-IP`, `X-Forwarded-For`, `X-Forwarded-Host` and `X-Forwarded-Proto` are believed only when the TCP peer is loopback (a proxy or tunnel on the same host); from any other peer they are written by the client and ignored. Behind a loopback proxy the client address is `CF-Connecting-IP`, else the right-most `X-Forwarded-For` hop (the one your proxy appended). Bind to `127.0.0.1` when a local proxy is the only way in; if the service listens on a LAN address, direct clients cannot spoof these headers, but a proxy on another host is not trusted either and all its clients share its address.
 
-## Outbound connections
+## Outbound connections and third-party loads
 
-Everything Zenivo itself (the Python service) connects to. Nothing else is contacted: there is no telemetry,
-no update check and no call home to the authors. The service reads no remote configuration.
+Everything Zenivo connects to, every third-party file a visitor's browser loads (with SRI status), and what
+each one receives is listed in one place: [TRANSPARENCY.md](TRANSPARENCY.md#1-outbound-connections-made-by-the-server).
+In short: there is no telemetry, no update check, no remote configuration and no call home to the authors.
+Optional connections (sync target, remote plate solver, Flightradar24, community sharing, local ADS-B
+receiver) are off until you set them. Satellite orbit data, radiosonde data (the position sent is rounded to 0.5 degrees; switch
+`radiosondes_enabled` turns it off) and airport data are fetched on demand, as that page explains.
 
-| Target | What is sent | When | Default | Turn off |
-|---|---|---|---|---|
-| Sync target (`--sync-target URL`) | Live frame (JPEG), telemetry, device id `zenivo-<hostname>` | Every `--sync-interval` seconds | **Off** (empty). One info line at start names the target when enabled | Leave `--sync-target ""` |
-| Remote plate solver (station setting `remote_solver_url`) | A frame, the station latitude/longitude and the time | Only when the local star match is not confident, during a plate-solve | **Off** (empty: the solver reports "local solve not confident; no remote solver configured") | Clear the field in Settings, Station & Optics |
-| IP geolocation (`ipwho.is`, `ipapi.co`, https only) | The public IP of this host (implicit in the request) | Only when an admin presses "Locate via GPS / IP" and browser GPS is unavailable | Admin button only | Do not press it; enter coordinates by hand |
-| Flightradar24 (`data-cloud.flightradar24.com`, `data-live.flightradar24.com`) | A map box (about +-3 degrees around the station for the traffic log, or the box a viewer asks for on the 3D map), optionally the FR24 account token. The request looks like a browser request because the endpoints are not an official API | Traffic log sampling (every 5 s, only once the camera has a star-solved pointing) and when someone opens the 3D flights map | **On** (`fr24_enabled` defaults to 1) | Settings, ADS-B: switch Flightradar24 off |
-| `hexdb.io`, `raw.githubusercontent.com` (OpenFlights airline list) | Aircraft ICAO hex codes of aircraft heard by a local ADS-B receiver | When a new aircraft is heard; cached on disk | Only active with an ADS-B receiver or FR24 traffic | Switch the ADS-B receiver / FR24 off |
-| OurAirports (`davidmegginson.github.io`) | Nothing about the station (plain file download) | Monthly refresh for the 3D map | On, cached 30 days | Do not open the 3D map |
-| `celestrak.org` | A group name (satellite TLE download) | Daily refresh | On | Do not use satellite features |
-| `api.v2.sondehub.org` | Station latitude/longitude and a search radius | While radiosonde data is requested (viewer or overlay), refreshed every 20 s | On when requested | Leave radiosonde overlays unused |
-| Community seeds and peers | Station card (name, rounded location, public URL) | Only after the owner joins the community network | **Off** | Community section of Settings |
-| Local ADS-B receiver (SBS-1 TCP port 30003) | Nothing (the service only reads) | Continuous when a host is configured | Off until a host is set | Clear the receiver host |
-| `tools/adsb_feeder.py` | Aircraft rows to the URL in `VLAB_URL` with `VLAB_KEY` | Only if the separate `zenivo-adsb-feeder` unit is installed and configured | Not installed by `install.sh` | Do not install or disable the unit |
+Two security points that belong here:
 
-Browser-side third parties (loaded by the visitor's browser, not by the service): Google Fonts
-(`fonts.googleapis.com`, `fonts.gstatic.com`), jsDelivr (`cdn.jsdelivr.net`: MapLibre, three.js), unpkg
-(`unpkg.com`), Esri World Imagery (`server.arcgisonline.com`), AWS terrain tiles (`s3.amazonaws.com`),
-Google photorealistic tiles (`tile.googleapis.com`, only with a Google Maps key configured), `flagcdn.com` and
-`pics.avs.io` (aircraft photos and logos). Each one sees the visitor's IP address and the page that asked.
-Self-host the assets to avoid that. Residual: the three.js import map entries cannot carry Subresource
-Integrity; the MapLibre script and stylesheet on `/flights3d` are pinned with SRI hashes.
-
-The Google Maps key returned by `/api/map/config` is meant for the browser, so it is visible to anyone who can
-open the 3D map. Restrict it in the Google Cloud console to HTTP referrers (your site) and to the Map Tiles
-API only. Guests do not receive it in `/api/station/config`, status, SSE or WebSocket payloads.
+- The Google Maps key returned by `/api/map/config` is meant for the browser, so it is visible to anyone who
+  can open the 3D map. Restrict it in the Google Cloud console to HTTP referrers (your site) and to the Map
+  Tiles API only. Guests do not receive it in `/api/station/config`, status, SSE or WebSocket payloads.
+- Subresource Integrity pins the MapLibre, Leaflet and three.js files. Google Fonts CSS, map and terrain tiles
+  and planet textures cannot be pinned.
 
 ## No backdoor
 
-Facts, checkable in the source:
+Facts, checkable in the source (details and the search commands: [TRANSPARENCY.md](TRANSPARENCY.md#5-guest-and-admin)
+and [section 9](TRANSPARENCY.md#9-how-to-verify-these-claims-yourself)):
 
 - No remote configuration, no remote command channel and no auto-update. The service never downloads code.
 - No default password. Until an admin password is set nothing can change settings; the setup code is a random
   value written to `data/admin_setup_code.txt` on the machine.
 - No bypass header or hidden route. Admin decisions come from one place, `src/auth/policy.py`.
-- Every outbound connection is listed above and each can be switched off or is off by default.
-- The only third-party code a browser runs is the CDN list above.
-
-To verify: `grep -rn "urlopen\|requests\.\|httpx\|http://\|https://" src --include=*.py` lists every network call;
-`grep -rn "hoan.uk" src deploy` shows only example/default text of the author's own deployment (see the
-community seed list and `deploy/*hoan.uk*` examples); `grep -rn "X-Forwarded\|CF-Connecting" src` shows the only
-headers read for client addresses (used for throttling, never for authorisation).
+- Every outbound connection is listed and each can be switched off or is off by default.
+- The only third-party code a browser runs is the CDN list in the transparency page.
 
 ## Location rounding limits
 
@@ -172,6 +161,12 @@ from casual viewers only. Aircraft, radiosonde and satellite rows carry their ow
 elevation and distance from the station, and the live image shows where they appear in the sky. Someone
 determined can combine several of these to place the station well inside the rounding grid. These fields are
 deliberately not removed, because they are the product.
+
+The rounding applies to what Zenivo publishes to visitors and the community card. It does not change what the
+server sends to the public data services it queries: the radiosonde request to SondeHub carries the position
+rounded to 0.5 degrees, and the Flightradar24 box (only when you switch it on) is centred on the station to 0.1 degree.
+Both are listed in [TRANSPARENCY.md](TRANSPARENCY.md#1-outbound-connections-made-by-the-server) and
+[its limitations](TRANSPARENCY.md#8-known-limitations).
 
 ## Guest abuse limits
 
@@ -185,7 +180,6 @@ deliberately not removed, because they are the product.
 - Expensive public GETs (`/api/satellites`, `/api/traffic`, `/api/day-objects`, `/api/frames/near`,
   `/api/calibration/dark-preview`) use short shared caches. Guest limits: 50 satellite ids, 600 s trails, 24 h
   time ranges; invalid timestamps return 400.
-- `/api/storage` hides absolute server paths from non-admins.
 
 ## Response headers
 

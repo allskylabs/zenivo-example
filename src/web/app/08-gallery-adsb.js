@@ -680,12 +680,23 @@ async function loadFlights() {
 
 // Live page: radiosondes (weather balloons) near the station, refreshed every 20 s
 const sondesCard = document.getElementById("sondes-card");
+let sondesOff = false;
+let sondesLast = 0;
 function renderSondes(d) {
     const list = (d && d.sondes) || [];
+    if (d && d.enabled === false) {
+        sondesOff = true;
+        sondesCard.hidden = false;
+        document.getElementById("sondes-count").textContent = "off";
+        document.getElementById("sondes-status").textContent = "Weather balloons are turned off";
+        document.getElementById("sondes-list").innerHTML = "";
+        return;
+    }
+    sondesOff = false;
     if (!d || (!list.length && d.error)) { sondesCard.hidden = true; return; }
     sondesCard.hidden = false;
     document.getElementById("sondes-count").textContent = `${d.in_view || 0} in view · ${d.total || 0} heard`;
-    document.getElementById("sondes-status").textContent = "Live from SondeHub (within 300 km)";
+    document.getElementById("sondes-status").textContent = "Live from SondeHub (within 350 km)";
     const ul = document.getElementById("sondes-list");
     if (!list.length) { ul.innerHTML = `<li class="live-events-empty">No radiosonde flying nearby right now.</li>`; return; }
     ul.innerHTML = list.map((a) => {
@@ -709,7 +720,12 @@ async function loadSondes() {
 }
 if (currentPage === "tab-live" && sondesCard) {
     loadSondes();
-    setInterval(() => { if (!document.hidden) loadSondes(); }, 20000);
+    setInterval(() => {
+        // when switched off in Settings, look again only every 5 minutes
+        if (document.hidden || (sondesOff && Date.now() - sondesLast < 300000)) return;
+        sondesLast = Date.now();
+        loadSondes();
+    }, 20000);
 }
 
 if (currentPage === "tab-live" && flightsCard) {
@@ -750,19 +766,10 @@ async function loadEventConfig() {
 
 eventToggles.forEach((el) => {
     el.addEventListener("change", async () => {
-        try {
-            const res = await fetch("/api/events/config", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ [el.dataset.event]: el.checked }),
-            });
-            const data = await res.json();
-            if (!res.ok || !data.success) throw new Error(JSON.stringify(data.detail || "Unknown error"));
-            syncEventConfigUI(data);
-        } catch (err) {
-            showAlert(stationAlert, `❌ Failed to save event detection: ${err.message}`, "error", true);
-            loadEventConfig();
-        }
+        const ok = await settingsSave(el, async () => {
+            syncEventConfigUI(await sendJson("/api/events/config", { [el.dataset.event]: el.checked }));
+        });
+        if (!ok) loadEventConfig();
     });
 });
 if (currentPage === "tab-settings") loadEventConfig();
@@ -773,10 +780,12 @@ const adsbPort = document.getElementById("adsb-port");
 const adsbEnabled = document.getElementById("adsb-enabled");
 const adsbStatus = document.getElementById("adsb-status");
 
+const sondesEnabled = document.getElementById("sondes-enabled");
+
 function syncAdsbUI(d) {
     if (!d || !adsbHost) return;
-    adsbHost.value = d.host || "";
-    adsbPort.value = d.port || 30003;
+    if (document.activeElement !== adsbHost) adsbHost.value = d.host || "";
+    if (document.activeElement !== adsbPort) adsbPort.value = d.port || 30003;
     adsbEnabled.checked = !!d.enabled;
     const st = d.status;
     let txt = !d.enabled ? "Off." : !st ? "Starting…"
@@ -784,6 +793,8 @@ function syncAdsbUI(d) {
         : st.last_error ? `Not connected: ${st.last_error}` : "Idle (reads the feed only at night with aircraft detection on).";
     if (d.enabled && !d.pointing_solved) txt += " Needs a star-solved camera pointing (plate solve) to match flights.";
     adsbStatus.textContent = txt;
+    syncFr24UI(d);
+    if (sondesEnabled) sondesEnabled.checked = d.radiosondes_enabled !== 0 && d.radiosondes_enabled !== false;
 }
 
 async function loadAdsb() {
@@ -793,22 +804,148 @@ async function loadAdsb() {
     } catch (err) { /* optional feature */ }
 }
 
-const adsbSave = document.getElementById("btn-adsb-save");
-if (adsbSave) {
-    adsbSave.addEventListener("click", async () => {
-        try {
-            const res = await fetch("/api/adsb", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ host: adsbHost.value.trim(), port: Number(adsbPort.value) || 30003, enabled: adsbEnabled.checked }),
-            });
-            const data = await res.json();
-            if (!res.ok || !data.success) throw new Error(JSON.stringify(data.detail || "Unknown error"));
-            syncAdsbUI(data);
-            setTimeout(loadAdsb, 3000);
-        } catch (err) {
-            showAlert(stationAlert, `❌ Failed to save ADS-B settings: ${err.message}`, "error", true);
-        }
+// Local receiver: host, port and the switch save themselves (host may be empty = receiver off)
+if (adsbHost) {
+    autosave(adsbHost.closest("fieldset"), async () => {
+        syncAdsbUI(await sendJson("/api/adsb", { host: adsbHost.value.trim(), port: Number(adsbPort.value) || 30003, enabled: adsbEnabled.checked }));
+        setTimeout(loadAdsb, 3000);
     });
 }
 if (currentPage === "tab-settings") loadAdsb();
+
+// Settings → Flightradar24: switch, optional account (e-mail + password, or a subscription token). The token and the
+// password are write-only: the server only says whether a token is set. They are sent only when typed here.
+const fr24Enabled = document.getElementById("fr24-enabled");
+const fr24Email = document.getElementById("fr24-email");
+const fr24Password = document.getElementById("fr24-password");
+const fr24Token = document.getElementById("fr24-token");
+const fr24TokenState = document.getElementById("fr24-token-state");
+const fr24Clear = document.getElementById("btn-fr24-clear-token");
+const fr24Status = document.getElementById("fr24-status");
+
+function syncFr24UI(d) {
+    if (!fr24Enabled || !d) return;
+    fr24Enabled.checked = !!d.fr24_enabled;
+    if (document.activeElement !== fr24Email) fr24Email.value = d.fr24_email || "";
+    const has = !!d.fr24_has_token;
+    fr24TokenState.textContent = has ? "Token saved" : "";
+    fr24Clear.hidden = !has;
+    fr24Token.placeholder = has ? "Paste a new token to replace it" : "";
+    const f = d.fr24 || {};
+    let txt;
+    if (!d.fr24_enabled) txt = "Off.";
+    else {
+        txt = has || f.authenticated ? "Using your Flightradar24 account (subscription feed)." : "Using the public feed (no account).";
+        if (f.last_error) txt += ` Last error: ${f.last_error}`;
+        else if (f.last_fetch_age_s !== null && f.last_fetch_age_s !== undefined) txt += ` Last update ${Math.round(f.last_fetch_age_s)} s ago, ${f.global_total || 0} aircraft worldwide.`;
+    }
+    fr24Status.textContent = txt;
+}
+
+async function saveFr24(field) {
+    const body = { fr24_enabled: fr24Enabled.checked, fr24_email: fr24Email.value.trim() };
+    const pw = fr24Password.value;
+    const tk = fr24Token.value.trim();
+    if (pw && !body.fr24_email) throw new Error("enter the account e-mail with the password");
+    if (pw) body.fr24_password = pw;
+    if (tk) body.fr24_token = tk;
+    const data = await sendJson("/api/adsb", body);
+    fr24Password.value = "";
+    fr24Token.value = "";
+    syncAdsbUI(data);
+    if (data.fr24_login && !data.fr24_login.ok) throw new Error(`Flightradar24 sign-in failed: ${data.fr24_login.message}`);
+}
+
+if (fr24Enabled) {
+    autosave(fr24Enabled.closest("fieldset"), saveFr24);
+    fr24Clear.addEventListener("click", async () => {
+        await settingsSave(fr24Clear, async () => {
+            syncAdsbUI(await sendJson("/api/adsb", { fr24_token: "" }));
+        });
+    });
+}
+
+// Settings → Weather balloons (SondeHub): one switch, saved on change
+if (sondesEnabled) {
+    autosave(sondesEnabled.closest("fieldset"), async () => {
+        syncAdsbUI(await sendJson("/api/adsb", { radiosondes_enabled: sondesEnabled.checked }));
+    });
+}
+
+// Settings → Detection → daytime objects (birds, insects, aircraft)
+const dayObj = {
+    group: document.getElementById("dayobj-group"),
+    enabled: document.getElementById("dayobj-enabled"),
+    classes: document.querySelectorAll("[data-dayobj-class]"),
+    sens: document.getElementById("dayobj-sensitivity"),
+    days: document.getElementById("dayobj-days"),
+    mb: document.getElementById("dayobj-mb"),
+    minA: document.getElementById("dayobj-min-area"),
+    maxA: document.getElementById("dayobj-max-area"),
+    contrast: document.getElementById("dayobj-contrast"),
+    status: document.getElementById("dayobj-status"),
+};
+const DAYOBJ_NAMES = { plane: "aircraft", bird: "birds", insect: "insects", object: "other" };
+
+function syncDayObjUI(d) {
+    const c = d && d.config;
+    if (!c || !dayObj.group) return;
+    const set = (el, v) => { if (el && document.activeElement !== el) el.value = v; };
+    dayObj.enabled.checked = !!c.enabled;
+    dayObj.classes.forEach((el) => { el.checked = c.classes.includes(el.dataset.dayobjClass); });
+    dayObj.sens.value = c.sensitivity;
+    set(dayObj.days, c.retention_days);
+    set(dayObj.mb, c.max_mb);
+    set(dayObj.minA, c.min_blob_area);
+    set(dayObj.maxA, c.max_blob_area);
+    set(dayObj.contrast, c.min_contrast_dn === null ? "" : c.min_contrast_dn);
+    if (d.presets && d.presets[c.sensitivity]) dayObj.contrast.placeholder = `${d.presets[c.sensitivity].min_contrast_dn} (from sensitivity)`;
+}
+
+async function loadDayObjStatus() {
+    if (!dayObj.group) return;
+    try {
+        const res = await fetch("/api/day-objects/status");
+        if (!res.ok) return;
+        const st = await res.json();
+        syncDayObjUI(st);
+        const parts = [];
+        if (!st.config.enabled) parts.push("Off.");
+        else if (st.tracker && st.tracker.raining) parts.push("Rain on the dome: recording paused.");
+        const midnight = new Date();
+        midnight.setHours(0, 0, 0, 0);
+        const r = await fetch(`/api/day-objects?t0=${midnight.getTime() / 1000}&t1=${Date.now() / 1000}&limit=20000`);
+        if (r.ok) {
+            const counts = {};
+            ((await r.json()).tracks || []).forEach((t) => { counts[t.cls] = (counts[t.cls] || 0) + 1; });
+            const txt = Object.keys(DAYOBJ_NAMES).filter((k) => counts[k]).map((k) => `${counts[k]} ${DAYOBJ_NAMES[k]}`).join(", ");
+            parts.push(`Today: ${txt || "nothing recorded yet"}.`);
+        }
+        dayObj.status.textContent = ` ${parts.join(" ")}`;
+    } catch (err) { /* optional feature */ }
+}
+
+if (dayObj.group) {
+    autosave(dayObj.group, async () => {
+        const body = {
+            enabled: dayObj.enabled.checked,
+            classes: [...dayObj.classes].filter((el) => el.checked).map((el) => el.dataset.dayobjClass),
+            sensitivity: dayObj.sens.value,
+            retention_days: Number(dayObj.days.value),
+            max_mb: Number(dayObj.mb.value),
+            min_blob_area: Number(dayObj.minA.value),
+            max_blob_area: Number(dayObj.maxA.value),
+            min_contrast_dn: dayObj.contrast.value.trim() === "" ? null : Number(dayObj.contrast.value),
+        };
+        for (const k of ["retention_days", "max_mb", "min_blob_area", "max_blob_area"]) {
+            if (!Number.isFinite(body[k]) || body[k] <= 0) throw new Error("enter a number");
+        }
+        syncDayObjUI(await sendJson("/api/day-objects/config", body));
+        loadDayObjStatus();
+    });
+    if (currentPage === "tab-settings") {
+        loadDayObjStatus();
+        setInterval(loadDayObjStatus, 60000);
+    }
+}
+

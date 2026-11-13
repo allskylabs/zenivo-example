@@ -24,7 +24,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261028ev9">
-    <link rel="stylesheet" href="/style.css?v=20261031st1">
+    <link rel="stylesheet" href="/style.css?v=20261113set">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -35,7 +35,7 @@
             <svg class="brand-mark" width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><path class="bm-ring" d="M36.2 6.35A26 26 0 1 1 27.8 6.35" fill="none" stroke-width="6"/><path class="bm-tick" d="M32 4.6V9.6" fill="none" stroke-width="2.2" stroke-linecap="round"/><circle class="bm-inner" cx="32" cy="32" r="18.5" fill="none" stroke-width="3.5"/><polygon class="bm-star" points="38.00,23.80 38.85,25.84 41.04,26.01 39.37,27.44 39.88,29.59 38.00,28.44 36.12,29.59 36.63,27.44 34.96,26.01 37.15,25.84"/></svg>
             <h1 class="brand-name">Zenivo</h1>
             <!-- brand:end -->
-            <span class="sensor-subtitle" id="sensor-subtitle">IMX335 · Hanoi</span>
+            <span class="sensor-subtitle" id="sensor-subtitle">IMX335</span>
         </div>
 
         <div class="nav-metrics">
@@ -387,7 +387,6 @@
                         </div>
                         <div class="flights-status" id="sondes-status">Loading…</div>
                         <ul class="flights-list" id="sondes-list"></ul>
-                        <a class="live-events-more" href="https://hoan.uk/weather/radiosonde" target="_blank" rel="noopener">Radiosonde tracker →</a>
                     </div>
 
                     <!-- Aircraft heard by the ADS-B receiver -->
@@ -492,7 +491,9 @@
                 <a href="/settings#skymask" data-sub="skymask">Sky Mask</a>
                 <a href="/settings#integrations" data-sub="integrations">Integrations</a>
                 <a href="/settings#community" data-sub="community">Community</a>
+                <a href="/settings#admin" data-sub="admin">Admin</a>
             </nav>
+            <p class="settings-autosave-note text-muted">Changes are saved automatically.</p>
             <div class="card settings-card" id="settings-focus-card" data-sgroup="station">
                 <div class="card-header">
                     <h2>Focus</h2>
@@ -721,6 +722,62 @@
                         </p>
                         <button type="button" class="btn btn-sm btn-outline" id="btn-cloud-ref-reset">Reset learned clear-sky reference</button>
                     </fieldset>
+                    <fieldset class="settings-group field-wide" id="dayobj-group">
+                        <legend>Daytime objects (birds, insects, aircraft)</legend>
+                        <div class="field">
+                            <label class="checkbox-label"><input type="checkbox" id="dayobj-enabled" checked /> Detect daytime objects</label>
+                        </div>
+                        <div class="field">
+                            <span class="field-label">Record these kinds</span>
+                            <div class="dayobj-classes">
+                                <label class="checkbox-label"><input type="checkbox" data-dayobj-class="plane" checked /> Aircraft</label>
+                                <label class="checkbox-label"><input type="checkbox" data-dayobj-class="bird" checked /> Birds</label>
+                                <label class="checkbox-label"><input type="checkbox" data-dayobj-class="insect" checked /> Insects</label>
+                                <label class="checkbox-label"><input type="checkbox" data-dayobj-class="object" checked /> Other objects</label>
+                            </div>
+                        </div>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="dayobj-sensitivity">Sensitivity</label>
+                                <select id="dayobj-sensitivity">
+                                    <option value="low">Low (fewer, surer detections)</option>
+                                    <option value="normal" selected>Normal</option>
+                                    <option value="high">High (more, also fainter ones)</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="dayobj-days">Keep for (days)</label>
+                                <input type="number" id="dayobj-days" min="1" max="90" step="1" value="14" />
+                            </div>
+                            <div class="field">
+                                <label for="dayobj-mb">Max log size (MB)</label>
+                                <input type="number" id="dayobj-mb" min="5" max="500" step="5" value="50" />
+                            </div>
+                        </div>
+                        <details class="params-summary">
+                            <summary>Advanced</summary>
+                            <div class="field-grid">
+                                <div class="field">
+                                    <label for="dayobj-min-area">Smallest object (px)</label>
+                                    <input type="number" id="dayobj-min-area" min="1" max="100" step="1" value="2" />
+                                </div>
+                                <div class="field">
+                                    <label for="dayobj-max-area">Largest object (px)</label>
+                                    <input type="number" id="dayobj-max-area" min="5" max="5000" step="5" value="700" />
+                                </div>
+                                <div class="field">
+                                    <label for="dayobj-contrast">Minimum contrast (levels)</label>
+                                    <input type="number" id="dayobj-contrast" min="3" max="100" step="1" placeholder="from sensitivity" />
+                                </div>
+                            </div>
+                            <p class="field-note">Sizes are in pixels at 640 px frame width. Contrast is how far an object must differ from the sky behind it (0&ndash;255 levels); empty uses the value of the chosen sensitivity.</p>
+                        </details>
+                        <p class="field-note">
+                            By day a small dark or bright dot that moves against the sky is followed across frames and classified from its size, speed and wing-beat flicker.
+                            Rain on the dome pauses recording. The frame interval by day (Image Output) sets what can be caught: insects and fast birds need under a second.
+                            <span id="dayobj-status"></span>
+                        </p>
+                    </fieldset>
                 </div>
             </div>
 
@@ -733,14 +790,11 @@
                     </div>
                     <div class="page-header-actions">
                         <span class="badge badge-accent" id="station-solve-badge">NOT SOLVED YET</span>
-                        <button id="btn-station-reset" class="btn btn-outline" type="button">Reset</button>
-                        <button id="btn-station-save" class="btn btn-primary" type="button" disabled>Save changes</button>
                     </div>
                 </div>
                 <p class="description">
                     Plate-solving on a starry night measures the lens and mounting parameters and saves them automatically, as does
-                    <strong>Locate via GPS / IP</strong> for the coordinates. <strong>Save changes</strong> is enabled
-                    after you edit a field by hand; <strong>Reset</strong> reloads the saved values.
+                    <strong>Locate via GPS / IP</strong> for the coordinates. Fields you edit by hand are saved as soon as you leave them.
                 </p>
 
                 <div class="settings-grid">
@@ -750,15 +804,15 @@
                         <div class="field-grid">
                             <div class="field field-wide">
                                 <label for="station-name">Station name</label>
-                                <input type="text" id="station-name" value="Hanoi, Vietnam" />
+                                <input type="text" id="station-name" value="My station" />
                             </div>
                             <div class="field">
                                 <label for="station-lat">Latitude (°N)</label>
-                                <input type="number" id="station-lat" min="-90" max="90" step="0.00001" value="21.0285" />
+                                <input type="number" id="station-lat" min="-90" max="90" step="0.00001" value="0" />
                             </div>
                             <div class="field">
                                 <label for="station-lon">Longitude (°E)</label>
-                                <input type="number" id="station-lon" min="-180" max="180" step="0.00001" value="105.8542" />
+                                <input type="number" id="station-lon" min="-180" max="180" step="0.00001" value="0" />
                             </div>
                             <div class="field">
                                 <label for="station-elev">Elevation (m)</label>
@@ -862,7 +916,7 @@
                 <div class="settings-actions">
                     <button id="btn-station-solve" class="btn btn-outline" type="button">🔭 Capture &amp; Auto Plate-Solve</button>
                     <label class="checkbox-label" title="Ignore the saved lens: re-read the sensor and re-measure focal length, distortion and optical centre from a 90 s star-tracking series (clear night). The old values are kept if the solve fails.">
-                        <input type="checkbox" id="chk-station-deep"> Deep solve (re-measure lens &amp; sensor)
+                        <input type="checkbox" id="chk-station-deep" data-no-autosave> Deep solve (re-measure lens &amp; sensor)
                     </label>
                 </div>
 
@@ -889,7 +943,7 @@
                         <div class="telem-box"><span class="telem-label">Diagonal FOV</span><span class="telem-value text-accent" id="st-fov-diag">225.0&deg;</span></div>
                         <div class="telem-box"><span class="telem-label">Optical center</span><span class="telem-value" id="st-opt-center">(1296.0, 972.0) px</span></div>
                         <div class="telem-box"><span class="telem-label">Sensor center offset &amp; R90</span><span class="telem-value" id="st-center-offset">&Delta;(0.0, 0.0) px &bull; R90=894 px</span></div>
-                        <div class="telem-box"><span class="telem-label">Station coordinates</span><span class="telem-value" id="st-coords">21.0285&deg;N, 105.8542&deg;E (20m)</span></div>
+                        <div class="telem-box"><span class="telem-label">Station coordinates</span><span class="telem-value" id="st-coords">--</span></div>
                         <div class="telem-box"><span class="telem-label">Field center (RA / Dec J2000)</span><span class="telem-value text-accent" id="st-radec">--</span></div>
                         <div class="telem-box"><span class="telem-label">Azimuth &amp; Alt</span><span class="telem-value" id="st-az-alt">Az 180.0&deg; (S) &bull; Alt 90.0&deg;</span></div>
                         <div class="telem-box"><span class="telem-label">Zenith tilt</span><span class="telem-value text-accent" id="st-tilt">0.00&deg;</span></div>
@@ -915,7 +969,7 @@
                         <button id="mask-new-obs" class="btn btn-sm btn-outline" type="button">＋ Obstruction</button>
                         <button id="mask-undo" class="btn btn-sm btn-outline" type="button">↶ Undo point</button>
                         <button id="mask-clear" class="btn btn-sm btn-outline" type="button">🗑 Clear all</button>
-                        <button id="mask-save" class="btn btn-sm btn-primary" type="button">💾 Save mask</button>
+                        <button id="mask-save" class="btn btn-sm btn-primary" type="button">✔ Apply mask</button>
                     </div>
                     <div class="mask-canvas-wrap">
                         <img id="mask-img" alt="Live frame for drawing the sky mask">
@@ -962,7 +1016,6 @@
                             </div>
                             <div class="field">
                                 <label class="checkbox-label"><input type="checkbox" id="adsb-enabled" /> Name the flight</label>
-                                <button type="button" class="btn btn-sm btn-outline" id="btn-adsb-save">Save</button>
                             </div>
                         </div>
                         <p class="field-note">
@@ -970,6 +1023,45 @@
                             to the flight whose position, projected with the star-solved camera pointing, lies on the streak. A “meteor” that matches a flight becomes an aircraft.
                             The feed is only read at night while aircraft detection is on.
                             <span id="adsb-status"></span>
+                        </p>
+                    </fieldset>
+                    <fieldset class="settings-group fr24-block" data-admin>
+                        <legend>Flightradar24</legend>
+                        <div class="field">
+                            <label class="checkbox-label"><input type="checkbox" id="fr24-enabled" /> Use Flightradar24</label>
+                        </div>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="fr24-email">Account e-mail (optional)</label>
+                                <input type="email" id="fr24-email" maxlength="254" autocomplete="off" spellcheck="false" />
+                            </div>
+                            <div class="field">
+                                <label for="fr24-password">Account password (optional)</label>
+                                <input type="password" id="fr24-password" maxlength="254" autocomplete="off" placeholder="Not shown once sent" />
+                            </div>
+                            <div class="field field-wide">
+                                <label for="fr24-token">Subscription token (optional)</label>
+                                <div class="fr24-token-row">
+                                    <input type="password" id="fr24-token" maxlength="1024" autocomplete="off" spellcheck="false" />
+                                    <span class="text-muted" id="fr24-token-state"></span>
+                                    <button type="button" class="btn btn-sm btn-outline" id="btn-fr24-clear-token" hidden>Clear token</button>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="field-note" id="fr24-status" aria-live="polite"></p>
+                        <p class="field-note">
+                            Off by default. When on, this station asks flightradar24.com for the aircraft positions around it; without credentials the public feed is used.
+                            Credentials are stored on this station only (token and e-mail in data/station_config.json, the password in memory only, never shown again).
+                        </p>
+                    </fieldset>
+                    <fieldset class="settings-group sondes-block" data-admin>
+                        <legend>Weather balloons (SondeHub)</legend>
+                        <div class="field">
+                            <label class="checkbox-label"><input type="checkbox" id="sondes-enabled" checked /> Show radiosondes on the Live page</label>
+                        </div>
+                        <p class="field-note">
+                            When on, the station asks api.v2.sondehub.org for the weather balloons within 350 km, about every 20 s while a Live page is open.
+                            The position sent is rounded to 0.5° (about 55 km); the exact location never leaves this station.
                         </p>
                     </fieldset>
                 </div>
@@ -1016,9 +1108,6 @@
                             <textarea id="community-seeds" rows="3" maxlength="2000" spellcheck="false" placeholder="https://sky.example.org"></textarea>
                             <p class="field-note">Stations asked first in every round. The built-in ones are listed here and can be removed; with an empty list this station only talks to stations it already knows. <button type="button" class="btn btn-sm btn-outline" id="btn-community-seeds-default">Restore built-in</button></p>
                         </div>
-                        <div class="field">
-                            <button type="button" class="btn btn-sm btn-outline" id="btn-community-save">Save</button>
-                        </div>
                         <p class="field-note" id="community-status" aria-live="polite">Loading&hellip;</p>
                         <div class="cm-health" id="community-health" hidden>
                             <div class="cm-health-head">
@@ -1049,9 +1138,6 @@
                                 <option value="0.1" selected>About 10 km (0.1&deg;)</option>
                                 <option value="1">About 100 km (1&deg;)</option>
                             </select>
-                        </div>
-                        <div class="field">
-                            <button type="button" class="btn btn-sm btn-outline" id="btn-admin-precision-save">Save</button>
                         </div>
                     </fieldset>
                     <fieldset class="settings-group">
@@ -1383,7 +1469,7 @@
                             <option value="timelapse">Timelapse</option>
                             <option value="products">Keogram / Startrails</option>
                             <option value="storage">Storage</option>
-                            <option value="sync">Sync (hoan.uk)</option>
+                            <option value="sync">Sync</option>
                             <option value="calibration">Calibration</option>
                             <option value="station">Station</option>
                         </select>
@@ -1410,22 +1496,22 @@
     <!-- App JavaScript -->
     <script src="/static/sky_catalog.js"></script>
     <script src="/static/activity.js?v=20261028ev9"></script>
-    <script src="/static/focus.js?v=20261113opt"></script>
-    <script defer src="/static/app/01-core.js?v=20261113opt"></script>
-    <script defer src="/static/app/02-controls-calibration.js?v=20261113opt"></script>
-    <script defer src="/static/app/03-station-settings.js?v=20261113opt"></script>
-    <script defer src="/static/app/04-live-view.js?v=20261113opt"></script>
-    <script defer src="/static/app/05-sky-overlay.js?v=20261113opt"></script>
-    <script defer src="/static/app/06-telemetry.js?v=20261113opt"></script>
-    <script defer src="/static/app/07-cloud.js?v=20261113opt"></script>
-    <script defer src="/static/app/08-gallery-adsb.js?v=20261113opt"></script>
-    <script defer src="/static/app/09-community.js?v=20261113opt"></script>
-    <script defer src="/static/app/10-admin.js?v=20261113opt"></script>
+    <script src="/static/focus.js?v=20261113set"></script>
+    <script defer src="/static/app/01-core.js?v=20261113set"></script>
+    <script defer src="/static/app/02-controls-calibration.js?v=20261113set"></script>
+    <script defer src="/static/app/03-station-settings.js?v=20261113set"></script>
+    <script defer src="/static/app/04-live-view.js?v=20261113set"></script>
+    <script defer src="/static/app/05-sky-overlay.js?v=20261113set"></script>
+    <script defer src="/static/app/06-telemetry.js?v=20261113set"></script>
+    <script defer src="/static/app/07-cloud.js?v=20261113set"></script>
+    <script defer src="/static/app/08-gallery-adsb.js?v=20261113set"></script>
+    <script defer src="/static/app/09-community.js?v=20261113set"></script>
+    <script defer src="/static/app/10-admin.js?v=20261113set"></script>
     <script>
     // Settings sub-navigation: one section at a time, driven by the URL hash (/settings#detection)
     (function () {
         var sec = document.getElementById("tab-settings");
-        var subs = ["image", "detection", "station", "skymask", "integrations", "community"];
+        var subs = ["image", "detection", "station", "skymask", "integrations", "community", "admin"];
         function apply() {
             var h = (location.hash || "").replace("#", "");
             var sub = subs.indexOf(h) >= 0 ? h : "image";

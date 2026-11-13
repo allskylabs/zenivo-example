@@ -23,7 +23,7 @@ class TrafficMixin:
             from src.analytics.fr24 import Fr24Feed
             cfg = self.station_config.get("adsb") or {}
             self.fr24 = Fr24Feed(
-                enabled=bool(cfg.get("fr24_enabled", 1)),
+                enabled=bool(cfg.get("fr24_enabled", 0)),
                 email=str(cfg.get("fr24_email") or ""),
                 password=str(cfg.get("fr24_password") or ""),
                 token=str(cfg.get("fr24_token") or ""),
@@ -40,7 +40,8 @@ class TrafficMixin:
             "port": int(cfg.get("port") or self.ADSB_DEFAULT_PORT),
             "pointing_solved": bool(sol.get("success")),
             "status": self.adsb.status() if self.adsb is not None else None,
-            "fr24_enabled": int(bool(cfg.get("fr24_enabled", 1))),
+            "radiosondes_enabled": int(bool(self.station_config.get("radiosondes_enabled", 1))),
+            "fr24_enabled": int(bool(cfg.get("fr24_enabled", 0))),
             "fr24_email": str(cfg.get("fr24_email") or ""),
             "fr24_has_token": bool(fr.subscription_key),
             "fr24_authenticated": bool(fr.logged_in),
@@ -50,7 +51,10 @@ class TrafficMixin:
     def set_adsb_config(self, host: Optional[str] = None, port: Optional[int] = None,
                         enabled: Optional[bool] = None, fr24_enabled: Optional[bool] = None,
                         fr24_email: Optional[str] = None, fr24_password: Optional[str] = None,
-                        fr24_token: Optional[str] = None) -> Dict[str, Any]:
+                        fr24_token: Optional[str] = None,
+                        radiosondes_enabled: Optional[bool] = None) -> Dict[str, Any]:
+        if radiosondes_enabled is not None:
+            self.station_config["radiosondes_enabled"] = int(bool(radiosondes_enabled))
         cfg = dict(self.station_config.get("adsb") or {})
         if host is not None:
             host = host.strip()
@@ -71,13 +75,15 @@ class TrafficMixin:
             cfg["fr24_token"] = fr24_token.strip()
 
         fr = self._fr24()
-        fr.enabled = bool(cfg.get("fr24_enabled", 1))
+        fr.enabled = bool(cfg.get("fr24_enabled", 0))
         if fr24_token is not None:
             fr.token = cfg["fr24_token"]
             fr.subscription_key = cfg["fr24_token"]
             fr.logged_in = bool(cfg["fr24_token"])
             fr.account_tier = "enterprise" if cfg["fr24_token"] else "public"
             fr.last_error = None
+            if not cfg["fr24_token"]:
+                fr.password = ""  # "Clear token" also forgets the in-memory password
         fr24_login = None
         if fr24_email and fr24_password:
             try:
@@ -185,12 +191,17 @@ class TrafficMixin:
 
         if getattr(self, "_sonde_feed", None) is None:
             self._sonde_feed = RadiosondeFeed()
+        t_now = time.time()
+        if not int(self.station_config.get("radiosondes_enabled", 1)):
+            return {"t": t_now, "enabled": False, "sondes": [], "total": 0, "in_view": 0, "error": ""}
         station = self._overlay_station()
         sol = self._overlay_solution()
         obstructions = [np.array(p, np.float32) for p in ((self.station_config.get("sky_mask") or {}).get("obstruction") or [])]
-        t_now = time.time()
-        feed = self._sonde_feed.current(float(station["latitude_deg"]), float(station["longitude_deg"]), at=t_now)
-        later = {s["serial"]: s for s in self._sonde_feed.current(float(station["latitude_deg"]), float(station["longitude_deg"]), at=t_now + 1.0)["sondes"]}
+        # Only a 0.5-degree grid cell centre (about 55 km) is sent to SondeHub; the exact station stays local (sky_position below).
+        q_lat = round(float(station["latitude_deg"]) * 2) / 2
+        q_lon = round(float(station["longitude_deg"]) * 2) / 2
+        feed = self._sonde_feed.current(q_lat, q_lon, at=t_now)
+        later = {s["serial"]: s for s in self._sonde_feed.current(q_lat, q_lon, at=t_now + 1.0)["sondes"]}
         out = []
         for s in feed["sondes"]:
             pos = sky_position(station, s["lat"], s["lon"], s["alt"], sol)
@@ -209,7 +220,7 @@ class TrafficMixin:
                 "in_view": in_view, "above_horizon": pos["alt_deg"] > 0,
             })
         out.sort(key=lambda r: (not r["in_view"], not r["above_horizon"], r["distance_km"]))
-        return {"t": t_now, "sondes": out[:limit], "total": len(out), "in_view": sum(r["in_view"] for r in out),
+        return {"t": t_now, "enabled": True, "sondes": out[:limit], "total": len(out), "in_view": sum(r["in_view"] for r in out),
                 "error": feed["error"]}
 
     def get_aircraft_now(self, limit: int = 30, trail_s: float = 0.0,

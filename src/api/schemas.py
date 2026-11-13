@@ -3,7 +3,7 @@ Pydantic Request and Response Schemas for IMX335 Edge Web API.
 Adheres to PROJECT.md § Interface Contracts and AC3 verification specifications.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -97,6 +97,19 @@ class EventConfigRequest(BaseModel):
     flash: Optional[bool] = None
 
 
+class DayObjectsConfigRequest(BaseModel):
+    """Daytime object detection (birds, insects, aircraft). Omitted fields stay as they are; min_contrast_dn null goes
+    back to the sensitivity preset."""
+    enabled: Optional[bool] = None
+    classes: Optional[List[Literal["plane", "bird", "insect", "object"]]] = None
+    sensitivity: Optional[Literal["low", "normal", "high"]] = None
+    min_blob_area: Optional[int] = Field(default=None, ge=1, le=100, description="px at 640 px work width")
+    max_blob_area: Optional[int] = Field(default=None, ge=5, le=5000, description="px at 640 px work width")
+    min_contrast_dn: Optional[float] = Field(default=None, ge=3.0, le=100.0)
+    retention_days: Optional[int] = Field(default=None, ge=1, le=90)
+    max_mb: Optional[int] = Field(default=None, ge=5, le=500)
+
+
 class AdsbConfigRequest(BaseModel):
     """ADS-B receiver (SBS-1 / BaseStation feed, usually port 30003) + Flightradar24 Enterprise global feed settings."""
     host: Optional[str] = Field(default=None, max_length=253)
@@ -106,6 +119,7 @@ class AdsbConfigRequest(BaseModel):
     fr24_email: Optional[str] = Field(default=None, max_length=254)
     fr24_password: Optional[str] = Field(default=None, max_length=254)
     fr24_token: Optional[str] = Field(default=None, max_length=1024)
+    radiosondes_enabled: Optional[bool] = Field(default=None, description="Weather balloons (SondeHub) on the Live page")
 
 
 class CloudConfigRequest(BaseModel):

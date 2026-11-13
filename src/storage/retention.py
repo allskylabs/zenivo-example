@@ -3,7 +3,7 @@ Disk retention for the AllSky data directory.
 
 Rules, applied in order:
 1. Age: archived frame days older than `frames_keep_days`, dated keograms / startrails / timelapses
-   older than `products_keep_days`, and files in extra directories (e.g. hoan.uk's ingest archive)
+   older than `products_keep_days`, and files in extra directories (e.g. a remote sync server's ingest archive)
    older than their own `keep_days` are deleted. Stale `.latest_tmp_*` encoder leftovers go too.
 2. Size: while the data directory is larger than `max_data_gb`, or the filesystem has less than
    `min_free_gb` free, the oldest archived frame day is deleted, then the oldest dated product.

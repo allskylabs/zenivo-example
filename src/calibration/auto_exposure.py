@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import math
 from typing import Tuple, Dict, Any, Optional
 import numpy as np
+from src.defaults import DEFAULT_LAT, DEFAULT_LON
 
 
 class DayNightProfile:
@@ -103,8 +104,8 @@ class DayNightAutoExposure:
 
     def __init__(
         self,
-        latitude_deg: float = 21.0285,   # Default Hanoi Observatory
-        longitude_deg: float = 105.8542,
+        latitude_deg: float = DEFAULT_LAT,
+        longitude_deg: float = DEFAULT_LON,
         elevation_m: float = 20.0,
         initial_exposure_s: float = 2.0,
         initial_gain_db: float = 24.0,

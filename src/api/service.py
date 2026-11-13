@@ -48,6 +48,7 @@ from src.api.lens_mixin import LensMixin
 from src.api.plate_solve_mixin import PlateSolveMixin
 from src.community.manager import CommunityManager
 from src.auth.manager import AuthManager
+from src.defaults import DEFAULT_LAT, DEFAULT_LON
 
 
 
@@ -180,8 +181,8 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
 
         self.mode = "auto"  # Default to 'auto' (Day/Night auto-exposure & auto-gain)
         self.auto_exposure = DayNightAutoExposure(
-            latitude_deg=21.0285,  # Hanoi coordinates default
-            longitude_deg=105.8542,
+            latitude_deg=DEFAULT_LAT,
+            longitude_deg=DEFAULT_LON,
             initial_exposure_s=getattr(self.camera, "current_exposure_s", 0.5),
             initial_gain_db=getattr(self.camera, "current_gain_db", 12.0),
         )
@@ -235,8 +236,8 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
         self.station_config: Dict[str, Any] = self._load_station_config()
         wb = self.station_config.get("white_balance") or {}
         configure_white_balance(wb.get("mode", "auto"), wb.get("r_gain"), wb.get("b_gain"))
-        self.auto_exposure.lat = float(self.station_config.get("latitude_deg", 21.0285))
-        self.auto_exposure.lon = float(self.station_config.get("longitude_deg", 105.8542))
+        self.auto_exposure.lat = float(self.station_config.get("latitude_deg", DEFAULT_LAT))
+        self.auto_exposure.lon = float(self.station_config.get("longitude_deg", DEFAULT_LON))
         self.auto_exposure.elevation = float(self.station_config.get("elevation_m", 20.0))
         self._sync_camera_identity()
         self._update_raw10_bin()

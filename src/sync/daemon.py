@@ -1,7 +1,7 @@
 """
 Sync daemon for the IMX335 AllSky Camera System.
 Coordinates the persistent SQLite queue, exponential backoff retries,
-circuit breaker state machine, and HTTP dispatch to hoan.uk.
+circuit breaker state machine, and HTTP dispatch to the remote sync server.
 """
 
 import os

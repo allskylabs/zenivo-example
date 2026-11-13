@@ -14,34 +14,34 @@ def _frame(level):
 
 
 def test_gain_lock_brightens_with_exposure_only():
-    ae = DayNightAutoExposure(initial_exposure_s=1.0, initial_gain_db=12.0)
+    ae = DayNightAutoExposure(latitude_deg=21.0285, longitude_deg=105.8542, initial_exposure_s=1.0, initial_gain_db=12.0)
     ae.lock_gain_db = 20.0
     exp, gain, telem = ae.process_frame_feedback(_frame(5), NIGHT, live_camera=True)
     assert gain == 20.0 and exp > 1.0 and telem["lock"] == "gain"
 
 
 def test_exposure_lock_brightens_with_gain_only():
-    ae = DayNightAutoExposure(initial_exposure_s=1.0, initial_gain_db=12.0)
+    ae = DayNightAutoExposure(latitude_deg=21.0285, longitude_deg=105.8542, initial_exposure_s=1.0, initial_gain_db=12.0)
     ae.lock_exposure_s = 2.0
     exp, gain, telem = ae.process_frame_feedback(_frame(5), NIGHT, live_camera=True)
     assert exp == 2.0 and gain > 12.0 and telem["lock"] == "exposure"
 
 
 def test_exposure_lock_darkens_with_gain_only_in_daylight():
-    ae = DayNightAutoExposure(initial_exposure_s=0.01, initial_gain_db=20.0)
+    ae = DayNightAutoExposure(latitude_deg=21.0285, longitude_deg=105.8542, initial_exposure_s=0.01, initial_gain_db=20.0)
     ae.lock_exposure_s = 0.01
     exp, gain, _ = ae.process_frame_feedback(_frame(250), NOON, live_camera=True)
     assert exp == 0.01 and gain < 20.0
 
 
 def test_no_lock_reports_none():
-    ae = DayNightAutoExposure()
+    ae = DayNightAutoExposure(latitude_deg=21.0285, longitude_deg=105.8542, )
     _, _, telem = ae.process_frame_feedback(_frame(100), NIGHT, live_camera=True)
     assert telem["lock"] is None
 
 
 def test_gain_lock_lets_exposure_run_to_60s():
-    ae = DayNightAutoExposure(initial_exposure_s=15.0, initial_gain_db=8.0)
+    ae = DayNightAutoExposure(latitude_deg=21.0285, longitude_deg=105.8542, initial_exposure_s=15.0, initial_gain_db=8.0)
     ae.lock_gain_db = 8.0
     ae.hw_max_exposure_s = 90.0
     for _ in range(10):
@@ -50,7 +50,7 @@ def test_gain_lock_lets_exposure_run_to_60s():
 
 
 def test_gain_lock_respects_camera_max_exposure():
-    ae = DayNightAutoExposure(initial_exposure_s=15.0, initial_gain_db=8.0)
+    ae = DayNightAutoExposure(latitude_deg=21.0285, longitude_deg=105.8542, initial_exposure_s=15.0, initial_gain_db=8.0)
     ae.lock_gain_db = 8.0
     ae.hw_max_exposure_s = 30.0
     for _ in range(10):
@@ -59,7 +59,7 @@ def test_gain_lock_respects_camera_max_exposure():
 
 
 def test_unlocked_auto_also_runs_to_60s():
-    ae = DayNightAutoExposure(initial_exposure_s=15.0, initial_gain_db=48.0)
+    ae = DayNightAutoExposure(latitude_deg=21.0285, longitude_deg=105.8542, initial_exposure_s=15.0, initial_gain_db=48.0)
     ae.hw_max_exposure_s = 90.0
     for _ in range(10):
         exp, _, _ = ae.process_frame_feedback(_frame(5), NIGHT, live_camera=True)
@@ -76,7 +76,7 @@ def test_stamp_writes_corner_and_keeps_input():
 
 
 def test_target_brightness_steers_frame_mean():
-    ae = DayNightAutoExposure(initial_exposure_s=1.0, initial_gain_db=12.0)
+    ae = DayNightAutoExposure(latitude_deg=21.0285, longitude_deg=105.8542, initial_exposure_s=1.0, initial_gain_db=12.0)
     ae.target_brightness = 150.0
     exp, gain, telem = ae.process_frame_feedback(_frame(100), NIGHT, live_camera=True)
     assert exp * 10 ** (gain / 20) > 1.0 * 10 ** (12 / 20) and telem["target_luma"] == 150.0
@@ -86,14 +86,14 @@ def test_target_brightness_steers_frame_mean():
 
 
 def test_target_brightness_holds_inside_band():
-    ae = DayNightAutoExposure(initial_exposure_s=1.0, initial_gain_db=12.0)
+    ae = DayNightAutoExposure(latitude_deg=21.0285, longitude_deg=105.8542, initial_exposure_s=1.0, initial_gain_db=12.0)
     ae.target_brightness = 100.0
     exp, gain, _ = ae.process_frame_feedback(_frame(103), NIGHT, live_camera=True)
     assert (exp, gain) == (1.0, 12.0)
 
 
 def test_night_whiteout_reduces_long_exposure_before_draining_gain():
-    ae = DayNightAutoExposure(initial_exposure_s=9.5, initial_gain_db=22.0)
+    ae = DayNightAutoExposure(latitude_deg=21.0285, longitude_deg=105.8542, initial_exposure_s=9.5, initial_gain_db=22.0)
     exp, gain, _ = ae.process_frame_feedback(_frame(245), NIGHT, live_camera=True)
     assert exp < 5.0
     assert gain == 22.0

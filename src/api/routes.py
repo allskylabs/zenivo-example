@@ -25,6 +25,7 @@ from src.api.schemas import (
     PerformanceSettingsRequest,
     AdsbConfigRequest,
     EventConfigRequest,
+    DayObjectsConfigRequest,
     StarBoostRequest,
     WhiteBalanceRequest,
     StoragePolicyRequest,
@@ -690,6 +691,9 @@ def get_meteor_events(
     """
     List detected sky events (meteors, aircraft, satellites, cloud changes, flashes), newest first.
     """
+    if limit > 100 and not brief:
+        # Full event records are capped at 100; only the compact timeline form may ask for more
+        raise HTTPException(status_code=422, detail="limit must be at most 100 unless brief=true")
     return service.get_events(limit=limit, event_type=type, since=since, until=until, brief=brief)
 
 
@@ -742,7 +746,7 @@ def get_adsb_config(request: Request, service: AllSkyService = Depends(get_servi
     from src.auth.middleware import is_admin
     cfg = service.get_adsb_config()
     if not is_admin(request):
-        cfg = dict(cfg, host="", fr24_email="")
+        cfg = dict(cfg, host="", fr24_email="", fr24=dict(cfg.get("fr24") or {}, email=""))
     return cfg
 
 
@@ -808,7 +812,21 @@ def get_day_objects(t0: float = Query(description="start, epoch seconds"),
 def get_day_objects_status(service: AllSkyService = Depends(get_service)):
     """Stored day-object tracks and the live tracker state (rain detected from drops on the dome, etc.)."""
     tracker = getattr(service, "day_objects", None)
-    return {"log": service.day_object_log().status(), "tracker": tracker.status() if tracker is not None else None}
+    return {"log": service.day_object_log().status(), "tracker": tracker.status() if tracker is not None else None,
+            **service.get_day_objects_config()}
+
+
+@router.get("/api/day-objects/config")
+def get_day_objects_config(service: AllSkyService = Depends(get_service)):
+    """Daytime object detection settings (classes recorded, sensitivity, blob size, contrast, retention) and the presets."""
+    return service.get_day_objects_config()
+
+
+@router.post("/api/day-objects/config")
+def set_day_objects_config(req: DayObjectsConfigRequest, service: AllSkyService = Depends(get_service)):
+    """Change the daytime object detection settings (persisted, applied live). Admin only like every write."""
+    fields = {k: v for k, v in req.model_dump(exclude_unset=True).items() if v is not None or k == "min_contrast_dn"}
+    return service.set_day_objects_config(**fields)
 
 
 @router.get("/api/radiosondes")

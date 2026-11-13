@@ -13,7 +13,7 @@ and dark calibration. It builds the observing products (keogram, startrails, tim
 estimates cloud cover, detects sky events, assists focusing, plate-solves the camera pointing,
 serves a web UI and optionally pushes frames and telemetry to a configured ingestion server (off by default).
 
-This document covers the edge station only. The hoan.uk server is a separate project. It provides
+This document covers the edge station only. The remote sync server is a separate project. It provides
 the `/api/allsky/ingest/*` endpoints and the plate solver.
 
 **Names.** The product is Zenivo (see [BRAND.md](BRAND.md)). Internal identifiers keep the original
@@ -54,7 +54,7 @@ and [API.md](API.md).
             │ src/storage       AVIF frame codec, retention                           │
             │ src/api           FastAPI routes, WS/MJPEG/SSE streams, page shell       │
             │ src/web           UI (index.html + app/01..08-*.js, focus.js, ...)     │
-            │ _sync_worker ───► SyncClient ──► hoan.uk /api/allsky/ingest/*            │
+            │ _sync_worker ───► SyncClient ──► sync server /api/allsky/ingest/*            │
             └───────────────────────────────────────────────────────────────────────────┘
  browser ◄── nginx :80 ◄── cloudflared (station.example.org)      data/ (frames, products, logs, config)
 ```
@@ -210,7 +210,7 @@ cloud events.
 - **Plate solving:** about 6 long exposures over 90 s or more.
   - The local `bright_star_solver` keeps only points that drift at the sidereal rate, then
     matches them against the catalog and the planets (TRIAD + Kabsch).
-  - If that fails, the frames go to the hoan.uk blind solver.
+  - If that fails, the frames go to the remote blind solver.
   - A failed solve never overwrites the optics. A sky/obstruction polygon mask limits where stars
     are searched.
 
@@ -250,7 +250,7 @@ preferences in `localStorage` under the key `allsky.ui.prefs.v1`. The Red Vision
 | Station | `GET /api/station/config`, `POST /api/station/{location,settings,auto-locate,plate-solve/start}`, `GET /api/station/plate-solve/status`, `GET/POST /api/station/sky-mask` |
 | Focus | `/api/focus`, `/api/focus/{start,stop,finish,config,auto-roi,frame,lens,lens/autofocus,...}` |
 | Products | `GET /api/gallery`, `POST /api/timelapse/generate`, `POST /api/timelapse/build`, `GET /api/events`, `GET/POST /api/events/config`, `/api/frames/*`, `/uploads/...` |
-| Traffic | `GET /api/adsb/aircraft`, `/api/satellites`, `/api/radiosondes`, `/api/traffic`, `/api/day-objects`, `GET/POST /api/adsb` |
+| Traffic | `GET /api/adsb/aircraft`, `/api/satellites`, `/api/radiosondes`, `/api/traffic`, `/api/day-objects`, `GET/POST /api/adsb`, `GET/POST /api/day-objects/config` |
 | Meta, OBS | `GET /api/version`, `GET/POST /api/obs/overlay`, `POST /api/obs/reload` |
 
 The full list is in [API.md](API.md).
@@ -259,7 +259,7 @@ The full list is in [API.md](API.md).
 Access control is a single-admin login (docs/SECURITY.md): default deny for every change, guests may watch. Bind to 127.0.0.1 behind nginx
 and cloudflared (or a trusted network).
 
-### 6.4 Sync to hoan.uk
+### 6.4 Sync to a remote server
 
 `_sync_worker` runs every `--sync-interval` (60 s). Each round it captures a frame, downscales it
 to `--sync-max-width` (1600 px, JPEG q82) and sends:
@@ -275,7 +275,7 @@ and `SyncDaemon` (circuit breaker) exist and are tested, but are not used in pro
 
 ## 7. Data and configuration
 
-Everything is under `data/` (git-ignored). Dates are local `YYYY-MM-DD`.
+Everything is under `data/` (git-ignored). Dates are local `YYYY-MM-DD`. Files that hold secrets or the station position (`admin*.json`, `admin_setup_code.txt`, `community_key.pem`, `station_config.json`) and their modes are listed in [TRANSPARENCY.md](TRANSPARENCY.md#6-files-stored-on-the-host).
 
 ```
 data/
@@ -317,7 +317,9 @@ data/
 | `performance` | `min_capture_interval_s` 2, `analysis_max_width` 960, `sky_analysis_enabled` 1, `analysis_interval_s` 300, `stream_max_width` 960, `stream_jpeg_quality` 75 |
 | `storage` | Retention policy |
 | `focus_record`, `focus_history`, `lens_focus` | Focus results, history and lens state |
-| `adsb`, `traffic_log`, `day_objects`, `obs_overlay`, `google_maps_key` | ADS-B/Flightradar24 settings, log retention, OBS overlay, map key |
+| `adsb`, `radiosondes_enabled`, `traffic_log`, `day_objects`, `obs_overlay`, `google_maps_key` | ADS-B/Flightradar24 settings (token and password write-only), SondeHub switch, log retention and daytime-object settings, OBS overlay, map key |
+
+Settings save model: every Settings card autosaves on change (`autosave` and `settingsSave` in `src/web/app/01-core.js`, with a status chip in the card header); buttons are only for actions.
 
 All keys and defaults are listed in [CONFIGURATION.md](CONFIGURATION.md#station-configuration-file).
 

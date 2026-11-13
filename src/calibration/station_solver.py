@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
+from src.defaults import DEFAULT_STATION_NAME, DEFAULT_LAT, DEFAULT_LON, DEFAULT_ELEVATION_M
 
 
 IMX335_SPEC = {
@@ -121,10 +122,10 @@ def auto_detect_ip_location() -> Dict[str, Any]:
 
     return {
         "success": True,
-        "latitude_deg": 21.0285,
-        "longitude_deg": 105.8542,
-        "elevation_m": 20.0,
-        "location_name": "Hanoi, Vietnam (Default)",
+        "latitude_deg": DEFAULT_LAT,
+        "longitude_deg": DEFAULT_LON,
+        "elevation_m": DEFAULT_ELEVATION_M,
+        "location_name": DEFAULT_STATION_NAME + " (Default)",
         "geo_source": "default_fallback",
     }
 

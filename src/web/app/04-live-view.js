@@ -34,23 +34,14 @@ async function loadWhiteBalance() {
     }
 }
 
-async function saveWhiteBalance(payload) {
-    try {
-        const res = await fetch("/api/camera/white-balance", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        if (!res.ok || !data.success) throw new Error(JSON.stringify(data.detail || "Unknown error"));
-        syncWhiteBalanceUI(data);
-    } catch (err) {
-        showAlert(stationAlert, `❌ White balance error: ${err.message}`, "error", true);
-        loadWhiteBalance();
-    }
+async function saveWhiteBalance(payload, field) {
+    const ok = await settingsSave(field || wbModeSelect, async () => {
+        syncWhiteBalanceUI(await sendJson("/api/camera/white-balance", payload));
+    }, { field });
+    if (!ok) loadWhiteBalance();
 }
 
-if (wbModeSelect) wbModeSelect.addEventListener("change", () => saveWhiteBalance({ mode: wbModeSelect.value }));
+if (wbModeSelect) wbModeSelect.addEventListener("change", () => saveWhiteBalance({ mode: wbModeSelect.value }, wbModeSelect));
 [wbRInput, wbBInput].forEach((inp) => {
     if (!inp) return;
     inp.addEventListener("change", () => {
@@ -61,7 +52,7 @@ if (wbModeSelect) wbModeSelect.addEventListener("change", () => saveWhiteBalance
             mode: "manual",
             r_gain: Math.min(4, Math.max(0.4, r)),
             b_gain: Math.min(4, Math.max(0.4, b)),
-        });
+        }, inp);
     });
 });
 
@@ -96,15 +87,15 @@ async function loadStationConfig() {
 }
 
 function readManualStationPayload(sourceLabel, autoPlateSolve = false) {
-    const lat = parseFloat(stationLatInput ? stationLatInput.value : "21.0285");
-    const lon = parseFloat(stationLonInput ? stationLonInput.value : "105.8542");
+    const lat = parseFloat(stationLatInput ? stationLatInput.value : "0");
+    const lon = parseFloat(stationLonInput ? stationLonInput.value : "0");
     const elev = parseFloat(stationElevInput ? stationElevInput.value : "20");
-    const name = stationNameInput ? stationNameInput.value.trim() : "Hanoi, Vietnam";
+    const name = stationNameInput ? stationNameInput.value.trim() : "My station";
     return {
-        latitude_deg: isNaN(lat) ? 21.0285 : lat,
-        longitude_deg: isNaN(lon) ? 105.8542 : lon,
+        latitude_deg: isNaN(lat) ? 0 : lat,
+        longitude_deg: isNaN(lon) ? 0 : lon,
         elevation_m: isNaN(elev) ? 20.0 : elev,
-        location_name: name || "Hanoi, Vietnam",
+        location_name: name || "My station",
         geo_source: sourceLabel,
         auto_plate_solve: autoPlateSolve,
         fov_hint: "auto",
@@ -202,39 +193,20 @@ if (btnStationAutoGps) {
     });
 }
 
-// Button 2: Save Coordinates & Manual Optical/Orientation Settings ("fix, settings" on UI)
-if (btnStationSave) {
-    btnStationSave.addEventListener("click", async () => {
+// Station & Optics: every hand edit saves itself when the field is left (coordinates, name, lens, orientation, solver URL)
+const stationCard = document.getElementById("station-name") ? document.getElementById("station-name").closest(".card") : null;
+if (stationCard) {
+    autosave(stationCard, async (el) => {
+        if (el.type === "number" && el.value.trim() === "") throw new Error("enter a number");
         const payload = readManualStationPayload("manual_ui", false);
-        if (payload.latitude_deg < -90 || payload.latitude_deg > 90 || payload.longitude_deg < -180 || payload.longitude_deg > 180) {
-            showAlert(stationAlert, "❌ Latitude must be within [-90, 90] and longitude within [-180, 180].", "error", true);
-            return;
-        }
-        btnStationSave.disabled = true;
-        try {
-            const res = await fetch("/api/station/settings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            });
-            const data = await res.json();
-            const st = data.station_config || data.station;
-            if (res.ok && st) {
-                setStationFormDirty(false);
-                updateStationUI(st);
-                showAlert(stationAlert, `✅ ${data.message || "Configuration and manual adjustments saved!"}`, "success", true);
-            } else {
-                showAlert(stationAlert, `❌ Failed to save configuration: ${data.detail || "Unknown error"}`, "error", true);
-            }
-        } catch (err) {
-            showAlert(stationAlert, `❌ Network error: ${err.message}`, "error", true);
-        } finally {
-            btnStationSave.disabled = !stationFormDirty;
-        }
-    });
+        const data = await sendJson("/api/station/settings", payload);
+        const st = data.station_config || data.station;
+        setStationFormDirty(false);
+        if (st) updateStationUI(st);
+    }, { selector: ".settings-grid input" });
 }
 
-// Button 3: Capture & Plate-Solve via https://hoan.uk/astronomy/plate-solving (Only when user clicks!)
+// Button 3: Capture & Plate-Solve via the remote plate solver (Only when user clicks!)
 // mode "deep" skips the known lens: re-reads the sensor and re-measures focal length, distortion, centre
 const runStationSolve = async (btn, mode) => {
         const idleLabel = btn.textContent;
@@ -444,9 +416,9 @@ if (maskEditor) {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
-            showAlert(maskAlert, `✅ Sky mask saved: ${data.sky.length} sky, ${data.obstruction.length} obstruction polygon(s)`, "success");
+            showAlert(maskAlert, `✅ Sky mask applied: ${data.sky.length} sky, ${data.obstruction.length} obstruction polygon(s)`, "success");
         } catch (err) {
-            showAlert(maskAlert, `❌ Could not save the sky mask: ${err.message}`, "error", true);
+            showAlert(maskAlert, `❌ Could not apply the sky mask: ${err.message}`, "error", true);
         }
     });
 }

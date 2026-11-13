@@ -1000,6 +1000,7 @@ input[type="range"] {
 .field input[type="number"],
 .field input[type="text"],
 .field input[type="url"],
+.field input[type="email"],
 .field input[type="password"],
 .field textarea {
     width: 100%;
@@ -1014,8 +1015,11 @@ input[type="range"] {
 
 .field input[type="text"],
 .field input[type="url"],
+.field input[type="email"],
 .field input[type="password"],
 .field textarea { font-family: var(--font-sans); }
+.field .field-label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.25rem; }
+.fr24-token-row input { flex: 1 1 14rem; width: auto; }
 .field[hidden] { display: none; }
 .field textarea { resize: vertical; min-height: 4.5rem; }
 
@@ -2104,7 +2108,8 @@ body.no-scroll { overflow: hidden; }
 #tab-settings[data-sub="station"] [data-sgroup]:not([data-sgroup~="station"]),
 #tab-settings[data-sub="skymask"] [data-sgroup]:not([data-sgroup~="skymask"]),
 #tab-settings[data-sub="integrations"] [data-sgroup]:not([data-sgroup~="integrations"]),
-#tab-settings[data-sub="community"] [data-sgroup]:not([data-sgroup~="community"]) { display: none; }
+#tab-settings[data-sub="community"] [data-sgroup]:not([data-sgroup~="community"]),
+#tab-settings[data-sub="admin"] [data-sgroup]:not([data-sgroup~="admin"]) { display: none; }
 #tab-settings > .card { margin-bottom: var(--space-4, 16px); }
 
 /* Live: big viewport + right rail */
@@ -2455,3 +2460,14 @@ details.registers-box[open] > summary { margin-bottom: 0.3rem; }
 .cm-target-url { color: var(--text-primary); font-family: var(--font-mono); font-size: 0.8rem; overflow-wrap: anywhere; }
 .cm-target-role { margin-left: 0.5rem; font-family: var(--font-sans); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }
 .cm-target-info { margin-top: 0.15rem; overflow-wrap: anywhere; }
+
+/* Settings autosave: status chip in each card header, and the line above the cards */
+.settings-autosave-note { margin: 0 0 0.75rem; font-size: 0.8rem; }
+.save-chip { margin-left: auto; margin-right: 0.75rem; font-size: 0.78rem; font-weight: 600; padding: 0.15rem 0.55rem; border-radius: 999px; border: 1px solid var(--border-color); color: var(--text-secondary); max-width: 26rem; overflow-wrap: anywhere; }
+.page-header-actions .save-chip { margin: 0; }
+.save-chip[data-state="saving"] { color: var(--text-muted); }
+.save-chip[data-state="saved"] { color: var(--success); border-color: var(--success); }
+.save-chip[data-state="error"] { color: var(--danger); border-color: var(--danger); }
+.fr24-block .field-note + .field-note { margin-top: 0.4rem; }
+.fr24-token-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.dayobj-classes { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; }

@@ -6,6 +6,11 @@ it is off nothing is sent, no key is created and no background thread runs.
 
 Turn it on in Settings, Community.
 
+What a seed station (and any other station) receives, what it can and cannot do, and how to remove the built-in
+seeds are spelled out in [TRANSPARENCY.md](TRANSPARENCY.md#3-the-built-in-community-seeds). The full list of
+card fields is in [section 4](TRANSPARENCY.md#4-what-is-shared-when-community-sharing-is-on) there. This page
+describes how the network works.
+
 ## What is shared
 
 A card is one JSON object of at most 16 KB:
@@ -14,7 +19,7 @@ A card is one JSON object of at most 16 KB:
 |-------|---------|
 | `id`, `pubkey` | Station id (first 16 bytes of the SHA-256 of the public key, hex) and the Ed25519 public key |
 | `name` | Station name (60 characters at most; defaults to the station location name) |
-| `lat`, `lon` | Location rounded to a grid: about 1 km (0.01 deg), about 10 km (0.1 deg, default) or about 100 km (1 deg). Your exact position is never sent |
+| `lat`, `lon` | Location rounded to a grid: about 1 km (0.01 deg), about 10 km (0.1 deg, default) or about 100 km (1 deg). Setting the precision to `0` sends the exact position, so leave it on a grid value unless you want that |
 | `url` | Public https address of the station, or null |
 | `camera`, `software` | Sensor name and `Zenivo <version>` |
 | `updated` | Unix time the card was signed |
@@ -42,9 +47,12 @@ are dropped and at most 500 are kept (when full, ids that never refreshed their 
 
 ## Seeds
 
-Seeds are the first stations a new station asks. Add your own, one URL per line, in Settings, Community. Seed
-URLs you type may use `http` and private addresses so you can test on a LAN; URLs learned from other stations
-never can.
+Seeds are the first stations a new station asks. The built-in ones are `https://sky.hoan.uk` and
+`https://allsky.hoan.uk` (stations run by the project author, `DEFAULT_SEEDS` in `src/community/__init__.py`).
+They are never contacted while Community is off. To remove them, delete their lines in Settings, Community,
+"Seed stations" and press Save ("Restore built-in" puts them back). Add your own, one URL per line. Seed
+URLs you type may use `http` and private addresses so you can test on a LAN; the built-in seeds and URLs
+learned from other stations never can.
 
 ## Limits
 

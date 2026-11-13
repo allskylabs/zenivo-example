@@ -583,21 +583,10 @@ function syncCloudConfigUI(cfg) {
     }
 }
 
-async function postCloudConfig(body) {
-    try {
-        const res = await fetch("/api/sky/clouds/config", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-        });
-        const data = await res.json();
-        if (!res.ok || !data.success) throw new Error(JSON.stringify(data.detail || "Unknown error"));
-        syncCloudConfigUI(data);
-        return true;
-    } catch (err) {
-        showAlert(stationAlert, `❌ Failed to save cloud settings: ${err.message}`, "error", true);
-        return false;
-    }
+async function postCloudConfig(body, field) {
+    return settingsSave(field || roiInputs[0], async () => {
+        syncCloudConfigUI(await sendJson("/api/sky/clouds/config", body));
+    }, { field });
 }
 
 if (roiInputs.length && currentPage === "tab-settings") {
@@ -609,7 +598,8 @@ if (roiInputs.length && currentPage === "tab-settings") {
         inp.addEventListener("change", () => {
             const roi = [0, 0, 1, 1];
             roiInputs.forEach((el) => (roi[Number(el.dataset.roi)] = Number(el.value) / 100));
-            if (roi.every(Number.isFinite)) postCloudConfig({ sky_roi: roi });
+            if (!roi.every(Number.isFinite) || roiInputs.some((el) => el.value.trim() === "")) return settingsSave(inp, async () => { throw new Error("enter a number"); });
+            postCloudConfig({ sky_roi: roi }, inp);
         })
     );
     if (btnCloudRefReset) {

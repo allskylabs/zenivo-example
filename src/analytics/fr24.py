@@ -20,6 +20,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from src.defaults import DEFAULT_LAT, DEFAULT_LON
 from src.net import https_handler, pooled_get
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
@@ -351,8 +352,8 @@ class Fr24Feed:
             with self._lock:
                 self._refreshing.discard(q_bounds)
 
-    def current(self, bounds: Optional[str] = None, station_lat: float = 21.0538,
-                station_lon: float = 105.9095, trail_s: float = 0.0) -> Tuple[List[Dict[str, Any]], int]:
+    def current(self, bounds: Optional[str] = None, station_lat: float = DEFAULT_LAT,
+                station_lon: float = DEFAULT_LON, trail_s: float = 0.0) -> Tuple[List[Dict[str, Any]], int]:
         """Return live FR24 aircraft for `bounds` ('north,south,west,east' or 'global') plus global_total."""
         if not self.enabled:
             return [], 0
@@ -407,7 +408,7 @@ class Fr24Feed:
             return [], self.global_total
 
     def _update_trails_locked(self, flights: List[Dict[str, Any]], now: float,
-                              station_lat: float = 21.0538, station_lon: float = 105.9095,
+                              station_lat: float = DEFAULT_LAT, station_lon: float = DEFAULT_LON,
                               is_global: bool = False) -> None:
         for f in flights:
             if is_global and (abs(f["lat"] - station_lat) > 10.0 or abs(f["lon"] - station_lon) > 12.0):
@@ -425,8 +426,8 @@ class Fr24Feed:
                 q.popleft()
 
     def _attach_trails(self, flights: List[Dict[str, Any]], trail_s: float, now: float,
-                       is_global: bool = False, station_lat: float = 21.0538,
-                       station_lon: float = 105.9095) -> List[Dict[str, Any]]:
+                       is_global: bool = False, station_lat: float = DEFAULT_LAT,
+                       station_lon: float = DEFAULT_LON) -> List[Dict[str, Any]]:
         if trail_s <= 0:
             return flights
         out: List[Dict[str, Any]] = []

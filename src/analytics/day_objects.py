@@ -28,10 +28,68 @@ import numpy as np
 from src.pipeline.star_boost import sky_polygon_mask
 
 
+CLASSES = ("plane", "bird", "insect", "object")
+# Sensitivity presets over the detection thresholds; "normal" is exactly the class constants below.
+SENSITIVITY: Dict[str, Dict[str, float]] = {
+    "low": {"min_contrast_dn": 26.0, "noise_sigmas": 5.0, "min_points": 5, "min_net_px": 20.0},
+    "normal": {"min_contrast_dn": 18.0, "noise_sigmas": 4.0, "min_points": 4, "min_net_px": 15.0},
+    "high": {"min_contrast_dn": 12.0, "noise_sigmas": 3.2, "min_points": 3, "min_net_px": 10.0},
+}
+CONFIG_DEFAULTS: Dict[str, Any] = {
+    "enabled": 1, "classes": list(CLASSES), "sensitivity": "normal", "min_blob_area": 2, "max_blob_area": 700,
+    "min_contrast_dn": None,  # None = from the sensitivity preset
+    "retention_days": 14, "max_mb": 50,
+}
+
+
+def _num(raw: Any, default: float, lo: float, hi: float) -> float:
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return default
+    return min(hi, max(lo, v)) if v == v else default
+
+
+def normalize_config(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Validate and clamp a stored/posted day-object config; missing or bad values fall back to the defaults."""
+    raw = raw or {}
+    d = CONFIG_DEFAULTS
+    cls = raw.get("classes", d["classes"])
+    classes = [c for c in CLASSES if isinstance(cls, (list, tuple)) and c in cls]
+    sens = raw.get("sensitivity")
+    lo = int(_num(raw.get("min_blob_area"), d["min_blob_area"], 1, 100))
+    hi = int(_num(raw.get("max_blob_area"), d["max_blob_area"], 5, 5000))
+    contrast = raw.get("min_contrast_dn")
+    return {
+        "enabled": int(bool(raw.get("enabled", d["enabled"]))),
+        "classes": classes,
+        "sensitivity": sens if sens in SENSITIVITY else d["sensitivity"],
+        "min_blob_area": lo,
+        "max_blob_area": max(hi, lo + 1),
+        "min_contrast_dn": None if contrast in (None, "") else round(_num(contrast, 18.0, 3.0, 100.0), 1),
+        "retention_days": int(_num(raw.get("retention_days"), d["retention_days"], 1, 90)),
+        "max_mb": int(_num(raw.get("max_mb"), d["max_mb"], 5, 500)),
+    }
+
+
+def keep_classes(tracks: List[Dict[str, Any]], classes) -> List[Dict[str, Any]]:
+    """The tracks whose class the owner wants recorded."""
+    return [t for t in tracks if t.get("cls") in classes]
+
+
 class DayObjectTracker:
-    def __init__(self, work_width: int = 640):
+    def __init__(self, work_width: int = 640, config: Optional[Dict[str, Any]] = None):
         self.work_width = int(work_width)
         self.reset()
+        self.configure(config)
+
+    def configure(self, config: Optional[Dict[str, Any]]) -> None:
+        """Apply the owner's settings live: instance attributes shadow the class constants (defaults = Normal)."""
+        cfg = normalize_config(config)
+        p = SENSITIVITY[cfg["sensitivity"]]
+        self.MIN_BLOB_AREA, self.MAX_BLOB_AREA = cfg["min_blob_area"], cfg["max_blob_area"]
+        self.MIN_CONTRAST_DN = cfg["min_contrast_dn"] if cfg["min_contrast_dn"] is not None else p["min_contrast_dn"]
+        self.NOISE_SIGMAS, self.MIN_POINTS, self.MIN_NET_PX = p["noise_sigmas"], int(p["min_points"]), p["min_net_px"]
 
     # tuning ---------------------------------------------------------
     MIN_BLOB_AREA = 2            # px at work size

@@ -1,7 +1,7 @@
 """
 Sync package for IMX335 AllSky Camera System.
 Provides persistent SQLite WAL queuing, multipart HTTP transport,
-and resilient background synchronization to hoan.uk.
+and resilient background synchronization to a remote sync server.
 """
 
 from src.sync.queue import SyncQueue

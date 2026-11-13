@@ -18,7 +18,7 @@ Contents: [Requirements](#requirements) | [Install with install.sh](#install-wit
 | Disk | 8 GB free for the default retention policy (`max_data_gb` 8, `min_free_gb` 3) |
 | Packages | `python3-venv`, `python3-pip`, `git` or `rsync`, `ffmpeg` (timelapse), `curl` |
 | Pi CSI camera | `python3-picamera2` (apt) |
-| Network | Outbound HTTPS for satellite TLEs, aircraft data and the optional sync target and remote plate solver (both off by default) |
+| Network | Outbound HTTPS for satellite orbits (CelesTrak), weather balloons (SondeHub), airports and aircraft data, plus the optional sync target, remote plate solver, Flightradar24 and community sharing (all off by default). Every destination is listed in [TRANSPARENCY.md](TRANSPARENCY.md#1-outbound-connections-made-by-the-server) |
 
 ## Install with install.sh
 
@@ -88,12 +88,12 @@ Contents: [Requirements](#requirements) | [Install with install.sh](#install-wit
    .venv/bin/python run_allsky.py --set-admin-password
    ```
 
-7. In **Settings > Station & Optics**, enter latitude, longitude and elevation. The factory default is
-   Hanoi (21.0285, 105.8542). Wrong coordinates shift aircraft, satellites and planets in every
+7. In **Settings > Station & Optics**, enter latitude, longitude and elevation. The factory default is a
+   neutral "My station" at 0, 0. Wrong coordinates shift aircraft, satellites and planets in every
    overlay.
 
 Visitors who are not signed in can watch (with the station location rounded) but cannot change anything;
-see [SECURITY.md](SECURITY.md). Use `--host 127.0.0.1` with a reverse proxy or tunnel over HTTPS.
+see [SECURITY.md](SECURITY.md) and [TRANSPARENCY.md](TRANSPARENCY.md) (what Zenivo sends and stores). Use `--host 127.0.0.1` with a reverse proxy or tunnel over HTTPS.
 
 ## Install by hand
 
@@ -117,6 +117,8 @@ Test it in the foreground:
 ```bash
 .venv/bin/python run_allsky.py --camera auto --port 8080
 ```
+
+The server binds to `127.0.0.1` (this machine only) by default. Add `--host 0.0.0.0` to open it on the LAN.
 
 Stop it with Ctrl+C, then install the service as described below.
 

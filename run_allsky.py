@@ -75,8 +75,8 @@ def parse_args():
     parser.add_argument(
         "--host",
         type=str,
-        default="0.0.0.0",
-        help="Network interface to bind (default: 0.0.0.0)",
+        default="127.0.0.1",
+        help="Network interface to bind (default: 127.0.0.1, this machine only; use 0.0.0.0 to expose on the LAN)",
     )
     parser.add_argument(
         "--port",
@@ -166,7 +166,7 @@ def parse_args():
         default=[],
         metavar="PATH:DAYS",
         help="Extra directory to clean: delete dated sub-folders / files older than DAYS "
-        "(e.g. the hoan.uk ingest archive). Repeatable.",
+        "(e.g. a sync server ingest archive). Repeatable.",
     )
     parser.add_argument(
         "--no-access-log",

@@ -2,7 +2,6 @@
 (function () {
     const sel = document.getElementById("admin-precision");
     if (!sel || currentPage !== "tab-settings") return;
-    const saveBtn = document.getElementById("btn-admin-precision-save");
     const form = document.getElementById("admin-password-form");
     const cur = document.getElementById("admin-current");
     const next = document.getElementById("admin-new");
@@ -23,23 +22,9 @@
         } catch (err) { /* admin only: guests never get here */ }
     }
 
-    saveBtn.addEventListener("click", async () => {
-        saveBtn.disabled = true;
-        try {
-            const res = await fetch("/api/community/settings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ public_precision_deg: Number(sel.value) }),
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(detail(data));
-            say("Public location precision saved", "success");
-        } catch (err) {
-            say(`Failed to save: ${err.message}`, "error");
-        } finally {
-            saveBtn.disabled = false;
-        }
-    });
+    // The location precision saves itself when changed
+    sel.addEventListener("change", () =>
+        settingsSave(sel, () => sendJson("/api/community/settings", { public_precision_deg: Number(sel.value) })));
 
     form.addEventListener("submit", async (ev) => {
         ev.preventDefault();

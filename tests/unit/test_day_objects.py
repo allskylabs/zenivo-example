@@ -111,3 +111,38 @@ def test_dry_sky_is_not_rain():
     for i in range(150):
         tr.process(_sky(i), 1000.0 + 2.0 * i)
     assert not tr.raining
+
+
+# --- settings: config clamping, sensitivity presets, class filter -------------------------------------------------
+import pytest
+
+from src.analytics.day_objects import SENSITIVITY, keep_classes, normalize_config
+
+
+@pytest.mark.parametrize("raw,expect", [
+    (None, {"enabled": 1, "sensitivity": "normal", "retention_days": 14, "max_mb": 50, "min_blob_area": 2,
+            "max_blob_area": 700, "min_contrast_dn": None, "classes": ["plane", "bird", "insect", "object"]}),
+    ({"retention_days": 500, "max_mb": 1, "sensitivity": "bogus"}, {"retention_days": 90, "max_mb": 5, "sensitivity": "normal"}),
+    ({"retention_days": "x", "min_blob_area": 50, "max_blob_area": 10}, {"retention_days": 14, "max_blob_area": 51}),
+    ({"classes": ["bird", "dragon"], "min_contrast_dn": 500}, {"classes": ["bird"], "min_contrast_dn": 100.0}),
+    ({"enabled": 0}, {"enabled": 0}),
+])
+def test_normalize_config_clamps(raw, expect):
+    got = normalize_config(raw)
+    assert {k: got[k] for k in expect} == expect
+
+
+def test_normal_preset_is_the_original_constants():
+    tr = DayObjectTracker()
+    assert (tr.MIN_CONTRAST_DN, tr.NOISE_SIGMAS, tr.MIN_POINTS, tr.MIN_NET_PX) == (18.0, 4.0, 4, 15.0)
+    assert (tr.MIN_BLOB_AREA, tr.MAX_BLOB_AREA) == (2, 700)
+    tr.configure({"sensitivity": "high", "min_contrast_dn": 40})
+    assert tr.MIN_CONTRAST_DN == 40.0 and tr.MIN_POINTS == SENSITIVITY["high"]["min_points"]
+    tr.configure({"sensitivity": "low"})
+    assert tr.MIN_CONTRAST_DN == SENSITIVITY["low"]["min_contrast_dn"]
+
+
+def test_keep_classes_filters_at_record_time():
+    tracks = [{"cls": "bird"}, {"cls": "plane"}, {"cls": "insect"}]
+    assert keep_classes(tracks, ["plane", "insect"]) == [{"cls": "plane"}, {"cls": "insect"}]
+    assert keep_classes(tracks, []) == []

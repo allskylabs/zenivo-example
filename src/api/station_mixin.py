@@ -11,6 +11,7 @@ from src.hardware.driver import describe_camera
 from src.hardware.v4l2_mmap import configure_white_balance, get_white_balance, get_raw10_bin, set_raw10_bin
 from src.pipeline.star_boost import GAMMA_RAW10, GAMMA_SRGB, STAR_BOOST_BINS, sky_polygon_mask, star_bin_boost
 from src.api.service_consts import ARCHIVE_WIDTH
+from src.defaults import DEFAULT_STATION_NAME, DEFAULT_LAT, DEFAULT_LON, DEFAULT_ELEVATION_M
 
 class StationMixin:
 
@@ -33,18 +34,18 @@ class StationMixin:
 
     @staticmethod
     def _default_station_config() -> Dict[str, Any]:
-        """Factory station config: Hanoi, IMX335 sensor, unsolved 1.65 mm fisheye pointing at the zenith."""
+        """Factory station config: neutral location, IMX335 sensor, unsolved 1.65 mm fisheye pointing at the zenith."""
         from src.calibration.station_solver import IMX335_SPEC, compute_lst_and_zenith
 
-        default_lat = 21.0285
-        default_lon = 105.8542
-        default_elev = 20.0
+        default_lat = DEFAULT_LAT
+        default_lon = DEFAULT_LON
+        default_elev = DEFAULT_ELEVATION_M
         z_ra, z_dec = compute_lst_and_zenith(default_lat, default_lon)
         default_cfg: Dict[str, Any] = {
             "latitude_deg": default_lat,
             "longitude_deg": default_lon,
             "elevation_m": default_elev,
-            "location_name": "Hanoi, Vietnam",
+            "location_name": DEFAULT_STATION_NAME,
             "geo_source": "default",
             "plate_solver_endpoint": "",
             "remote_solver_url": "",

@@ -8,7 +8,6 @@
     const previewEl = document.getElementById("community-preview");
     const openEl = document.getElementById("community-open");
     const seedsEl = document.getElementById("community-seeds");
-    const saveBtn = document.getElementById("btn-community-save");
     const statusEl = document.getElementById("community-status");
 
     function ago(ts) {
@@ -18,10 +17,11 @@
 
     let defaultSeeds = [];
     const btnSeeds = document.getElementById("btn-community-seeds-default");
-    // Puts the built-in seeds back at the top of the list (nothing is saved until Save is pressed)
+    // Puts the built-in seeds back at the top of the list and saves it
     if (btnSeeds) btnSeeds.addEventListener("click", () => {
         const mine = seedsEl.value.split("\n").map((l) => l.trim()).filter(Boolean);
         seedsEl.value = defaultSeeds.concat(mine.filter((u) => !defaultSeeds.includes(u))).join("\n");
+        seedsEl.dispatchEvent(new Event("change"));
     });
 
     function showStatus(st) {
@@ -139,35 +139,20 @@
         loadStatus();
     }
 
-    saveBtn.addEventListener("click", async () => {
-        saveBtn.disabled = true;
-        try {
-            const res = await fetch("/api/community/settings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    enabled: box.checked,
-                    name: nameEl.value.trim(),
-                    public_url: urlEl.value.trim(),
-                    share_thumbnail: thumbEl.checked,
-                    share_preview: previewEl.checked,
-                    allow_open: openEl.checked,
-                    seeds: seedsEl.value.split("\n").map((l) => l.trim()).filter(Boolean),
-                }),
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                const d = data.detail;
-                throw new Error(Array.isArray(d) ? d.map((e) => e.msg).join("; ") : String(d || "Unknown error"));
-            }
-            showAlert(stationAlert, "Community settings saved", "success");
-            setTimeout(loadStatus, 1500);
-            loadStatus();
-        } catch (err) {
-            showAlert(stationAlert, `Failed to save Community settings: ${err.message}`, "error", true);
-        } finally {
-            saveBtn.disabled = false;
-        }
+    // Every change saves itself (saving with sharing on publishes the card; the server's validation errors show in the chip)
+    autosave(box.closest("fieldset"), async () => {
+        const data = await sendJson("/api/community/settings", {
+            enabled: box.checked,
+            name: nameEl.value.trim(),
+            public_url: urlEl.value.trim(),
+            share_thumbnail: thumbEl.checked,
+            share_preview: previewEl.checked,
+            allow_open: openEl.checked,
+            seeds: seedsEl.value.split("\n").map((l) => l.trim()).filter(Boolean),
+        });
+        setTimeout(loadStatus, 1500);
+        loadStatus();
+        return data;
     });
 
     load();

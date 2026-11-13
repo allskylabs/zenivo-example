@@ -259,8 +259,8 @@
             };
 
             let stationConfig = {
-                latitude_deg: 21.0285,
-                longitude_deg: 105.8542,
+                latitude_deg: 0,
+                longitude_deg: 0,
                 camera_sensor: { width_px: 2592, height_px: 1944 },
                 optics: {
                     lens_model: "Fisheye 1.65mm f/2.0 AllSky",
@@ -526,8 +526,8 @@
 
                 const sensorW = Number(sensor.width_px || 2592);
                 const sensorH = Number(sensor.height_px || 1944);
-                const latDeg = Number(st.latitude_deg !== undefined ? st.latitude_deg : 21.0285);
-                const lonDeg = Number(st.longitude_deg !== undefined ? st.longitude_deg : 105.8542);
+                const latDeg = Number(st.latitude_deg !== undefined ? st.latitude_deg : 0);
+                const lonDeg = Number(st.longitude_deg !== undefined ? st.longitude_deg : 0);
 
                 const optX = Number(optics.optical_center_x_px !== undefined ? optics.optical_center_x_px : sensorW / 2.0);
                 const optY = Number(optics.optical_center_y_px !== undefined ? optics.optical_center_y_px : sensorH / 2.0);
@@ -1208,13 +1208,25 @@
                             URL.revokeObjectURL(activeObjectUrl);
                             activeObjectUrl = null;
                         }
-                        img.src = "/api/stream/mjpeg";
+                        setMjpegSrc();
                         scheduleReconnect(2000);
                     };
                 } catch (err) {
-                    img.src = "/api/stream/mjpeg";
+                    setMjpegSrc();
                     scheduleReconnect(3000);
                 }
+            }
+
+            // Guest MJPEG ends cleanly after ~10 min (no error event): re-set src with a cache-buster before that
+            let mjpegRefreshTimer = null;
+            function setMjpegSrc() {
+                if (mjpegRefreshTimer && img.src.includes("/api/stream/mjpeg")) return;
+                img.src = "/api/stream/mjpeg?t=" + Date.now();
+                if (mjpegRefreshTimer) clearInterval(mjpegRefreshTimer);
+                mjpegRefreshTimer = setInterval(() => {
+                    if (img.src.includes("/api/stream/mjpeg")) img.src = "/api/stream/mjpeg?t=" + Date.now();
+                    else { clearInterval(mjpegRefreshTimer); mjpegRefreshTimer = null; }
+                }, 9 * 60 * 1000);
             }
 
             fetch("/api/station/config")

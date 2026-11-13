@@ -145,7 +145,6 @@ const orientRot180Day = document.getElementById("orient-rot180-day");
 const orientStatus = document.getElementById("orient-status");
 const btnOrientReset = document.getElementById("btn-orient-reset");
 const btnStationAutoGps = document.getElementById("btn-station-auto-gps");
-const btnStationSave = document.getElementById("btn-station-save");
 const btnStationSolve = document.getElementById("btn-station-solve");
 const chkStationDeep = document.getElementById("chk-station-deep");
 const stationAlert = document.getElementById("station-alert");
@@ -425,3 +424,105 @@ if (tabBar && activeTab && tabBar.scrollWidth > tabBar.clientWidth) {
     tabBar.scrollLeft = activeTab.offsetLeft - (tabBar.clientWidth - activeTab.offsetWidth) / 2;
 }
 document.title = currentPage === "tab-live" ? "Zenivo — All-sky observatory" : `${PAGE_TITLES[currentPage]} — Zenivo`;
+
+// ------------------------------------------------------------------
+// Settings autosave: one save model for every Settings card, with a status chip in the card header
+//   "Saving…" -> "Saved ✓" (fades after ~2 s) -> "Not saved: <reason>" (stays until the next change retries).
+// settingsSave(el, fn): run one save and show its outcome in the chip of the card holding `el`.
+// autosave(card, saveFn): wire every editable field of a card: text / number / textarea save on `change` (blur or
+// Enter) after a short debounce, switches / selects / checkboxes at once. Invalid fields are not sent: the chip says why.
+// Filling a form from the API never fires `change`, so loading does not save.
+// ------------------------------------------------------------------
+const settingsChips = new WeakMap();
+
+function settingsChip(el) {
+    const card = el && el.closest ? el.closest(".card") : null;
+    if (!card) return null;
+    let c = settingsChips.get(card);
+    if (c) return c;
+    const node = document.createElement("span");
+    node.className = "save-chip";
+    node.setAttribute("role", "status");
+    node.setAttribute("aria-live", "polite");
+    node.hidden = true;
+    const actions = card.querySelector(".page-header-actions");
+    const head = card.querySelector(".card-header, .page-header");
+    if (actions) actions.insertBefore(node, actions.firstChild);
+    else if (head && head.firstElementChild) head.firstElementChild.after(node);
+    else if (head) head.appendChild(node);
+    else card.insertBefore(node, card.firstChild);
+    c = { node, seq: 0, timer: null };
+    settingsChips.set(card, c);
+    return c;
+}
+
+function settingsChipShow(c, state, text) {
+    clearTimeout(c.timer);
+    c.node.hidden = false;
+    c.node.dataset.state = state;
+    c.node.textContent = text;
+    if (state === "saved") c.timer = setTimeout(() => { c.node.hidden = true; }, 2000);
+}
+
+// Human reason for a failed save: 401 -> sign in, FastAPI validation / detail -> its message
+function saveErrorText(err) {
+    if (err && err.status === 401) return "Sign in as admin";
+    const m = err && err.message ? String(err.message) : "unknown error";
+    return m.length > 140 ? `${m.slice(0, 137)}…` : m;
+}
+
+// POST/PUT JSON and return the parsed body; throws an Error (with .status) built from the server's `detail`
+async function sendJson(url, body, method = "POST") {
+    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    let data = null;
+    try { data = await res.json(); } catch (e) { /* no body */ }
+    if (!res.ok || (data && data.success === false)) {
+        const d = data && data.detail;
+        const msg = Array.isArray(d) ? d.map((e) => `${(e.loc || []).slice(1).join(".")} ${e.msg}`.trim()).join("; ")
+            : d ? (typeof d === "string" ? d : JSON.stringify(d)) : (res.status === 401 ? "Sign in as admin" : `HTTP ${res.status}`);
+        const err = new Error(msg);
+        err.status = res.status;
+        throw err;
+    }
+    return data;
+}
+
+// Runs fn() and reports in the card's chip. opts.field: an input that must be valid first. Resolves to true / false.
+async function settingsSave(el, fn, opts = {}) {
+    const c = settingsChip(el);
+    const f = opts.field;
+    if (f && f.checkValidity && !f.checkValidity()) {
+        const label = (f.labels && f.labels[0] ? f.labels[0].textContent : f.id || "Value").trim().replace(/\s*[:(].*$/, "");
+        if (c) settingsChipShow(c, "error", `Not saved: ${label}: ${f.validationMessage}`);
+        return false;
+    }
+    const seq = c ? ++c.seq : 0;
+    if (c) settingsChipShow(c, "saving", "Saving…");
+    try {
+        await fn();
+        if (c && c.seq === seq) settingsChipShow(c, "saved", "Saved ✓");
+        return true;
+    } catch (err) {
+        if (c) settingsChipShow(c, "error", `Not saved: ${saveErrorText(err)}`);
+        return false;
+    }
+}
+
+const AUTOSAVE_SKIP = "[readonly],[type=button],[type=submit],[type=file],[data-no-autosave]";
+function autosave(card, saveFn, opts = {}) {
+    if (!card) return null;
+    const debounceMs = opts.debounceMs === undefined ? 600 : opts.debounceMs;
+    const timers = new Map();
+    const fire = (el) => { timers.delete(el); return settingsSave(el, () => saveFn(el), { field: el }); };
+    const fields = card.querySelectorAll(opts.selector || "input, select, textarea");
+    fields.forEach((el) => {
+        if (el.matches(AUTOSAVE_SKIP)) return;
+        const instant = el.tagName === "SELECT" || el.type === "checkbox" || el.type === "radio";
+        el.addEventListener("change", () => {
+            clearTimeout(timers.get(el));
+            if (instant || !debounceMs) { fire(el); return; }
+            timers.set(el, setTimeout(() => fire(el), debounceMs));
+        });
+    });
+    return { flush: () => Promise.all([...timers.keys()].map((el) => { clearTimeout(timers.get(el)); return fire(el); })) };
+}

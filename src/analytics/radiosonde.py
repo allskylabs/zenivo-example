@@ -20,7 +20,7 @@ EARTH_R = 6371000.0
 
 
 class RadiosondeFeed:
-    def __init__(self, radius_km: float = 300.0):
+    def __init__(self, radius_km: float = 350.0):
         self.radius_m = int(radius_km * 1000)
         self._sondes: List[Dict[str, Any]] = []
         self._fetched = 0.0

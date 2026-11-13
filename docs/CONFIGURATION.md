@@ -14,7 +14,7 @@ Run `python3 run_allsky.py --help` for the flags of the version you have install
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--version` | | Print `Zenivo <version>` and exit |
-| `--host` | `0.0.0.0` | Network interface to bind. Use `127.0.0.1` behind a reverse proxy |
+| `--host` | `127.0.0.1` | Network interface to bind (this machine only). Use `0.0.0.0` to open it on the LAN; behind a reverse proxy keep `127.0.0.1` |
 | `--port` | `8080` | TCP port of the web UI and API |
 | `--device` | auto-detected RTS5869, else `/dev/video0` | V4L2 camera device node |
 | `--camera` | `auto` (or `$ALLSKY_CAMERA`) | Camera backend: `auto`, `rts5869`, `picamera`, `v4l2`, `simulator`. `auto` tries RTS5869, then a Pi CSI camera, then a USB/V4L2 webcam, then the simulator |
@@ -37,7 +37,7 @@ Notes:
 - With `--camera` other than `simulator` and without `--simulator`, Zenivo keeps retrying the real
   camera in the background if it was not usable at startup. It runs on the simulator meanwhile.
 - Sync is off by default (`--sync-target` is empty). Set it only if you run a compatible ingestion
-  server; see [SECURITY.md](SECURITY.md#outbound-connections) for every outbound connection.
+  server; see [TRANSPARENCY.md](TRANSPARENCY.md#1-outbound-connections-made-by-the-server) for every outbound connection.
 - The sync protocol (`/api/allsky/ingest/frame` and `/api/allsky/ingest/telemetry`) keeps its
   original name. Pushes are not queued: a missed round is not re-sent.
 
@@ -79,14 +79,17 @@ defaults at the top level only: a key present in the file replaces the whole def
 key. Zenivo writes the file itself. Edit it only while the service is stopped, and keep a copy
 first. Back it up before upgrades.
 
-The file may contain a Flightradar24 token (`adsb.fr24_token`) and a map key (`google_maps_key`).
-Treat it as private and do not commit it.
+The file holds the exact station position and may contain a Flightradar24 e-mail and token (`adsb.fr24_email`,
+`adsb.fr24_token`; the Flightradar24 password is used once to log in and never stored), a map key
+(`google_maps_key`) and the remote solver address (`remote_solver_url`). Zenivo writes it with mode 0600.
+Treat it as private and do not commit it. All files under `data/` are listed in
+[TRANSPARENCY.md](TRANSPARENCY.md#6-files-stored-on-the-host).
 
-Factory defaults (Hanoi, IMX335 sensor, 1.65 mm fisheye pointing at the zenith):
+Factory defaults (neutral station "My station" at 0, 0, IMX335 sensor, 1.65 mm fisheye pointing at the zenith; `src/defaults.py`):
 
 | Key | Contents |
 |-----|----------|
-| `latitude_deg`, `longitude_deg`, `elevation_m` | Station position. Defaults 21.0285, 105.8542, 20.0 |
+| `latitude_deg`, `longitude_deg`, `elevation_m` | Station position. Defaults 0.0, 0.0, 0.0 (set your own in Settings, Station & Optics) |
 | `location_name`, `geo_source` | Display name and where the coordinates came from (`default`, `manual`, `browser_gps`, `ip_geolocation`) |
 | `remote_solver_url` | Opt-in remote blind plate solver base URL (default empty = never upload). When set, a frame, the station coordinates and the time are sent to it if the local solve is not confident. Settable in Settings, Station & Optics, or `POST /api/station/settings` |
 | `plate_solver_endpoint` | Informational: which solver produced the last solution |
@@ -110,7 +113,8 @@ Keys added when you change the matching setting:
 | `performance` | See [Performance profile](#performance-profile-for-small-hosts) |
 | `storage` | Retention policy, see [Retention and storage](#retention-and-storage) |
 | `adsb` | ADS-B receiver `host`, `port`, `enabled`, Flightradar24 switches and token, `record` |
-| `traffic_log`, `day_objects` | Retention settings of the aircraft/satellite log and the day-object log (`day_objects` defaults: 14 days, 50 MB) |
+| `radiosondes_enabled` | 1 (default) or 0: weather balloons from SondeHub on the Live page. 0 stops the outbound request. The position sent is rounded to 0.5 degrees |
+| `traffic_log`, `day_objects` | Retention settings of the aircraft/satellite log, and the daytime object detection settings. `day_objects` keys (defaults, bounds): `enabled` (1), `classes` (`plane`, `bird`, `insect`, `object`), `sensitivity` (`normal`; `low`, `normal`, `high`), `min_blob_area` (2; 1 to 100), `max_blob_area` (700; 5 to 5000), `min_contrast_dn` (none = from the preset; 3 to 100), `retention_days` (14; 1 to 90), `max_mb` (50; 5 to 500) |
 | `obs_overlay` | OBS browser-source overlay options |
 | `google_maps_key` | Optional key that enables Google map layers in Flights 3D |
 | `focus_record`, `focus_history`, `lens_focus` | Focus results, history and motorised-lens state |
@@ -121,8 +125,8 @@ defaults for the optics keys and removes `bright_star_solution`.
 
 ## Settings pages
 
-Open `/settings`. Each section saves immediately or through its own Save button; most changes take
-effect without a restart.
+Open `/settings`. Every card saves itself when a field changes and shows a status chip in its header; buttons are only for
+actions. Most changes take effect without a restart.
 
 ### Image Output
 
@@ -176,6 +180,11 @@ displayed frame and turn with the image when you change the orientation.
 - **ADS-B receiver**: host and port of an SBS-1 / BaseStation feed (usually port 30003), a switch,
   and the Flightradar24 Enterprise feed (email and password for a login, or a token). Without a
   local receiver, aircraft come from Flightradar24 around the station when it is enabled.
+  The Flightradar24 feed is off until `adsb.fr24_enabled` is set to 1 (Settings, Integrations, Flightradar24
+  block: switch, e-mail, password, token); it is an opt-in outbound connection. The token and the password are
+  write-only (never shown again; the password is kept in memory only).
+- **Weather balloons (SondeHub)**: one switch (`radiosondes_enabled`, on by default). The position sent to
+  sondehub.org is rounded to 0.5 degrees.
 
 ## Retention and storage
 

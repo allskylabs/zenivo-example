@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple, Any
 import numpy as np
 import cv2
+from src.defaults import DEFAULT_LAT, DEFAULT_LON
 
 
 # Catalog of major bright stars: RA (deg), Dec (deg), visual magnitude, name
@@ -177,8 +178,8 @@ def project_alt_az_to_fisheye(
 def render_celestial_overlay(
     canvas: np.ndarray,
     dt: datetime,
-    latitude_deg: float = 21.0285,
-    longitude_deg: float = 105.8542,
+    latitude_deg: float = DEFAULT_LAT,
+    longitude_deg: float = DEFAULT_LON,
     center_x: int = 1296,
     center_y: int = 972,
     focal_length_px: float = 618.8,

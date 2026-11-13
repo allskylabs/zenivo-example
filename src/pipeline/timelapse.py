@@ -14,13 +14,14 @@ from typing import List, Optional, Tuple, Union, Dict, Any
 import numpy as np
 import cv2
 from src.storage import frame_codec
+from src.defaults import DEFAULT_STATION_NAME
 
 
 def render_metadata_overlay(
     frame: np.ndarray,
     timestamp: Optional[datetime] = None,
     telemetry: Optional[Dict[str, Any]] = None,
-    station_name: str = "AllSky Hanoi",
+    station_name: str = DEFAULT_STATION_NAME,
     banner_height: int = 32,
 ) -> np.ndarray:
     """
@@ -135,7 +136,7 @@ def compile_timelapse(
     add_overlay: bool = False,
     telemetry_list: Optional[List[Dict[str, Any]]] = None,
     timestamps: Optional[List[datetime]] = None,
-    station_name: str = "AllSky Hanoi",
+    station_name: str = DEFAULT_STATION_NAME,
     crf: int = 23,
     target_size: Optional[tuple] = None,
 ) -> str:

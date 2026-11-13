@@ -1,7 +1,7 @@
 /* Zenivo dashboard (part of the former app.js): Settings pages: station and plate solving, orientation, resolution, star boost, performance.
  * Classic script: top-level declarations are shared with the other src/web/app/*.js files; load order is fixed in index.html. */
 
-// Station Setup, Manual Settings & Astrometric Plate-Solving (hoan.uk/astronomy/plate-solving)
+// Station Setup, Manual Settings & Astrometric Plate-Solving (remote plate solver)
 // ------------------------------------------------------------------
 function azimuthToCardinal(az) {
     const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
@@ -9,25 +9,15 @@ function azimuthToCardinal(az) {
     return dirs[idx];
 }
 
-// Save is only needed for hand edits: plate-solve and locate save on the server themselves.
-// While the form has unsaved edits, the periodic status refresh must not overwrite them.
+// Hand edits save themselves (autosave, wired in 04-live-view.js); plate-solve and locate save on the server as well.
+// While a field has an edit that is not saved yet, the periodic status refresh must not overwrite it.
 let stationFormDirty = false;
 function setStationFormDirty(dirty) {
     stationFormDirty = dirty;
-    if (btnStationSave) btnStationSave.disabled = !dirty;
 }
-const btnStationReset = document.getElementById("btn-station-reset");
-if (btnStationReset) {
-    btnStationReset.addEventListener("click", async () => {
-        setStationFormDirty(false);
-        await loadStationConfig();
-    });
-}
-if (btnStationSave) {
-    btnStationSave.closest(".card").querySelectorAll(".settings-grid input").forEach((el) =>
-        el.addEventListener("input", () => setStationFormDirty(true))
-    );
-}
+document.querySelectorAll('[data-sgroup="station"] .settings-grid input:not([readonly])').forEach((el) =>
+    el.addEventListener("input", () => setStationFormDirty(true))
+);
 
 function updateStationUI(st) {
     if (!st) return;
@@ -35,7 +25,7 @@ function updateStationUI(st) {
 
     const latVal = st.latitude_deg !== undefined ? st.latitude_deg : st.latitude;
     const lonVal = st.longitude_deg !== undefined ? st.longitude_deg : st.longitude;
-    const nameVal = st.location_name || st.station_name || "Hanoi, Vietnam";
+    const nameVal = st.location_name || st.station_name || "My station";
     const sensor = st.camera_sensor || {};
     const subtitle = document.getElementById("sensor-subtitle");
     if (subtitle) subtitle.textContent = `IMX335 · ${String(nameVal).split(",")[0].trim()}`;
@@ -136,8 +126,8 @@ function updateStationUI(st) {
         stCenterOffset.textContent = `Δ(${Number(off.dx || 0).toFixed(1)}, ${Number(off.dy || 0).toFixed(1)}) px • R90=${r90} px`;
     }
     if (stCoords) {
-        const lat = Number(latVal !== undefined ? latVal : 21.0285);
-        const lon = Number(lonVal !== undefined ? lonVal : 105.8542);
+        const lat = Number(latVal !== undefined ? latVal : 0);
+        const lon = Number(lonVal !== undefined ? lonVal : 0);
         const elev = Math.round(Number(st.elevation_m || 20));
         stCoords.textContent = `${Math.abs(lat).toFixed(5)}°${lat >= 0 ? "N" : "S"}, ${Math.abs(lon).toFixed(5)}°${lon >= 0 ? "E" : "W"} (${elev}m)`;
     }
@@ -217,26 +207,16 @@ async function saveOrientation(payload) {
     const toggles = [orientFlipH, orientFlipV, orientRot180, orientRot180Day];
     orientationBusy = true;
     toggles.forEach((t) => t && (t.disabled = true));
-    try {
-        const res = await fetch("/api/camera/orientation", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        if (!res.ok || !data.success) throw new Error(data.detail || "Unknown error");
+    const ok = await settingsSave(orientFlipH, async () => {
+        const data = await sendJson("/api/camera/orientation", payload);
         orientationBusy = false;
         if (data.station_config) updateStationUI(data.station_config);
         drawReticle();
         if (liveImg) liveImg.src = `/api/live/snapshot.jpg?t=${Date.now()}`;
-    } catch (err) {
-        orientationBusy = false;
-        showAlert(stationAlert, `❌ Failed to update image orientation: ${err.message}`, "error", true);
-        if (state.station) syncOrientationUI(state.station.image_transform);
-    } finally {
-        orientationBusy = false;
-        toggles.forEach((t) => t && (t.disabled = false));
-    }
+    });
+    orientationBusy = false;
+    toggles.forEach((t) => t && (t.disabled = false));
+    if (!ok && state.station) syncOrientationUI(state.station.image_transform);
 }
 
 // ------------------------------------------------------------------
@@ -320,23 +300,14 @@ if (outputResSelect) {
     outputResSelect.addEventListener("change", async () => {
         const [width, height] = outputResSelect.value.split("x").map(Number);
         outputResSelect.disabled = true;
-        try {
-            const res = await fetch("/api/camera/resolution", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ width, height }),
-            });
-            const data = await res.json();
-            if (!res.ok || !data.success) throw new Error(data.detail || "Unknown error");
+        const ok = await settingsSave(outputResSelect, async () => {
+            const data = await sendJson("/api/camera/resolution", { width, height });
             syncResolutionUI(data.current);
             if (data.station_config) updateStationUI(data.station_config);
             loadPerformance();
-        } catch (err) {
-            showAlert(stationAlert, `❌ Failed to set resolution: ${err.message}`, "error", true);
-            if (state.station) syncResolutionUI(state.station.output_resolution);
-        } finally {
-            outputResSelect.disabled = false;
-        }
+        });
+        if (!ok && state.station) syncResolutionUI(state.station.output_resolution);
+        outputResSelect.disabled = false;
     });
 }
 
@@ -359,22 +330,13 @@ async function loadStarBoost() {
 
 async function saveStarBoost() {
     starBoostEnabled.disabled = starBoostBin.disabled = true;
-    try {
-        const res = await fetch("/api/camera/star-boost", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ enabled: starBoostEnabled.checked, bin: Number(starBoostBin.value) }),
-        });
-        const data = await res.json();
-        if (!res.ok || !data.success) throw new Error(data.detail || "Unknown error");
+    const ok = await settingsSave(starBoostEnabled, async () => {
+        const data = await sendJson("/api/camera/star-boost", { enabled: starBoostEnabled.checked, bin: Number(starBoostBin.value) });
         starBoostEnabled.checked = !!data.enabled;
         starBoostBin.value = String(data.bin);
-    } catch (err) {
-        showAlert(stationAlert, `❌ Failed to set star boost: ${err.message}`, "error", true);
-        loadStarBoost();
-    } finally {
-        starBoostEnabled.disabled = starBoostBin.disabled = false;
-    }
+    });
+    if (!ok) loadStarBoost();
+    starBoostEnabled.disabled = starBoostBin.disabled = false;
 }
 
 if (starBoostEnabled) {
@@ -436,19 +398,13 @@ Object.entries(perfFields).forEach(([key, el]) => {
     if (!el) return;
     el.addEventListener("change", async () => {
         const value = el.type === "checkbox" ? (el.checked ? 1 : 0) : Number(el.value) * Number(el.dataset.scale || 1);
-        if (!Number.isFinite(value)) return;
-        try {
-            const res = await fetch("/api/camera/performance", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ [key]: value }),
-            });
-            const data = await res.json();
-            if (!res.ok || !data.success) throw new Error(JSON.stringify(data.detail || "Unknown error"));
-            syncPerformanceUI(data);
-        } catch (err) {
-            showAlert(stationAlert, `❌ Failed to save performance setting: ${err.message}`, "error", true);
-            loadPerformance();
+        if (el.type !== "checkbox" && (el.value.trim() === "" || !Number.isFinite(value))) {
+            await settingsSave(el, async () => { throw new Error("enter a number"); });
+            return;
         }
+        const ok = await settingsSave(el, async () => {
+            syncPerformanceUI(await sendJson("/api/camera/performance", { [key]: value }));
+        }, { field: el });
+        if (!ok) loadPerformance();
     });
 });

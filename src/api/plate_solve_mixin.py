@@ -11,12 +11,17 @@ from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 import numpy as np
 import cv2
+from src.defaults import DEFAULT_LAT, DEFAULT_LON
 
 class PlateSolveMixin:
 
     def get_station_config(self) -> Dict[str, Any]:
-        """Return station coordinates and astrometric camera/lens calibration parameters."""
-        return dict(self.station_config)
+        """Return station coordinates and astrometric camera/lens calibration parameters. The Flightradar24 token and
+        password are write-only: they never leave the station (GET /api/adsb reports only whether a token is set)."""
+        out = dict(self.station_config)
+        if isinstance(out.get("adsb"), dict):
+            out["adsb"] = {k: v for k, v in out["adsb"].items() if k not in ("fr24_token", "fr24_password")}
+        return out
 
     def update_station_location(
         self,
@@ -586,8 +591,8 @@ class PlateSolveMixin:
                              f"(ignored: {', '.join(map(str, skipped)) or 'none'}); click at least 4 stars there")
         det = np.array(valid, dtype=np.float64)
         det = det[np.argsort(-det[:, 2])][:40]  # the pattern search seeds on the brightest 16, all 40 are matched
-        lat = float(self.station_config.get("latitude_deg", 21.0285))
-        lon = float(self.station_config.get("longitude_deg", 105.8542))
+        lat = float(self.station_config.get("latitude_deg", DEFAULT_LAT))
+        lon = float(self.station_config.get("longitude_deg", DEFAULT_LON))
         res = bss.solve_bright_stars(
             np.zeros((h, w, 3), np.uint8), lat, lon, when=when or datetime.now().astimezone(), projection="equidistant",
             hfov_candidates_deg=(176, 179, 182, 185), max_mag=4.5, n_detections=min(len(det), 8), n_seed_stars=100,
@@ -670,8 +675,8 @@ class PlateSolveMixin:
         """
         from src.calibration.station_solver import solve_station_parameters
 
-        lat = float(self.station_config.get("latitude_deg", 21.0285))
-        lon = float(self.station_config.get("longitude_deg", 105.8542))
+        lat = float(self.station_config.get("latitude_deg", DEFAULT_LAT))
+        lon = float(self.station_config.get("longitude_deg", DEFAULT_LON))
         # Lens already solved: one frame usually fixes the pointing (only the rotation is unknown). Hot pixels
         # from the dark library are masked out; the 90 s tracking series runs only if this is not sure.
         if deep:

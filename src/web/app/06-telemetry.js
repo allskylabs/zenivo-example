@@ -254,7 +254,25 @@ function renderBinaryFrameBlob(blob) {
     liveImg.src = objUrl;
 }
 
+// Guest MJPEG streams are closed by the server after ~10 min without an error event,
+// so while an <img> shows /api/stream/mjpeg re-set its src (cache-busted) a bit earlier.
+let mjpegRefreshTimer = null;
+function setMjpegSrc(img) {
+    if (!img) return;
+    img.src = "/api/stream/mjpeg?t=" + Date.now();
+    if (mjpegRefreshTimer) clearInterval(mjpegRefreshTimer);
+    mjpegRefreshTimer = setInterval(() => {
+        if (img.src.includes("/api/stream/mjpeg")) img.src = "/api/stream/mjpeg?t=" + Date.now();
+        else clearMjpegRefresh();
+    }, 9 * 60 * 1000);
+}
+function clearMjpegRefresh() {
+    if (mjpegRefreshTimer) clearInterval(mjpegRefreshTimer);
+    mjpegRefreshTimer = null;
+}
+
 function stopSSEFallback() {
+    clearMjpegRefresh();
     if (state.sseSource) {
         try {
             state.sseSource.close();
@@ -272,7 +290,7 @@ function startSSEFallback() {
             hudStreamMode.textContent = "SSE Push + MJPEG";
         }
         if (liveImg && !liveImg.src.includes("/api/stream/mjpeg")) {
-            liveImg.src = "/api/stream/mjpeg";
+            setMjpegSrc(liveImg);
         }
         es.onmessage = (ev) => {
             try {
@@ -474,6 +492,7 @@ if (currentPage === "tab-live") {
                     state.ws.close();
                 } catch (e) {}
             }
+            clearMjpegRefresh();
             if (liveImg && liveImg.src.includes("/api/stream/mjpeg")) liveImg.removeAttribute("src");
         } else if (state.streamPaused) {
             state.streamPaused = false;

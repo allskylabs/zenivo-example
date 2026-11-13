@@ -8,6 +8,7 @@ described here. When the service runs, FastAPI also publishes the live schema at
 
 - Base URL: `http://<host>:<port>` (default port 8080).
 - Format: JSON unless noted. Request bodies for `POST`/`PUT` are JSON.
+- **What leaves the station**: see [TRANSPARENCY.md](TRANSPARENCY.md) for every outbound connection behind these endpoints.
 - **Authentication**: one admin, session cookie `zenivo_session`, see [Authentication](#authentication) and [SECURITY.md](SECURITY.md). Routes marked **admin** in the tables below answer `401 {"detail":"Sign in as admin","code":"auth"}` to guests; every `POST`/`PUT`/`DELETE` is admin unless stated.
 - Times: epoch parameters are Unix seconds. Recorded timestamps are local ISO 8601 with offset.
 - Validation errors return HTTP 422. Names such as `/api/allsky/ingest/*` and `/uploads/allsky/...`
@@ -22,7 +23,8 @@ Contents: [Pages and static files](#pages-and-static-files) | [Version and statu
 ## Authentication
 
 Default deny: any request that is not `GET`/`HEAD`/`OPTIONS` needs an admin session, except the open routes below.
-Admin-only reads: `/api/logs`, `/api/logs/download`, `/api/community/settings`. Admin pages: `/settings`,
+Admin-only reads: `/api/logs`, `/api/logs/download`, `/api/community/settings`, `/api/focus`, `/api/focus/frame`,
+`/api/focus/overview.jpg`, `/api/storage`, `/docs`, `/redoc`, `/openapi.json`. Admin pages: `/settings`,
 `/calibration`, `/focus`, `/logs` (guests are redirected to `/login?next=<path>`). A state-changing request with an
 `Origin` header that differs from `Host` gets 403.
 
@@ -171,16 +173,17 @@ it, and captures are cached for `max(min_capture_interval_s, 0.9 x exposure)`.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET, POST | `/api/adsb` | ADS-B and Flightradar24 settings: `host`, `port`, `enabled`, `fr24_enabled`, `fr24_email`, `fr24_password`, `fr24_token` |
+| GET, POST | `/api/adsb` | ADS-B and Flightradar24 settings: `host`, `port`, `enabled`, `fr24_enabled` (default off), `fr24_email`, `fr24_password` (used once to log in, never stored), `fr24_token`, `radiosondes_enabled` (default on). POST is admin only. Write-only secrets: GET returns only `fr24_has_token` (never the token or password); the e-mail, also in the nested `fr24` object, is blank for guests |
 | GET | `/api/adsb/aircraft` | Aircraft now. Query `limit` (1 to 6000, default 30), `trail` (0 to 900 s), `bounds`, `fr24`, `compact` |
 | GET | `/api/adsb/flight/{fr24_id}` | Flight detail for a Flightradar24 id |
-| GET | `/api/satellites` | Satellites now. Query `track` (minutes), `below`, `limit` (1 to 400, default 60), `ids` (NORAD list), `trail` (0 to 1800 s) |
-| GET | `/api/radiosondes` | Radiosondes. Query `limit` (1 to 200, default 40) |
+| GET | `/api/satellites` | Satellites now (orbit data from CelesTrak, refreshed daily). Query `track` (minutes), `below`, `limit` (1 to 400, default 60), `ids` (NORAD list), `trail` (0 to 1800 s) |
+| GET | `/api/radiosondes` | Radiosondes (SondeHub; the request to SondeHub carries the station position rounded to 0.5 degrees, see [TRANSPARENCY.md](TRANSPARENCY.md#1-outbound-connections-made-by-the-server)). Query `limit` (1 to 200, default 40). The answer has `enabled`; with `radiosondes_enabled` off nothing is requested and `sondes` is empty |
 | GET | `/api/traffic` | Log of aircraft/satellites seen in the camera view. Query `t0`, `t1` (required), `limit` (default 2000) |
 | GET | `/api/traffic/status` | State of the traffic log |
 | GET | `/api/day-objects` | Log of daytime objects (birds, insects, aircraft). Query `t0`, `t1` (required), `limit` |
-| GET | `/api/day-objects/status` | State of the day-object tracker (includes rain detection) |
-| GET | `/api/map/config` | Map settings for Flights 3D |
+| GET | `/api/day-objects/status` | State of the day-object tracker (includes rain detection), the stored log (`log`: retention, size, oldest and newest day), and the active `config`, `classes` and sensitivity `presets` |
+| GET, POST | `/api/day-objects/config` | Daytime object settings: `enabled`, `classes`, `sensitivity` (`low`, `normal`, `high`), `min_blob_area` (1 to 100), `max_blob_area` (5 to 5000), `min_contrast_dn` (3 to 100, null = from the preset), `retention_days` (1 to 90), `max_mb` (5 to 500). Omitted fields stay; applied live; POST is admin only |
+| GET | `/api/map/config` | Map settings for Flights 3D: `{google_maps_key}` (empty unless configured). Open to guests, because the browser needs the key; restrict it by referrer in Google Cloud |
 | GET | `/api/map/airports` | Airports near the station |
 
 ## Sky and clouds
@@ -194,7 +197,7 @@ it, and captures are cached for `max(min_capture_interval_s, 0.9 x exposure)`.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/storage` | Disk usage and retention policy |
+| GET | `/api/storage` | **admin**. Disk usage and retention policy |
 | POST | `/api/storage/cleanup` | Run the retention job now |
 | PUT | `/api/storage/policy` | Update the policy: `frames_keep_days`, `products_keep_days`, `max_data_gb`, `min_free_gb`, `archive_interval_s`, `timelapse_refresh_s` |
 | GET | `/api/logs` | Activity log. Query `since_id`, `limit` (1 to 1000, default 200), `level` (`info`, `success`, `warning`, `error`), `category` |

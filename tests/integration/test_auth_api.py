@@ -143,3 +143,48 @@ class TestWebSocketGate:
 
 def test_safe_next_exported():
     assert safe_next("/settings") == "/settings"
+
+
+class TestDayObjectsConfig:
+    """POST /api/day-objects/config: admin only, bounds enforced, persisted and applied live."""
+
+    @pytest.fixture(autouse=True)
+    def private_station_config(self, guest_client, tmp_path, monkeypatch):
+        """These tests save settings: write them to a temp file, never to the real data/station_config.json."""
+        monkeypatch.setattr(guest_client.service, "station_config_path", str(tmp_path / "station_config.json"))
+
+    def test_guest_401_admin_ok_and_bounds(self, guest_client, fresh_auth):
+        c = guest_client
+        assert c.post("/api/day-objects/config", json={"sensitivity": "high"}).status_code == 401
+        setup_admin(c, fresh_auth)
+        r = c.post("/api/day-objects/config", json={"sensitivity": "high", "classes": ["bird"], "retention_days": 30})
+        assert r.status_code == 200
+        cfg = r.json()["config"]
+        assert (cfg["sensitivity"], cfg["classes"], cfg["retention_days"]) == ("high", ["bird"], 30)
+        assert c.get("/api/day-objects/status").json()["config"]["sensitivity"] == "high"
+        assert c.post("/api/day-objects/config", json={"retention_days": 500}).status_code == 422
+        assert c.post("/api/day-objects/config", json={"classes": ["dragon"]}).status_code == 422
+        assert c.post("/api/day-objects/config", json={"min_contrast_dn": None, "sensitivity": "normal",
+                                                       "classes": ["plane", "bird", "insect", "object"]}).status_code == 200
+
+    def test_radiosonde_switch_is_admin_only(self, guest_client, fresh_auth):
+        c = guest_client
+        assert c.post("/api/adsb", json={"radiosondes_enabled": False}).status_code == 401
+        setup_admin(c, fresh_auth)
+        assert c.post("/api/adsb", json={"radiosondes_enabled": False}).status_code == 200
+        assert c.get("/api/adsb").json()["radiosondes_enabled"] == 0
+        assert c.get("/api/radiosondes").json()["enabled"] is False
+        c.post("/api/adsb", json={"radiosondes_enabled": True})
+
+    def test_fr24_secrets_are_never_returned(self, guest_client, fresh_auth):
+        c = guest_client
+        setup_admin(c, fresh_auth)
+        assert c.post("/api/adsb", json={"fr24_enabled": True, "fr24_email": "me@example.org", "fr24_token": "SECRET-TOKEN"}).status_code == 200
+        body = c.get("/api/adsb").text + c.get("/api/station/config").text
+        assert "SECRET-TOKEN" not in body
+        assert c.get("/api/adsb").json()["fr24_has_token"] is True
+        c.post("/api/auth/logout")
+        guest = c.get("/api/adsb").text
+        assert "me@example.org" not in guest and "SECRET-TOKEN" not in guest
+        c.post("/api/auth/login", json={"password": PW})
+        c.post("/api/adsb", json={"fr24_enabled": False, "fr24_token": ""})

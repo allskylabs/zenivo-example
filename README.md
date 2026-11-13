@@ -12,6 +12,10 @@ estimates cloud cover, detects sky events, assists focusing and plate-solves the
 It runs on a Raspberry Pi 4 (1.8 GB RAM) as well as on a laptop or mini-PC. Low CPU and memory use
 is the main design constraint: heavy analysis is sampled, never done per frame.
 
+**Privacy and trust:** no telemetry, no auto-update, no remote control, no default password. Every outbound
+connection, third-party load and stored file is listed, with its source file, in
+[docs/TRANSPARENCY.md](docs/TRANSPARENCY.md).
+
 ## Features
 
 - **Capture and exposure**: pull-driven capture (a frame is taken when a viewer, an API call or the
@@ -22,8 +26,9 @@ is the main design constraint: heavy analysis is sampled, never done per frame.
 - **Products**: keogram, startrails and timelapse per day, plus a timelapse builder for a date range.
 - **Analytics**: cloud cover (clear / scattered / overcast) with history, star count, rain detection
   on the dome, sky events (meteor, plane, satellite, flash, cloud change) by night and by day.
-- **Traffic**: ADS-B aircraft (local receiver and Flightradar24 feed), satellite passes from TLEs,
-  radiosondes, an aircraft/satellite log of what crossed the camera view.
+- **Traffic**: ADS-B aircraft (local receiver, and a Flightradar24 feed that is off until you switch it on), satellite passes from TLEs,
+  radiosondes (position sent to SondeHub rounded to 0.5 degrees, with an off switch), an aircraft/satellite log of what crossed the camera view.
+  Daytime birds, insects and aircraft are detected locally with their own settings. Every Settings card saves itself on change.
 - **Focus assistant**: HFR and contrast measurement on a region of interest, motorised lens control
   and autofocus for supported Raspberry Pi lenses.
 - **Plate solving**: local bright-star solver, with a remote blind-solve fallback; sky and obstruction mask.
@@ -31,7 +36,7 @@ is the main design constraint: heavy analysis is sampled, never done per frame.
 - **Community** (opt-in, off by default): share a signed station card with other Zenivo stations by gossip, no central server, and see them on a map; see [docs/COMMUNITY.md](docs/COMMUNITY.md).
 - **Admin login**: one admin password protects every change and the logs; guests can watch and see the station location rounded. First start: read the setup code with `cat data/admin_setup_code.txt` and open `/login`; see [docs/SECURITY.md](docs/SECURITY.md).
 - **Storage**: AVIF frame archive, age and size based retention, extra directories to prune.
-- **Sync**: optional push of frames and telemetry to a hoan.uk server.
+- **Sync**: optional push of frames and telemetry to a remote sync server (off unless you pass `--sync-target`).
 
 ## Supported cameras
 
@@ -59,7 +64,7 @@ With the simulator (no camera needed):
 git clone https://github.com/hoanb1/zenivo.git zenivo
 cd zenivo
 ./install.sh --no-systemd --camera simulator
-.venv/bin/python run_allsky.py --camera simulator --port 8080
+.venv/bin/python run_allsky.py --camera simulator --port 8080   # add --host 0.0.0.0 to open it on the LAN
 ```
 
 With a real camera, installed as a systemd service:
@@ -93,6 +98,7 @@ Check the running version with `curl http://localhost:8080/api/version`.
 | [docs/INSTALL.md](docs/INSTALL.md) | Installation on Raspberry Pi OS and Debian/Ubuntu, systemd, nginx, upgrades, uninstall |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | CLI flags, environment variables, `station_config.json`, Settings pages, retention, small-host tuning |
 | [docs/API.md](docs/API.md) | REST, WebSocket and SSE endpoint reference |
+| [docs/TRANSPARENCY.md](docs/TRANSPARENCY.md) | **Everything Zenivo sends, loads, stores and exposes**: every outbound host, browser third parties, community seeds, files on disk, guest vs admin, how to verify |
 | [docs/SECURITY.md](docs/SECURITY.md) | Admin login, what guests can do, setup code, sessions, location rounding |
 | [docs/SDD.md](docs/SDD.md) | Software design: architecture, capture cycle, data layout, sync, deployment |
 | [docs/BRAND.md](docs/BRAND.md) | Name, logo, colours, typography, voice |
@@ -132,7 +138,7 @@ The Python code is documented in [docs/SDD.md](docs/SDD.md).
 ## Internal names
 
 Some identifiers keep the original "allsky" name for compatibility with running installs and with
-the hoan.uk server. They are not renamed: logger names `allsky.*`, the browser storage key
+the remote sync server. They are not renamed: logger names `allsky.*`, the browser storage key
 `allsky.ui.prefs.v1`, upload paths `/uploads/allsky/...`, the sync API `/api/allsky/ingest/*`,
 environment variables `ALLSKY_*` and the script name `run_allsky.py`. Live hosts use the unit `zenivo` and the folder `~/zenivo`; a legacy symlink `~/allsky-ng` is kept for old scripts.
 

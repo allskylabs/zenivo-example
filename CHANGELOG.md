@@ -4,6 +4,32 @@ All notable changes to Zenivo are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Settings: every card saves automatically on change and shows a status chip; buttons remain only for actions.
+- Settings, Integrations: Flightradar24 block (switch, e-mail, password, token) and a "Weather balloons (SondeHub)" switch (`radiosondes_enabled`, saved through `POST /api/adsb`; `GET /api/radiosondes` returns `enabled`, and the Live page shows "turned off" and re-checks every 5 minutes).
+- Settings, Detection: daytime object (birds, insects, aircraft) settings, `GET`/`POST /api/day-objects/config`; `GET /api/day-objects/status` also returns `config`, `classes` and `presets`.
+
+### Changed
+
+- The position sent to SondeHub is rounded to a 0.5 degree grid (search radius 350 km); the exact position is used only locally.
+
+- New [docs/TRANSPARENCY.md](docs/TRANSPARENCY.md): every outbound connection, third-party browser load, built-in community seed, file on disk and guest/admin rule, with source files and verification commands; SECURITY, COMMUNITY, CONFIGURATION, API and INSTALL corrected and linked to it.
+- The server binds to `127.0.0.1` by default (`--host`); use `--host 0.0.0.0` to expose it on the LAN.
+- The Flightradar24 feed is off until `adsb.fr24_enabled` is set (opt-in outbound connection).
+- A fresh install no longer ships a city: the factory station is "My station" at 0, 0 (`src/defaults.py`). Saved configs are unaffected.
+- Three.js import maps on the 3D flights and satellites pages carry Subresource Integrity hashes.
+- Removed the leftover hoan.uk radiosonde link and wording; `GET /api/events` rejects `limit` above 100 unless `brief=true`.
+
+### Fixed
+
+- Flightradar24 token and password are write-only: `/api/station/config` no longer returns them and `GET /api/adsb` reports only `fr24_has_token`.
+- Settings, Admin section was unreachable (`#admin` was missing from the section switcher), so the password could not be changed from the UI.
+- Guest live view recovers when the server ends the MJPEG stream after 10 minutes (the image reloads itself).
+- The 3D flights map shows "Aircraft are shown only near the station" when a guest pans out of range, and backs off instead of retrying.
+
 ## [1.1.0] - 2026-11-13
 
 ### Changed

@@ -37,8 +37,8 @@ function updateAstroTiles() {
     const sunEl = document.getElementById("telem-sun-alt");
     if (!moonEl && !sunEl) return;
     const d2r = Math.PI / 180.0;
-    const lat = stationLatInput && !isNaN(parseFloat(stationLatInput.value)) ? parseFloat(stationLatInput.value) : 21.0285;
-    const lon = stationLonInput && !isNaN(parseFloat(stationLonInput.value)) ? parseFloat(stationLonInput.value) : 105.8542;
+    const lat = stationLatInput && !isNaN(parseFloat(stationLatInput.value)) ? parseFloat(stationLatInput.value) : 0;
+    const lon = stationLonInput && !isNaN(parseFloat(stationLonInput.value)) ? parseFloat(stationLonInput.value) : 0;
     const now = new Date();
     const sm = sunMoonEquatorial(now);
     if (moonEl) moonEl.textContent = `${Math.round(sm.moon.illum * 100)}%`;
@@ -120,13 +120,13 @@ function drawReticle() {
             ? Number(st.latitude_deg)
             : stationLatInput && !isNaN(parseFloat(stationLatInput.value))
             ? parseFloat(stationLatInput.value)
-            : 21.0285;
+            : 0;
     const lonDeg =
         st.longitude_deg !== undefined
             ? Number(st.longitude_deg)
             : stationLonInput && !isNaN(parseFloat(stationLonInput.value))
             ? parseFloat(stationLonInput.value)
-            : 105.8542;
+            : 0;
 
     const optX =
         optics.optical_center_x_px !== undefined
@@ -600,7 +600,7 @@ function drawReticle() {
     const starWeight = (mag) => Math.max(0.24, Math.min(1.0, (5.2 - mag) / 4.5));
     const reticleRadius = (mag) => (Math.max(1.4, Math.min(4.8, 3.8 - mag * 0.65)) + 4) * u;
 
-    // Bi-tapered, magnitude-weighted constellation filament (after the hoan.uk plate-solving viewer):
+    // Bi-tapered, magnitude-weighted constellation filament (after the remote plate-solving viewer):
     // anchored at each star's reticle rim, a soft bloom, a gradient body and a fine core, screen-blended
     const lw = 1.6;
     function drawFilament(v1, v2) {

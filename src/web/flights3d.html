@@ -159,6 +159,10 @@
         { "imports": {
             "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
             "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        },
+        "integrity": {
+            "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js": "sha384-61S/Nu32S3E5+n+KpCOTb2eRYps6fVKm+9Gz1QBvSePFthb46f063Aa/qe/lykFZ",
+            "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/utils/BufferGeometryUtils.js": "sha384-jHGXS4+FuVOBnZkNme2ury3Ccg5DWDLYK22xX/WGdZCZsjRM4J+3n6Qc4CXx1Hjf"
         } }
     </script>
 </head>
@@ -329,7 +333,7 @@
         </div>
         <label style="display:flex;justify-content:space-between;align-items:center;font-size:13px;cursor:pointer">
             <span>Combine FR24 Global Data</span>
-            <input type="checkbox" id="fr24-enabled" checked style="accent-color:var(--accent);width:16px;height:16px">
+            <input type="checkbox" id="fr24-enabled" style="accent-color:var(--accent);width:16px;height:16px">
         </label>
         <div class="field">
             <span>Enterprise Account Email</span>
@@ -499,7 +503,7 @@
                     "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.5, "fog-ground-blend": 0.35,
                     "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 0.85, 6, 0.85, 10, 0.45, 12, 0] },
             },
-            center: [105.9095, 21.0538], zoom: 9, pitch: 64, bearing: -20, maxPitch: 82,
+            center: [0, 0], zoom: 9, pitch: 64, bearing: -20, maxPitch: 82,
             attributionControl: { compact: true },
         });
         map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
@@ -1624,7 +1628,23 @@
             }
         }
 
+        // Guests get HTTP 400 when the requested box is far from the station: show a notice and back off
+        let rangeBlockedUntil = 0;
+        function showRangeNotice(on) {
+            let el = document.getElementById("range-notice");
+            if (!el) {
+                if (!on) return;
+                el = document.createElement("div");
+                el.id = "range-notice";
+                el.textContent = "Aircraft are shown only near the station";
+                el.style.cssText = "position:fixed;left:50%;bottom:16px;transform:translateX(-50%);padding:6px 12px;border-radius:14px;background:rgba(10,14,22,.78);color:#cdd6e4;font:12px system-ui,sans-serif;z-index:50;pointer-events:none";
+                document.body.appendChild(el);
+            }
+            el.style.display = on ? "" : "none";
+        }
+
         function poll(forceBounds) {
+            if (Date.now() < rangeBlockedUntil && !forceBounds) return;
             const b = typeof forceBounds === "string" ? forceBounds : boundsParam();
             if (pollInFlight && !forceBounds && b === lastBounds) return;
             pollInFlight = true;
@@ -1634,8 +1654,17 @@
             lastBounds = b;
             const fr = layerOn.fr24 ? "true" : "false";
             fetch(`/api/adsb/aircraft?limit=5000&trail=${span}&bounds=${encodeURIComponent(b)}&fr24=${fr}&compact=true`)
-                .then((r) => r.json())
-                .then((d) => { if (seq === pollSeq) { update(d); haveTrails = true; } })
+                .then((r) => {
+                    if (r.status === 400) {
+                        rangeBlockedUntil = Date.now() + 8000;
+                        showRangeNotice(true);
+                        return null;
+                    }
+                    rangeBlockedUntil = 0;
+                    showRangeNotice(false);
+                    return r.json();
+                })
+                .then((d) => { if (d && seq === pollSeq) { update(d); haveTrails = true; } })
                 .catch(() => { if (seq === pollSeq) $("status").textContent = "Receiver unavailable"; })
                 .finally(() => { if (seq === pollSeq) pollInFlight = false; });
         }
@@ -2465,14 +2494,14 @@
         $("btn-globe").onclick = () => {
             camMode = camZoom = camPitch = null; centering = false; map.setCenterClampedToGround(true); showCamera();
             if (map.getProjection()?.type !== "globe") map.setProjection({ type: "globe" });
-            const c = station ? [station.lon, station.lat] : [105.9095, 21.0538];
+            const c = station ? [station.lon, station.lat] : [0, 0];
             map.easeTo({ center: c, zoom: 2.2, pitch: 20, bearing: 0, duration: 1200 });
             poll("global");
         };
         function openFr24Modal() {
             $("fr24-msg").textContent = "";
             fetch("/api/adsb").then((r) => r.json()).then((cfg) => {
-                $("fr24-enabled").checked = cfg.fr24_enabled !== false;
+                $("fr24-enabled").checked = !!cfg.fr24_enabled;
                 $("fr24-email").value = cfg.fr24_email || "";
                 $("fr24-password").value = "";
                 $("fr24-token").placeholder = cfg.fr24_authenticated ? "Authenticated token saved (enter to replace)" : "Optional direct FR24 token";
@@ -2501,7 +2530,7 @@
             fetch("/api/adsb", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
                 .then((r) => r.json())
                 .then((res) => {
-                    layerOn.fr24 = res.fr24_enabled !== false;
+                    layerOn.fr24 = !!res.fr24_enabled;
                     $("lay-fr24").checked = layerOn.fr24;
                     if (res.fr24_login && !res.fr24_login.ok) {
                         $("fr24-msg").textContent = `Login notice: ${res.fr24_login.message || "check credentials"}`;
