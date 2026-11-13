@@ -178,11 +178,54 @@ def parse_args():
         action="store_true",
         help="Enable uvicorn hot reloading for development",
     )
+    parser.add_argument(
+        "--set-admin-password",
+        action="store_true",
+        help="Set the admin password (asks twice; reads one line from stdin when it is not a terminal), then exit",
+    )
+    parser.add_argument(
+        "--reset-admin",
+        action="store_true",
+        help="Forget the admin password and sign everybody out, then exit (a new setup code is issued at the next start)",
+    )
     return parser.parse_args()
+
+
+def _admin_cli(args) -> bool:
+    """--set-admin-password / --reset-admin: act on data/admin.json and exit. Returns True when one was handled."""
+    if not (args.set_admin_password or args.reset_admin):
+        return False
+    from src.auth.manager import AuthManager, PasswordError
+
+    auth = AuthManager(os.path.join(PROJECT_ROOT, "data"))
+    if args.reset_admin:
+        auth.reset()
+        print("Admin password and sessions removed. A new setup code is created at the next start.")
+        return True
+    if sys.stdin.isatty():
+        import getpass
+
+        pw, again = getpass.getpass("New admin password: "), getpass.getpass("Repeat: ")
+        if pw != again:
+            sys.exit("Passwords do not match")
+    else:
+        pw = sys.stdin.readline().rstrip("\r\n")
+    try:
+        auth.set_password(pw)
+    except PasswordError as exc:
+        sys.exit(str(exc))
+    try:
+        os.remove(auth.setup_code_path)
+    except FileNotFoundError:
+        pass
+    print("Admin password set; all sessions were signed out.")
+    return True
 
 
 def main():
     args = parse_args()
+    if _admin_cli(args):
+        return
 
     # Configure logging
     log_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"

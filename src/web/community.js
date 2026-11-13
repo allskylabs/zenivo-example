@@ -47,10 +47,13 @@
     const noteEl = document.getElementById("cnote");
 
     const map = L.map("cmap", { worldCopyJump: true, minZoom: 2 }).setView([20, 10], 2);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 18,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
-    }).addTo(map);
+    // The map box gets its final size after the shell lays out (and on rotation): tell Leaflet, or tiles land off-centre
+    if (window.ResizeObserver) new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById("cmap"));
+    // Esri dark-grey canvas (same tile host as the Flights page): dark by design, with a separate label layer on top
+    const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas";
+    const esriAttr = 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors';
+    L.tileLayer(`${ESRI}/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 16, attribution: esriAttr }).addTo(map);
+    L.tileLayer(`${ESRI}/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 16 }).addTo(map);
     const layer = L.layerGroup().addTo(map);
     let stations = [];   // [{card, marker}]
     let ownId = null;

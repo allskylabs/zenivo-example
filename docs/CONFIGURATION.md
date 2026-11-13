@@ -42,6 +42,9 @@ Notes:
 - The sync protocol (`/api/allsky/ingest/frame` and `/api/allsky/ingest/telemetry`) keeps its
   original name. Pushes are not queued: a missed round is not re-sent.
 
+`--set-admin-password` sets the admin password (asks twice, or reads one line from stdin) and exits;
+`--reset-admin` removes the password and all sessions and exits. See [SECURITY.md](SECURITY.md).
+
 ## Environment variables
 
 Read by Zenivo:
@@ -159,6 +162,14 @@ effect without a restart.
 Draw the polygons that mark the visible sky and the obstructions (trees, buildings). The star
 search and the cloud analysis stay inside the sky polygons. Polygons are stored as fractions of the
 displayed frame and turn with the image when you change the orientation.
+
+### Admin
+
+- **Public location precision**: `0` (exact), `0.01` (about 1 km), `0.1` (about 10 km, default) or `1.0` (about 100 km).
+  Guests and the community card see the station location rounded to this grid; you see it exact. Stored as
+  `public_precision_deg` in `data/community.json`.
+- **Password**: change it (signs out other browsers) or sign out everywhere. Files: `data/admin.json`,
+  `data/admin_sessions.json`, `data/admin_setup_code.txt` (first start only). See [SECURITY.md](SECURITY.md).
 
 ### Integrations
 

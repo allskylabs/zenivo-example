@@ -113,8 +113,8 @@ class PlateSolveMixin:
 
         self.activity.success(
             "station",
-            f"Station configuration saved: {self.station_config.get('location_name')} "
-            f"({self.station_config.get('latitude_deg')}°N, {self.station_config.get('longitude_deg')}°E)",
+            # No coordinates in the activity log: its messages must stay safe to show to anyone
+            f"Station configuration saved: {self.station_config.get('location_name')}",
         )
         if auto_plate_solve:
             return self.run_station_plate_solve(fov_hint=fov_hint)

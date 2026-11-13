@@ -1000,6 +1000,7 @@ input[type="range"] {
 .field input[type="number"],
 .field input[type="text"],
 .field input[type="url"],
+.field input[type="password"],
 .field textarea {
     width: 100%;
     background: var(--bg-primary);
@@ -1013,7 +1014,9 @@ input[type="range"] {
 
 .field input[type="text"],
 .field input[type="url"],
+.field input[type="password"],
 .field textarea { font-family: var(--font-sans); }
+.field[hidden] { display: none; }
 .field textarea { resize: vertical; min-height: 4.5rem; }
 
 .field select {
@@ -2420,3 +2423,18 @@ details.registers-box[open] > summary { margin-bottom: 0.3rem; }
 .size-pipeline { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
 .size-pipeline li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 6px; background: var(--bg-elevated, rgba(255,255,255,0.03)); font-size: 0.9rem; }
 .size-pipeline strong { font-family: ui-monospace, monospace; color: var(--accent, #38bdf8); }
+
+/* ---- Admin sign-in: guests see a read-only UI (the server enforces; auth.js sets is-admin) ---- */
+:root:not(.is-admin) [data-admin] { display: none !important; }
+.side-auth { display: inline-block; margin-top: 6px; font-size: 12px; color: var(--text-secondary, inherit); text-decoration: underline; }
+.m-sheet-foot .side-auth { margin: 0 0 6px; display: block; }
+.auth-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 10000; max-width: calc(100vw - 32px);
+    padding: 10px 16px; border-radius: 10px; background: var(--bg-card, #111827); color: var(--text-primary, #fff);
+    border: 1px solid var(--accent, #38bdf8); box-shadow: 0 6px 24px rgba(0, 0, 0, .45); font-size: 14px; }
+.auth-toast a { color: var(--accent, #38bdf8); font-weight: 600; }
+.login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px; }
+.login-card { width: 100%; max-width: 420px; }
+.login-card .login-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.login-card .field { margin-bottom: 14px; }
+.login-card input[type="password"], .login-card input[type="text"] { width: 100%; box-sizing: border-box; min-height: 44px; }
+.login-card .btn { width: 100%; min-height: 44px; }

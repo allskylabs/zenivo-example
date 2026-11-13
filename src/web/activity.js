@@ -108,6 +108,8 @@
 
     async function poll() {
         if (document.hidden) return;
+        // The activity log is admin-only: guests do not poll it (the server would answer 401)
+        if (!(window.zenivoAuth && window.zenivoAuth.admin)) return;
         try {
             const since = lastSeenId === null ? 0 : lastSeenId;
             const res = await fetch(`/api/logs?since_id=${since}&limit=50`);

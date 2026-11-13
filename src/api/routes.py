@@ -38,6 +38,7 @@ from src.api.schemas import (
 from src.api.service import AllSkyService
 from src.storage import frame_codec
 from src.api.stream import mjpeg_frame_generator, handle_live_websocket, sse_event_generator
+from src.auth.rounding import view_for
 
 router = APIRouter()
 
@@ -45,6 +46,18 @@ router = APIRouter()
 def get_service() -> AllSkyService:
     """Dependency injector for AllSkyService instance."""
     return AllSkyService.get_instance()
+
+
+def _view_for_request(request, service: AllSkyService):
+    from src.auth.middleware import is_admin
+    return view_for(is_admin(request), service.public_precision)
+
+
+def public_view(request, service: AllSkyService, payload):
+    """Payload as the caller may see it: exact for the admin, station coordinates rounded and ADS-B secrets removed
+    for guests (src/auth/rounding.py). Server-side computations always keep the exact coordinates."""
+    from src.auth.middleware import is_admin
+    return view_for(is_admin(request), service.public_precision)(payload)
 
 
 # ----------------------------------------------------------------------
@@ -58,21 +71,21 @@ def get_version():
 
 
 @router.get("/api/status")
-def get_camera_status(service: AllSkyService = Depends(get_service)):
+def get_camera_status(request: Request, service: AllSkyService = Depends(get_service)):
     """
     Retrieve camera hardware status, Sony IMX335 I2C registers (VMAX, HMAX, SHR0, PGC),
     accurate hardware timing, and system uptime.
     """
-    return service.get_status()
+    return public_view(request, service, service.get_status())
 
 
 @router.get("/api/telemetry")
-def get_live_telemetry(service: AllSkyService = Depends(get_service)):
+def get_live_telemetry(request: Request, service: AllSkyService = Depends(get_service)):
     """
     Retrieve real-time astronomical telemetry: exposure, gain, star count,
     cloud cover percentage, and 256-bin RGB/Luma histogram.
     """
-    return service.get_telemetry()
+    return public_view(request, service, service.get_telemetry())
 
 
 # ----------------------------------------------------------------------
@@ -327,13 +340,14 @@ def trigger_master_dark(
 
 @router.get("/api/station/config")
 def get_station_config(
+    request: Request,
     service: AllSkyService = Depends(get_service),
 ):
     """
     Retrieve complete station coordinates, optical parameters, FOV, focal length,
     optical center, zenith tilt, azimuth, altitude, and WCS parameters.
     """
-    return service.get_station_config()
+    return public_view(request, service, service.get_station_config())
 
 
 @router.post("/api/station/location")
@@ -682,9 +696,13 @@ def set_event_config(req: EventConfigRequest, service: AllSkyService = Depends(g
 
 
 @router.get("/api/adsb")
-def get_adsb_config(service: AllSkyService = Depends(get_service)):
-    """ADS-B flight matching: receiver address and live feed status."""
-    return service.get_adsb_config()
+def get_adsb_config(request: Request, service: AllSkyService = Depends(get_service)):
+    """ADS-B flight matching: receiver address and live feed status (receiver address and FR24 account e-mail: admin only)."""
+    from src.auth.middleware import is_admin
+    cfg = service.get_adsb_config()
+    if not is_admin(request):
+        cfg = dict(cfg, host="", fr24_email="")
+    return cfg
 
 
 @router.get("/api/adsb/aircraft")
@@ -693,11 +711,13 @@ def get_adsb_aircraft(limit: int = Query(default=30, ge=1, le=6000),
                       bounds: Optional[str] = Query(default=None, max_length=120),
                       fr24: Optional[bool] = Query(default=None),
                       compact: bool = Query(default=False),
+                      request: Request = None,
                       service: AllSkyService = Depends(get_service)):
     """Aircraft heard right now (local ADS-B + Flightradar24 global feed): flight, altitude, speed, heading,
     distance, direction, in camera view. trail=<seconds> adds lat/lon and each aircraft's recent path (3D map);
     bounds=north,south,west,east or 'global' queries Flightradar24 for that region or the whole globe."""
-    return service.get_aircraft_now(limit=limit, trail_s=trail, bounds=bounds, include_fr24=fr24, compact=compact)
+    return public_view(request, service, service.get_aircraft_now(
+        limit=limit, trail_s=trail, bounds=bounds, include_fr24=fr24, compact=compact))
 
 
 @router.get("/api/traffic")
@@ -755,12 +775,14 @@ def get_satellites(track: float = Query(default=0.0, ge=0.0, le=120.0),
                    limit: int = Query(default=60, ge=1, le=400),
                    ids: str = Query(default=""),
                    trail: float = Query(default=0.0, ge=0.0, le=1800.0),
+                   request: Request = None,
                    service: AllSkyService = Depends(get_service)):
     """Large satellites above the horizon now: az/alt, range, sunlit, lat/lon/height and position in the camera
     frame. track=<minutes> adds each of the highest ones' path (5 min back, <minutes> ahead); below=true also
     lists those under the horizon (3D map); ids=<norad,...> also tracks those."""
-    return service.get_satellites_now(track_min=track, below=below, limit=limit, trail_s=trail,
-                                       track_ids={int(i) for i in ids.split(",") if i.strip().isdigit()})
+    return public_view(request, service, service.get_satellites_now(
+        track_min=track, below=below, limit=limit, trail_s=trail,
+        track_ids={int(i) for i in ids.split(",") if i.strip().isdigit()}))
 
 
 @router.get("/api/map/config")
@@ -819,6 +841,7 @@ def get_mjpeg_stream(
 @router.get("/api/stream/sse")
 @router.get("/api/sse")
 def get_sse_stream(
+    request: Request,
     interval: float = Query(default=1.0, ge=0.25, le=10.0),
     service: AllSkyService = Depends(get_service),
 ):
@@ -826,7 +849,7 @@ def get_sse_stream(
     Server-Sent Events (SSE) push stream for real-time telemetry and status updates.
     """
     return StreamingResponse(
-        sse_event_generator(service, interval=interval),
+        sse_event_generator(service, interval=interval, view=_view_for_request(request, service)),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -939,9 +962,9 @@ def reset_station_calibration(service: AllSkyService = Depends(get_service)):
 
 
 @router.get("/api/station/plate-solve/status")
-def get_station_plate_solve_status(service: AllSkyService = Depends(get_service)):
+def get_station_plate_solve_status(request: Request, service: AllSkyService = Depends(get_service)):
     """State of the background plate-solve job (idle / running / success / failed)."""
-    return service.get_plate_solve_status()
+    return public_view(request, service, service.get_plate_solve_status())
 
 
 # ----------------------------------------------------------------------

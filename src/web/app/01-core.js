@@ -350,6 +350,7 @@ btnNightVision.addEventListener("click", () => {
     chk.checked = !!prefs[prefKey];
     chk.addEventListener("change", () => {
         savePrefs({ [prefKey]: chk.checked });
+        if (!(window.zenivoAuth && window.zenivoAuth.admin)) return;  // guests keep the choice in this browser only
         fetch("/api/obs/overlay", {
             method: "POST",
             headers: { "Content-Type": "application/json" },

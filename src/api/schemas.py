@@ -278,7 +278,8 @@ class CommunitySettingsRequest(BaseModel):
     enabled: Optional[bool] = None
     name: Optional[str] = Field(None, max_length=60, description="Station name shown on the community map (default: the station location name)")
     public_url: Optional[str] = Field(None, max_length=200, description="https URL where this station can be reached from the internet, or empty")
-    precision_deg: Optional[float] = Field(None, description="Location grid: 0.01, 0.1 or 1.0 degree")
+    public_precision_deg: Optional[float] = Field(None, description="Rounding grid for the station's public location (guests and the community card): 0 (exact), 0.01, 0.1 or 1.0 degree")
+    precision_deg: Optional[float] = Field(None, description="Deprecated name of public_precision_deg")
     share_thumbnail: Optional[bool] = None
     seeds: Optional[List[str]] = Field(None, max_length=10, description="Stations to ask first, one URL each (http allowed for a LAN)")
 

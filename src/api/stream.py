@@ -17,6 +17,8 @@ from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 
 from src.api.service import AllSkyService
+from src.auth.middleware import can_mutate, is_admin
+from src.auth.rounding import view_for
 
 # 92-byte Little-Endian Binary Header ("ASB1") + 4096-byte uint32[4][256] Histogram + Raw JPEG
 ASB1_HEADER_STRUCT = struct.Struct("<4sBBBBdffffIfffIIIIfffffHHI")
@@ -423,20 +425,27 @@ async def _build_full_binary_packet(
 _stream_jpeg_cache: list = [None, -1.0, b""]
 
 
-async def sse_event_generator(service: AllSkyService, interval: float = 1.0):
+# WebSocket messages that change state: only a signed-in admin (cookie from the handshake) may send them
+WS_MUTATING_ACTIONS = frozenset({"set_exposure", "set_gain", "set_mode", "trigger_master_dark"})
+WS_MUTATING_COMMANDS = frozenset({1, 2})  # ASC1 binary: 1 = set_mode, 2 = set_exposure + gain
+WS_AUTH_ERROR = {"type": "error", "code": "auth", "message": "Sign in as admin"}
+
+
+async def sse_event_generator(service: AllSkyService, interval: float = 1.0, view=None):
     """
     Server-Sent Events (SSE) generator yielding real-time telemetry and status pushes
-    without client HTTP fetch polling.
+    without client HTTP fetch polling. `view` filters the payload for the caller (guests get rounded coordinates).
     """
+    view = view or (lambda p: p)
     while True:
         try:
             status_payload = await asyncio.to_thread(service.get_status)
             telem_payload = await asyncio.to_thread(service.get_telemetry)
-            payload = json.dumps({
+            payload = json.dumps(view({
                 "type": "telemetry",
                 "status": status_payload,
                 "telemetry": telem_payload,
-            })
+            }))
             yield f"data: {payload}\n\n"
         except asyncio.CancelledError:
             break
@@ -457,6 +466,8 @@ async def handle_live_websocket(websocket: WebSocket, service: AllSkyService):
     binary_mode = websocket.query_params.get("binary", "0") in ("1", "true", "yes")
     full_res = websocket.query_params.get("full", "0") in ("1", "true", "yes")
     client_v2 = websocket.query_params.get("v", "") == "2"
+    view = view_for(is_admin(websocket), service.public_precision)  # guests get rounded station coordinates
+    may_change = can_mutate(websocket)  # admin session from the handshake cookie + same-site Origin
     try:
         if binary_mode:
             pkt = await _build_full_binary_packet(service, packet_type=1, full_res=full_res, client_v2=client_v2)
@@ -464,11 +475,11 @@ async def handle_live_websocket(websocket: WebSocket, service: AllSkyService):
         else:
             status_payload = await asyncio.to_thread(service.get_status)
             telem_payload = await asyncio.to_thread(service.get_telemetry)
-            await websocket.send_json({
+            await websocket.send_json(view({
                 "type": "welcome",
                 "status": status_payload,
                 "telemetry": telem_payload,
-            })
+            }))
 
         # Lock state is not in ASB1: push it as text whenever it (or the frame brightness) changes
         last_lock = None
@@ -496,11 +507,11 @@ async def handle_live_websocket(websocket: WebSocket, service: AllSkyService):
                 else:
                     telem = await asyncio.to_thread(service.get_telemetry)
                     status = await asyncio.to_thread(service.get_status)
-                    await websocket.send_json({
+                    await websocket.send_json(view({
                         "type": "telemetry",
                         "data": telem,
                         "status": status,
-                    })
+                    }))
 
         streamer_task = asyncio.create_task(live_streamer())
 
@@ -517,6 +528,9 @@ async def handle_live_websocket(websocket: WebSocket, service: AllSkyService):
                         _, cmd_id, mode_val, _, exp_val, gain_val = ASC1_CMD_STRUCT.unpack(
                             raw_bytes[:ASC1_CMD_STRUCT.size]
                         )
+                        if cmd_id in WS_MUTATING_COMMANDS and not may_change:
+                            await websocket.send_json(WS_AUTH_ERROR)
+                            continue
                         if cmd_id == 1:  # set_mode
                             target_mode = "auto" if mode_val == 1 else "manual"
                             await asyncio.to_thread(service.set_mode, target_mode)
@@ -533,15 +547,18 @@ async def handle_live_websocket(websocket: WebSocket, service: AllSkyService):
                 try:
                     cmd = json.loads(data_text)
                     action = cmd.get("action", "")
+                    if action in WS_MUTATING_ACTIONS and not may_change:
+                        await websocket.send_json(WS_AUTH_ERROR)
+                        continue
 
                     if action == "ping":
                         await websocket.send_json({"type": "pong", "timestamp": time.time()})
                     elif action == "get_telemetry":
                         telem = await asyncio.to_thread(service.get_telemetry)
-                        await websocket.send_json({"type": "telemetry", "data": telem})
+                        await websocket.send_json(view({"type": "telemetry", "data": telem}))
                     elif action == "get_status":
                         status = await asyncio.to_thread(service.get_status)
-                        await websocket.send_json({"type": "status", "data": status})
+                        await websocket.send_json(view({"type": "status", "data": status}))
                     elif action == "set_exposure":
                         exp = float(cmd.get("exposure_s", 2.0))
                         gain = cmd.get("gain_db")

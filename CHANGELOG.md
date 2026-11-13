@@ -6,6 +6,11 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ## [1.1.0] - 2026-11-13
 
+### Changed
+
+- CORS no longer allows credentials; the admin cookie is same-site only.
+- Station activity messages no longer contain coordinates.
+
 ### Added
 
 - Community (opt-in, off by default): stations share a signed station card (name, approximate location,
@@ -13,6 +18,12 @@ All notable changes to Zenivo are recorded here. The format follows
   Ed25519 identity in `data/community_key.pem`, signed and size-capped cards, SSRF-guarded fetching,
   endpoints under `/api/community/`, a Community section in Settings and a `/community` map page (Leaflet).
   See `docs/COMMUNITY.md`.
+- Admin login (single admin, no new dependency): everything that changes or leaks is admin only and denied by default,
+  including WebSocket commands; guests can watch. First-start setup code in `data/admin_setup_code.txt`, scrypt password,
+  30-day sessions, login throttling, CSRF origin check, `run_allsky.py --set-admin-password` and `--reset-admin`,
+  `/login` page, `/api/auth/*`, Settings, Admin. See `docs/SECURITY.md`.
+- Guests see the station location rounded (`public_precision_deg`: exact, 0.01, 0.1 default or 1.0 degree); the community
+  card uses the same setting (the Community card's own precision select is gone, the old `precision_deg` key is still read).
 - New dependency: `cryptography>=38` (without it Community reports itself unavailable and everything else works).
 
 ## [1.0.0] - 2026-11-13

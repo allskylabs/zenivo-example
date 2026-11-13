@@ -19,7 +19,7 @@ MAX_URL = 200
 MAX_SHORT = 60          # camera, software
 MAX_THUMB_BYTES = 8 * 1024
 FUTURE_SKEW_S = 600     # `updated` may be at most 10 minutes ahead of our clock
-PRECISIONS = (0.01, 0.1, 1.0)
+PRECISIONS = (0.0, 0.01, 0.1, 1.0)  # 0 = exact
 THUMB_PREFIXES = ("data:image/jpeg;base64,", "data:image/webp;base64,")
 _FIELDS = {"v", "id", "pubkey", "name", "lat", "lon", "url", "camera", "software", "updated", "thumb", "sig"}
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
@@ -37,7 +37,9 @@ def canonical(card: Dict[str, Any]) -> bytes:
 
 
 def snap(value: float, precision_deg: float) -> float:
-    """Round a coordinate to the sharing grid (0.1 deg is about 10 km)."""
+    """Round a coordinate to the sharing grid (0.1 deg is about 10 km); 0 keeps it exact."""
+    if not precision_deg:
+        return round(float(value), 5)
     return round(round(float(value) / precision_deg) * precision_deg, 4)
 
 
@@ -45,7 +47,7 @@ def build_card(identity: Identity, *, name: str, lat: float, lon: float, precisi
                camera: Optional[str], software: str, thumb: Optional[str] = None,
                updated: Optional[float] = None) -> Dict[str, Any]:
     if precision_deg not in PRECISIONS:
-        raise CardError("precision_deg must be 0.01, 0.1 or 1.0")
+        raise CardError("precision_deg must be 0, 0.01, 0.1 or 1.0")
     card: Dict[str, Any] = {
         "v": CARD_VERSION,
         "id": identity.id,

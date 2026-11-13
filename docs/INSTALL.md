@@ -79,12 +79,21 @@ Contents: [Requirements](#requirements) | [Install with install.sh](#install-wit
 
    Expected output: `{"product":"Zenivo","version":"1.0.0"}`.
 
-6. In **Settings > Station & Optics**, enter latitude, longitude and elevation. The factory default is
+6. Set the admin password. Until you do, nobody can change settings. Read the one-time setup code on the
+   station and enter it at `http://<host>:8080/login` together with a password of 10 characters or more:
+
+   ```bash
+   cat data/admin_setup_code.txt        # inside the install directory
+   # or, without the browser:
+   .venv/bin/python run_allsky.py --set-admin-password
+   ```
+
+7. In **Settings > Station & Optics**, enter latitude, longitude and elevation. The factory default is
    Hanoi (21.0285, 105.8542). Wrong coordinates shift aircraft, satellites and planets in every
    overlay.
 
-The edge API has no authentication. With `--host 0.0.0.0` anyone on the network can open the UI and
-change settings. Use `--host 127.0.0.1` with a reverse proxy, or keep the host on a trusted network.
+Visitors who are not signed in can watch (with the station location rounded) but cannot change anything;
+see [SECURITY.md](SECURITY.md). Use `--host 127.0.0.1` with a reverse proxy or tunnel over HTTPS.
 
 ## Install by hand
 

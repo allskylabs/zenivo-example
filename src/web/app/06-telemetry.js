@@ -433,6 +433,8 @@ function initWebSocket() {
                     if (msg.type === "ae_lock" && !state.dragging && !state.lockPending) {
                         syncModeButtons(msg.mode);
                         syncAeLock(msg.ae_lock);
+                    } else if (msg.type === "error" && msg.code === "auth") {
+                        if (window.zenivoAuth) window.zenivoAuth.toast();
                     } else if (msg.type === "obs_overlay" && msg.settings) {
                         if (chkSkyOverlay && typeof msg.settings.sky_overlay === "boolean") chkSkyOverlay.checked = msg.settings.sky_overlay;
                         if (chkSkyLabels && typeof msg.settings.sky_labels === "boolean") chkSkyLabels.checked = msg.settings.sky_labels;

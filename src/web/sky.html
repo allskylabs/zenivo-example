@@ -17,6 +17,7 @@
     <meta property="og:description" content="Interactive planetarium of the sky above your Zenivo all-sky station.">
     <meta property="og:image" content="/static/brand/og-image.png">
     <meta name="twitter:card" content="summary_large_image">
+    <script src="/static/auth.js?v=1"></script>
     <script src="/static/brand/version.js?v=1" defer></script>
     <!-- head-brand:end -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -61,19 +62,19 @@
             <div class="side-group">
                 <div class="side-group-title">Archive</div>
                 <a class="tab-btn side-item" href="/gallery" data-tab="tab-gallery"><span class="side-ic">&#9638;</span><span class="side-txt">Gallery &amp; Events</span></a>
-                <a class="tab-btn side-item" href="/logs" data-tab="tab-logs"><span class="side-ic">&#8801;</span><span class="side-txt">Activity Log</span></a>
+                <a class="tab-btn side-item" href="/logs" data-tab="tab-logs" data-admin><span class="side-ic">&#8801;</span><span class="side-txt">Activity Log</span></a>
             </div>
             <div class="side-group">
                 <div class="side-group-title">Camera</div>
-                <a class="tab-btn side-item" href="/focus" data-tab="tab-focus"><span class="side-ic">&#9678;</span><span class="side-txt">Focus</span></a>
-                <a class="tab-btn side-item" href="/calibration" data-tab="tab-calibration"><span class="side-ic">&#9680;</span><span class="side-txt">Master Dark</span></a>
+                <a class="tab-btn side-item" href="/focus" data-tab="tab-focus" data-admin><span class="side-ic">&#9678;</span><span class="side-txt">Focus</span></a>
+                <a class="tab-btn side-item" href="/calibration" data-tab="tab-calibration" data-admin><span class="side-ic">&#9680;</span><span class="side-txt">Master Dark</span></a>
             </div>
             <div class="side-group">
                 <div class="side-group-title">Broadcast</div>
                 <a class="side-item side-link" href="/obs/dock"><span class="side-ic">&#9635;</span><span class="side-txt">OBS Dock</span></a>
                 <a class="side-item side-link" href="/obs" target="_blank" rel="noopener"><span class="side-ic">&#8599;</span><span class="side-txt">OBS Preview</span></a>
             </div>
-            <div class="side-group side-group-settings">
+            <div class="side-group side-group-settings" data-admin>
                 <div class="side-group-title">Settings</div>
                 <a class="tab-btn side-item" href="/settings" data-tab="tab-settings"><span class="side-ic">&#9881;</span><span class="side-txt">Settings</span></a>
                 <div class="side-sub-list" id="settings-subnav">
@@ -83,10 +84,11 @@
                     <a class="side-sub" href="/settings#skymask" data-sub="skymask">Sky Mask</a>
                     <a class="side-sub" href="/settings#integrations" data-sub="integrations">Integrations</a>
                     <a class="side-sub" href="/settings#community" data-sub="community">Community</a>
+                    <a class="side-sub" href="/settings#admin" data-sub="admin">Admin</a>
                 </div>
             </div>
         </nav>
-        <div class="side-foot"><span id="app-version" data-app-version>Zenivo</span></div>
+        <div class="side-foot"><span id="app-version" data-app-version>Zenivo</span><br><a class="side-auth" href="/login" data-auth-link>Sign in</a></div>
     </aside>
 
     <!-- Phone navigation (<=768px): 4 tabs + More sheet, same routes as the sidebar -->
@@ -102,21 +104,22 @@
         <div class="m-sheet-grip" aria-hidden="true"></div>
         <a class="m-sheet-item" href="/satellites3d" data-mpath="/satellites3d">Satellites 3D</a>
         <a class="m-sheet-item" href="/community" data-mpath="/community">Community</a>
-        <a class="m-sheet-item" href="/logs" data-mpath="/logs">Activity Log</a>
-        <a class="m-sheet-item" href="/focus" data-mpath="/focus">Focus</a>
-        <a class="m-sheet-item" href="/calibration" data-mpath="/calibration">Master Dark</a>
-        <div class="m-sheet-title">Settings</div>
-        <a class="m-sheet-item" href="/settings#image">Image Output</a>
-        <a class="m-sheet-item" href="/settings#detection">Detection</a>
-        <a class="m-sheet-item" href="/settings#station">Station &amp; Optics</a>
-        <a class="m-sheet-item" href="/settings#skymask">Sky Mask</a>
-        <a class="m-sheet-item" href="/settings#integrations">Integrations</a>
-        <a class="m-sheet-item" href="/settings#community">Community</a>
+        <a class="m-sheet-item" href="/logs" data-mpath="/logs" data-admin>Activity Log</a>
+        <a class="m-sheet-item" href="/focus" data-mpath="/focus" data-admin>Focus</a>
+        <a class="m-sheet-item" href="/calibration" data-mpath="/calibration" data-admin>Master Dark</a>
+        <div class="m-sheet-title" data-admin>Settings</div>
+        <a class="m-sheet-item" href="/settings#image" data-admin>Image Output</a>
+        <a class="m-sheet-item" href="/settings#detection" data-admin>Detection</a>
+        <a class="m-sheet-item" href="/settings#station" data-admin>Station &amp; Optics</a>
+        <a class="m-sheet-item" href="/settings#skymask" data-admin>Sky Mask</a>
+        <a class="m-sheet-item" href="/settings#integrations" data-admin>Integrations</a>
+        <a class="m-sheet-item" href="/settings#community" data-admin>Community</a>
+        <a class="m-sheet-item" href="/settings#admin" data-admin>Admin</a>
         <div class="m-sheet-title">Broadcast</div>
         <a class="m-sheet-item" href="/obs/dock">OBS Dock</a>
         <a class="m-sheet-item" href="/obs" target="_blank" rel="noopener">OBS Preview</a>
         <button class="m-sheet-item m-sheet-rv" type="button" id="m-rv-toggle" role="switch" aria-checked="false"><span>Red Vision</span><span class="rv-track"><span class="rv-knob"></span></span></button>
-        <div class="m-sheet-foot"><span id="app-version-m" data-app-version>Zenivo</span></div>
+        <div class="m-sheet-foot"><a class="side-auth" href="/login" data-auth-link>Sign in</a><span id="app-version-m" data-app-version>Zenivo</span></div>
     </div>
     <!-- nav:end -->
 

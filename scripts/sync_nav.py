@@ -14,7 +14,8 @@ import sys
 
 WEB = os.path.join(os.path.dirname(__file__), "..", "src", "web")
 PAGES = {"index.html": None, "sky.html": "/sky", "flights3d.html": "/flights3d", "satellites3d.html": "/satellites3d",
-         "community.html": "/community"}
+         "community.html": "/community", "login.html": "/login"}
+NO_NAV = {"login.html"}  # standalone page without sidebar: only head and brand are generated
 
 # Zenivo mark, inline so it follows the theme (ring = --accent, inner ring + star = --text-primary; see .brand-mark in style.css)
 BRAND = [
@@ -33,6 +34,7 @@ HEAD = {
     "sky.html": ("Sky view — Zenivo", "Interactive planetarium of the sky above your Zenivo all-sky station."),
     "flights3d.html": ("Flights 3D — Zenivo", "3D map of the aircraft your all-sky station hears over ADS-B."),
     "satellites3d.html": ("Satellites 3D — Zenivo", "3D map of the satellites above your all-sky station."),
+    "login.html": ("Sign in — Zenivo", "Sign in to the admin controls of your Zenivo all-sky station."),
     "community.html": ("Community — Zenivo", "Map of the Zenivo all-sky stations that share themselves with the community."),
 }
 
@@ -51,8 +53,11 @@ NAV = [
     ("Broadcast", [("/obs/dock", "&#9635;", "OBS Dock", "link", ""),
                    ("/obs", "&#8599;", "OBS Preview", "blank", "")]),
 ]
+# Items only the admin sees (hidden for guests via data-admin; the server enforces the same list)
+ADMIN_HREFS = {"/logs", "/focus", "/calibration"}
 SETTINGS = [("image", "Image Output"), ("detection", "Detection"), ("station", "Station &amp; Optics"),
-            ("skymask", "Sky Mask"), ("integrations", "Integrations"), ("community", "Community")]
+            ("skymask", "Sky Mask"), ("integrations", "Integrations"), ("community", "Community"),
+            ("admin", "Admin")]
 # phone tab bar: 4 tabs + More (the rest lives in the sheet)
 MOBILE = [("/live", "&#9673;", "Live", "/live,/,/index.html"), ("/sky", "&#10024;", "Sky", "/sky"),
           ("/flights3d", "&#9992;", "Flights", "/flights3d"), ("/gallery", "&#9638;", "Archive", "/gallery,/logs")]
@@ -77,6 +82,7 @@ def render_head(name):
              '<meta property="og:site_name" content="Zenivo">', '<meta property="og:type" content="website">',
              f'<meta property="og:title" content="{title}">', f'<meta property="og:description" content="{desc}">',
              f'<meta property="og:image" content="{img}">', '<meta name="twitter:card" content="summary_large_image">',
+             '<script src="/static/auth.js?v=1"></script>',
              '<script src="/static/brand/version.js?v=1" defer></script>', "<!-- head-brand:end -->"]
     return "\n    ".join(lines)
 
@@ -86,6 +92,7 @@ def side_item(href, ic, label, kind, tab, current, is_index):
     if current == href and not is_index:
         cls += " active"
     attrs = f' data-tab="{tab}"' if kind == "tab" else ""
+    attrs += " data-admin" if href in ADMIN_HREFS else ""
     attrs += ' aria-current="page"' if current == href and not is_index else ""
     attrs += ' target="_blank" rel="noopener"' if kind == "blank" else ""
     badge = ' <span class="log-badge" id="log-error-badge" hidden>0</span>' if href == "/logs" and is_index else ""
@@ -102,12 +109,13 @@ def render(current, is_index):
             o.append(f'                <div class="side-group-title">{title}</div>')
         o += [side_item(*it, current, is_index) for it in items]
         o.append('            </div>')
-    o += ['            <div class="side-group side-group-settings">', '                <div class="side-group-title">Settings</div>',
+    o += ['            <div class="side-group side-group-settings" data-admin>', '                <div class="side-group-title">Settings</div>',
           '                <a class="tab-btn side-item" href="/settings" data-tab="tab-settings"><span class="side-ic">&#9881;</span>'
           '<span class="side-txt">Settings</span></a>', '                <div class="side-sub-list" id="settings-subnav">']
     o += [f'                    <a class="side-sub" href="/settings#{k}" data-sub="{k}">{t}</a>' for k, t in SETTINGS]
     o += ['                </div>', '            </div>', '        </nav>',
-          '        <div class="side-foot"><span id="app-version" data-app-version>Zenivo</span></div>', '    </aside>', '',
+          '        <div class="side-foot"><span id="app-version" data-app-version>Zenivo</span>'
+          '<br><a class="side-auth" href="/login" data-auth-link>Sign in</a></div>', '    </aside>', '',
           '    <!-- Phone navigation (<=768px): 4 tabs + More sheet, same routes as the sidebar -->',
           '    <nav class="m-tabbar" id="m-tabbar" aria-label="Mobile navigation">']
     o += [f'        <a class="m-tab" href="{h}" data-mpath="{p}"><span class="m-ic">{i}</span><span class="m-txt">{t}</span></a>'
@@ -117,14 +125,16 @@ def render(current, is_index):
           '    </nav>', '    <div class="m-sheet-backdrop" id="m-sheet-backdrop" hidden></div>',
           '    <div class="m-sheet" id="m-more-sheet" role="dialog" aria-label="More" hidden>',
           '        <div class="m-sheet-grip" aria-hidden="true"></div>']
-    o += [f'        <a class="m-sheet-item" href="{h}" data-mpath="{h}">{t}</a>' for h, t in SHEET]
-    o.append('        <div class="m-sheet-title">Settings</div>')
-    o += [f'        <a class="m-sheet-item" href="/settings#{k}">{t}</a>' for k, t in SETTINGS]
+    o += [f'        <a class="m-sheet-item" href="{h}" data-mpath="{h}"{" data-admin" if h in ADMIN_HREFS else ""}>{t}</a>'
+          for h, t in SHEET]
+    o.append('        <div class="m-sheet-title" data-admin>Settings</div>')
+    o += [f'        <a class="m-sheet-item" href="/settings#{k}" data-admin>{t}</a>' for k, t in SETTINGS]
     o += ['        <div class="m-sheet-title">Broadcast</div>', '        <a class="m-sheet-item" href="/obs/dock">OBS Dock</a>',
           '        <a class="m-sheet-item" href="/obs" target="_blank" rel="noopener">OBS Preview</a>',
           '        <button class="m-sheet-item m-sheet-rv" type="button" id="m-rv-toggle" role="switch" aria-checked="false">'
           '<span>Red Vision</span><span class="rv-track"><span class="rv-knob"></span></span></button>',
-          '        <div class="m-sheet-foot"><span id="app-version-m" data-app-version>Zenivo</span></div>',
+          '        <div class="m-sheet-foot"><a class="side-auth" href="/login" data-auth-link>Sign in</a>'
+          '<span id="app-version-m" data-app-version>Zenivo</span></div>',
           '    </div>', '    <!-- nav:end -->']
     return "\n".join(o)
 
@@ -144,7 +154,8 @@ def patch(text, current, is_index):
 
 
 def patch_page(name, text, current, is_index):
-    text = patch(text, current, is_index)
+    if name not in NO_NAV:
+        text = patch(text, current, is_index)
     text = re.sub(r"<!-- brand:start.*?<!-- brand:end -->", lambda m: render_brand(), text, flags=re.S)
     return re.sub(r"<!-- head-brand:start.*?<!-- head-brand:end -->", lambda m: render_head(name), text, flags=re.S)
 

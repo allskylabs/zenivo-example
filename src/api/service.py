@@ -47,6 +47,7 @@ from src.api.focus_mixin import FocusMixin
 from src.api.lens_mixin import LensMixin
 from src.api.plate_solve_mixin import PlateSolveMixin
 from src.community.manager import CommunityManager
+from src.auth.manager import AuthManager
 
 
 
@@ -299,6 +300,9 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
         # Opt-in station sharing (src/community); creates no file and starts no thread until enabled in Settings
         self.community = CommunityManager(self.output_dir, self._community_station, lambda: self.last_jpeg,
                                           self.get_snapshot_jpeg)
+        # Single-admin login (src/auth): until a password exists everything that changes or leaks stays locked
+        self.auth = AuthManager(self.output_dir)
+        self.auth.ensure_setup_code()
         if not os.environ.get("PYTEST_CURRENT_TEST"):
             threading.Thread(target=self._retention_worker, name="retention", daemon=True).start()
             threading.Thread(target=self._background_capture_worker, name="bg-capture", daemon=True).start()
@@ -990,6 +994,10 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
         data = webp.tobytes()
         self.last_webp, self._webp_frame_ts = data, frame_ts
         return data
+
+    def public_precision(self) -> float:
+        """Grid (degrees, 0 = exact) the station's own coordinates are rounded to for guests and the community card."""
+        return float(self.community.settings()["public_precision_deg"])
 
     def _community_station(self) -> Dict[str, Any]:
         """What the community card says about this station (name, coordinates, sensor)."""

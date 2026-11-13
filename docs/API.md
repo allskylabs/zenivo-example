@@ -8,16 +8,36 @@ described here. When the service runs, FastAPI also publishes the live schema at
 
 - Base URL: `http://<host>:<port>` (default port 8080).
 - Format: JSON unless noted. Request bodies for `POST`/`PUT` are JSON.
-- **Authentication: none.** Restrict access with the bind address and a reverse proxy.
+- **Authentication**: one admin, session cookie `zenivo_session`, see [Authentication](#authentication) and [SECURITY.md](SECURITY.md). Routes marked **admin** in the tables below answer `401 {"detail":"Sign in as admin","code":"auth"}` to guests; every `POST`/`PUT`/`DELETE` is admin unless stated.
 - Times: epoch parameters are Unix seconds. Recorded timestamps are local ISO 8601 with offset.
 - Validation errors return HTTP 422. Names such as `/api/allsky/ingest/*` and `/uploads/allsky/...`
   keep the original "allsky" name.
 
 Contents: [Pages and static files](#pages-and-static-files) | [Version and status](#version-and-status) |
-[Camera](#camera) | [Calibration](#calibration) | [Station](#station) | [Live images and streams](#live-images-and-streams) |
+[Authentication](#authentication) | [Camera](#camera) | [Calibration](#calibration) | [Station](#station) | [Live images and streams](#live-images-and-streams) |
 [Focus](#focus) | [Products and events](#products-and-events) | [Frames](#frames) | [Traffic](#traffic-aircraft-satellites-radiosondes) |
 [Sky and clouds](#sky-and-clouds) | [Storage and logs](#storage-and-logs) | [OBS](#obs) |
 [WebSocket](#websocket-wslive) | [Sync API](#sync-api-on-the-hoanuk-server)
+
+## Authentication
+
+Default deny: any request that is not `GET`/`HEAD`/`OPTIONS` needs an admin session, except the open routes below.
+Admin-only reads: `/api/logs`, `/api/logs/download`, `/api/community/settings`. Admin pages: `/settings`,
+`/calibration`, `/focus`, `/logs` (guests are redirected to `/login?next=<path>`). A state-changing request with an
+`Origin` header that differs from `Host` gets 403.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/auth/status` | `{configured, admin, setup_pending}` |
+| POST | `/api/auth/setup` | Body `{code, password}`. First start only: the code is in `data/admin_setup_code.txt`. Sets the password and signs in. 403 wrong code, 409 already set, 422 bad password, 429 throttled |
+| POST | `/api/auth/login` | Body `{password}`. Sets the session cookie. 403 wrong password, 409 not set up, 429 throttled (`Retry-After`) |
+| POST | `/api/auth/logout` | Ends this session |
+| POST | `/api/auth/password` | **admin**. Body `{current, new}`. Ends every other session |
+| POST | `/api/auth/logout-all` | **admin**. Ends every session |
+
+Guests get the station location rounded to `public_precision_deg` (`"location_rounded": true`) in
+`/api/station/config`, `/api/status`, `/api/telemetry`, SSE/WebSocket telemetry, the plate-solve status and the `station`
+object of `/api/adsb/aircraft` and `/api/satellites`; the ADS-B receiver address and Flightradar24 e-mail are blank.
 
 ## Pages and static files
 
@@ -88,7 +108,7 @@ Opt-in station sharing, see [COMMUNITY.md](COMMUNITY.md). All of it is off until
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/api/community/status` | `{available, reason, enabled, id, known, last_round}` (`available` is false when the `cryptography` package is missing) |
-| GET, POST | `/api/community/settings` | `enabled` (default false), `name`, `public_url` (https or empty), `precision_deg` (0.01, 0.1 or 1.0), `share_thumbnail`, `seeds` (list of URLs). POST starts or stops the gossip worker and runs a round |
+| GET, POST | `/api/community/settings` | **admin**. `enabled` (default false), `name`, `public_url` (https or empty), `public_precision_deg` (0, 0.01, 0.1 or 1.0; default 0.1; also what guests see of the station location; `precision_deg` is the old name), `share_thumbnail`, `seeds` (list of URLs). POST starts or stops the gossip worker and runs a round |
 | GET | `/api/community/card` | Own signed card; 404 while sharing is off |
 | GET | `/api/community/peers` | `{cards: [own card, ...known cards]}`; `{cards: []}` while off. Open to any origin (`Access-Control-Allow-Origin: *`) |
 | POST | `/api/community/announce` | Body: one card (max 16 KB). 200 `{ok: true}` when the signature verifies; 400 bad card, 403 sharing off, 413 too large, 429 over 30 per minute per client address |
@@ -199,6 +219,8 @@ Connect to `ws://<host>:<port>/ws/live?binary=1`. Without `binary=1` the endpoin
   exposure and gain.
 - A text message `{"type": "ae_lock", ...}` is sent when the lock state or the frame brightness changes.
 - Broadcast text messages: `{"type": "obs_overlay", ...}` and `{"type": "obs_reload"}`.
+
+Commands that change state (ASC1 `1` and `2`, `set_exposure`, `set_gain`, `set_mode`, `trigger_master_dark`) need the admin session cookie on the handshake and a matching `Origin`; for guests the server answers `{"type":"error","code":"auth","message":"Sign in as admin"}` and does nothing.
 
 **JSON mode** (tests and simple clients): send `{"action": ...}` with one of `ping`,
 `get_telemetry`, `get_status`, `set_exposure` (`exposure_s`, `gain_db`), `set_gain` (`gain_db`),

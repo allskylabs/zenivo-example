@@ -29,6 +29,7 @@ is the main design constraint: heavy analysis is sampled, never done per frame.
 - **Plate solving**: local bright-star solver, with a remote blind-solve fallback; sky and obstruction mask.
 - **Sky pages**: observer sky view, Flights 3D and Satellites 3D, OBS browser source and dock.
 - **Community** (opt-in, off by default): share a signed station card with other Zenivo stations by gossip, no central server, and see them on a map; see [docs/COMMUNITY.md](docs/COMMUNITY.md).
+- **Admin login**: one admin password protects every change and the logs; guests can watch and see the station location rounded. First start: read the setup code with `cat data/admin_setup_code.txt` and open `/login`; see [docs/SECURITY.md](docs/SECURITY.md).
 - **Storage**: AVIF frame archive, age and size based retention, extra directories to prune.
 - **Sync**: optional push of frames and telemetry to a hoan.uk server.
 
@@ -67,7 +68,8 @@ With a real camera, installed as a systemd service:
 ./install.sh --camera auto --port 8080
 ```
 
-Open `http://<host>:8080/`. Full steps are in [docs/INSTALL.md](docs/INSTALL.md).
+Open `http://<host>:8080/`. First run: nobody can change settings until you set the admin password. Read the one-time
+setup code with `cat data/admin_setup_code.txt` and enter it at `/login`. Full steps are in [docs/INSTALL.md](docs/INSTALL.md).
 Check the running version with `curl http://localhost:8080/api/version`.
 
 ## Pages
@@ -91,6 +93,7 @@ Check the running version with `curl http://localhost:8080/api/version`.
 | [docs/INSTALL.md](docs/INSTALL.md) | Installation on Raspberry Pi OS and Debian/Ubuntu, systemd, nginx, upgrades, uninstall |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | CLI flags, environment variables, `station_config.json`, Settings pages, retention, small-host tuning |
 | [docs/API.md](docs/API.md) | REST, WebSocket and SSE endpoint reference |
+| [docs/SECURITY.md](docs/SECURITY.md) | Admin login, what guests can do, setup code, sessions, location rounding |
 | [docs/SDD.md](docs/SDD.md) | Software design: architecture, capture cycle, data layout, sync, deployment |
 | [docs/BRAND.md](docs/BRAND.md) | Name, logo, colours, typography, voice |
 | [deploy/README.md](deploy/README.md) | Which deployment file is for what |

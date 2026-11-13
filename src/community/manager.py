@@ -27,7 +27,7 @@ ANNOUNCES_PER_MIN = 30
 MAX_SEEDS = 10
 
 DEFAULTS: Dict[str, Any] = {
-    "enabled": False, "name": "", "public_url": "", "precision_deg": 0.1, "share_thumbnail": True, "seeds": [],
+    "enabled": False, "name": "", "public_url": "", "public_precision_deg": 0.1, "share_thumbnail": True, "seeds": [],
 }
 
 
@@ -68,6 +68,8 @@ class CommunityManager:
                     data = loaded if isinstance(loaded, dict) else {}
                 except (OSError, ValueError):
                     pass
+                if "public_precision_deg" not in data and "precision_deg" in data:
+                    data["public_precision_deg"] = data["precision_deg"]  # older key
                 merged = dict(DEFAULTS)
                 merged.update({k: v for k, v in data.items() if k in DEFAULTS})
                 self._settings = merged
@@ -77,9 +79,12 @@ class CommunityManager:
         """Validated partial update (see CommunitySettingsRequest); persists and starts/stops the worker."""
         with self._lock:
             cur = self.settings()
+            patch = dict(patch)
+            if patch.get("precision_deg") is not None:  # older name of public_precision_deg
+                patch.setdefault("public_precision_deg", patch["precision_deg"])
             cur.update({k: v for k, v in patch.items() if k in DEFAULTS and v is not None})
-            if cur["precision_deg"] not in PRECISIONS:
-                raise ValueError("precision_deg must be 0.01, 0.1 or 1.0")
+            if cur["public_precision_deg"] not in PRECISIONS:
+                raise ValueError("public_precision_deg must be 0, 0.01, 0.1 or 1.0")
             if cur["enabled"]:
                 ok, reason = idmod.availability()
                 if not ok:
@@ -135,7 +140,7 @@ class CommunityManager:
         name = (s["name"] or st.get("name") or "Zenivo station").strip()[:cardmod.MAX_NAME] or "Zenivo station"
         url = s["public_url"] or None
         want_thumb = bool(s["share_thumbnail"]) and not url
-        key = (name, st.get("lat"), st.get("lon"), s["precision_deg"], url, st.get("camera"), want_thumb)
+        key = (name, st.get("lat"), st.get("lon"), s["public_precision_deg"], url, st.get("camera"), want_thumb)
         now = time.time()
         with self._lock:
             c = self._card
@@ -149,7 +154,7 @@ class CommunityManager:
                     from src.community.thumb import make_embedded
                     thumb = make_embedded(jpeg)
             self._card = cardmod.build_card(
-                self._identity, name=name, lat=float(st["lat"]), lon=float(st["lon"]), precision_deg=s["precision_deg"],
+                self._identity, name=name, lat=float(st["lat"]), lon=float(st["lon"]), precision_deg=s["public_precision_deg"],
                 url=url, camera=(st.get("camera") or None), software=f"Zenivo {__version__}", thumb=thumb)
             self._card_key = key
             return self._card

@@ -4,7 +4,6 @@
     if (!box || currentPage !== "tab-settings") return;
     const nameEl = document.getElementById("community-name");
     const urlEl = document.getElementById("community-url");
-    const precEl = document.getElementById("community-precision");
     const thumbEl = document.getElementById("community-thumb");
     const seedsEl = document.getElementById("community-seeds");
     const saveBtn = document.getElementById("btn-community-save");
@@ -43,7 +42,6 @@
             box.checked = !!s.enabled;
             nameEl.value = s.name || "";
             urlEl.value = s.public_url || "";
-            precEl.value = String(s.precision_deg);
             thumbEl.checked = !!s.share_thumbnail;
             seedsEl.value = (s.seeds || []).join("\n");
         } catch (err) { /* optional feature */ }
@@ -60,7 +58,6 @@
                     enabled: box.checked,
                     name: nameEl.value.trim(),
                     public_url: urlEl.value.trim(),
-                    precision_deg: Number(precEl.value),
                     share_thumbnail: thumbEl.checked,
                     seeds: seedsEl.value.split("\n").map((l) => l.trim()).filter(Boolean),
                 }),

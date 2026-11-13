@@ -95,3 +95,59 @@ def sqlite_queue_db(temp_output_dir) -> Generator[str, None, None]:
     conn.commit()
     conn.close()
     yield db_path
+
+
+# ---------------------------------------------------------------------------
+# Admin login in tests: every TestClient is signed in as admin by default (existing tests exercise write routes);
+# `guest_client` is the explicit not-signed-in client. Auth state never touches the real data/ folder.
+# ---------------------------------------------------------------------------
+TEST_ADMIN_TOKEN = "test-admin-session-token"
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _admin_cookie_for_test_clients(tmp_path_factory):
+    from starlette.testclient import TestClient
+    from src.auth.manager import AuthManager, COOKIE_NAME
+
+    real_data = os.path.join(PROJECT_ROOT, "data")
+    auth_dir = str(tmp_path_factory.mktemp("auth"))
+    orig_init, orig_valid, orig_client = AuthManager.__init__, AuthManager.session_valid, TestClient.__init__
+
+    def init(self, data_dir, *a, **k):
+        orig_init(self, auth_dir if os.path.abspath(data_dir) == real_data else data_dir, *a, **k)
+
+    def valid(self, token):
+        return token == TEST_ADMIN_TOKEN or orig_valid(self, token)
+
+    def client_init(self, *a, **k):
+        orig_client(self, *a, **k)
+        self.cookies.set(COOKIE_NAME, TEST_ADMIN_TOKEN)
+
+    AuthManager.__init__, AuthManager.session_valid, TestClient.__init__ = init, valid, client_init
+    yield
+    AuthManager.__init__, AuthManager.session_valid, TestClient.__init__ = orig_init, orig_valid, orig_client
+
+
+@pytest.fixture(scope="module")
+def guest_client(tmp_path_factory):
+    """TestClient with no session cookie, on a service whose admin password is not set yet."""
+    from starlette.testclient import TestClient
+    from src.api.main import create_app
+    from src.api.service import AllSkyService
+    from src.auth.manager import AuthManager
+    from src.hardware.simulator import SimulatedIMX335Controller
+
+    cam = SimulatedIMX335Controller(width=640, height=480, seed=42)
+    cam.open()
+    AllSkyService.reset_instance()
+    service = AllSkyService.get_instance(camera=cam)
+    service.community.data_dir = str(tmp_path_factory.mktemp("community"))
+    auth_dir = str(tmp_path_factory.mktemp("guest_auth"))
+    service.auth = AuthManager(auth_dir)
+    app = create_app(camera=cam)
+    with TestClient(app) as c:
+        c.cookies.clear()
+        c.service, c.auth_dir = service, auth_dir
+        yield c
+    service.close()
+    AllSkyService.reset_instance()

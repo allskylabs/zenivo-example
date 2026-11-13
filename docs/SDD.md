@@ -256,7 +256,7 @@ preferences in `localStorage` under the key `allsky.ui.prefs.v1`. The Red Vision
 The full list is in [API.md](API.md).
 | Ops | `GET /api/storage`, `POST /api/storage/cleanup`, `PUT /api/storage/policy`, `GET /api/logs`, `/api/logs/download` |
 
-The edge API has **no authentication**. Access is limited by binding to 127.0.0.1 behind nginx
+Access control is a single-admin login (docs/SECURITY.md): default deny for every change, guests may watch. Bind to 127.0.0.1 behind nginx
 and cloudflared (or a trusted network).
 
 ### 6.4 Sync to hoan.uk
@@ -392,7 +392,7 @@ single test files while iterating.
 
 ## 11. Known gaps
 
-- The edge API has no authentication.
+- The edge API has a single-admin login (see docs/SECURITY.md); a visitor who is not signed in can only watch.
 - The sync client does not use the persistent queue, so frames missed during an outage are not
   re-sent.
 - `src/pipeline/overlay.py`, `src/calibration/stacking.py` and `src/analytics/meteor.py` are not

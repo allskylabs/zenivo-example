@@ -7,15 +7,18 @@ import hashlib
 import os
 import re
 from typing import Dict, Optional, Tuple
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from src.hardware.driver_interface import CameraDriverInterface
 from src.api.service import AllSkyService
 from src.api.routes import router
+from src.auth.middleware import AuthMiddleware, is_admin
+from src.auth.policy import safe_next
+from src.auth.routes import auth_router
 from src.version import PRODUCT, __version__
 
 # Local scripts/styles in the pages carry a hand-written ?v=...: replaced at serve time by <version>-<hash of mtime+size>
@@ -63,11 +66,11 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
 
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-    # Allow CORS for development and cross-origin network access
+    # Allow CORS for development and cross-origin network access (never with credentials: the admin cookie stays same-site)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -75,8 +78,12 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
     # Initialize AllSkyService singleton
     service = AllSkyService.get_instance(camera=camera)
 
+    # Default-deny admin enforcement (src/auth/policy.py decides); outermost, so it also sees the WebSocket handshake
+    app.add_middleware(AuthMiddleware, auth_fn=lambda: AllSkyService.get_instance().auth)
+
     # Include REST and streaming routes
     app.include_router(router)
+    app.include_router(auth_router)
 
     # Observational products static mount (/uploads/allsky/timelapses/latest.mp4, keograms, startrails)
     uploads_root = os.path.join(service.output_dir, "uploads")
@@ -155,6 +162,13 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         @app.get("/satellites3d")
         def serve_satellites3d():
             return read_page("satellites3d.html")
+
+        # Admin sign-in / first-time setup (standalone page)
+        @app.get("/login")
+        def serve_login(request: Request, next: str = "/"):
+            if is_admin(request):
+                return RedirectResponse(safe_next(next), status_code=302)
+            return read_page("login.html")
 
         # Map of the Zenivo stations that share themselves with the community (standalone page; loads Leaflet)
         @app.get("/community")
