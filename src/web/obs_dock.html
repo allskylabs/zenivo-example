@@ -4,7 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <title>AllSky OBS Studio Control Dock</title>
+    <title>OBS Dock — Zenivo</title>
+    <meta name="theme-color" content="#070a13">
+    <link rel="icon" href="/static/brand/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <meta name="description" content="Zenivo control dock for OBS Studio: stream overlays and live view settings.">
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -122,7 +129,7 @@
         <div class="head">
             <div class="head-left">
                 <span id="status-dot" class="dot" title="Connection status"></span>
-                <span class="title">OBS Dock</span>
+                <span class="title">Zenivo · OBS Dock</span>
                 <span id="stream-pill" class="pill">Streaming</span>
             </div>
             <div class="row">
@@ -555,7 +562,7 @@
             $("tg-caption").addEventListener("click", () => {
                 const on = !!(state.title_text || state.title_sub);
                 if (on) pushPatch({ title_text: "", title_sub: "" }, "Caption hidden");
-                else pushPatch({ title_text: $("inp-title").value.trim() || "AllSky Station", title_sub: $("inp-sub").value.trim(), title_pos: $("sel-title-pos").value }, "Caption shown");
+                else pushPatch({ title_text: $("inp-title").value.trim() || "Zenivo Station", title_sub: $("inp-sub").value.trim(), title_pos: $("sel-title-pos").value }, "Caption shown");
             });
 
             // Presets & Fit/Bg

@@ -1,0 +1,37 @@
+# Zenivo systemd unit TEMPLATE. install.sh fills the @PLACEHOLDERS@ and installs the result as
+# /etc/systemd/system/<service-name>.service. To use it by hand, replace them yourself:
+#   @USER@         Linux user that runs Zenivo (owns the install directory)
+#   @INSTALL_DIR@  absolute path of the checkout (contains run_allsky.py, .venv and data/)
+#   @HOST@         bind address: 0.0.0.0 (all interfaces) or 127.0.0.1 (behind a reverse proxy)
+#   @PORT@         TCP port of the web UI and API
+#   @CAMERA@       auto | rts5869 | picamera | v4l2 | simulator
+# Based on the production unit deploy/allsky-ng.service.
+[Unit]
+Description=Zenivo - all-sky observatory software
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=@USER@
+# The camera nodes (/dev/video*) belong to the "video" group on Raspberry Pi OS, Debian and Ubuntu.
+SupplementaryGroups=video
+WorkingDirectory=@INSTALL_DIR@
+# --sync-target "" disables the push to a hoan.uk server. Set a URL to enable it, and add
+# --prune-dir PATH:DAYS lines for extra directories that the retention job should clean.
+ExecStart=@INSTALL_DIR@/.venv/bin/python run_allsky.py --host @HOST@ --port @PORT@ --camera @CAMERA@ --sync-target "" --log-level warning --no-access-log
+Restart=always
+RestartSec=10
+# Low priority so the host stays responsive; MemoryMax suits a Raspberry Pi 4 with 2 GB RAM.
+# Raise MemoryMax on hosts with more memory.
+Nice=5
+MemoryMax=700M
+Environment=PYTHONUNBUFFERED=1
+Environment=OMP_NUM_THREADS=2
+Environment=LIBCAMERA_LOG_LEVELS=*:WARN
+# Optional tuning (see docs/CONFIGURATION.md):
+#   Environment=ALLSKY_CV_THREADS=1
+#   Environment=ALLSKY_DISABLE_RAW10=1
+#   Environment=ALLSKY_ISP_WB_K=4500
+
+[Install]
+WantedBy=multi-user.target

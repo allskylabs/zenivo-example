@@ -1,4 +1,4 @@
-/* AllSky dashboard (part of the former app.js): Exposure/gain controls and master dark calibration UI.
+/* Zenivo dashboard (part of the former app.js): Exposure/gain controls and master dark calibration UI.
  * Classic script: top-level declarations are shared with the other src/web/app/*.js files; load order is fixed in index.html. */
 
 // ------------------------------------------------------------------

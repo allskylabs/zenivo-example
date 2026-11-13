@@ -1,20 +1,28 @@
-# Software Design Document: IMX335 AllSky (allsky-ng)
+# Software Design Document: Zenivo
 
 | | |
 |---|---|
-| Version | 1.0 (2026-10-18) |
+| Document version | 1.0.0 (2026-11-13), describes Zenivo 1.0.0 |
 | Repository | `github.com/hoanb1/imx335-allsky` |
-| Production | https://allsky.hoan.uk (Raspberry Pi 4, `/home/pi/allsky-ng`, systemd `allsky-ng`) |
+| Production | https://allsky.hoan.uk (Raspberry Pi 4, `/home/pi/allsky-ng`, systemd `allsky-ng`). The folder and unit names predate the Zenivo name and are unchanged |
 
 ## 1. Purpose and scope
 
-allsky-ng is the edge software for one all-sky camera. It captures frames and runs auto-exposure
+Zenivo (all-sky observatory software) is the edge software for one all-sky camera. It captures frames and runs auto-exposure
 and dark calibration. It builds the observing products (keogram, startrails, timelapse),
 estimates cloud cover, detects sky events, assists focusing, plate-solves the camera pointing,
 serves a web UI and pushes frames and telemetry to hoan.uk.
 
 This document covers the edge station only. The hoan.uk server is a separate project. It provides
 the `/api/allsky/ingest/*` endpoints and the plate solver.
+
+**Names.** The product is Zenivo (see [BRAND.md](BRAND.md)). Internal identifiers keep the original
+name and are not renamed: logger names `allsky.*`, the browser storage key `allsky.ui.prefs.v1`,
+upload paths `/uploads/allsky/...`, the sync API `/api/allsky/ingest/*`, the `ALLSKY_*` environment
+variables, the class `AllSkyService` and the unit names `allsky-ng` and `allsky-web`. The version
+has one source, `src/version.py` (`__version__`), exposed by `--version`, `GET /api/version` and the UI.
+Installation, configuration and the API are in [INSTALL.md](INSTALL.md), [CONFIGURATION.md](CONFIGURATION.md)
+and [API.md](API.md).
 
 ### 1.1 Design constraints
 
@@ -41,10 +49,11 @@ the `/api/allsky/ingest/*` endpoints and the plate solver.
             │                     get_telemetry → cloud/star sampling                  │
             │ src/calibration   dark library, auto-exposure, plate solvers            │
             │ src/pipeline      keogram, startrails, timelapse, star boost            │
-            │ src/analytics     cloud cover/history, sky events, focus, lens tracking │
-            │ src/storage       retention                                             │
+            │ src/analytics     cloud cover/history, sky events, traffic (ADS-B, FR24, │
+            │                   satellites, radiosondes), day objects, focus          │
+            │ src/storage       AVIF frame codec, retention                           │
             │ src/api           FastAPI routes, WS/MJPEG/SSE streams, page shell       │
-            │ src/web           single-page UI (app/*.js, focus.js, activity.js)         │
+            │ src/web           UI (index.html + app/01..08-*.js, focus.js, ...)     │
             │ _sync_worker ───► SyncClient ──► hoan.uk /api/allsky/ingest/*            │
             └───────────────────────────────────────────────────────────────────────────┘
  browser ◄── nginx :80 ◄── cloudflared (allsky.hoan.uk)      data/ (frames, products, logs, config)
@@ -54,14 +63,18 @@ the `/api/allsky/ingest/*` endpoints and the plate solver.
 
 | Package | Responsibility |
 |---|---|
-| `src/hardware` | Camera backends behind `CameraDriverInterface`: `driver.py` (RTS5869 + factory), `xu.py` (UVC extension unit), `registers.py` (IMX335 timing math), `v4l2_mmap.py` (mmap capture, RAW10 demosaic), `picamera.py`, `uvc_generic.py`, `simulator.py` |
+| `src/hardware` | Camera backends behind `CameraDriverInterface` (`driver_interface.py`): `driver.py` (RTS5869 + factory), `xu.py` (UVC extension unit), `registers.py` (IMX335 timing math), `v4l2_mmap.py` (mmap capture, RAW10 demosaic, ISP shading correction), `picamera.py`, `uvc_generic.py`, `simulator.py`, `constants.py` |
 | `src/calibration` | `dark.py` (master darks, hot-pixel maps), `auto_exposure.py` (solar elevation, day/night AE), `bright_star_solver.py` (local plate solve), `station_solver.py` (remote blind solve), `stacking.py` (unused by the service) |
-| `src/pipeline` | `keogram.py`, `startrails.py`, `timelapse.py` (encode + banner), `star_boost.py`, `overlay.py` (not used live; the sky overlay is drawn client-side) |
-| `src/analytics` | `cloud_cover.py`, `cloud_history.py`, `cloud_backfill.py` (CLI), `sky_events.py`, `focus.py`, `focus_tracker.py`, `meteor.py` (legacy, tests only) |
-| `src/api` | `main.py` (app factory, page shell), `routes.py` (REST), `stream.py` (WS/MJPEG/SSE), `schemas.py`, `histogram.py`, `service.py` (core) |
-| `src/storage` | `retention.py` (age and size cleanup) |
+| `src/pipeline` | `keogram.py`, `startrails.py`, `timelapse.py` (encode + banner), `star_boost.py`, `hot_pixels.py`, `highlights.py`, `overlay.py` (not used live; the sky overlay is drawn client-side) |
+| `src/analytics` | `cloud_cover.py`, `cloud_history.py`, `cloud_backfill.py` (CLI), `stars_clouds.py`, `star_clarity.py`, `sky_events.py`, `day_objects.py` (daytime birds, insects, aircraft, rain), `adsb.py`, `fr24.py`, `aircraft_info.py`, `airports.py`, `satellites.py` (SGP4 from TLEs), `radiosonde.py`, `traffic_log.py`, `focus.py`, `focus_tracker.py`, `meteors.py`, `meteor.py` (legacy, tests only) |
+| `src/api` | `main.py` (app factory, page shell, static mounts), `app.py` (re-export of the app), `routes.py` (REST), `stream.py` (WS/MJPEG/SSE), `schemas.py`, `histogram.py`, `service_consts.py`, `service.py` (`AllSkyService` core: state, capture cycle, telemetry) and the mixins that add its methods: `calibration_mixin.py`, `products_mixin.py`, `events_mixin.py`, `traffic_mixin.py`, `station_mixin.py`, `focus_mixin.py`, `lens_mixin.py`, `plate_solve_mixin.py`. The public API of the service is unchanged by the split |
+| `src/net.py` | Shared outbound HTTPS helper: one SSL context and a keep-alive urllib3 pool reused by every outbound request (certificate verification stays on) |
+| `src/storage` | `frame_codec.py` (AVIF frame read/write, legacy JPEG still readable), `retention.py` (age and size cleanup) |
+| `src/version.py` | Product name and version, the single source (`__version__`, `PRODUCT`) |
 | `src/sync` | `client.py` (used in production), `queue.py` and `daemon.py` (SQLite queue and circuit breaker; tested but not wired up) |
 | `src/activity.py` | User-facing activity log (`data/logs/activity.jsonl`) |
+| `src/web` | Static UI. `index.html` is the shell of `/live`, `/gallery`, `/logs`, `/focus`, `/calibration`, `/settings`; `app/01-core.js` to `08-gallery-adsb.js` are classic scripts with one shared global scope, loaded in numeric order; `focus.js`, `activity.js`, `sky_catalog.js`; separate pages `sky.html`, `flights3d.html`, `satellites3d.html`, `obs_dock.html`, `full.html`; `tokens.css` and `style.css`; `brand/`; `sky/` (built skyview bundle) and `skydata/` (star tiles, catalogues). Navigation, brand block and page head are generated from one definition by `scripts/sync_nav.py` (`--check` verifies) |
+| `tools/` | `adsb_feeder.py`, `isp_calibrate.py`, `convert_frames_avif.py`, `skyview/` (TypeScript source of the planetarium bundle) |
 
 ## 3. Startup
 
@@ -79,7 +92,7 @@ the `/api/allsky/ingest/*` endpoints and the plate solver.
 7. Run `uvicorn` as a single process (proxy headers trusted). On exit, stop sync and close the
    camera.
 
-CLI flags: see the README. Environment variables:
+CLI flags: see [CONFIGURATION.md](CONFIGURATION.md#command-line-flags). Environment variables:
 
 | Variable | Effect |
 |---|---|
@@ -87,6 +100,7 @@ CLI flags: see the README. Environment variables:
 | `ALLSKY_CV_THREADS` | OpenCV thread count |
 | `ALLSKY_SIMULATOR` | Prefer the simulator |
 | `ALLSKY_RUNNER` | Stops `src/api/main.py` from building its module-level app |
+| `ALLSKY_DISABLE_RAW10`, `ALLSKY_ISP_WB_K`, `ALLSKY_ISP_CAL`, `ALLSKY_ISP_CAL_OFF` | RTS5869 workarounds, see [CONFIGURATION.md](CONFIGURATION.md#environment-variables) |
 | `PYTEST_CURRENT_TEST` | Test mode: no background threads, archiving or live AE |
 
 ## 4. Camera backends
@@ -156,8 +170,9 @@ opens, it falls back to the simulator (unless told not to).
 
 **Archive and products.** The first 15 frames of a day are archived every 2.5 s, then one every
 `archive_interval_s` (30 s).
-- Each archived frame is a 1296 px JPEG (q88) in
-  `frames/<YYYY-MM-DD>/frame_YYYYmmdd_HHMMSS_mmm.jpg`, plus one line in `telemetry.jsonl`.
+- Each archived frame is a 1296 px AVIF (quality 62, written by `src/storage/frame_codec.py`) in
+  `frames/<YYYY-MM-DD>/frame_YYYYmmdd_HHMMSS_mmm.avif`, plus one line in `telemetry.jsonl`.
+  Older `frame_*.jpg` files stay readable.
 - Each day keeps at most 2880 frames.
 - The keogram (central meridian slice) and startrails (max-pixel blend) update with every
   archived frame and are saved as `<date>.jpg` and `latest.jpg`.
@@ -204,10 +219,14 @@ cloud events.
 ### 6.1 Web UI
 
 One page shell (`index.html`) is served at `/`, `/live`, `/gallery`, `/settings`, `/calibration`,
-`/logs` and `/focus`. The live viewport is pre-sized to the frame's aspect ratio. `src/web/app/*.js` hold
-the live view, histogram, client-side sky overlay, settings, master darks, cloud chart and
-gallery/events. `focus.js` and `activity.js` cover their own pages. `sky_catalog.js` holds the
-constellations, stars and Messier objects.
+`/logs` and `/focus`. The live viewport is pre-sized to the frame's aspect ratio. The eight scripts in
+`src/web/app/` (core and routing, controls and calibration, station settings, live view, client-side
+sky overlay, telemetry, cloud chart, gallery/events/ADS-B) share one global scope and run in numeric
+order. Each page loads only the data of its own tab. `focus.js` and `activity.js` cover their own
+pages. `sky_catalog.js` holds the constellations, stars and Messier objects. `/sky`, `/flights3d`,
+`/satellites3d`, `/obs` (alias `/full`) and `/obs/dock` are separate pages. The UI keeps viewer
+preferences in `localStorage` under the key `allsky.ui.prefs.v1`. The Red Vision theme
+(`data-theme="red"`) is an alternate token palette, see [BRAND.md](BRAND.md).
 
 ### 6.2 Streams
 
@@ -230,11 +249,15 @@ constellations, stars and Messier objects.
 | Calibration | `GET /api/calibration/status`, `POST /api/calibration/{auto-library,master-dark}` |
 | Station | `GET /api/station/config`, `POST /api/station/{location,settings,auto-locate,plate-solve/start}`, `GET /api/station/plate-solve/status`, `GET/POST /api/station/sky-mask` |
 | Focus | `/api/focus`, `/api/focus/{start,stop,finish,config,auto-roi,frame,lens,lens/autofocus,...}` |
-| Products | `GET /api/gallery`, `POST /api/timelapse/generate`, `GET /api/events`, `GET/POST /api/events/config`, `/uploads/...` |
+| Products | `GET /api/gallery`, `POST /api/timelapse/generate`, `POST /api/timelapse/build`, `GET /api/events`, `GET/POST /api/events/config`, `/api/frames/*`, `/uploads/...` |
+| Traffic | `GET /api/adsb/aircraft`, `/api/satellites`, `/api/radiosondes`, `/api/traffic`, `/api/day-objects`, `GET/POST /api/adsb` |
+| Meta, OBS | `GET /api/version`, `GET/POST /api/obs/overlay`, `POST /api/obs/reload` |
+
+The full list is in [API.md](API.md).
 | Ops | `GET /api/storage`, `POST /api/storage/cleanup`, `PUT /api/storage/policy`, `GET /api/logs`, `/api/logs/download` |
 
 The edge API has **no authentication**. Access is limited by binding to 127.0.0.1 behind nginx
-and cloudflared.
+and cloudflared (or a trusted network).
 
 ### 6.4 Sync to hoan.uk
 
@@ -257,7 +280,7 @@ Everything is under `data/` (git-ignored). Dates are local `YYYY-MM-DD`.
 ```
 data/
 ├── station_config.json            station settings (see below)
-├── frames/<date>/frame_*.jpg      archived frames, 1296 px
+├── frames/<date>/frame_*.avif     archived frames, 1296 px (legacy frame_*.jpg still read)
 │               telemetry.jsonl    {filename, timestamp, exposure_s, gain_db, star_count, cloud_cover_pct}
 ├── live/latest.webp               refreshed every ≤120 s
 ├── logs/allsky.log                Python log (5 MB × 3)
@@ -265,6 +288,9 @@ data/
 │        cloud_history.jsonl       {t (epoch), cc, m, conf, stars, sun}
 ├── calibration/cloud_reference.json
 │              darks/master_dark_raw10_exp*_gain*.npy, hot_pixels_*.npy
+├── traffic/<date>.jsonl           aircraft and satellites seen in the camera view (retention-limited)
+├── day_objects/                   daytime object log (14 days / 50 MB by default)
+├── cache/                         TLEs (sat_tle.json), aircraft and airline databases, airports, ADS-B trails
 └── uploads/allsky/                served at /uploads
     ├── keograms/<date>.jpg, latest.jpg
     ├── startrails/<date>.jpg, latest.jpg
@@ -291,6 +317,9 @@ data/
 | `performance` | `min_capture_interval_s` 2, `analysis_max_width` 960, `sky_analysis_enabled` 1, `analysis_interval_s` 300, `stream_max_width` 960, `stream_jpeg_quality` 75 |
 | `storage` | Retention policy |
 | `focus_record`, `focus_history`, `lens_focus` | Focus results, history and lens state |
+| `adsb`, `traffic_log`, `day_objects`, `obs_overlay`, `google_maps_key` | ADS-B/Flightradar24 settings, log retention, OBS overlay, map key |
+
+All keys and defaults are listed in [CONFIGURATION.md](CONFIGURATION.md#station-configuration-file).
 
 ### 7.1 Retention
 
@@ -303,6 +332,7 @@ The retention job runs 30 s after start, then hourly. Default policy:
 | `max_data_gb` | 8 |
 | `min_free_gb` | 3 |
 | `archive_interval_s` | 30 |
+| `max_events_per_day` | 1000 |
 | `timelapse_refresh_s` | 1800 |
 
 1. Age rules delete frame days, dated products and event days older than their limits.
@@ -335,9 +365,10 @@ holds a few hours that are 2026-10-18 in local time.
 | Item | Value |
 |---|---|
 | Host | Raspberry Pi 4, 192.168.3.24, Wi-Fi. hoan.uk runs on the same Pi on :3000 (sync target and plate solver) |
-| Service | `deploy/allsky-ng.service`: user `pi`, group `video`, `.venv/bin/python run_allsky.py --host 127.0.0.1 --port 8095 --camera auto --sync-target http://127.0.0.1:3000 --sync-interval 60 --log-level warning --no-access-log --prune-dir …archive:3 --prune-dir …events:90`, `Restart=always`, `Nice=5`, `MemoryMax=700M` |
+| Service | `deploy/allsky-ng.service` (live unit; new installs use the `deploy/zenivo.service` template through `install.sh`): user `pi`, group `video`, `.venv/bin/python run_allsky.py --host 127.0.0.1 --port 8095 --camera auto --sync-target http://127.0.0.1:3000 --sync-interval 60 --log-level warning --no-access-log --prune-dir …archive:3 --prune-dir …events:90`, `Restart=always`, `Nice=5`, `MemoryMax=700M` |
 | Web | `deploy/nginx-allsky.hoan.uk.conf`: :80 → 127.0.0.1:8095, WebSocket upgrade, `proxy_buffering off`, 3600 s timeouts. cloudflared maps allsky.hoan.uk → :80 and is never restarted for allsky |
 | Development instance | User service `allsky-web` on port 8080 from the repo checkout |
+| New installs | `./install.sh` creates `.venv`, installs the dependencies and a `zenivo` unit; see [INSTALL.md](INSTALL.md) |
 | Current instance (2026-11-08) | minipc 192.168.6.15 (LAN) / `minipcv6.hoan.uk` (IPv6 SSH), user `hoan`, `/home/hoan/allsky-ng`, system service `allsky-web` on 127.0.0.1:8080, no sync target; cloudflared ingress `sky.hoan.uk -> 127.0.0.1:8080` (`/etc/cloudflared/config.yml`) |
 
 To deploy:
@@ -351,8 +382,8 @@ Restart the service once per deploy, and run long installs on the Pi with `nohup
 
 ## 10. Testing
 
-`python3 -m pytest -q` runs the full suite (474 tests at v1.0) under `tests/unit`, `tests/e2e`
-and `tests/integration`. Synthetic fixtures live in `tests/fixtures` and `conftest.py`.
+`python3 -m pytest -q` runs the full suite (591 tests collected at 1.0.0) under `tests/unit`,
+`tests/e2e` and `tests/integration`. Five tests are known to fail at 1.0.0, see [CHANGELOG.md](../CHANGELOG.md). Synthetic fixtures live in `tests/fixtures` and `conftest.py`.
 
 Caveat: `test_hardware.py::test_live_camera_capture_if_available` opens a real camera. Modules
 that import `src.api.main` build a service at collection time, which detects the real camera and
@@ -368,3 +399,4 @@ single test files while iterating.
   used by the live service.
 - The `--reload` flag is parsed but not passed to uvicorn.
 - The `--min-capture-interval` help text says the default is 1.0 s, but the code default is 2.0 s.
+- The default `--sync-target` is `http://localhost:3005`, which does not exist on a standalone install; pass `--sync-target ""` to turn the sync worker off.

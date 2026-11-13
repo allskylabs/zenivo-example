@@ -1,9 +1,16 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AllSky Observatory — Full Live Frame (OBS)</title>
+    <title>Live Frame — Zenivo</title>
+    <meta name="theme-color" content="#070a13">
+    <link rel="icon" href="/static/brand/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <meta name="description" content="Full live frame of the Zenivo all-sky camera for OBS and kiosk displays.">
+    
     <style>
         * {
             box-sizing: border-box;
@@ -183,7 +190,7 @@
 <body>
     <div id="obs-stage">
         <div id="obs-viewport">
-            <img id="live-stream-img" class="media-layer" alt="Live AllSky Stream" draggable="false" />
+            <img id="live-stream-img" class="media-layer" alt="Live all-sky stream" draggable="false" />
             <img id="replay-img" class="media-layer" alt="Replay Image" draggable="false" />
             <video id="replay-video" class="media-layer" loop muted playsinline></video>
             <canvas id="reticle-canvas"></canvas>

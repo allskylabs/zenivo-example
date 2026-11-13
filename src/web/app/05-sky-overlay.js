@@ -1,4 +1,4 @@
-/* AllSky dashboard (part of the former app.js): Celestial sky overlay, aircraft/satellite/radiosonde overlays.
+/* Zenivo dashboard (part of the former app.js): Celestial sky overlay, aircraft/satellite/radiosonde overlays.
  * Classic script: top-level declarations are shared with the other src/web/app/*.js files; load order is fixed in index.html. */
 
 // ------------------------------------------------------------------

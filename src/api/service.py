@@ -28,6 +28,7 @@ from src.analytics.sky_events import SkyEventDetector
 logger = logging.getLogger("imx335.api")
 from src.analytics.focus_tracker import FocusTracker, TempCompensation
 from src.analytics.focus import FocusSession
+from src.version import __version__
 from src.api.histogram import compute_fast_histogram
 from src.pipeline.keogram import KeogramGenerator
 from src.pipeline.startrails import StartrailsAccumulator, StartrailsFrameGate
@@ -615,6 +616,7 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
             and not self.focus.active and self.calibration_status.get("state") != "running"
         return {
             "status": "stalled" if stalled else "online",
+            "version": __version__,
             "camera_connected": not stalled,
             "uptime_s": uptime_s,
             "simulator_mode": is_sim,

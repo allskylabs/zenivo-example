@@ -1,20 +1,29 @@
-/* Night Sky design tokens: shared by index.html, obs_dock.html, flights3d.html (served as /static/tokens.css) */
+/* Zenivo "Night Sky" design tokens: shared by index.html, obs_dock.html, flights3d.html (served as /static/tokens.css) */
 :root {
+    /* Zenivo brand palette (the named source colours; everything below points at these) */
+    --brand-blue: #38bdf8;       /* Zenivo Blue: primary accent, logo ring */
+    --brand-navy: #070a13;       /* Deep Navy: page background, icon tile */
+    --brand-ink: #0d1322;        /* Ink: cards and raised surfaces */
+    --brand-starlight: #f1f5f9;  /* Starlight: primary text, logo inner ring and star */
+    --brand-aurora: #10b981;     /* Aurora: success / online */
+    --brand-amber: #f59e0b;      /* Amber: warning */
+    --brand-meteor: #ef4444;     /* Meteor: danger / error */
+
     /* Surfaces & text */
-    --bg-primary: #070a13;
-    --bg-card: #0d1322;
+    --bg-primary: var(--brand-navy);
+    --bg-card: var(--brand-ink);
     --bg-card-sub: #131d31;
     --border-color: #1e293b;
-    --text-primary: #f1f5f9;
+    --text-primary: var(--brand-starlight);
     --text-secondary: #94a3b8;
     --text-muted: #64748b;
     /* Accent & status */
-    --accent: #38bdf8;
+    --accent: var(--brand-blue);
     --accent-hover: #0284c7;
     --accent-bg: rgba(56, 189, 248, 0.16);
-    --success: #10b981;
-    --warning: #f59e0b;
-    --danger: #ef4444;
+    --success: var(--brand-aurora);
+    --warning: var(--brand-amber);
+    --danger: var(--brand-meteor);
     /* Spacing */
     --space-1: 4px;
     --space-2: 8px;

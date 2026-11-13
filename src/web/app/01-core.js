@@ -1,4 +1,4 @@
-/* AllSky dashboard (part of the former app.js): Shared state and DOM refs, clock and Red Vision, UI prefs, page routing.
+/* Zenivo dashboard (part of the former app.js): Shared state and DOM refs, clock and Red Vision, UI prefs, page routing.
  * Classic script: top-level declarations are shared with the other src/web/app/*.js files; load order is fixed in index.html. */
 
 // Page routing basics first: the initial data loads below are gated on the page that shows them
@@ -404,7 +404,7 @@ if (currentPage === "tab-live") fetch("/api/obs/overlay")
 // Page Routing: every section has its own URL (/live, /gallery, /settings, /calibration)
 // ------------------------------------------------------------------
 const PAGE_TITLES = {
-    "tab-live": "Live Observatory",
+    "tab-live": "Live",
     "tab-gallery": "Gallery & Events",
     "tab-settings": "Settings",
     "tab-calibration": "Master Dark",
@@ -423,4 +423,4 @@ const activeTab = tabBar && tabBar.querySelector(".tab-btn.active");
 if (tabBar && activeTab && tabBar.scrollWidth > tabBar.clientWidth) {
     tabBar.scrollLeft = activeTab.offsetLeft - (tabBar.clientWidth - activeTab.offsetWidth) / 2;
 }
-document.title = `${PAGE_TITLES[currentPage]} — AllSky Observatory`;
+document.title = currentPage === "tab-live" ? "Zenivo — All-sky observatory" : `${PAGE_TITLES[currentPage]} — Zenivo`;

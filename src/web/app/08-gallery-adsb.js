@@ -1,4 +1,4 @@
-/* AllSky dashboard (part of the former app.js): Gallery, events, timelapse builder and ADS-B settings.
+/* Zenivo dashboard (part of the former app.js): Gallery, events, timelapse builder and ADS-B settings.
  * Classic script: top-level declarations are shared with the other src/web/app/*.js files; load order is fixed in index.html. */
 
 // Gallery & Events Fetcher + On-Demand Timelapse Builder

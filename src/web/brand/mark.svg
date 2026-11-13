@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>Zenivo</title>
+  <path d="M36.2 6.35A26 26 0 1 1 27.8 6.35" fill="none" stroke="#38bdf8" stroke-width="6"/>
+  <path d="M32 4.6V9.6" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round"/>
+  <circle cx="32" cy="32" r="18.5" fill="none" stroke="#f1f5f9" stroke-width="3.5"/>
+  <polygon points="38.00,23.80 38.85,25.84 41.04,26.01 39.37,27.44 39.88,29.59 38.00,28.44 36.12,29.59 36.63,27.44 34.96,26.01 37.15,25.84" fill="#f1f5f9"/>
+</svg>

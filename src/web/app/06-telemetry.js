@@ -1,4 +1,4 @@
-/* AllSky dashboard (part of the former app.js): Histogram, telemetry polling, WebSocket/SSE frame stream.
+/* Zenivo dashboard (part of the former app.js): Histogram, telemetry polling, WebSocket/SSE frame stream.
  * Classic script: top-level declarations are shared with the other src/web/app/*.js files; load order is fixed in index.html. */
 
 // ------------------------------------------------------------------

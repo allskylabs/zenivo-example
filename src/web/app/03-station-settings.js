@@ -1,4 +1,4 @@
-/* AllSky dashboard (part of the former app.js): Settings pages: station and plate solving, orientation, resolution, star boost, performance.
+/* Zenivo dashboard (part of the former app.js): Settings pages: station and plate solving, orientation, resolution, star boost, performance.
  * Classic script: top-level declarations are shared with the other src/web/app/*.js files; load order is fixed in index.html. */
 
 // Station Setup, Manual Settings & Astrometric Plate-Solving (hoan.uk/astronomy/plate-solving)

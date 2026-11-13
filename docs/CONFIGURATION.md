@@ -1,0 +1,229 @@
+# Configuring Zenivo
+
+Zenivo is configured in four places:
+
+1. [Command-line flags](#command-line-flags) of `run_allsky.py`, set in the systemd unit.
+2. [Environment variables](#environment-variables) for hardware workarounds and thread limits.
+3. [`data/station_config.json`](#station-configuration-file), written by the Settings pages.
+4. The [Settings pages](#settings-pages) in the web UI, which are the normal way to change 3.
+
+Run `python3 run_allsky.py --help` for the flags of the version you have installed.
+
+## Command-line flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--version` | | Print `Zenivo <version>` and exit |
+| `--host` | `0.0.0.0` | Network interface to bind. Use `127.0.0.1` behind a reverse proxy |
+| `--port` | `8080` | TCP port of the web UI and API |
+| `--device` | auto-detected RTS5869, else `/dev/video0` | V4L2 camera device node |
+| `--camera` | `auto` (or `$ALLSKY_CAMERA`) | Camera backend: `auto`, `rts5869`, `picamera`, `v4l2`, `simulator`. `auto` tries RTS5869, then a Pi CSI camera, then a USB/V4L2 webcam, then the simulator |
+| `--camera-index` | `0` | libcamera camera number for `--camera picamera` |
+| `--resolution` | camera default | Capture size `WIDTHxHEIGHT`. Defaults: IMX335 2592x1944, Pi camera full-FOV binned mode, webcam maximum |
+| `--simulator` | off | Force the simulated IMX335 controller (tests, CI, demos). Sets `ALLSKY_SIMULATOR=1` |
+| `--exposure` | `0.2` | Starting exposure in seconds before auto-exposure takes over. If the sun is at or above -2 degrees and the defaults are unchanged, the start is 0.6 ms / 0 dB |
+| `--gain` | `12.0` | Starting gain in dB before auto-exposure takes over |
+| `--log-level` | `info` | `debug`, `info`, `warning`, `error` |
+| `--sync-target` | `http://localhost:3005` | hoan.uk server that receives frames and telemetry. Pass an empty string (`--sync-target ""`) to disable the sync worker |
+| `--sync-interval` | `60` | Seconds between pushes (minimum 0.25) |
+| `--sync-max-width` | `1600` | Downscale pushed frames to at most this width in pixels |
+| `--min-capture-interval` | the saved setting (2.0) | Minimum seconds between captures while viewers are connected. Overrides the Performance setting for this run only |
+| `--prune-dir` | none | `PATH:DAYS`. Extra directory the retention job cleans: dated sub-folders or files older than DAYS are deleted. Repeatable. Not saved |
+| `--no-access-log` | off | Disable per-request HTTP access logging |
+| `--reload` | off | Parsed, but not passed to uvicorn (hot reload does not work) |
+
+Notes:
+
+- With `--camera` other than `simulator` and without `--simulator`, Zenivo keeps retrying the real
+  camera in the background if it was not usable at startup. It runs on the simulator meanwhile.
+- The default `--sync-target` points at `localhost:3005`, where nothing listens on a standalone
+  install. Each push then fails and is recorded in the activity log. Pass `--sync-target ""` unless
+  you run a compatible hoan.uk server. The shipped `deploy/zenivo.service` does this.
+- The sync protocol (`/api/allsky/ingest/frame` and `/api/allsky/ingest/telemetry`) keeps its
+  original name. Pushes are not queued: a missed round is not re-sent.
+
+## Environment variables
+
+Read by Zenivo:
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `ALLSKY_CAMERA` | `auto` | Default for `--camera` |
+| `ALLSKY_CV_THREADS` | `1` | OpenCV thread count. One thread avoids spin-waiting worker pools on small CPUs |
+| `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS` | `1` | Set to 1 by `run_allsky.py` unless already set. The shipped unit sets `OMP_NUM_THREADS=2` |
+| `ALLSKY_SIMULATOR` | `0` | `1` prefers the simulator when the service builds its camera |
+| `ALLSKY_DISABLE_RAW10` | unset | `1` keeps the RTS5869 camera on MJPG at night. Needed on a host where writing the Bayer route stops the stream (the mini-PC) |
+| `ALLSKY_ISP_WB_K` | unset | Kelvin value (digits only). Locks the RTS5869 camera's own auto white balance; useful when day frames drift magenta |
+| `ALLSKY_ISP_CAL` | `data/calibration/isp_shading.npz` | Path of the per-pixel ISP shading calibration made by `tools/isp_calibrate.py` |
+| `ALLSKY_ISP_CAL_OFF` | unset | `1` skips the ISP shading correction even when the file exists |
+| `LIBCAMERA_LOG_LEVELS` | unset | Read by libcamera. The shipped unit sets `*:WARN` to quiet it |
+
+Internal (do not set by hand): `ALLSKY_RUNNER` is set by `run_allsky.py` so `src/api/main.py` does
+not build a second app at import time. `PYTEST_CURRENT_TEST` is set by pytest and turns off
+background threads, archiving and live auto-exposure.
+
+Read by the tools:
+
+| Variable | Used by | Effect |
+|----------|---------|--------|
+| `ALLSKY_CAL_EXPOSURE` | `tools/isp_calibrate.py` | Exposure in seconds for the calibration capture (default `0.0006`) |
+| `ALLSKY_URL` | `tools/adsb_feeder.py` | Zenivo API base URL (default `http://127.0.0.1:8095`) |
+| `VLAB_URL`, `VLAB_KEY`, `VLAB_INTERVAL` | `tools/adsb_feeder.py` | Ingest URL, service key and push interval in seconds (default 3, minimum 2) |
+
+## Station configuration file
+
+`data/station_config.json` holds everything the Settings pages save. It is merged over the factory
+defaults at the top level only: a key present in the file replaces the whole default value for that
+key. Zenivo writes the file itself. Edit it only while the service is stopped, and keep a copy
+first. Back it up before upgrades.
+
+The file may contain a Flightradar24 token (`adsb.fr24_token`) and a map key (`google_maps_key`).
+Treat it as private and do not commit it.
+
+Factory defaults (Hanoi, IMX335 sensor, 1.65 mm fisheye pointing at the zenith):
+
+| Key | Contents |
+|-----|----------|
+| `latitude_deg`, `longitude_deg`, `elevation_m` | Station position. Defaults 21.0285, 105.8542, 20.0 |
+| `location_name`, `geo_source` | Display name and where the coordinates came from (`default`, `manual`, `browser_gps`, `ip_geolocation`) |
+| `plate_solver_endpoint` | Remote blind plate solver (default `https://hoan.uk/astronomy/plate-solving`) |
+| `solve_source`, `solved_at`, `matched_stars_count`, `constellations_in_fov` | Result bookkeeping of the last plate solve |
+| `camera_sensor` | Sensor specification (size in pixels, pixel pitch) |
+| `optics` | Lens model, projection, focal length in mm, field of view, optical centre in pixels, 90-degree horizon radius in pixels, pixel scale |
+| `orientation` | Centre RA/Dec, azimuth, altitude, zenith tilt, north position angle, rotation, CD matrix |
+| `image_transform` | `flip_horizontal`, `flip_vertical`, `rotate_deg` (0 or 180); `rotate_isp_180` is added for RTS5869 day frames |
+| `output_resolution` | `width`, `height` of the frames Zenivo outputs (default 2592 x 1944) |
+
+Keys added when you change the matching setting:
+
+| Key | Contents |
+|-----|----------|
+| `bright_star_solution` | Last local plate solve. Editing azimuth, altitude, tilt or north angle in Settings also rewrites its pointing fields and sets `manual_override`. Overlays read the camera pointing from it |
+| `camera_settings` | Saved manual exposure mode, restored at startup |
+| `white_balance` | Mode (`auto`, `manual`) and red/blue gains |
+| `sky_roi`, `sky_mask` | Sky region for cloud analysis and sky/obstruction polygons (fractions of the displayed frame) |
+| `star_boost` | Star boost on/off and bin size (2 to 4) |
+| `event_detection` | Per-type switches: `meteor`, `plane`, `satellite`, `clouds`, `flash` |
+| `performance` | See [Performance profile](#performance-profile-for-small-hosts) |
+| `storage` | Retention policy, see [Retention and storage](#retention-and-storage) |
+| `adsb` | ADS-B receiver `host`, `port`, `enabled`, Flightradar24 switches and token, `record` |
+| `traffic_log`, `day_objects` | Retention settings of the aircraft/satellite log and the day-object log (`day_objects` defaults: 14 days, 50 MB) |
+| `obs_overlay` | OBS browser-source overlay options |
+| `google_maps_key` | Optional key that enables Google map layers in Flights 3D |
+| `focus_record`, `focus_history`, `lens_focus` | Focus results, history and motorised-lens state |
+| `plate_solve_debug` | Diagnostics of the last plate solve |
+
+"Reset lens, sensor and mounting" (`POST /api/station/calibration/reset`) restores the camera
+defaults for the optics keys and removes `bright_star_solution`.
+
+## Settings pages
+
+Open `/settings`. Each section saves immediately or through its own Save button; most changes take
+effect without a restart.
+
+### Image Output
+
+- **Image size**: output resolution, chosen from the presets of the attached camera. Smaller sizes
+  cut CPU use.
+- **Live view**: width and JPEG quality of the live stream (`stream_max_width`, `stream_jpeg_quality`)
+  and the night star boost (sum-binning of the display copy, bin window 2 to 4).
+- **Star count and cloud cover**: whether the sky analysis runs, its image width and the sampling
+  interval (`sky_analysis_enabled`, `analysis_max_width`, `analysis_interval_s`).
+- **Capture timing**: minimum interval between captures while someone watches
+  (`min_capture_interval_s`), and the capture interval with nobody watching
+  (`background_capture_interval_s`; 0 captures back to back, which suits meteor detection).
+- **White Balance**: auto, or manual red and blue gains.
+- **Orientation**: mirror, flip and 180-degree rotation. Applied right after capture, so archives,
+  products, events and plate solving all see the corrected frame.
+
+### Detection
+
+- **Event detection**: switches for meteors, aircraft, satellites, flashes/lightning and clouds
+  arriving or clearing. Events are saved under `data/uploads/allsky/events/<date>/`.
+- **Cloud Cover**: the sky region used for the analysis (left, top, right, bottom as percentages)
+  and a reset of the learned clear-sky reference. Reset it after re-aiming the camera.
+
+### Station & Optics
+
+- **Station Coordinates**: latitude, longitude, elevation, name. The page can use the browser's
+  location or an IP lookup. Coordinates keep 5 decimals.
+- **Sensor & Lens, Lens & Optics**: sensor size, focal length, projection, optical centre, horizon
+  radius, distortion. Normally filled by a plate solve.
+- **Camera Mounting**: azimuth, altitude, zenith tilt and north angle. A manual edit takes effect
+  in all overlays immediately; run a star solve to refine it.
+- **Solver status**: start a plate solve (quick or deep) and see its result. Run it on a clear night.
+- **Focus**: the saved focus result and history.
+
+### Sky Mask
+
+Draw the polygons that mark the visible sky and the obstructions (trees, buildings). The star
+search and the cloud analysis stay inside the sky polygons. Polygons are stored as fractions of the
+displayed frame and turn with the image when you change the orientation.
+
+### Integrations
+
+- **ADS-B receiver**: host and port of an SBS-1 / BaseStation feed (usually port 30003), a switch,
+  and the Flightradar24 Enterprise feed (email and password for a login, or a token). Without a
+  local receiver, aircraft come from Flightradar24 around the station when it is enabled.
+
+## Retention and storage
+
+The retention job runs 30 s after start and then every hour. Defaults:
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `frames_keep_days` | `7` | Days of archived frames kept |
+| `products_keep_days` | `60` | Days of dated keograms, startrails and timelapses kept |
+| `max_data_gb` | `8` | Cap for the whole `data/` directory |
+| `min_free_gb` | `3` | Free space always left on the file system |
+| `archive_interval_s` | `30` | Seconds between archived frames (the first 15 frames of a day are taken every 2.5 s) |
+| `max_events_per_day` | `1000` | Events saved per day; more are dropped (protects against false-alarm storms) |
+| `timelapse_refresh_s` | `1800` | Seconds between live timelapse re-encodes |
+| `extra_dirs` | `[]` | `[{"path": ..., "keep_days": N}]`, filled by `--prune-dir` |
+
+The job works in two passes. Age rules delete frame days, dated products and event days older than
+their limits. Size rules then delete the oldest days, never today's data or the `latest.*` files,
+until `data/` is under `max_data_gb` and the free space is above `min_free_gb`. Read the policy with
+`GET /api/storage`, change it with `PUT /api/storage/policy`, run it now with
+`POST /api/storage/cleanup`. Archived frames are AVIF files (`frame_*.avif`, 1296 px wide, quality
+62); older `frame_*.jpg` files stay readable.
+
+## Performance profile for small hosts
+
+The limits come from `GET /api/camera/performance`, which returns `current`, `defaults` and
+`limits`. Values are clamped to the limits.
+
+| Key | Default | Limits | Effect |
+|-----|---------|--------|--------|
+| `min_capture_interval_s` | `2.0` | 0.4 to 60 | Floor between real captures while viewers poll. Raise it to cut CPU |
+| `background_capture_interval_s` | `0` | 0 to 3600 | Capture interval with no viewer. 0 = back to back, N = every N seconds |
+| `analysis_max_width` | `960` | 320 to 2592 | Width of the copy used for star and cloud analysis |
+| `sky_analysis_enabled` | `1` | 0 or 1 | Turn the star count and cloud cover sampling off |
+| `analysis_interval_s` | `300` | 10 to 3600 | Seconds between star/cloud samples. Frames in between reuse the last result |
+| `stream_max_width` | `960` | 320 to 2592 | Width of the live WebSocket JPEG |
+| `stream_jpeg_quality` | `75` | 40 to 95 | JPEG quality of the live stream |
+
+Settings made in the UI are saved in `station_config.json`. `--min-capture-interval` overrides the
+first one for the current run only.
+
+For a Raspberry Pi 4 (1.8 GB) the shipped unit uses `Nice=5`, `MemoryMax=700M` and
+`OMP_NUM_THREADS=2`. Other measures that help on small hosts: a smaller output resolution, a
+longer `analysis_interval_s` (or switching the sky analysis off), `--log-level warning` with
+`--no-access-log`, and `ALLSKY_CV_THREADS=1`. Heavy analysis already runs on a downscaled copy,
+only at the sampling interval, and never in daylight.
+
+## Time zone
+
+All recorded times are the system's local time with an explicit offset, for example
+`2026-10-18T06:34:17+07:00`. Archive folders, frame names, event folders and dated products use the
+local date `YYYY-MM-DD`. Set the machine's time zone (`timedatectl set-timezone ...`) before the
+first run. Astronomical calculations convert to UTC internally. Archives written before
+2026-10-18 06:34 (+07:00) are named in UTC; their telemetry carries the offset, so tools read times
+from telemetry and not from file names.
+
+## Dark calibration
+
+The `/calibration` page (sidebar entry "Master Dark") builds the dark library, either the full
+automatic library or one master dark at a chosen exposure and gain, and previews the stored darks
+with statistics and warnings. Darks are stored under `data/calibration/darks/`. Exposures of 0.4 s
+and longer are dark-subtracted using the closest master dark.

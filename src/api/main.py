@@ -1,10 +1,12 @@
 """
-FastAPI Application Entry Point for IMX335 AllSky Observatory Edge API.
+FastAPI Application Entry Point for Zenivo (all-sky observatory software) Edge API.
 Initializes middleware, API routes, static file serving for Edge Web UI, and lifecycle hooks.
 """
 
+import hashlib
 import os
-from typing import Optional
+import re
+from typing import Dict, Optional, Tuple
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -14,6 +16,39 @@ from fastapi.responses import FileResponse, HTMLResponse
 from src.hardware.driver_interface import CameraDriverInterface
 from src.api.service import AllSkyService
 from src.api.routes import router
+from src.version import PRODUCT, __version__
+
+# Local scripts/styles in the pages carry a hand-written ?v=...: replaced at serve time by <version>-<hash of mtime+size>
+_ASSET_URL = re.compile(r'((?:src|href)=")(/static/[^"?#]+|/style\.css)\?v=[^"]*(")')
+
+
+def make_asset_stamper(web_dir: str):
+    """Return stamp(html): rewrite ?v=<anything> on local /static/... and /style.css URLs so a changed file busts the cache.
+    The per-file stamp is recomputed only when its (mtime, size) changes (one stat per asset per page view)."""
+    cache: Dict[str, Tuple[Tuple[int, int], str]] = {}
+
+    def stamp_of(url_path: str) -> Optional[str]:
+        rel = "style.css" if url_path == "/style.css" else url_path[len("/static/"):]
+        full = os.path.normpath(os.path.join(web_dir, rel))
+        if not full.startswith(web_dir + os.sep):
+            return None
+        try:
+            st = os.stat(full)
+        except OSError:
+            return None
+        key = (st.st_mtime_ns, st.st_size)
+        hit = cache.get(url_path)
+        if hit is None or hit[0] != key:
+            digest = hashlib.sha1(f"{key[0]}:{key[1]}".encode()).hexdigest()[:8]
+            hit = (key, f"{__version__}-{digest}")
+            cache[url_path] = hit
+        return hit[1]
+
+    def repl(m):
+        s = stamp_of(m.group(2))
+        return m.group(0) if s is None else f"{m.group(1)}{m.group(2)}?v={s}{m.group(3)}"
+
+    return lambda html: _ASSET_URL.sub(repl, html)
 
 
 def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
@@ -21,9 +56,9 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
     Factory function creating and configuring the FastAPI AllSky Edge application.
     """
     app = FastAPI(
-        title="IMX335 AllSky Observatory Edge API",
-        description="Edge Web UI and Real-Time REST/Streaming API for Sony IMX335 + RTS5869 Camera Subsystem.",
-        version="1.0.0",
+        title=PRODUCT,
+        description="Zenivo: all-sky observatory software. Edge Web UI and real-time REST/streaming API for the all-sky camera (Sony IMX335 + RTS5869).",
+        version=__version__,
     )
 
     app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -58,6 +93,12 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
             "Expires": "0",
         }
 
+        stamp = make_asset_stamper(web_dir)
+
+        def read_page(name: str) -> HTMLResponse:
+            with open(os.path.join(web_dir, name), encoding="utf-8") as f:
+                return HTMLResponse(stamp(f.read()), headers=no_cache)
+
         index_path = os.path.join(web_dir, "index.html")
         viewport_tag = '<div class="viewport-wrapper" id="viewport-container">'
         shell_cache = {"mtime": None, "html": ""}
@@ -87,13 +128,13 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
                     f'style="aspect-ratio: {ratio}" data-frame-ratio="{ratio}">',
                     1,
                 )
-            return HTMLResponse(html, headers=no_cache)
+            return HTMLResponse(stamp(html), headers=no_cache)
 
         @app.get("/")
         def serve_root():
             if os.path.exists(index_path):
                 return page_shell()
-            return {"status": "online", "message": "IMX335 AllSky Edge API"}
+            return {"status": "online", "message": "Zenivo API"}
 
         # Each UI section has its own URL; all share the same page shell
         @app.get("/live")
@@ -108,33 +149,31 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         # 3D map of the aircraft the ADS-B receiver hears (standalone page; loads MapLibre + three.js)
         @app.get("/flights3d")
         def serve_flights3d():
-            return FileResponse(os.path.join(web_dir, "flights3d.html"), media_type="text/html", headers=no_cache)
+            return read_page("flights3d.html")
 
         # 3D map of the satellites above the station (standalone page; loads MapLibre + three.js)
         @app.get("/satellites3d")
         def serve_satellites3d():
-            return FileResponse(os.path.join(web_dir, "satellites3d.html"), media_type="text/html", headers=no_cache)
+            return read_page("satellites3d.html")
 
         # Interactive planetarium (standalone page; WebGL sky engine bundle under /static/sky, star data under /static/skydata)
         @app.get("/sky")
         def serve_sky():
-            return FileResponse(os.path.join(web_dir, "sky.html"), media_type="text/html", headers=no_cache)
+            return read_page("sky.html")
 
         # Standalone full-bleed WebSocket live image view for OBS / Kiosk
         @app.api_route("/full", methods=["GET", "HEAD"])
         @app.api_route("/live/full", methods=["GET", "HEAD"])
         @app.api_route("/obs", methods=["GET", "HEAD"])
         def serve_full_live():
-            with open(os.path.join(web_dir, "full.html"), encoding="utf-8") as f:
-                return HTMLResponse(f.read(), headers=no_cache)
+            return read_page("full.html")
 
         # Dedicated OBS Custom Browser Dock control panel
         @app.api_route("/obs/dock", methods=["GET", "HEAD"])
         @app.api_route("/obs/control", methods=["GET", "HEAD"])
         @app.api_route("/dock", methods=["GET", "HEAD"])
         def serve_obs_dock():
-            with open(os.path.join(web_dir, "obs_dock.html"), encoding="utf-8") as f:
-                return HTMLResponse(f.read(), headers=no_cache)
+            return read_page("obs_dock.html")
 
         @app.get("/index.html")
         def serve_index_html():
@@ -147,6 +186,17 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         @app.get("/static/focus.js")
         def serve_focus_js():
             return FileResponse(os.path.join(web_dir, "focus.js"), media_type="application/javascript", headers=no_cache)
+
+        # Brand files at their conventional root URLs (the rest of src/web/brand/ is under /static/brand/)
+        @app.get("/favicon.ico", include_in_schema=False)
+        def serve_favicon():
+            return FileResponse(os.path.join(web_dir, "brand", "favicon.ico"), media_type="image/x-icon",
+                                headers={"Cache-Control": "public, max-age=604800"})
+
+        @app.get("/site.webmanifest", include_in_schema=False)
+        def serve_manifest():
+            return FileResponse(os.path.join(web_dir, "brand", "site.webmanifest"), media_type="application/manifest+json",
+                                headers={"Cache-Control": "public, max-age=86400"})
 
         app.mount("/static", StaticFiles(directory=web_dir), name="static")
 

@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Query, WebSocket, status, Depends
 from fastapi.responses import Response, StreamingResponse
 
+from src.version import PRODUCT, __version__
 from src.api.schemas import (
     ExposureControlRequest,
     GainControlRequest,
@@ -47,6 +48,12 @@ def get_service() -> AllSkyService:
 # ----------------------------------------------------------------------
 # Camera Status & Telemetry Endpoints (AC3.1, AC3.2)
 # ----------------------------------------------------------------------
+
+@router.get("/api/version")
+def get_version():
+    """Product name and version (single source: src/version.py)."""
+    return {"product": PRODUCT, "version": __version__}
+
 
 @router.get("/api/status")
 def get_camera_status(service: AllSkyService = Depends(get_service)):

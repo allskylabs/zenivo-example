@@ -48,9 +48,32 @@ class TestWebUIStaticAssets:
         assert res.status_code == 200
         assert "text/html" in res.headers["content-type"]
         html = res.text
-        assert "AllSky Observatory" in html
+        assert "Zenivo" in html
+        assert ">AllSky<" not in html
         assert "<html" in html
         assert "</html>" in html
+
+    def test_version_and_brand_files(self, web_client):
+        from src.version import __version__
+        res = web_client.get("/api/version")
+        assert res.status_code == 200
+        assert res.json() == {"product": "Zenivo", "version": __version__}
+        ico = web_client.get("/favicon.ico")
+        assert ico.status_code == 200 and ico.content[:4] == b"\x00\x00\x01\x00"
+        assert web_client.get("/site.webmanifest").json()["short_name"] == "Zenivo"
+        assert web_client.get("/static/brand/mark.svg").status_code == 200
+
+    def test_asset_urls_get_content_stamp(self, tmp_path):
+        from src.api.main import make_asset_stamper
+        from src.version import __version__
+        (tmp_path / "style.css").write_text("a{}")
+        stamp = make_asset_stamper(str(tmp_path))
+        html = '<link href="/style.css?v=hand-bumped"><script src="/static/missing.js?v=1"></script><a href="https://x/y.js?v=1">'
+        out = stamp(html)
+        assert f'/style.css?v={__version__}-' in out and "hand-bumped" not in out
+        assert "/static/missing.js?v=1" in out and "https://x/y.js?v=1" in out  # unknown / external URLs untouched
+        (tmp_path / "style.css").write_text("a{color:red}")
+        assert stamp(html) != out  # a changed file changes the stamp
 
     def test_serve_index_html_direct(self, web_client):
         res = web_client.get("/index.html")

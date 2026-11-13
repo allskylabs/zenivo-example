@@ -1,72 +1,143 @@
-# IMX335 AllSky (allsky-ng)
+<p align="center">
+  <img src="src/web/brand/logo-horizontal.svg" alt="Zenivo" width="320">
+</p>
 
-Lightweight all-sky observatory software for a single camera: capture, dark calibration,
-day/night auto-exposure, live view, keogram / startrails / timelapse, cloud cover, sky events
-(meteors, aircraft, satellites), focus assistant, plate solving and sync to hoan.uk.
+# Zenivo
 
-It runs on a Raspberry Pi 4 (1.8 GB) as well as on a laptop/mini-PC. Keeping CPU and RAM use low
+> All-sky observatory software
+
+Zenivo is the software for one all-sky camera. It captures frames, calibrates dark frames, runs
+day/night auto-exposure, serves a live web UI, builds keograms, startrails and timelapses,
+estimates cloud cover, detects sky events, assists focusing and plate-solves the camera pointing.
+It runs on a Raspberry Pi 4 (1.8 GB RAM) as well as on a laptop or mini-PC. Low CPU and memory use
 is the main design constraint: heavy analysis is sampled, never done per frame.
 
-Supported cameras (picked automatically with `--camera auto`, in this order):
+## Features
 
-1. USB 5MP Sony Starvis IMX335 on a Realtek RTS5869 bridge (`0bda:5869`), with direct sensor
-   register control (long exposures, 10-bit RAW)
-2. Raspberry Pi CSI cameras via picamera2/libcamera (e.g. IMX708 NoIR)
-3. Any V4L2/UVC webcam
-4. A built-in simulator (CI, tests, no hardware)
+- **Capture and exposure**: pull-driven capture (a frame is taken when a viewer, an API call or the
+  sync worker asks for one), day/night auto-exposure from the solar elevation, manual exposure and
+  gain, exposure/gain lock, dark-frame library with hot-pixel repair, optional star boost.
+- **Live view**: WebSocket stream (binary JPEG packets with telemetry and histograms), MJPEG, SSE
+  and snapshot endpoints; constellation, star and RA/Dec grid overlay drawn in the browser.
+- **Products**: keogram, startrails and timelapse per day, plus a timelapse builder for a date range.
+- **Analytics**: cloud cover (clear / scattered / overcast) with history, star count, rain detection
+  on the dome, sky events (meteor, plane, satellite, flash, cloud change) by night and by day.
+- **Traffic**: ADS-B aircraft (local receiver and Flightradar24 feed), satellite passes from TLEs,
+  radiosondes, an aircraft/satellite log of what crossed the camera view.
+- **Focus assistant**: HFR and contrast measurement on a region of interest, motorised lens control
+  and autofocus for supported Raspberry Pi lenses.
+- **Plate solving**: local bright-star solver, with a remote blind-solve fallback; sky and obstruction mask.
+- **Sky pages**: observer sky view, Flights 3D and Satellites 3D, OBS browser source and dock.
+- **Storage**: AVIF frame archive, age and size based retention, extra directories to prune.
+- **Sync**: optional push of frames and telemetry to a hoan.uk server.
+
+## Supported cameras
+
+`--camera auto` tries them in this order:
+
+1. USB 5 MP Sony Starvis IMX335 on a Realtek RTS5869 bridge (`0bda:5869`), with direct sensor
+   register control (exposures up to 90 s, 10-bit RAW).
+2. Raspberry Pi CSI cameras through picamera2/libcamera (for example IMX708 NoIR).
+3. Any V4L2/UVC webcam.
+4. A built-in simulator (tests, demos, no hardware).
+
+## Requirements
+
+- Python 3.10 or newer.
+- Linux (Raspberry Pi OS or a Debian/Ubuntu-based distribution; the V4L2 camera backends are Linux only).
+- For a Pi CSI camera: `python3-picamera2` from apt.
+- `ffmpeg` for timelapse videos (Zenivo falls back to OpenCV without it).
+- About 8 GB of free disk space for the default retention policy.
 
 ## Quick start
 
+With the simulator (no camera needed):
+
 ```bash
-pip install -r requirements.txt fastapi uvicorn opencv-python requests httpx   # picamera2 comes from apt on a Pi
-python3 run_allsky.py --port 8080
+git clone https://github.com/hoanb1/imx335-allsky.git zenivo
+cd zenivo
+./install.sh --no-systemd --camera simulator
+.venv/bin/python run_allsky.py --camera simulator --port 8080
 ```
 
-Open http://localhost:8080. Pages: `/live`, `/gallery`, `/settings`, `/calibration`, `/logs`, `/focus`.
+With a real camera, installed as a systemd service:
 
-Useful flags (`python3 run_allsky.py --help` for all):
+```bash
+./install.sh --camera auto --port 8080
+```
 
-| Flag | Default | Meaning |
-|------|---------|---------|
-| `--camera` | `auto` (`$ALLSKY_CAMERA`) | `auto`, `rts5869`, `picamera`, `v4l2`, `simulator` |
-| `--host` / `--port` | `0.0.0.0` / `8080` | Web UI and API bind address |
-| `--resolution` | sensor default | Capture size `WIDTHxHEIGHT` |
-| `--sync-target` | `http://localhost:3005` | hoan.uk server that receives frames and telemetry |
-| `--sync-interval` | `60` | Seconds between pushes |
-| `--prune-dir PATH:DAYS` | – | Extra directory cleaned by the retention job |
-| `--simulator` | off | Force the simulator |
+Open `http://<host>:8080/`. Full steps are in [docs/INSTALL.md](docs/INSTALL.md).
+Check the running version with `curl http://localhost:8080/api/version`.
 
-## Time zone
+## Pages
 
-All recorded times are **system local time** with an explicit offset
-(e.g. `2026-10-18T06:34:17+07:00`). Archive folders, frame file names, event folders and dated
-products use the local date `YYYY-MM-DD`. Set the machine's time zone (`timedatectl
-set-timezone ...`) before running. Astronomical calculations convert to UTC internally.
-Archives written before 2026-10-18 06:34 (+07) are named in UTC; their telemetry carries the
-offset, so tools read times from telemetry rather than from file names.
+| Path | Purpose |
+|------|---------|
+| `/live` | Live view with overlays, exposure and gain controls, histogram, cloud chart |
+| `/gallery` | Keograms, startrails, timelapses and the sky event archive |
+| `/logs` | Activity log |
+| `/focus` | Focus assistant |
+| `/calibration` | Master dark library and previews |
+| `/settings` | Image Output, Detection, Station & Optics, Sky Mask, Integrations |
+| `/sky` | Observer sky view (WebGL planetarium with aircraft, satellites, events) |
+| `/flights3d`, `/satellites3d` | 3D views of aircraft and satellites around the station |
+| `/obs`, `/obs/dock` | Clean OBS browser source and its control dock |
 
-## Data
+## Documentation
 
-Runtime data lives in `data/` (git-ignored): archived frames per day, live image, logs,
-calibration darks, products and `station_config.json` (location, optics, storage policy, ...).
-See [docs/SDD.md](docs/SDD.md) for the full layout.
+| Document | Contents |
+|----------|----------|
+| [docs/INSTALL.md](docs/INSTALL.md) | Installation on Raspberry Pi OS and Debian/Ubuntu, systemd, nginx, upgrades, uninstall |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | CLI flags, environment variables, `station_config.json`, Settings pages, retention, small-host tuning |
+| [docs/API.md](docs/API.md) | REST, WebSocket and SSE endpoint reference |
+| [docs/SDD.md](docs/SDD.md) | Software design: architecture, capture cycle, data layout, sync, deployment |
+| [docs/BRAND.md](docs/BRAND.md) | Name, logo, colours, typography, voice |
+| [deploy/README.md](deploy/README.md) | Which deployment file is for what |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes |
 
-## Tests
+## Development
 
 ```bash
 python3 -m pytest -q
 ```
 
-Some hardware tests open the real camera if one is connected. Stop a running instance first
-(`systemctl --user stop allsky-web`), or run only the test files you need while iterating.
+Some hardware tests open a real camera if one is connected. Stop a running instance first, or run
+single test files while iterating. A few tests fail at 1.0.0; see "Known issues" in
+[CHANGELOG.md](CHANGELOG.md).
 
-## Deployment
+The navigation, brand block and page head of every HTML page are generated from one definition:
 
-`deploy/allsky-ng.service` (systemd) and `deploy/nginx-allsky.hoan.uk.conf` are the production
-setup on the Pi behind https://allsky.hoan.uk. Deploy by rsync of the code (never `data/`) and
-one `systemctl restart allsky-ng`. Details in [docs/SDD.md](docs/SDD.md#deployment).
+```bash
+python3 scripts/sync_nav.py          # rewrite src/web/*.html
+python3 scripts/sync_nav.py --check  # exit 1 when a page is out of date
+```
 
-## Documentation
+Layout of the web UI:
 
-- [docs/SDD.md](docs/SDD.md): software design document (architecture, capture cycle, data,
-  API, sync, retention, time handling, deployment)
+- `src/web/index.html`: page shell for `/live`, `/gallery`, `/logs`, `/focus`, `/calibration`, `/settings`.
+- `src/web/app/01-core.js` to `08-gallery-adsb.js`: classic scripts that share one global scope and
+  load in numeric order (core and routing, controls and calibration, station settings, live view,
+  sky overlay, telemetry, cloud, gallery and ADS-B).
+- `src/web/focus.js`, `src/web/activity.js`: the Focus and Activity Log pages.
+- `src/web/sky.html`, `flights3d.html`, `satellites3d.html`, `obs_dock.html`: separate pages.
+- `src/web/tokens.css`, `src/web/style.css`: design tokens and styles.
+- `src/web/brand/`: logo, favicon and manifest.
+
+The Python code is documented in [docs/SDD.md](docs/SDD.md).
+
+## Internal names
+
+Some identifiers keep the original "allsky" name for compatibility with running installs and with
+the hoan.uk server. They are not renamed: logger names `allsky.*`, the browser storage key
+`allsky.ui.prefs.v1`, upload paths `/uploads/allsky/...`, the sync API `/api/allsky/ingest/*`,
+environment variables `ALLSKY_*`, and the unit names `allsky-ng` and `allsky-web` on existing hosts.
+
+## Versioning
+
+Zenivo follows [Semantic Versioning](https://semver.org/). The version lives in one place,
+`src/version.py`, and is reported by `python3 run_allsky.py --version`, `GET /api/version` and the
+UI sidebar. Release notes are in [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+Not yet specified; all rights reserved by the author until one is added.

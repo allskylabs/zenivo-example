@@ -3,22 +3,26 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "imx335-allsky"
-version = "0.1.0"
-description = "Next-Generation AllSky Camera System (Sony IMX335 + Realtek RTS5869)"
-authors = [{ name = "AllSky Observatory Team" }]
+name = "zenivo"
+dynamic = ["version"]
+description = "Zenivo — all-sky observatory software (capture, calibration, live view, sky events)"
+authors = [{ name = "Zenivo" }]
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.24.0",
     "Pillow>=11.3.0",
     "pillow-avif-plugin>=1.5.0",
+    "urllib3>=1.26",
 ]
 
 [project.optional-dependencies]
 test = [
     "pytest>=7.0.0",
 ]
+
+[tool.setuptools.dynamic]
+version = {attr = "src.version.__version__"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -60,7 +60,17 @@ from src.api.main import create_app
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="AllSky Camera Edge System (IMX335/RTS5869, Raspberry Pi cameras, UVC webcams)."
+        prog="run_allsky.py",
+        description="Zenivo \u2014 all-sky observatory software",
+    )
+    try:
+        from src.version import __version__ as _zenivo_version
+    except ImportError:
+        _zenivo_version = "unknown"
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"Zenivo {_zenivo_version}",
     )
     parser.add_argument(
         "--host",
@@ -148,7 +158,7 @@ def parse_args():
         default=None,
         help="Minimum seconds between camera captures while live viewers are connected; "
         "raise it to cut CPU on small hosts. Overrides Settings > Performance for this run "
-        "(default: the saved setting, 1.0)",
+        "(default: the saved setting, 2.0)",
     )
     parser.add_argument(
         "--prune-dir",

@@ -1,4 +1,4 @@
-/* AllSky dashboard (part of the former app.js): White balance, live view controls, zoom and pan.
+/* Zenivo dashboard (part of the former app.js): White balance, live view controls, zoom and pan.
  * Classic script: top-level declarations are shared with the other src/web/app/*.js files; load order is fixed in index.html. */
 
 // ------------------------------------------------------------------
