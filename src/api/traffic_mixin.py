@@ -85,13 +85,17 @@ class TrafficMixin:
             if not cfg["fr24_token"]:
                 fr.password = ""  # "Clear token" also forgets the in-memory password
         fr24_login = None
-        if fr24_email and fr24_password:
+        if fr24_email and fr24_password and time.time() - getattr(self, "_fr24_login_failed_at", 0.0) < 60.0:
+            # One failed sign-in per minute at most: never hammer the Flightradar24 login with a wrong password
+            fr24_login = {"ok": False, "message": "the last sign-in failed less than a minute ago, wait and try again"}
+        elif fr24_email and fr24_password:
             try:
                 fr.login(fr24_email.strip(), fr24_password)
                 cfg["fr24_email"] = fr.email
                 cfg["fr24_token"] = fr.subscription_key
                 fr24_login = {"ok": True}
             except ValueError as exc:
+                self._fr24_login_failed_at = time.time()
                 fr24_login = {"ok": False, "message": str(exc)}
 
         self.station_config["adsb"] = cfg

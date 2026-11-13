@@ -823,8 +823,10 @@ const fr24TokenState = document.getElementById("fr24-token-state");
 const fr24Clear = document.getElementById("btn-fr24-clear-token");
 const fr24Status = document.getElementById("fr24-status");
 
+let fr24Loaded = false;
 function syncFr24UI(d) {
     if (!fr24Enabled || !d) return;
+    fr24Loaded = true;
     fr24Enabled.checked = !!d.fr24_enabled;
     if (document.activeElement !== fr24Email) fr24Email.value = d.fr24_email || "";
     const has = !!d.fr24_has_token;
@@ -842,22 +844,32 @@ function syncFr24UI(d) {
     fr24Status.textContent = txt;
 }
 
-async function saveFr24(field) {
+async function saveFr24(withSecrets) {
     const body = { fr24_enabled: fr24Enabled.checked, fr24_email: fr24Email.value.trim() };
-    const pw = fr24Password.value;
-    const tk = fr24Token.value.trim();
+    // The password and token leave this page only on the explicit button (never on autosave: a browser's
+    // password manager can fill these fields by itself, and a filled field must not be sent anywhere)
+    const pw = withSecrets ? fr24Password.value : "";
+    const tk = withSecrets ? fr24Token.value.trim() : "";
+    if (!fr24Loaded) throw new Error("still loading, try again");
     if (pw && !body.fr24_email) throw new Error("enter the account e-mail with the password");
     if (pw) body.fr24_password = pw;
     if (tk) body.fr24_token = tk;
     const data = await sendJson("/api/adsb", body);
-    fr24Password.value = "";
-    fr24Token.value = "";
+    if (withSecrets) {
+        fr24Password.value = "";
+        fr24Token.value = "";
+    }
     syncAdsbUI(data);
     if (data.fr24_login && !data.fr24_login.ok) throw new Error(`Flightradar24 sign-in failed: ${data.fr24_login.message}`);
 }
 
 if (fr24Enabled) {
-    autosave(fr24Enabled.closest("fieldset"), saveFr24);
+    autosave(fr24Enabled.closest("fieldset"), () => saveFr24(false));
+    const fr24Signin = document.getElementById("btn-fr24-signin");
+    if (fr24Signin) fr24Signin.addEventListener("click", async () => {
+        if (!fr24Password.value && !fr24Token.value.trim()) return;
+        await settingsSave(fr24Signin, () => saveFr24(true));
+    });
     fr24Clear.addEventListener("click", async () => {
         await settingsSave(fr24Clear, async () => {
             syncAdsbUI(await sendJson("/api/adsb", { fr24_token: "" }));

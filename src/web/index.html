@@ -1037,13 +1037,14 @@
                             </div>
                             <div class="field">
                                 <label for="fr24-password">Account password (optional)</label>
-                                <input type="password" id="fr24-password" maxlength="254" autocomplete="off" placeholder="Not shown once sent" />
+                                <input type="password" id="fr24-password" maxlength="254" autocomplete="new-password" data-no-autosave placeholder="Not shown once sent" />
                             </div>
                             <div class="field field-wide">
                                 <label for="fr24-token">Subscription token (optional)</label>
                                 <div class="fr24-token-row">
-                                    <input type="password" id="fr24-token" maxlength="1024" autocomplete="off" spellcheck="false" />
+                                    <input type="password" id="fr24-token" maxlength="1024" autocomplete="new-password" data-no-autosave spellcheck="false" />
                                     <span class="text-muted" id="fr24-token-state"></span>
+                                    <button type="button" class="btn btn-sm btn-outline" id="btn-fr24-signin">Send to Flightradar24</button>
                                     <button type="button" class="btn btn-sm btn-outline" id="btn-fr24-clear-token" hidden>Clear token</button>
                                 </div>
                             </div>
