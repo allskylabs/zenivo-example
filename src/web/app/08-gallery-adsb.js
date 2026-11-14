@@ -649,7 +649,13 @@ function renderFlights(d) {
     flightsCard.hidden = false;
     const list = d.aircraft || [];
     flightsCount.textContent = `${d.in_view || 0} in view · ${d.total || 0} heard`;
-    flightsStatus.textContent = d.connected ? "Live from the ADS-B receiver" : "Receiver not connected";
+    if (d.source_in_use === "public" && d.public_provider) {
+        // adsb.fi / adsb.lol terms: credit the source with a link
+        const pp = d.public_provider;
+        flightsStatus.innerHTML = `Live from the public network: <a href="${escapeHtml(pp.link)}" target="_blank" rel="noopener">${escapeHtml(pp.name)}</a>`;
+    } else {
+        flightsStatus.textContent = d.connected ? "Live from the ADS-B receiver" : "Receiver not connected";
+    }
     if (!list.length) {
         flightsList.innerHTML = `<li class="live-events-empty">No aircraft heard right now.</li>`;
         return;
@@ -779,6 +785,8 @@ const adsbHost = document.getElementById("adsb-host");
 const adsbPort = document.getElementById("adsb-port");
 const adsbEnabled = document.getElementById("adsb-enabled");
 const adsbStatus = document.getElementById("adsb-status");
+const adsbPublic = document.getElementById("adsb-public-fallback");
+const adsbSourceStatus = document.getElementById("adsb-source-status");
 
 const sondesEnabled = document.getElementById("sondes-enabled");
 
@@ -793,6 +801,15 @@ function syncAdsbUI(d) {
         : st.last_error ? `Not connected: ${st.last_error}` : "Idle (reads the feed only at night with aircraft detection on).";
     if (d.enabled && !d.pointing_solved) txt += " Needs a star-solved camera pointing (plate solve) to match flights.";
     adsbStatus.textContent = txt;
+    if (adsbPublic) {
+        adsbPublic.checked = !!d.public_fallback;
+        const ps = d.public_status || {};
+        const src = d.source_in_use === "receiver" ? "your receiver"
+            : d.source_in_use === "public" ? `public network (${ps.provider || "adsb.fi"})` : "none";
+        let line = `Source in use: ${src}.`;
+        if (d.public_fallback && ps.last_error) line += ` Last public error: ${ps.last_error}`;
+        adsbSourceStatus.textContent = line;
+    }
     syncFr24UI(d);
     if (sondesEnabled) sondesEnabled.checked = d.radiosondes_enabled !== 0 && d.radiosondes_enabled !== false;
 }
@@ -808,6 +825,12 @@ async function loadAdsb() {
 if (adsbHost) {
     autosave(adsbHost.closest("fieldset"), async () => {
         syncAdsbUI(await sendJson("/api/adsb", { host: adsbHost.value.trim(), port: Number(adsbPort.value) || 30003, enabled: adsbEnabled.checked }));
+        setTimeout(loadAdsb, 3000);
+    });
+}
+if (adsbPublic) {
+    autosave(adsbPublic.closest("fieldset"), async () => {
+        syncAdsbUI(await sendJson("/api/adsb", { public_fallback: adsbPublic.checked }));
         setTimeout(loadAdsb, 3000);
     });
 }

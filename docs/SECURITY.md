@@ -133,7 +133,7 @@ Everything Zenivo connects to, every third-party file a visitor's browser loads 
 each one receives is listed in one place: [TRANSPARENCY.md](TRANSPARENCY.md#1-outbound-connections-made-by-the-server).
 In short: there is no telemetry, no update check, no remote configuration and no call home to the authors.
 Optional connections (sync target, remote plate solver, Flightradar24, community sharing, local ADS-B
-receiver) are off until you set them. Satellite orbit data, radiosonde data (the position sent is rounded to 0.5 degrees; switch
+receiver, the public ADS-B fallback adsb.fi / adsb.lol) are off until you set them. Satellite orbit data, radiosonde data (the position sent is rounded to 0.5 degrees; switch
 `radiosondes_enabled` turns it off) and airport data are fetched on demand, as that page explains.
 
 Two security points that belong here:
@@ -166,7 +166,7 @@ deliberately not removed, because they are the product.
 
 The rounding applies to what Zenivo publishes to visitors and the community card. It does not change what the
 server sends to the public data services it queries: the radiosonde request to SondeHub carries the position
-rounded to 0.5 degrees, and the Flightradar24 box (only when you switch it on) is centred on the station to 0.1 degree.
+rounded to 0.5 degrees, the public ADS-B fallback (off by default) sends the same 0.5 degree grid position to adsb.fi / adsb.lol, and the Flightradar24 box (only when you switch it on) is centred on the station to 0.1 degree.
 Both are listed in [TRANSPARENCY.md](TRANSPARENCY.md#1-outbound-connections-made-by-the-server) and
 [its limitations](TRANSPARENCY.md#8-known-limitations).
 

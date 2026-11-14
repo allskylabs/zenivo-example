@@ -31,7 +31,7 @@ is the main design constraint: heavy analysis is sampled, never done per frame.
 - **Products**: keogram, startrails and timelapse per day, plus a timelapse builder for a date range.
 - **Analytics**: cloud cover (clear / scattered / overcast) with history, star count, rain detection
   on the dome, sky events (meteor, plane, satellite, flash, cloud change) by night and by day.
-- **Traffic**: ADS-B aircraft (local receiver, and an optional Flightradar24 feed, see the note below), satellite passes from TLEs,
+- **Traffic**: ADS-B aircraft (your own receiver first; an optional public-network fallback, adsb.fi then adsb.lol, off by default; and an optional Flightradar24 feed, see the note below), satellite passes from TLEs,
   radiosondes (position sent to SondeHub rounded to 0.5 degrees, with an off switch), an aircraft/satellite log of what crossed the camera view.
   Daytime birds, insects and aircraft are detected locally with their own settings. Every Settings card saves itself on change.
 - **Focus assistant**: HFR and contrast measurement on a region of interest, motorised lens control

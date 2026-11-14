@@ -26,14 +26,14 @@ Contents: [1 Server outbound](#1-outbound-connections-made-by-the-server) |
 "Server" means the Python service (`run_allsky.py` and `src/`). All connections use HTTPS with certificate
 verification on (`src/net.py`), except where you type an `http://` address yourself (sync target, remote
 solver, your own community seeds, ADS-B receiver). Requests identify themselves as `Zenivo/<version>`, except
-Flightradar24 (see its row) and the sync client (Python `requests` default).
+Flightradar24 (see its row), adsb.fi and adsb.lol (`zenivo-allsky`) and the sync client (Python `requests` default).
 
 | # | Destination | What is sent | When | Default | Turn off | Source |
 |---|---|---|---|---|---|---|
 | 1 | `celestrak.org` (`/NORAD/elements/gp.php?GROUP=stations` and `visual`) | Only the group name. Your IP address, as with any request | At most once per 24 h (retry after 30 min on failure), when satellite positions are first needed: a visitor opens the satellite overlay or page, or the traffic log runs at night with a solved camera pointing | **On** | Turn the traffic log off (Settings, Detection) and do not use satellite views | `src/analytics/satellites.py` |
 | 2 | `api.v2.sondehub.org` (`/sondes?lat=..&lon=..&distance=..`) | The station position **rounded to a 0.5 degree grid** (about 55 km; the exact position stays on the host and is only used locally to place balloons in the sky) and a 350 km radius | At most every 20 s, while any browser has the Live tab open and visible (it asks `/api/radiosondes` every 20 s) or someone switches the balloon overlay on | **On** while a page asks for it. With the factory station (0, 0) it sends 0, 0 | Settings, Integrations, "Weather balloons (SondeHub)" switch (`radiosondes_enabled`, admin only; set to 0 nothing is requested and the Live page says the balloons are turned off and re-checks only every 5 minutes), or block `api.v2.sondehub.org` in your firewall | `src/analytics/radiosonde.py`, `src/api/traffic_mixin.py` (`get_radiosondes_now`) |
 | 3 | `davidmegginson.github.io/ourairports-data` (`airports.csv`, `runways.csv`) | Nothing about the station: a plain file download (about 17 MB). Your IP address | When a visitor opens Flights 3D and the cached file is missing, older than 30 days, or the station moved | **On** (on demand), cached 30 days | Do not open Flights 3D | `src/analytics/airports.py` |
-| 4 | `hexdb.io` (`/api/v1/aircraft/<icao hex>`, `/api/v1/route/icao/<callsign>`) | The ICAO hex code and the callsign of an aircraft shown on the map or in the flight list | When a new aircraft is shown (queued, answers cached on disk, unknown hex asked again after 7 days, routes after 12 h) | **On** when a local ADS-B receiver or the Flightradar24 feed delivers aircraft. Without either, nothing is looked up | Clear the ADS-B receiver host and keep Flightradar24 off | `src/analytics/aircraft_info.py` |
+| 4 | `hexdb.io` (`/api/v1/aircraft/<icao hex>`, `/api/v1/route/icao/<callsign>`) | The ICAO hex code and the callsign of an aircraft shown on the map or in the flight list | When a new aircraft is shown (queued, answers cached on disk, unknown hex asked again after 7 days, routes after 12 h) | **On** when a local ADS-B receiver, the public fallback (rows 12 and 13) or the Flightradar24 feed delivers aircraft. Without any of them, nothing is looked up | Clear the ADS-B receiver host and keep the public fallback and Flightradar24 off | `src/analytics/aircraft_info.py` |
 | 5 | `raw.githubusercontent.com` (OpenFlights `airlines.dat`) | Nothing: a file download | Once, then cached on disk | **On** with row 4 | Same as row 4 | `src/analytics/aircraft_info.py` |
 | 6 | Flightradar24: `data-cloud.flightradar24.com` (`/zones/fcgi/feed.js`), `data-live.flightradar24.com` (`/clickhandler/`), `www.flightradar24.com` (`/user/login`) | A map box (`bounds`) rounded to 0.1 degree. The box is centred on the station (plus or minus 3 degrees for the traffic log; plus or minus 14 degrees of latitude and 18 of longitude in global mode), so Flightradar24 can infer the station position to about 10 km. Also: world boxes in global mode, the flight id when you open a flight, and, only if you enter your Flightradar24 account in Settings, that e-mail and password once at login (the password is not stored; the returned token is) | Traffic log every 5 s once the camera pointing is solved; when someone opens the 3D map; at least 2 s between requests | **Off** (`adsb.fr24_enabled` defaults to 0) | Settings, Integrations, Flightradar24 switch off | `src/analytics/fr24.py`, `src/api/traffic_mixin.py` |
 | 7 | `ipwho.is`, then `ipapi.co` if the first fails (`https` only) | Nothing but your public IP address (implicit in the request). They answer with the coordinates of that address | Only when the admin presses "Locate via GPS / IP" (`POST /api/station/auto-locate`, admin only) | **Off** (button) | Do not press it; type the coordinates | `src/calibration/station_solver.py`, `src/api/plate_solve_mixin.py` |
@@ -41,6 +41,8 @@ Flightradar24 (see its row) and the sync client (Python `requests` default).
 | 9 | Sync target you pass as `--sync-target` | A JPEG frame (width at most `--sync-max-width`), the telemetry JSON, headers `X-Device-Id` (`$ZENIVO_DEVICE_ID` or `zenivo-<hostname>`, so your host name leaves the machine), `X-Device-Token` if set, exposure and gain | Every `--sync-interval` seconds (default 60) | **Off** (empty). One log line at start names the target when on | Start without `--sync-target` | `run_allsky.py`, `src/sync/client.py` |
 | 10 | Community: the seed list and a few known stations (`<origin>/api/community/peers`, `<origin>/api/community/announce`) | Your signed station card. See [section 4](#4-what-is-shared-when-community-sharing-is-on) | Every 15 minutes, up to 5 stations per round | **Off**. No key is created and no thread runs while off | Settings, Community, off | `src/community/gossip.py`, `src/community/netguard.py`, `src/community/manager.py` |
 | 11 | Local ADS-B receiver (SBS-1, TCP, default port 30003) at the host you enter | Nothing (the service only reads the feed) | Continuously, reconnecting every 20 s | **Off** until you enter a host | Clear the host in Settings, Integrations | `src/analytics/adsb.py`, `src/api/traffic_mixin.py` |
+| 12 | `opendata.adsb.fi` (`/api/v3/lat/<lat>/lon/<lon>/dist/150`), public ADS-B network, fallback source | The station position **rounded to a 0.5 degree grid** (about 55 km) and a 150 NM radius; User-Agent `zenivo-allsky`. Your IP address | Every 10 s, only while the fallback switch is on **and** your receiver is missing, not connected or silent for more than 90 s, and a page or recording needs aircraft. Stops within one cycle when the receiver delivers again. Slows down on errors and honours `Retry-After` (at most 5 min between retries, longer only if the server asks) | **Off** (`adsb.public_fallback` defaults to 0) | Settings, Integrations, "2. Public network (fallback)" switch off | `src/analytics/adsb_public.py`, `src/api/traffic_mixin.py` |
+| 13 | `api.adsb.lol` (`/v2/point/<lat>/<lon>/150`), failover for row 12 | Same as row 12 | Only after 3 failures in a row of adsb.fi, one request per 180 s (under adsb.lol's 500 requests a day per IP); adsb.fi is tried again after 10 minutes | **Off**, same switch as row 12 | Same as row 12 | `src/analytics/adsb_public.py` |
 
 Flightradar24 settings (Settings, Integrations, "Flightradar24" block, admin only): a switch, an optional account
 e-mail and password, and an optional subscription token. The token and the password are **write-only**:
@@ -49,6 +51,18 @@ e-mail and password, and an optional subscription token. The token and the passw
 `get_station_config`), and the e-mail is shown to the admin only (guests get it blank, also inside the nested
 `fr24` object of `GET /api/adsb`; `src/api/routes.py`, `src/api/guest_view.py`). The password is kept in memory only
 and forgotten on restart or when the token is cleared; the token and e-mail are saved in `station_config.json`.
+
+### Aircraft sources: order of use
+
+1. **Your own receiver** (row 11) is the primary source, whenever it delivers.
+2. **A public open ADS-B network** (rows 12 and 13) is used only when the fallback switch is on **and** the receiver
+   is not configured, not connected, or has sent no message for more than 90 s. As soon as the receiver delivers
+   again the public network is no longer asked (within one poll cycle) and its aircraft are dropped. Aircraft from
+   this source are labelled "public" and credited to adsb.fi or adsb.lol with a link in the Flights panel and on
+   the 3D map, as the providers require. adsb.fi data is offered for personal, non-commercial use and must credit
+   adsb.fi; adsb.lol data is under the ODbL 1.0. The position leaves the station only rounded to 0.5 degree.
+3. **Flightradar24** (row 6) is independent and optional: off by default, used only when you switch it on, and not
+   changed by the two items above.
 
 Notes on the table:
 
@@ -314,7 +328,7 @@ Everything else uses the process's default umask: protect the directory itself.
 | `admin_sessions.json` | SHA-256 of each signed-in browser's token, expiry | High | 0600 |
 | `admin_setup_code.txt` | One-time setup code. Exists only while no password is set | High | 0600 |
 | `community_key.pem` | Ed25519 private key of the station. Created only when community sharing is first enabled | High | 0600 |
-| `station_config.json` | Exact latitude and longitude, name, optics, sky mask, ADS-B receiver host and port, Flightradar24 e-mail and token (the FR24 password is never stored), `radiosondes_enabled`, `day_objects`, `google_maps_key`, `remote_solver_url`, retention and other settings | High | 0600 |
+| `station_config.json` | Exact latitude and longitude, name, optics, sky mask, ADS-B receiver host and port, `public_fallback`, Flightradar24 e-mail and token (the FR24 password is never stored), `radiosondes_enabled`, `day_objects`, `google_maps_key`, `remote_solver_url`, retention and other settings | High | 0600 |
 | `community.json` | Community settings: switch, name, public URL, precision, preview switches, `relay_previews`, seed list. No secrets | Low | default |
 | `community_relay/<station id>.jpg` | While "Relay previews" is on (the default; the folder only fills when a station uploads): large preview images pushed by other stations (re-encoded JPEG, at most 100 files / 25 MB, deleted after 24 h; the folder is emptied when the switch is turned off) | Low | default |
 | `community_relays.json` | Only for a station without a public URL: the relay stations that hold your preview (origin, last success, failures) | Low | default |

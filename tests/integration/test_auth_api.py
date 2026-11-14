@@ -176,6 +176,16 @@ class TestDayObjectsConfig:
         assert c.get("/api/radiosondes").json()["enabled"] is False
         c.post("/api/adsb", json={"radiosondes_enabled": True})
 
+    def test_public_fallback_defaults_off_round_trips_and_is_admin_only(self, guest_client, fresh_auth):
+        c = guest_client
+        assert c.get("/api/adsb").json()["public_fallback"] == 0
+        assert c.post("/api/adsb", json={"public_fallback": True}).status_code == 401
+        setup_admin(c, fresh_auth)
+        r = c.post("/api/adsb", json={"public_fallback": True})
+        assert r.status_code == 200 and r.json()["public_fallback"] == 1
+        assert c.get("/api/adsb").json()["source_in_use"] in ("receiver", "public", "none")
+        assert c.post("/api/adsb", json={"public_fallback": False}).json()["public_fallback"] == 0
+
     def test_fr24_secrets_are_never_returned(self, guest_client, fresh_auth):
         c = guest_client
         setup_admin(c, fresh_auth)

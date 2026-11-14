@@ -2359,7 +2359,10 @@
                 if (logo.getAttribute("src") !== src) { logo.hidden = true; logo.onload = () => { logo.hidden = false; }; logo.src = src; }
             } else { logo.hidden = true; logo.removeAttribute("src"); }
             const route = a.route ? a.route.split("-").join(" → ") : null;
-            const srcLabel = a.source === "both" ? "Local ADS-B + FR24" : a.source === "fr24" ? "Flightradar24 Global" : "Local ADS-B";
+            const PUBLIC_LINKS = { "adsb.fi": "https://adsb.fi", "adsb.lol": "https://adsb.lol" };
+            const srcLabel = a.source === "public" && PUBLIC_LINKS[a.provider]
+                ? { html: `Public network: <a href="${PUBLIC_LINKS[a.provider]}" target="_blank" rel="noopener">${esc(a.provider)}</a>` }
+                : a.source === "both" ? "Local ADS-B + FR24" : a.source === "fr24" ? "Flightradar24 Global" : a.source === "public" ? "Public network" : "Local ADS-B";
             const rows = [
                 a.airline ? ["Airline", a.airline] : null,
                 route ? ["Route", route] : null,
@@ -2382,7 +2385,7 @@
             $("info-stats").innerHTML = [["Altitude", `${alt} m`], ["Speed", a.speed_kmh != null ? `${a.speed_kmh} km/h` : "--"],
                 ["Distance", `${a.distance_km} km`], ["Elevation", a.above_horizon ? `${a.alt_deg}°` : "below"]]
                 .map(([k, v]) => `<div><small>${k}</small><b>${esc(v)}</b></div>`).join("");
-            $("info-dl").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
+            $("info-dl").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v && v.html ? v.html : esc(v)}</dd>`).join("");
             $("info-link").href = `https://globe.adsbexchange.com/?icao=${encodeURIComponent(String(a.icao).toLowerCase())}`;
             const frLink = $("info-fr24");
             if (a.fr24_id) {

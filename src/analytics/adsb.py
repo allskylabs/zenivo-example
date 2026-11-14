@@ -56,34 +56,34 @@ def pointing_rotation(az_deg: float, alt_deg: float, roll_deg: float) -> np.ndar
     return np.column_stack([np.cross(y, axis), y, axis])
 
 
-class AdsbFeed:
-    """SBS-1 reader. Connects only while wanted() is true (night with aircraft detection on)."""
+class AircraftStore:
+    """Per-aircraft position store shared by the receiver feed and the public-network feed: recent fixes,
+    a thinned path for the 3D map, tracks for flight matching and dead-reckoned current positions."""
 
     KEEP_S = 300.0       # seconds of positions kept per aircraft
     TRAIL_KEEP_S = 900.0  # seconds of thinned path kept per aircraft for the 3D map
     TRAIL_STEP_S = 4.0
     MAX_AIRCRAFT = 400
 
-    def __init__(self, host: str, port: int = 30003, wanted: Optional[Callable[[], bool]] = None):
-        self.host, self.port = host, int(port)
-        self.wanted = wanted or (lambda: True)
+    def __init__(self) -> None:
         self._lock = threading.Lock()
         self._ac: Dict[str, Dict[str, Any]] = {}
-        self._stop = threading.Event()
-        self._thread: Optional[threading.Thread] = None
-        self.connected = False
-        self.last_error: Optional[str] = None
-        self.last_message_ts = 0.0
-        self.messages = 0
 
-    def start(self) -> None:
-        if self._thread is None or not self._thread.is_alive():
-            self._stop.clear()
-            self._thread = threading.Thread(target=self._run, name="adsb-feed", daemon=True)
-            self._thread.start()
+    def _entry(self, icao: str, now: float) -> Optional[Dict[str, Any]]:
+        """The record of `icao` (created when new, None when the store is full); caller holds the lock."""
+        ac = self._ac.get(icao)
+        if ac is None:
+            if len(self._ac) >= self.MAX_AIRCRAFT:
+                return None
+            ac = self._ac[icao] = {"icao": icao, "callsign": "", "pos": deque(maxlen=400), "seen": now,
+                                   "trail": deque(maxlen=int(self.TRAIL_KEEP_S / self.TRAIL_STEP_S) + 8)}
+        ac["seen"] = now
+        return ac
 
-    def stop(self) -> None:
-        self._stop.set()
+    def _add_fix(self, ac: Dict[str, Any], t: float, lat: float, lon: float, alt_m: float) -> None:
+        ac["pos"].append((t, lat, lon, alt_m))
+        if not ac["trail"] or t - ac["trail"][-1][0] >= self.TRAIL_STEP_S:
+            ac["trail"].append((t, lat, lon, alt_m))
 
     def save_trails(self, path: str) -> None:
         """Write the recent paths (e.g. on shutdown) so the 3D map has history again right after a restart."""
@@ -117,6 +117,80 @@ class AdsbFeed:
                                   "seen": pts[-1][0], "trail": trail}
                 n += 1
         return n
+
+    def _prune(self, now: float) -> None:
+        with self._lock:
+            for icao in [k for k, a in self._ac.items() if now - a["seen"] > self.KEEP_S]:
+                del self._ac[icao]
+            for a in self._ac.values():
+                q: Deque = a["pos"]
+                while q and now - q[0][0] > self.KEEP_S:
+                    q.popleft()
+                q = a["trail"]
+                while q and now - q[0][0] > self.TRAIL_KEEP_S:
+                    q.popleft()
+
+    def tracks(self, t0: float, t1: float, margin_s: float = 30.0) -> List[Dict[str, Any]]:
+        """Aircraft with positions around [t0, t1]: [{"icao", "callsign", "pos": [(t, lat, lon, alt_m)]}]."""
+        out = []
+        with self._lock:
+            for a in self._ac.values():
+                pts = [p for p in a["pos"] if t0 - margin_s <= p[0] <= t1 + margin_s]
+                if pts:
+                    out.append({"icao": a["icao"], "callsign": a["callsign"], "pos": pts,
+                                **{k: a[k] for k in ("speed_kt", "track_deg", "vrate_fpm") if k in a}})
+        return out
+
+    def current(self, max_age_s: float = 60.0, trail_s: float = 0.0, at: Optional[float] = None) -> List[Dict[str, Any]]:
+        """Latest state of every aircraft with a position in the last max_age_s seconds; with trail_s, also
+        its recent path as [[lat, lon, alt_m, age_s], ...] (oldest first, one point per TRAIL_STEP_S, ending
+        at the latest fix)."""
+        now = time.time() if at is None else at   # `at`: dead-reckon to another instant (the displayed frame's, or a second later for the velocity)
+        out = []
+        with self._lock:
+            for a in self._ac.values():
+                if a["pos"] and now - a["pos"][-1][0] <= max_age_s:
+                    t, lat, lon, alt = a["pos"][-1]
+                    fix = (lat, lon, alt)
+                    lat, lon, alt = _dead_reckon(a, lat, lon, alt, now - t)
+                    rec = {"icao": a["icao"], "callsign": a["callsign"], "lat": lat, "lon": lon,
+                           "altitude_m": alt, "age_s": now - t,
+                           **{k: a[k] for k in ("speed_kt", "track_deg", "vrate_fpm") if k in a}}
+                    if trail_s > 0:
+                        trail = [[round(plat, 5), round(plon, 5), round(palt), round(now - pt, 1)]
+                                 for pt, plat, plon, palt in a["trail"]
+                                 if now - pt <= trail_s and (pt < t or (pt - t <= 0.1 and (plat != lat or plon != lon)))]
+                        trail.append([round(fix[0], 5), round(fix[1], 5), round(fix[2]), round(now - t, 1)])
+                        if fix != (lat, lon, alt):
+                            trail.append([round(lat, 5), round(lon, 5), round(alt), 0.0])
+                        rec["trail"] = trail
+                    out.append(rec)
+        return out
+
+
+
+class AdsbFeed(AircraftStore):
+    """SBS-1 reader. Connects only while wanted() is true (night with aircraft detection on)."""
+
+    def __init__(self, host: str, port: int = 30003, wanted: Optional[Callable[[], bool]] = None):
+        super().__init__()
+        self.host, self.port = host, int(port)
+        self.wanted = wanted or (lambda: True)
+        self._stop = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self.connected = False
+        self.last_error: Optional[str] = None
+        self.last_message_ts = 0.0
+        self.messages = 0
+
+    def start(self) -> None:
+        if self._thread is None or not self._thread.is_alive():
+            self._stop.clear()
+            self._thread = threading.Thread(target=self._run, name="adsb-feed", daemon=True)
+            self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
 
     # ------------------------------------------------------------------
     def _run(self) -> None:
@@ -166,13 +240,9 @@ class AdsbFeed:
         self.messages += 1
         self.last_message_ts = now
         with self._lock:
-            ac = self._ac.get(icao)
+            ac = self._entry(icao, now)
             if ac is None:
-                if len(self._ac) >= self.MAX_AIRCRAFT:
-                    return
-                ac = self._ac[icao] = {"icao": icao, "callsign": "", "pos": deque(maxlen=400), "seen": now,
-                                       "trail": deque(maxlen=int(self.TRAIL_KEEP_S / self.TRAIL_STEP_S) + 8)}
-            ac["seen"] = now
+                return
             if f[1] == "1":
                 if f[10].strip():
                     ac["callsign"] = f[10].strip()
@@ -193,23 +263,8 @@ class AdsbFeed:
                 alt_ft, lat, lon = float(f[11]), float(f[14]), float(f[15])
             except ValueError:
                 return
-            ac["pos"].append((now, lat, lon, alt_ft * FT))
-            if not ac["trail"] or now - ac["trail"][-1][0] >= self.TRAIL_STEP_S:
-                ac["trail"].append((now, lat, lon, alt_ft * FT))
+            self._add_fix(ac, now, lat, lon, alt_ft * FT)
 
-    def _prune(self, now: float) -> None:
-        with self._lock:
-            for icao in [k for k, a in self._ac.items() if now - a["seen"] > self.KEEP_S]:
-                del self._ac[icao]
-            for a in self._ac.values():
-                q: Deque = a["pos"]
-                while q and now - q[0][0] > self.KEEP_S:
-                    q.popleft()
-                q = a["trail"]
-                while q and now - q[0][0] > self.TRAIL_KEEP_S:
-                    q.popleft()
-
-    # ------------------------------------------------------------------
     def status(self) -> Dict[str, Any]:
         with self._lock:
             n = len(self._ac)
@@ -217,43 +272,6 @@ class AdsbFeed:
         return {"host": self.host, "port": self.port, "connected": self.connected, "aircraft": n,
                 "with_position": with_pos, "messages": self.messages, "last_error": self.last_error,
                 "last_message_age_s": round(time.time() - self.last_message_ts, 1) if self.last_message_ts else None}
-
-    def tracks(self, t0: float, t1: float, margin_s: float = 30.0) -> List[Dict[str, Any]]:
-        """Aircraft with positions around [t0, t1]: [{"icao", "callsign", "pos": [(t, lat, lon, alt_m)]}]."""
-        out = []
-        with self._lock:
-            for a in self._ac.values():
-                pts = [p for p in a["pos"] if t0 - margin_s <= p[0] <= t1 + margin_s]
-                if pts:
-                    out.append({"icao": a["icao"], "callsign": a["callsign"], "pos": pts,
-                                **{k: a[k] for k in ("speed_kt", "track_deg", "vrate_fpm") if k in a}})
-        return out
-
-    def current(self, max_age_s: float = 60.0, trail_s: float = 0.0, at: Optional[float] = None) -> List[Dict[str, Any]]:
-        """Latest state of every aircraft with a position in the last max_age_s seconds; with trail_s, also
-        its recent path as [[lat, lon, alt_m, age_s], ...] (oldest first, one point per TRAIL_STEP_S, ending
-        at the latest fix)."""
-        now = time.time() if at is None else at   # `at`: dead-reckon to another instant (the displayed frame's, or a second later for the velocity)
-        out = []
-        with self._lock:
-            for a in self._ac.values():
-                if a["pos"] and now - a["pos"][-1][0] <= max_age_s:
-                    t, lat, lon, alt = a["pos"][-1]
-                    fix = (lat, lon, alt)
-                    lat, lon, alt = _dead_reckon(a, lat, lon, alt, now - t)
-                    rec = {"icao": a["icao"], "callsign": a["callsign"], "lat": lat, "lon": lon,
-                           "altitude_m": alt, "age_s": now - t,
-                           **{k: a[k] for k in ("speed_kt", "track_deg", "vrate_fpm") if k in a}}
-                    if trail_s > 0:
-                        trail = [[round(plat, 5), round(plon, 5), round(palt), round(now - pt, 1)]
-                                 for pt, plat, plon, palt in a["trail"]
-                                 if now - pt <= trail_s and (pt < t or (pt - t <= 0.1 and (plat != lat or plon != lon)))]
-                        trail.append([round(fix[0], 5), round(fix[1], 5), round(fix[2]), round(now - t, 1)])
-                        if fix != (lat, lon, alt):
-                            trail.append([round(lat, 5), round(lon, 5), round(alt), 0.0])
-                        rec["trail"] = trail
-                    out.append(rec)
-        return out
 
 
 def _dead_reckon(a: Dict[str, Any], lat: float, lon: float, alt: float, dt: float,

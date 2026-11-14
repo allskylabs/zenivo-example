@@ -66,7 +66,7 @@ and [API.md](API.md).
 | `src/hardware` | Camera backends behind `CameraDriverInterface` (`driver_interface.py`): `driver.py` (RTS5869 + factory), `xu.py` (UVC extension unit), `registers.py` (IMX335 timing math), `v4l2_mmap.py` (mmap capture, RAW10 demosaic, ISP shading correction), `picamera.py`, `uvc_generic.py`, `simulator.py`, `constants.py` |
 | `src/calibration` | `dark.py` (master darks, hot-pixel maps), `auto_exposure.py` (solar elevation, day/night AE), `bright_star_solver.py` (local plate solve), `station_solver.py` (remote blind solve), `stacking.py` (unused by the service) |
 | `src/pipeline` | `keogram.py`, `startrails.py`, `timelapse.py` (encode + banner), `star_boost.py`, `hot_pixels.py`, `highlights.py`, `overlay.py` (not used live; the sky overlay is drawn client-side) |
-| `src/analytics` | `cloud_cover.py`, `cloud_history.py`, `cloud_backfill.py` (CLI), `stars_clouds.py`, `star_clarity.py`, `sky_events.py`, `day_objects.py` (daytime birds, insects, aircraft, rain), `adsb.py`, `fr24.py`, `aircraft_info.py`, `airports.py`, `satellites.py` (SGP4 from TLEs), `radiosonde.py`, `traffic_log.py`, `focus.py`, `focus_tracker.py`, `meteors.py`, `meteor.py` (legacy, tests only) |
+| `src/analytics` | `cloud_cover.py`, `cloud_history.py`, `cloud_backfill.py` (CLI), `stars_clouds.py`, `star_clarity.py`, `sky_events.py`, `day_objects.py` (daytime birds, insects, aircraft, rain), `adsb.py`, `adsb_public.py` (public ADS-B fallback), `fr24.py`, `aircraft_info.py`, `airports.py`, `satellites.py` (SGP4 from TLEs), `radiosonde.py`, `traffic_log.py`, `focus.py`, `focus_tracker.py`, `meteors.py`, `meteor.py` (legacy, tests only) |
 | `src/api` | `main.py` (app factory, page shell, static mounts), `app.py` (re-export of the app), `routes.py` (REST), `stream.py` (WS/MJPEG/SSE), `schemas.py`, `histogram.py`, `service_consts.py`, `service.py` (`AllSkyService` core: state, capture cycle, telemetry) and the mixins that add its methods: `calibration_mixin.py`, `products_mixin.py`, `events_mixin.py`, `traffic_mixin.py`, `station_mixin.py`, `focus_mixin.py`, `lens_mixin.py`, `plate_solve_mixin.py`. The public API of the service is unchanged by the split |
 | `src/net.py` | Shared outbound HTTPS helper: one SSL context and a keep-alive urllib3 pool reused by every outbound request (certificate verification stays on) |
 | `src/storage` | `frame_codec.py` (AVIF frame read/write, legacy JPEG still readable), `retention.py` (age and size cleanup) |
@@ -317,7 +317,7 @@ data/
 | `performance` | `min_capture_interval_s` 2, `analysis_max_width` 960, `sky_analysis_enabled` 1, `analysis_interval_s` 300, `stream_max_width` 960, `stream_jpeg_quality` 75 |
 | `storage` | Retention policy |
 | `focus_record`, `focus_history`, `lens_focus` | Focus results, history and lens state |
-| `adsb`, `radiosondes_enabled`, `traffic_log`, `day_objects`, `obs_overlay`, `google_maps_key` | ADS-B/Flightradar24 settings (token and password write-only), SondeHub switch, log retention and daytime-object settings, OBS overlay, map key |
+| `adsb`, `radiosondes_enabled`, `traffic_log`, `day_objects`, `obs_overlay`, `google_maps_key` | ADS-B/public-fallback/Flightradar24 settings (token and password write-only), SondeHub switch, log retention and daytime-object settings, OBS overlay, map key |
 
 Settings save model: every Settings card autosaves on change (`autosave` and `settingsSave` in `src/web/app/01-core.js`, with a status chip in the card header); buttons are only for actions.
 

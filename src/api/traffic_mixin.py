@@ -30,6 +30,35 @@ class TrafficMixin:
             )
         return self.fr24
 
+    def _receiver_status(self) -> Optional[Dict[str, Any]]:
+        return self.adsb.status() if self.adsb is not None else None
+
+    def _public_needed(self) -> bool:
+        """The public network is polled only when the fallback switch is on and the receiver is not delivering."""
+        from src.analytics.adsb_public import receiver_delivering
+        return bool((self.station_config.get("adsb") or {}).get("public_fallback", 0)) \
+            and not receiver_delivering(self._receiver_status())
+
+    def _source_in_use(self) -> str:
+        """'receiver' | 'public' | 'none' (see adsb_public.choose_source)."""
+        from src.analytics.adsb_public import choose_source
+        on = bool((self.station_config.get("adsb") or {}).get("public_fallback", 0))
+        src = choose_source(self._receiver_status(), on)
+        return "none" if src == "public" and self.adsb_public is None else src
+
+    def _aircraft_feed(self):
+        """The one feed every aircraft consumer reads: the receiver while it delivers, else the public network when
+        the fallback is on, else the receiver (silent or None)."""
+        return self.adsb_public if self._source_in_use() == "public" else self.adsb
+
+    def _public_status(self) -> Dict[str, Any]:
+        pf = self.adsb_public
+        if pf is None:
+            return {"provider": None, "last_ok": None, "last_error": None, "aircraft": 0, "active": False}
+        st = pf.status()
+        return {"provider": pf.provider["name"], "link": pf.provider["link"], "last_ok": st["last_ok"],
+                "last_error": st["last_error"], "aircraft": st["aircraft"], "active": pf.active()}
+
     def get_adsb_config(self) -> Dict[str, Any]:
         cfg = self.station_config.get("adsb") or {}
         sol = self.station_config.get("bright_star_solution") or {}
@@ -40,6 +69,9 @@ class TrafficMixin:
             "port": int(cfg.get("port") or self.ADSB_DEFAULT_PORT),
             "pointing_solved": bool(sol.get("success")),
             "status": self.adsb.status() if self.adsb is not None else None,
+            "public_fallback": int(bool(cfg.get("public_fallback", 0))),
+            "public_status": self._public_status(),
+            "source_in_use": self._source_in_use(),
             "radiosondes_enabled": int(bool(self.station_config.get("radiosondes_enabled", 1))),
             "fr24_enabled": int(bool(cfg.get("fr24_enabled", 0))),
             "fr24_email": str(cfg.get("fr24_email") or ""),
@@ -52,7 +84,8 @@ class TrafficMixin:
                         enabled: Optional[bool] = None, fr24_enabled: Optional[bool] = None,
                         fr24_email: Optional[str] = None, fr24_password: Optional[str] = None,
                         fr24_token: Optional[str] = None,
-                        radiosondes_enabled: Optional[bool] = None) -> Dict[str, Any]:
+                        radiosondes_enabled: Optional[bool] = None,
+                        public_fallback: Optional[bool] = None) -> Dict[str, Any]:
         if radiosondes_enabled is not None:
             self.station_config["radiosondes_enabled"] = int(bool(radiosondes_enabled))
         cfg = dict(self.station_config.get("adsb") or {})
@@ -67,6 +100,8 @@ class TrafficMixin:
             cfg["port"] = int(port)
         if enabled is not None:
             cfg["enabled"] = int(bool(enabled))
+        if public_fallback is not None:
+            cfg["public_fallback"] = int(bool(public_fallback))
         if fr24_enabled is not None:
             cfg["fr24_enabled"] = int(bool(fr24_enabled))
         if fr24_email is not None:
@@ -191,6 +226,7 @@ class TrafficMixin:
     def get_radiosondes_now(self, limit: int = 40) -> Dict[str, Any]:
         """Weather balloons (SondeHub) near the station with their sky position and camera frame position."""
         from src.analytics.adsb import sky_position
+        from src.analytics.adsb_public import snap_half_degree
         from src.analytics.radiosonde import RadiosondeFeed
 
         if getattr(self, "_sonde_feed", None) is None:
@@ -202,8 +238,8 @@ class TrafficMixin:
         sol = self._overlay_solution()
         obstructions = [np.array(p, np.float32) for p in ((self.station_config.get("sky_mask") or {}).get("obstruction") or [])]
         # Only a 0.5-degree grid cell centre (about 55 km) is sent to SondeHub; the exact station stays local (sky_position below).
-        q_lat = round(float(station["latitude_deg"]) * 2) / 2
-        q_lon = round(float(station["longitude_deg"]) * 2) / 2
+        q_lat = snap_half_degree(station["latitude_deg"])
+        q_lon = snap_half_degree(station["longitude_deg"])
         feed = self._sonde_feed.current(q_lat, q_lon, at=t_now)
         later = {s["serial"]: s for s in self._sonde_feed.current(q_lat, q_lon, at=t_now + 1.0)["sondes"]}
         out = []
@@ -236,8 +272,10 @@ class TrafficMixin:
 
         fr = self._fr24()
         use_fr24 = bool(bounds) and (include_fr24 if include_fr24 is not None else fr.enabled)
-        if self.adsb is None and not use_fr24:
+        feed = self._aircraft_feed()
+        if feed is None and not use_fr24:
             return {"enabled": False, "connected": False, "aircraft": []}
+        feed_source = "public" if feed is not None and feed is self.adsb_public else "local"
 
         self._adsb_view_ts = time.time()  # someone is looking: keep the feed on, day or night
         sol = self._overlay_solution()
@@ -250,10 +288,10 @@ class TrafficMixin:
         by_icao: Dict[str, Dict[str, Any]] = {}
         t_now = time.time()
 
-        if self.adsb is not None:
+        if feed is not None:
             # Where each aircraft will be one second later: lets the page slide every mark to the instant of the frame it is shown on
-            later = {r["icao"]: r for r in self.adsb.current(at=t_now + 1.0)} if sol else {}
-            for a in self.adsb.current(trail_s=trail_s, at=t_now):
+            later = {r["icao"]: r for r in feed.current(at=t_now + 1.0)} if sol else {}
+            for a in feed.current(trail_s=trail_s, at=t_now):
                 pos = sky_position(station, a["lat"], a["lon"], a["altitude_m"], sol)
                 xy = pos.get("frame_xy")
                 nxt = later.get(a["icao"])
@@ -263,10 +301,12 @@ class TrafficMixin:
                         pos["frame_v"] = [round(xy2[0] - xy[0], 5), round(xy2[1] - xy[1], 5)]   # frame fractions per second
                 in_view = bool(xy) and not any(cv2.pointPolygonTest(p, (float(xy[0]), float(xy[1])), False) >= 0 for p in obstructions)
                 rec: Dict[str, Any] = {
-                    "icao": a["icao"], "callsign": a["callsign"] or None, "source": "local",
+                    "icao": a["icao"], "callsign": a["callsign"] or None, "source": feed_source,
                     "altitude_m": round(a["altitude_m"]), **motion_fields(a), **pos,
                     "in_view": in_view, "above_horizon": pos["alt_deg"] > 0, "age_s": round(a["age_s"], 1),
                 }
+                if feed_source == "public":
+                    rec["provider"] = self.adsb_public.provider["name"]   # shown with a link: the data terms require the credit
                 if trail_s > 0:
                     rec.update(lat=round(a["lat"], 5), lon=round(a["lon"], 5), trail=a.get("trail") or [],
                                **self._aircraft_info().describe(a["icao"], a["callsign"] or None))
@@ -395,11 +435,13 @@ class TrafficMixin:
                     ])
             sliced = full_list
 
-        st = self.adsb.status() if self.adsb is not None else {"connected": False}
+        st = feed.status() if feed is not None else {"connected": False}
         res: Dict[str, Any] = {
             "enabled": True,
             "connected": bool(st["connected"] or (use_fr24 and (fr24_count > 0 or global_total > 0))),
-            "local_connected": bool(st["connected"]),
+            "local_connected": bool(st["connected"]) and feed_source == "local",
+            "source_in_use": self._source_in_use(),
+            "public_provider": self.adsb_public.provider if feed_source == "public" else None,
             "t": t_now,
             "total": len(out),
             "local_count": local_count,
@@ -470,7 +512,7 @@ class TrafficMixin:
         return tl
 
     def _traffic_sample(self, now: float) -> Dict[str, List[List[Any]]]:
-        """Aircraft (local ADS-B receiver first, Flightradar24 around the station otherwise) and sunlit satellites
+        """Aircraft (local ADS-B receiver first, else the public network when the fallback is on, plus Flightradar24 when enabled) and sunlit satellites
         that are above the horizon and inside the camera frame right now, as compact rows."""
         from src.analytics.adsb import motion_fields, sky_position
 
@@ -489,9 +531,10 @@ class TrafficMixin:
             rows[icao] = [icao, callsign or None, reg or None, typ or None, round(float(lat), 5), round(float(lon), 5),
                           round(float(alt_m)), spd, hdg, pos["az_deg"], pos["alt_deg"], xy[0], xy[1]]
 
-        if self.adsb is not None:
+        feed = self._aircraft_feed()
+        if feed is not None:
             try:
-                for a in self.adsb.current(at=now):
+                for a in feed.current(at=now):
                     mf = motion_fields(a)
                     add(a["icao"], a.get("callsign"), None, None, a["lat"], a["lon"], a["altitude_m"],
                         mf.get("speed_kmh"), mf.get("heading_deg"))
@@ -544,8 +587,17 @@ class TrafficMixin:
     def start_adsb(self) -> None:
         """(Re)start the ADS-B reader from the station config; stops it when turned off."""
         from src.analytics.adsb import AdsbFeed
+        from src.analytics.adsb_public import PublicAdsbFeed
 
         cfg = self.get_adsb_config()
+        if cfg["public_fallback"] and self.adsb_public is None:
+            self.adsb_public = PublicAdsbFeed(
+                station=lambda: (float(self.auto_exposure.lat), float(self.auto_exposure.lon)),
+                wanted=self._adsb_wanted, needed=self._public_needed)
+            self.adsb_public.start()
+        elif not cfg["public_fallback"] and self.adsb_public is not None:
+            self.adsb_public.stop()
+            self.adsb_public = None
         old = self.adsb
         if old is not None and (not cfg["enabled"] or (old.host, old.port) != (cfg["host"], cfg["port"])):
             old.stop()
@@ -561,7 +613,8 @@ class TrafficMixin:
     def _match_flight(self, ev: Dict[str, Any]) -> None:
         """Name the flight behind a streak / dot event; a 'meteor' or 'satellite' that matches an aircraft
         becomes a plane."""
-        if self.adsb is None or ev.get("type") not in ("plane", "meteor", "satellite") or not ev.get("line"):
+        feed = self._aircraft_feed()
+        if feed is None or ev.get("type") not in ("plane", "meteor", "satellite") or not ev.get("line"):
             return
         sol = self.station_config.get("bright_star_solution") or {}
         if not sol.get("success"):
@@ -576,7 +629,7 @@ class TrafficMixin:
         t1 = float(ev.get("end_ts", t0))
         station = {"latitude_deg": self.auto_exposure.lat, "longitude_deg": self.auto_exposure.lon,
                    "elevation_m": float(self.station_config.get("elevation_m") or 0.0)}
-        tracks = self.adsb.tracks(t0, t1)
+        tracks = feed.tracks(t0, t1)
         flight = match_flight(ev, tracks, station, sol, lag_s=self.ADSB_FRAME_LAG_S)
         if flight is None:
             # Diagnostics: the nearest aircraft anywhere in the frame and how far off it was

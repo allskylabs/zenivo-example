@@ -266,6 +266,7 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
         self._event_seq = 0
         self._cloud_state: Optional[str] = None
         self.adsb = None  # ADS-B feed naming the flight behind aircraft events (start_adsb)
+        self.adsb_public = None  # public-network fallback feed, only while adsb.public_fallback is on (start_adsb)
 
         # Observational products pipeline accumulators (Keogram, Startrails, Timelapse)
         self.keogram_gen = KeogramGenerator(slice_width=3)
@@ -1177,6 +1178,8 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
             self.adsb.stop()
             os.makedirs(os.path.dirname(self._adsb_trails_path()), exist_ok=True)
             self.adsb.save_trails(self._adsb_trails_path())
+        if self.adsb_public is not None:
+            self.adsb_public.stop()
         if getattr(self, "aircraft_info", None) is not None:
             self.aircraft_info.stop()
         if getattr(self, "community", None) is not None:
