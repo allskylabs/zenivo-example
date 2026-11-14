@@ -1645,7 +1645,9 @@
 
         function poll(forceBounds) {
             if (Date.now() < rangeBlockedUntil && !forceBounds) return;
-            const b = typeof forceBounds === "string" ? forceBounds : boundsParam();
+            // Until the first answer arrives the station is unknown and the map still sits at its [0,0] placeholder:
+            // a box around it is "too far from the station" for guests (HTTP 400), so the station would never be learned
+            const b = typeof forceBounds === "string" ? forceBounds : (origin ? boundsParam() : "global");
             if (pollInFlight && !forceBounds && b === lastBounds) return;
             pollInFlight = true;
             lastFetch = Date.now();
