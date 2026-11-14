@@ -746,7 +746,7 @@ def get_adsb_config(request: Request, service: AllSkyService = Depends(get_servi
     from src.auth.middleware import is_admin
     cfg = service.get_adsb_config()
     if not is_admin(request):
-        cfg = dict(cfg, host="", fr24_email="", fr24=dict(cfg.get("fr24") or {}, email=""))
+        cfg = dict(cfg, host="", network_host="", fr24_email="", fr24=dict(cfg.get("fr24") or {}, email=""))
     return cfg
 
 

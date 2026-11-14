@@ -164,6 +164,16 @@ class CommunityManager:
             if self._registry is not None:
                 self._registry.save()
 
+    def identity(self) -> Optional[idmod.Identity]:
+        """This station's signing identity (created on first use), or None when `cryptography` is missing. Works
+        while community sharing is off: it only loads or creates the key file."""
+        with self._lock:
+            if self._identity is None:
+                if not idmod.availability()[0]:
+                    return None
+                self._identity = idmod.Identity(self._path("community_key.pem"))
+            return self._identity
+
     def _ensure(self) -> None:
         with self._lock:
             if self._identity is None:

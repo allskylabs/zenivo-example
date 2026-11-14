@@ -5,11 +5,17 @@ Order of use: the owner's own receiver (AdsbFeed) first; this feed only while th
 receiver is not delivering (not configured, not connected, or silent for more than RECEIVER_SILENT_S). Flightradar24
 (src/analytics/fr24.py) is a separate optional source and is not touched here.
 
-Providers (readsb JSON, `ac` list):
+Providers (readsb JSON, `ac` list), tried in this order:
+  Zenivo network  {network base}/api/v1/adsb/point/...  - only when a network base URL exists (the origin of the
+                                       configured remote solver); community stations contribute to it, one request
+                                       per POLL_S. Skipped for good when there is no base: nothing is sent then.
   adsb.fi  https://opendata.adsb.fi  - default, one request per POLL_S (limit 1 req/s; personal, non-commercial use;
                                        the data must be credited to adsb.fi with a link)
-  adsb.lol https://api.adsb.lol      - failover after FAILOVER_AFTER failures of adsb.fi, one request per LOL_POLL_S
-                                       (ODbL 1.0, 500 requests/day without a key), back to adsb.fi after RETURN_AFTER_S
+  adsb.lol https://api.adsb.lol      - last resort, one request per LOL_POLL_S (ODbL 1.0, 500 requests/day without
+                                       a key)
+Failover to the next provider after FAILOVER_AFTER consecutive failures, or when the current one has returned no
+aircraft for EMPTY_FAILOVER_S (an empty community network must not blind the station); the first provider is tried
+again after RETURN_AFTER_S.
 
 Only the station position snapped to a 0.5 degree grid (about 55 km) is ever sent; the exact position stays local.
 """
@@ -19,6 +25,7 @@ import logging
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -31,8 +38,9 @@ RECEIVER_SILENT_S = 90.0     # a receiver with no message for this long is "not 
 RADIUS_NM = 150
 POLL_S = 10.0                # adsb.fi
 LOL_POLL_S = 180.0           # adsb.lol: 480 requests/day, under its 500/day limit
-FAILOVER_AFTER = 3           # consecutive adsb.fi failures before adsb.lol is used
-RETURN_AFTER_S = 600.0       # time on adsb.lol before adsb.fi is tried again
+FAILOVER_AFTER = 3           # consecutive failures of a provider before the next one is used
+EMPTY_FAILOVER_S = 120.0     # a provider that returned no aircraft for this long is skipped
+RETURN_AFTER_S = 600.0       # time on a later provider before the first one is tried again
 BACKOFF_MAX_S = 300.0
 RETRY_AFTER_MAX_S = 900.0
 TIMEOUT_S = 8.0
@@ -45,6 +53,23 @@ PROVIDERS: Tuple[Dict[str, Any], ...] = (
     {"name": "adsb.lol", "url": "https://api.adsb.lol/v2/point/{lat}/{lon}/{nm}", "poll_s": LOL_POLL_S,
      "link": "https://adsb.lol"},
 )
+
+
+NETWORK_NAME = "Zenivo network"
+NETWORK_PATH = "/api/v1/adsb/point/{lat}/{lon}/{nm}"
+
+
+def network_base(station_config: Optional[Dict[str, Any]]) -> str:
+    """Origin (`scheme://host[:port]`) of the Zenivo network server: the configured remote solver's origin.
+    Empty when no remote solver is set, so nothing is ever sent to the network by default."""
+    raw = str((station_config or {}).get("remote_solver_url") or "").strip()
+    try:
+        u = urllib.parse.urlsplit(raw)
+        if u.scheme in ("http", "https") and u.hostname and not u.username:
+            return f"{u.scheme}://{u.netloc}"
+    except ValueError:
+        pass
+    return ""
 
 
 def snap_half_degree(value: float) -> float:
@@ -137,9 +162,12 @@ class PublicAdsbFeed(AircraftStore):
 
     def __init__(self, station: Callable[[], Tuple[float, float]], wanted: Optional[Callable[[], bool]] = None,
                  needed: Optional[Callable[[], bool]] = None, fetch: Callable[[str], Any] = http_fetch,
-                 clock: Callable[[], float] = time.time):
+                 clock: Callable[[], float] = time.time, network: Optional[Callable[[], str]] = None):
         super().__init__()
         self.station, self._fetch, self._clock = station, fetch, clock
+        self._network = network or (lambda: "")   # base URL of the Zenivo network, "" = not used
+        self._base = ""
+        self._empty_since: Optional[float] = None
         self.wanted = wanted or (lambda: True)
         self.needed = needed or (lambda: True)   # false while the receiver is delivering
         self._stop = threading.Event()
@@ -189,29 +217,56 @@ class PublicAdsbFeed(AircraftStore):
                 self._stop.wait(30.0)
 
     # ------------------------------------------------------------------ one request
+    def _chain(self) -> List[Dict[str, Any]]:
+        """Providers in order of use; the Zenivo network comes first while a base URL exists."""
+        try:
+            base = str(self._network() or "")
+        except Exception:
+            base = ""
+        if base != self._base:   # the network was added, removed or moved: start from the top
+            self._base, self._provider, self._fails, self._empty_since = base, 0, 0, None
+        if not base:
+            return list(PROVIDERS)
+        return [{"name": NETWORK_NAME, "url": base + NETWORK_PATH, "poll_s": POLL_S, "link": base}, *PROVIDERS]
+
+    def _switch(self, idx: int, now: float) -> None:
+        self._provider, self._provider_since, self._fails, self._empty_since = idx, now, 0, None
+
     def step(self) -> float:
         """One poll of the current provider; returns the seconds to wait before the next one."""
         now = self._clock()
+        chain = self._chain()
+        if self._provider >= len(chain):
+            self._switch(0, now)
         if self._provider != 0 and now - self._provider_since >= RETURN_AFTER_S:
-            self._provider, self._fails = 0, 0   # try adsb.fi again
-        prov = PROVIDERS[self._provider]
+            self._switch(0, now)   # try the first provider again
+        prov = chain[self._provider]
+        last = self._provider >= len(chain) - 1
         lat, lon = self.station()
         url = prov["url"].format(lat=f"{snap_half_degree(lat):.1f}", lon=f"{snap_half_degree(lon):.1f}", nm=RADIUS_NM)
         self.polls += 1
         try:
             recs = parse_readsb(self._fetch(url), now)
         except Exception as exc:
-            return self._failed(exc, prov, now)
+            return self._failed(exc, prov, now, last)
         self._ingest(recs, now)
         self._fails, self.last_error, self.last_ok_ts = 0, None, now
+        if recs:
+            self._empty_since = None
+        elif self._empty_since is None:
+            self._empty_since = now
+        if not recs and not last and now - self._empty_since >= EMPTY_FAILOVER_S:
+            self.last_error = f"{prov['name']}: no aircraft for {int(EMPTY_FAILOVER_S)} s"
+            self._switch(self._provider + 1, now)
+            return 0.0
         return float(prov["poll_s"])
 
-    def _failed(self, exc: Exception, prov: Dict[str, Any], now: float) -> float:
+    def _failed(self, exc: Exception, prov: Dict[str, Any], now: float, last: bool = True) -> float:
         self.last_error = f"{prov['name']}: {str(exc)[:100]}"
         self._fails += 1
-        if self._provider == 0 and self._fails >= FAILOVER_AFTER:
-            self._provider, self._provider_since, self._fails = 1, now, 0
-            return 0.0   # first adsb.lol request right away, then one per LOL_POLL_S
+        if not last and self._fails >= FAILOVER_AFTER:
+            self._switch(self._provider + 1, now)
+            return 0.0   # first request to the next provider right away
         delay = min(BACKOFF_MAX_S, float(prov["poll_s"]) * 2 ** (self._fails - 1))
         ra = getattr(exc, "retry_after_s", None)
         if ra is not None:
@@ -236,7 +291,8 @@ class PublicAdsbFeed(AircraftStore):
     # ------------------------------------------------------------------ read interface
     @property
     def provider(self) -> Dict[str, str]:
-        p = PROVIDERS[self._provider]
+        chain = self._chain()
+        p = chain[min(self._provider, len(chain) - 1)]
         return {"name": p["name"], "link": p["link"]}
 
     def status(self) -> Dict[str, Any]:

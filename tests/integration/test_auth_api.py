@@ -186,6 +186,15 @@ class TestDayObjectsConfig:
         assert c.get("/api/adsb").json()["source_in_use"] in ("receiver", "public", "none")
         assert c.post("/api/adsb", json={"public_fallback": False}).json()["public_fallback"] == 0
 
+    def test_adsb_contribute_defaults_off_round_trips_and_is_admin_only(self, guest_client, fresh_auth):
+        c = guest_client
+        d = c.get("/api/adsb").json()
+        assert d["contribute"] == 0 and d["contribute_status"]["posts"] == 0
+        assert c.post("/api/adsb", json={"contribute": True}).status_code == 401
+        setup_admin(c, fresh_auth)
+        assert c.post("/api/adsb", json={"contribute": True}).json()["contribute"] == 1
+        assert c.post("/api/adsb", json={"contribute": False}).json()["contribute"] == 0
+
     def test_fr24_secrets_are_never_returned(self, guest_client, fresh_auth):
         c = guest_client
         setup_admin(c, fresh_auth)

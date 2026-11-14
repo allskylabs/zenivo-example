@@ -116,6 +116,7 @@ class AdsbConfigRequest(BaseModel):
     port: Optional[int] = Field(default=None, ge=1, le=65535)
     enabled: Optional[bool] = None
     public_fallback: Optional[bool] = Field(default=None, description="Use a public ADS-B network (adsb.fi, then adsb.lol) while the receiver is not delivering; sends the station position rounded to 0.5 degree")
+    contribute: Optional[bool] = Field(default=None, description="Share what this station's own receiver hears with the Zenivo network (signed with the station key); never forwards public-network or Flightradar24 data")
     fr24_enabled: Optional[bool] = None
     fr24_email: Optional[str] = Field(default=None, max_length=254, pattern=r"^$|^[^@\s]+@[^@\s]+\.[^@\s]+$",
                                       description="Flightradar24 account e-mail (empty clears it); anything that is not an e-mail address is refused")

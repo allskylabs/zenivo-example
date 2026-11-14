@@ -59,6 +59,12 @@ class TrafficMixin:
         return {"provider": pf.provider["name"], "link": pf.provider["link"], "last_ok": st["last_ok"],
                 "last_error": st["last_error"], "aircraft": st["aircraft"], "active": pf.active()}
 
+    def _contribute_status(self) -> Dict[str, Any]:
+        c = getattr(self, "adsb_contrib", None)
+        if c is None:
+            return {"active": False, "last_ok": None, "last_error": None, "last_sent": 0, "posts": 0}
+        return c.status()
+
     def get_adsb_config(self) -> Dict[str, Any]:
         cfg = self.station_config.get("adsb") or {}
         sol = self.station_config.get("bright_star_solution") or {}
@@ -71,6 +77,9 @@ class TrafficMixin:
             "status": self.adsb.status() if self.adsb is not None else None,
             "public_fallback": int(bool(cfg.get("public_fallback", 0))),
             "public_status": self._public_status(),
+            "contribute": int(bool(cfg.get("contribute", 0))),
+            "contribute_status": self._contribute_status(),
+            "network_host": self._network_base(),
             "source_in_use": self._source_in_use(),
             "radiosondes_enabled": int(bool(self.station_config.get("radiosondes_enabled", 1))),
             "fr24_enabled": int(bool(cfg.get("fr24_enabled", 0))),
@@ -85,7 +94,8 @@ class TrafficMixin:
                         fr24_email: Optional[str] = None, fr24_password: Optional[str] = None,
                         fr24_token: Optional[str] = None,
                         radiosondes_enabled: Optional[bool] = None,
-                        public_fallback: Optional[bool] = None) -> Dict[str, Any]:
+                        public_fallback: Optional[bool] = None,
+                        contribute: Optional[bool] = None) -> Dict[str, Any]:
         if radiosondes_enabled is not None:
             self.station_config["radiosondes_enabled"] = int(bool(radiosondes_enabled))
         cfg = dict(self.station_config.get("adsb") or {})
@@ -102,6 +112,8 @@ class TrafficMixin:
             cfg["enabled"] = int(bool(enabled))
         if public_fallback is not None:
             cfg["public_fallback"] = int(bool(public_fallback))
+        if contribute is not None:
+            cfg["contribute"] = int(bool(contribute))
         if fr24_enabled is not None:
             cfg["fr24_enabled"] = int(bool(fr24_enabled))
         if fr24_email is not None:
@@ -584,6 +596,10 @@ class TrafficMixin:
             return True
         return bool(self.get_event_config()["enabled"].get("plane"))
 
+    def _network_base(self) -> str:
+        from src.analytics.adsb_public import network_base
+        return network_base(self.station_config)
+
     def start_adsb(self) -> None:
         """(Re)start the ADS-B reader from the station config; stops it when turned off."""
         from src.analytics.adsb import AdsbFeed
@@ -593,7 +609,7 @@ class TrafficMixin:
         if cfg["public_fallback"] and self.adsb_public is None:
             self.adsb_public = PublicAdsbFeed(
                 station=lambda: (float(self.auto_exposure.lat), float(self.auto_exposure.lon)),
-                wanted=self._adsb_wanted, needed=self._public_needed)
+                wanted=self._adsb_wanted, needed=self._public_needed, network=self._network_base)
             self.adsb_public.start()
         elif not cfg["public_fallback"] and self.adsb_public is not None:
             self.adsb_public.stop()
@@ -606,6 +622,18 @@ class TrafficMixin:
             self.adsb = AdsbFeed(cfg["host"], cfg["port"], wanted=self._adsb_wanted)
             self.adsb.load_trails(self._adsb_trails_path())
             self.adsb.start()
+        # Contributing: only the receiver feed (self.adsb) is ever handed over, never adsb_public or Flightradar24.
+        if cfg["contribute"] and getattr(self, "adsb_contrib", None) is None:
+            from src.analytics.adsb_contribute import AdsbContributor
+            self.adsb_contrib = AdsbContributor(receiver=lambda: self.adsb, enabled=self._contribute_on,
+                                                base=self._network_base, identity=self.community.identity)
+            self.adsb_contrib.start()
+        elif not cfg["contribute"] and getattr(self, "adsb_contrib", None) is not None:
+            self.adsb_contrib.stop()
+            self.adsb_contrib = None
+
+    def _contribute_on(self) -> bool:
+        return bool((self.station_config.get("adsb") or {}).get("contribute", 0))
 
     def _adsb_trails_path(self) -> str:
         return os.path.join(self.output_dir, "cache", "adsb_trails.json")

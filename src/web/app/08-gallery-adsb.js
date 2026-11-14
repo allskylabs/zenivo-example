@@ -787,6 +787,8 @@ const adsbEnabled = document.getElementById("adsb-enabled");
 const adsbStatus = document.getElementById("adsb-status");
 const adsbPublic = document.getElementById("adsb-public-fallback");
 const adsbSourceStatus = document.getElementById("adsb-source-status");
+const adsbContribute = document.getElementById("adsb-contribute");
+const adsbContributeStatus = document.getElementById("adsb-contribute-status");
 
 const sondesEnabled = document.getElementById("sondes-enabled");
 
@@ -805,10 +807,20 @@ function syncAdsbUI(d) {
         adsbPublic.checked = !!d.public_fallback;
         const ps = d.public_status || {};
         const src = d.source_in_use === "receiver" ? "your receiver"
-            : d.source_in_use === "public" ? `public network (${ps.provider || "adsb.fi"})` : "none";
+            : d.source_in_use === "public" ? `public network (${ps.provider || "Zenivo network"})` : "none";
         let line = `Source in use: ${src}.`;
         if (d.public_fallback && ps.last_error) line += ` Last public error: ${ps.last_error}`;
         adsbSourceStatus.textContent = line;
+    }
+    if (adsbContribute) {
+        adsbContribute.checked = !!d.contribute;
+        const cs = d.contribute_status || {};
+        const nh = document.getElementById("adsb-network-host");
+        if (nh && d.network_host) nh.textContent = d.network_host;
+        adsbContributeStatus.textContent = !d.contribute ? ""
+            : !d.network_host ? "No network server: set a remote solver URL first."
+            : cs.last_error ? `Last error: ${cs.last_error}`
+            : cs.last_ok ? `Sending ${cs.last_sent} aircraft (${cs.posts} posts).` : "Waiting for your receiver.";
     }
     syncFr24UI(d);
     if (sondesEnabled) sondesEnabled.checked = d.radiosondes_enabled !== 0 && d.radiosondes_enabled !== false;
@@ -826,11 +838,17 @@ if (adsbHost) {
     autosave(adsbHost.closest("fieldset"), async () => {
         syncAdsbUI(await sendJson("/api/adsb", { host: adsbHost.value.trim(), port: Number(adsbPort.value) || 30003, enabled: adsbEnabled.checked }));
         setTimeout(loadAdsb, 3000);
-    });
+    }, { selector: "#adsb-host, #adsb-port, #adsb-enabled" });
 }
 if (adsbPublic) {
     autosave(adsbPublic.closest("fieldset"), async () => {
         syncAdsbUI(await sendJson("/api/adsb", { public_fallback: adsbPublic.checked }));
+        setTimeout(loadAdsb, 3000);
+    });
+}
+if (adsbContribute) {
+    autosave(adsbContribute.closest(".field"), async () => {
+        syncAdsbUI(await sendJson("/api/adsb", { contribute: adsbContribute.checked }));
         setTimeout(loadAdsb, 3000);
     });
 }

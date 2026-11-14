@@ -75,6 +75,22 @@ preview on stations that offer to store it. Store-and-forward, no new server:
 - **Map**: the large preview comes from `<url>/api/community/preview.jpg` if the card has a url, else from the station
   you are on when it holds the image, else from the first reachable origin in `relays`, else the 8 KB thumbnail.
 
+## Aircraft network
+
+The server that hosts the remote solver (the origin of the station's `remote_solver_url`) also keeps a community ADS-B
+picture. It is optional and off by default; both parts need that URL to be set.
+
+- **Read**: with Settings, Integrations, "Use a public ADS-B network" on, a station without a working receiver asks
+  `GET /api/v1/adsb/point/<lat>/<lon>/150` (position rounded to 0.5 degree) first, then adsb.fi, then adsb.lol. The
+  next one is used after 3 failures or 2 minutes without aircraft.
+- **Contribute**: with "Share what my receiver hears with the Zenivo network" on, the station posts the aircraft its own
+  receiver decoded to `POST /api/v1/adsb/ingest` every 5 s, signed with the station key (Ed25519, headers
+  `X-Zenivo-Id`, `-Key`, `-Time`, `-Sig` as for preview uploads, domain `zenivo-adsb-v1`). Data from adsb.fi, adsb.lol
+  and Flightradar24 is never forwarded. It works with community sharing off and does not announce the station. The
+  server sees the station's IP address and can estimate where the receiver is.
+
+Full list of what is sent: [TRANSPARENCY.md](TRANSPARENCY.md), rows 14 and 15.
+
 ## Seeds
 
 Seeds are the first stations a new station asks. The built-in ones are `https://sky.hoan.uk` and

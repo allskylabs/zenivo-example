@@ -141,6 +141,20 @@ class AircraftStore:
                                 **{k: a[k] for k in ("speed_kt", "track_deg", "vrate_fpm") if k in a}})
         return out
 
+    def latest_fixes(self, max_age_s: float = 30.0, at: Optional[float] = None) -> List[Dict[str, Any]]:
+        """Last reported (not dead-reckoned) fix of every aircraft newer than max_age_s, freshest first:
+        {icao, callsign, t, lat, lon, alt_m, [speed_kt, track_deg, vrate_fpm]}."""
+        now = time.time() if at is None else at
+        out = []
+        with self._lock:
+            for a in self._ac.values():
+                if a["pos"] and now - a["pos"][-1][0] <= max_age_s:
+                    t, lat, lon, alt = a["pos"][-1]
+                    out.append({"icao": a["icao"], "callsign": a["callsign"], "t": t, "lat": lat, "lon": lon,
+                                "alt_m": alt, **{k: a[k] for k in ("speed_kt", "track_deg", "vrate_fpm") if k in a}})
+        out.sort(key=lambda r: -r["t"])
+        return out
+
     def current(self, max_age_s: float = 60.0, trail_s: float = 0.0, at: Optional[float] = None) -> List[Dict[str, Any]]:
         """Latest state of every aircraft with a position in the last max_age_s seconds; with trail_s, also
         its recent path as [[lat, lon, alt_m, age_s], ...] (oldest first, one point per TRAIL_STEP_S, ending

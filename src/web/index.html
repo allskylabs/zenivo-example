@@ -1024,6 +1024,16 @@
                             The feed is only read at night while aircraft detection is on.
                             <span id="adsb-status"></span>
                         </p>
+                        <div class="field" data-admin>
+                            <label class="checkbox-label"><input type="checkbox" id="adsb-contribute" /> Share what my receiver hears with the Zenivo network</label>
+                        </div>
+                        <p class="field-note" data-admin>
+                            Off by default. When on, this station sends the aircraft positions your receiver decoded (public broadcast data) to
+                            <span id="adsb-network-host">the Zenivo network server (the origin of your remote solver URL; nothing is sent while that is empty)</span>,
+                            signed with this station's key, every 5 s while your receiver delivers. The server sees this station's IP address and can estimate
+                            where your receiver is from what it hears. Data from adsb.fi, adsb.lol or Flightradar24 is never forwarded.
+                            <span id="adsb-contribute-status" aria-live="polite"></span>
+                        </p>
                     </fieldset>
                     <fieldset class="settings-group" data-admin>
                         <legend>2. Public network (fallback)</legend>
@@ -1032,9 +1042,9 @@
                         </div>
                         <p class="field-note">
                             Off by default. Used only while your receiver is missing, not connected, or silent for more than 90 s; polling stops as soon as it is back.
-                            When on, this station sends its position rounded to 0.5 degree (about 55 km) to
+                            When on, this station sends its position rounded to 0.5 degree (about 55 km), in this order: to the Zenivo network (only if a remote solver URL is set), then to
                             <a href="https://adsb.fi" target="_blank" rel="noopener">adsb.fi</a>, and to
-                            <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a> if adsb.fi fails. The data is for personal, non-commercial use.
+                            <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a>; the next one is used when one fails or returns no aircraft for 2 minutes. The data is for personal, non-commercial use.
                         </p>
                         <p class="field-note" id="adsb-source-status" aria-live="polite"></p>
                     </fieldset>
@@ -1520,7 +1530,7 @@
     <script defer src="/static/app/05-sky-overlay.js?v=20261114a"></script>
     <script defer src="/static/app/06-telemetry.js?v=20261114a"></script>
     <script defer src="/static/app/07-cloud.js?v=20261114a"></script>
-    <script defer src="/static/app/08-gallery-adsb.js?v=20261114b"></script>
+    <script defer src="/static/app/08-gallery-adsb.js?v=20261114c"></script>
     <script defer src="/static/app/09-community.js?v=20261114b"></script>
     <script defer src="/static/app/10-admin.js?v=20261114a"></script>
     <script>

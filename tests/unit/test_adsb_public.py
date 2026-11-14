@@ -96,3 +96,43 @@ def test_inactive_without_station_or_need():
     assert not _feed(lambda u: {}, clock, station=(0.0, 0.0)).active()
     f = ap.PublicAdsbFeed(station=lambda: (21.0, 105.0), needed=lambda: False)
     assert not f.active()
+
+
+def test_zenivo_network_is_first_and_fails_over_on_errors_or_emptiness():
+    clock, calls, mode = Clock(), [], {"zen": "ok"}
+    row = {"hex": "ABC123", "lat": 21.1, "lon": 105.9, "alt_baro": 3000}
+
+    def fetch(url):
+        calls.append(url)
+        if "/api/v1/adsb/point/" in url:
+            if mode["zen"] == "down":
+                raise ap.FetchError("HTTP 503")
+            return {"ac": [row] if mode["zen"] == "ok" else []}
+        return {"ac": [row]}
+
+    feed = ap.PublicAdsbFeed(station=lambda: (21.0285, 105.8542), fetch=fetch, clock=clock,
+                             network=lambda: "https://net.example")
+    assert feed.step() == ap.POLL_S
+    assert calls[0] == "https://net.example/api/v1/adsb/point/21.0/106.0/150"
+    assert feed.provider == {"name": "Zenivo network", "link": "https://net.example"}
+    # trigger 1: three failures in a row, then adsb.fi at once
+    mode["zen"] = "down"
+    assert feed.step() == 10.0 and feed.step() == 20.0 and feed.step() == 0.0
+    assert feed.provider["name"] == "adsb.fi"
+    # the first provider is tried again after RETURN_AFTER_S
+    mode["zen"] = "ok"
+    clock.t += ap.RETURN_AFTER_S
+    feed.step()
+    assert feed.provider["name"] == "Zenivo network"
+    # trigger 2: an empty network for 2 minutes
+    mode["zen"] = "empty"
+    feed.step()
+    clock.t += ap.EMPTY_FAILOVER_S - 1
+    feed.step()
+    assert feed.provider["name"] == "Zenivo network"
+    clock.t += 1
+    assert feed.step() == 0.0 and feed.provider["name"] == "adsb.fi"
+    # without a network base the chain is adsb.fi, adsb.lol only
+    assert ap.network_base({"remote_solver_url": "https://net.example/solve/x"}) == "https://net.example"
+    assert ap.network_base({"remote_solver_url": ""}) == "" and ap.network_base({}) == ""
+    assert _feed(lambda u: {"ac": []}, Clock()).provider["name"] == "adsb.fi"
