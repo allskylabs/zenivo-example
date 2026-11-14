@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Document version | 1.0.0 (2026-11-13), describes Zenivo 1.0.0 |
-| Repository | `github.com/hoanb1/zenivo` (private) |
+| Repository | `github.com/hoanb1/zenivo` |
 | Production | https://station.example.org (Raspberry Pi 4, `/home/pi/zenivo`, systemd `zenivo`; legacy symlink `/home/pi/allsky-ng` kept) |
 
 ## 1. Purpose and scope
@@ -74,7 +74,7 @@ and [API.md](API.md).
 | `src/sync` | `client.py` (used in production), `queue.py` and `daemon.py` (SQLite queue and circuit breaker; tested but not wired up) |
 | `src/activity.py` | User-facing activity log (`data/logs/activity.jsonl`) |
 | `src/web` | Static UI. `index.html` is the shell of `/live`, `/gallery`, `/logs`, `/focus`, `/calibration`, `/settings`; `app/01-core.js` to `08-gallery-adsb.js` are classic scripts with one shared global scope, loaded in numeric order; `focus.js`, `activity.js`, `sky_catalog.js`; separate pages `sky.html`, `flights3d.html`, `satellites3d.html`, `obs_dock.html`, `full.html`; `tokens.css` and `style.css`; `brand/`; `sky/` (built skyview bundle) and `skydata/` (star tiles, catalogues). Navigation, brand block and page head are generated from one definition by `scripts/sync_nav.py` (`--check` verifies) |
-| `tools/` | `adsb_feeder.py`, `isp_calibrate.py`, `convert_frames_avif.py`, `skyview/` (TypeScript source of the planetarium bundle) |
+| `tools/` | `adsb_feeder.py`, `isp_calibrate.py`, `convert_frames_avif.py`, `skyview/` (TypeScript source of the planetarium bundle; the committed bundle in `src/web/sky/` is what ships, and its build needs two sibling repositories that are not published yet, see `tools/skyview/README.md` and `THIRD_PARTY.md`) |
 
 ## 3. Startup
 
@@ -116,7 +116,7 @@ opens, it falls back to the simulator (unless told not to).
    - **Night or exposure ≥ 0.4 s:** RAW10 Bayer bypass (black level 52), demosaiced with
      optional 2×2 or 4×4 binning and gray-world white balance.
    - The stream stays on (persistent STREAMON) and is reset after errors.
-   - **Known host limit (minipc `<minipc-host>`, 2026-11-08):** writing the Bayer route (`XDATA[0x8000..0x8007]`) stops
+   - **Known host limit (one mini-PC, 2026-11-08):** writing the Bayer route (`XDATA[0x8000..0x8007]`) stops
      the stream on this unit (no frame, even after STREAMOFF/ON; only a USB reset recovers). `ALLSKY_DISABLE_RAW10=1`
      keeps MJPG day and night there; the night RAW10 path is therefore not available on that host (root cause open).
    - **MJPG colour:** `ALLSKY_ISP_WB_K=<kelvin>` locks the camera's own AWB (it drifts magenta under foliage).
@@ -368,10 +368,9 @@ holds a few hours that are 2026-10-18 in local time.
 |---|---|
 | Host | Raspberry Pi 4 (`<pi-host>`), Wi-Fi. An optional ingestion/plate-solver service may run on the same Pi on :3000 |
 | Service | `deploy/zenivo-pi.service` (live unit `zenivo`; new installs use the `deploy/zenivo.service` template through `install.sh`): user `pi`, group `video`, `.venv/bin/python run_allsky.py --host 127.0.0.1 --port 8095 --camera auto --sync-target http://127.0.0.1:3000 --sync-interval 60 --log-level warning --no-access-log --prune-dir …archive:3 --prune-dir …events:90`, `Restart=always`, `Nice=5`, `MemoryMax=700M` |
-| Web | `deploy/nginx-allsky.hoan.uk.conf` (the author's example): :80 → 127.0.0.1:8095, WebSocket upgrade, `proxy_buffering off`, 3600 s timeouts. cloudflared maps station.example.org → :80 and is never restarted for allsky |
+| Web | `deploy/nginx-zenivo.example.conf`: :80 → 127.0.0.1:8095, WebSocket upgrade, `proxy_buffering off`, 3600 s timeouts. cloudflared maps station.example.org → :80 and is never restarted for allsky |
 | Development instance | Service `zenivo` on port 8080 from the repo checkout |
 | New installs | `./install.sh` creates `.venv`, installs the dependencies and a `zenivo` unit; see [INSTALL.md](INSTALL.md) |
-| Current instance (2026-11-08) | minipc `<minipc-host>` (LAN) / `minipc.example.org` (IPv6 SSH), user `<user>`, `/home/<user>/zenivo`, system service `zenivo` on 127.0.0.1:8080 (`ALLSKY_DISABLE_RAW10=1`, `ALLSKY_ISP_WB_K=5000`, output appended to `data/allsky.log`), no sync target; cloudflared ingress `station.example.org -> 127.0.0.1:8080` (`/etc/cloudflared/config.yml`) |
 
 To deploy:
 

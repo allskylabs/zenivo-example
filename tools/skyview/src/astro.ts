@@ -59,7 +59,7 @@ export function solarTermDates(year: number): Record<string, Date> {
   return out;
 }
 
-/** Observing notes for well-known constellations (subset of hoan.uk constellationFacts). */
+/** Observing notes for well-known constellations (a short hand-written subset). */
 export const CON_FACTS: Record<string, { star: string; seasonEn: string; seasonVi: string; en: string; vi: string }> = {
   Ori: { star: 'Rigel & Betelgeuse', seasonEn: 'Winter', seasonVi: 'Mùa đông', en: "The most prominent winter constellation, featuring Orion's three-star belt and the Orion Nebula (M42).", vi: 'Chòm sao rực rỡ nhất mùa đông với thắt lưng 3 ngôi sao và Tinh vân Lạp Hộ (M42).' },
   UMa: { star: 'Alioth & Dubhe', seasonEn: 'Year-round (northern)', seasonVi: 'Quanh năm (bắc bán cầu)', en: 'Contains the Big Dipper; the pointer stars Merak and Dubhe line up toward Polaris.', vi: 'Chứa mảng sao Bắc Đẩu; hai sao Merak và Dubhe chỉ tới sao Bắc Cực.' },
@@ -75,7 +75,7 @@ export const CON_FACTS: Record<string, { star: string; seasonEn: string; seasonV
 };
 
 export interface Shower { id: string; name: string; zhr: number; vel: number; ra: number; dec: number; peak: [number, number]; from: [number, number]; to: [number, number] }
-// [month 0-11, day]; source: hoan.uk meteorPredictionEngine radiant table
+// [month 0-11, day]; source: hand-entered table of the main meteor-shower radiants
 export const SHOWERS: Shower[] = [
   { id: 'qua', name: 'Quadrantids', zhr: 110, vel: 41, ra: 230.1, dec: 49.5, peak: [0, 3], from: [11, 28], to: [0, 12] },
   { id: 'lyr', name: 'Lyrids', zhr: 18, vel: 49, ra: 271.4, dec: 34.3, peak: [3, 22], from: [3, 14], to: [3, 30] },

@@ -24,7 +24,7 @@ from tests.fixtures.astro_reference import (
     reference_star_count_and_cloud_cover,
     reference_detect_meteors,
 )
-from tests.fixtures.sync_reference import ReferenceSyncQueue, create_mock_hoan_uk_app
+from tests.fixtures.sync_reference import ReferenceSyncQueue, create_mock_sync_app
 from fastapi.testclient import TestClient
 
 
@@ -180,8 +180,8 @@ class TestTier2SyncAndNetworkBoundaries:
 
     def test_tier2_payload_ceiling_enforcement(self):
         """Upload payload exceeding 10MB ceiling is rejected with HTTP 413 Payload Too Large."""
-        mock_hoan = create_mock_hoan_uk_app(network_online=True)
-        client = TestClient(mock_hoan)
+        mock_sync = create_mock_sync_app(network_online=True)
+        client = TestClient(mock_sync)
 
         # 11 MB payload
         oversized = b"\x00" * (11 * 1024 * 1024)

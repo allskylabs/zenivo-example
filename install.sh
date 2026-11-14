@@ -135,7 +135,7 @@ fi
 # 4. Python dependencies (headless OpenCV: Zenivo opens no GUI windows)
 info "Installing Python dependencies"
 run "$VENV/bin/python" -m pip install --upgrade pip
-run "$VENV/bin/python" -m pip install -r "$REQ" fastapi uvicorn websockets opencv-python-headless requests httpx
+run "$VENV/bin/python" -m pip install -r "$REQ"
 
 # 5. systemd
 if [ "$USE_SYSTEMD" -eq 1 ]; then

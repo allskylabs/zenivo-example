@@ -173,7 +173,7 @@ def test_flights3d_globe_and_terrain_structure():
 def test_fr24_row_parsing_and_status():
     import time
     from src.analytics.fr24 import Fr24Feed
-    feed = Fr24Feed(enabled=True, email="ops@allsky.hoan.uk", token="test_enterprise_token")
+    feed = Fr24Feed(enabled=True, email="ops@example.org", token="test_enterprise_token")
     st = feed.status()
     assert st["enabled"] is True
     assert st["authenticated"] is True

@@ -53,7 +53,7 @@ def test_size_cap_removes_oldest_but_never_today(tmp_path):
 
 
 def test_extra_dir_cleanup_by_date_and_mtime(tmp_path):
-    extra = tmp_path / "hoan_archive"
+    extra = tmp_path / "extra_archive"
     old_day = extra / (TODAY - timedelta(days=30)).isoformat()
     new_day = extra / date.today().isoformat()
     old_day.mkdir(parents=True)

@@ -1,4 +1,4 @@
-// Plain object config (no `import 'vite'`): this dir has no node_modules; vite, astronomy-engine and three are borrowed from sibling checkouts.
+// Plain object config (no 'import vite'): this dir has no node_modules; vite, astronomy-engine and three are borrowed from sibling checkouts that are not published yet (see README.md).
 import { fileURLToPath } from 'node:url';
 
 const AP = fileURLToPath(new URL('../../../astrophoto/', import.meta.url));

@@ -7,8 +7,10 @@ name = "zenivo"
 dynamic = ["version"]
 description = "Zenivo — all-sky observatory software (capture, calibration, live view, sky events)"
 authors = [{ name = "Zenivo" }]
+license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.10"
+classifiers = ["License :: OSI Approved :: MIT License"]
 dependencies = [
     "numpy>=1.24.0",
     "Pillow>=11.3.0",

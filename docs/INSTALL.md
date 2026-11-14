@@ -104,13 +104,12 @@ cd ~/zenivo
 # On a Pi with picamera2 from apt, add --system-site-packages:
 python3 -m venv .venv                # or: python3 -m venv --system-site-packages .venv
 .venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -r requirements.txt \
-    fastapi uvicorn websockets opencv-python-headless requests httpx
+.venv/bin/python -m pip install -r requirements.txt
 ```
 
-`requirements.txt` lists numpy, Pillow, pillow-avif-plugin, sgp4, urllib3 (and cryptography). Test tools are in `requirements-dev.txt`. The web
-framework, the WebSocket library and OpenCV are installed separately. Zenivo opens no GUI windows,
-so the headless OpenCV build is enough.
+`requirements.txt` lists every runtime dependency: numpy, Pillow, pillow-avif-plugin, sgp4, urllib3, cryptography, the web
+framework (FastAPI, uvicorn, websockets), requests, httpx and OpenCV. Zenivo opens no GUI windows, so the headless OpenCV
+build is enough. Test tools (pytest) are in `requirements-dev.txt`.
 
 Test it in the foreground:
 
@@ -183,13 +182,12 @@ Run Zenivo with `--host 127.0.0.1` when nginx is the only entry point. The setti
 | `client_max_body_size 20m` | Uploads from the UI |
 | `X-Forwarded-Proto` | Zenivo runs uvicorn with proxy headers trusted, so it sees the original scheme and client |
 
-Zenivo has no login. Put authentication in front of it (nginx `auth_basic`, a VPN or a tunnel such
-as Cloudflare Tunnel) if the host is reachable from the internet.
+Zenivo has its own single-admin login (see [SECURITY.md](SECURITY.md)); guests can watch but not change anything. Serve it over TLS (or a tunnel such as Cloudflare Tunnel) if the host is reachable from the internet, so the session cookie is Secure.
 
 ## ADS-B feeder service
 
 Optional. `tools/adsb_feeder.py` reads the local aircraft list from Zenivo and pushes it to a
-virtuallab3d endpoint every few seconds.
+ingest endpoint of your choice every few seconds.
 
 1. Create `feeder.env` next to the code from the template. Never commit this file.
 
@@ -199,7 +197,7 @@ virtuallab3d endpoint every few seconds.
    nano ~/zenivo/feeder.env      # VLAB_URL, VLAB_KEY, VLAB_INTERVAL
    ```
 
-2. Adapt `deploy/zenivo-adsb-feeder.service` (it is the Pi's live unit): replace `/home/pi/zenivo`
+2. Adapt `deploy/zenivo-adsb-feeder.service` (an example unit): replace `/home/pi/zenivo`
    with your install directory, `User=pi` with your user, and `After=zenivo.service` with your
    service name. Set `ALLSKY_URL` in `feeder.env` if Zenivo does not listen on `http://127.0.0.1:8095`.
 
@@ -245,23 +243,16 @@ file, so browsers pick up the new files without a hard refresh. Restart the unit
 
 ## Existing installs
 
-Two hosts already run Zenivo. Since 2026-11-13 their units are named `zenivo` and their folders are
-`~/zenivo`. A legacy symlink `~/allsky-ng` -> `zenivo` is kept for old scripts. Ports are unchanged:
+Installs from before 2026-11-13 used the unit and folder name `allsky-ng`; since then both are `zenivo`
+(`~/zenivo`), and a legacy symlink `~/allsky-ng` -> `zenivo` keeps old scripts working. Ports are unchanged.
 
-| Host | Unit | Folder | Port | Camera |
-|------|------|--------|------|--------|
-| Raspberry Pi 4 (1.8 GB) | `zenivo` | `/home/pi/zenivo` | 8095 (behind nginx) | IMX708 through picamera2 |
-| Mini-PC | `zenivo` | `/home/<user>/zenivo` | 8080 | IMX335 USB |
-
-Upgrade them with the rsync flow above, then restart the existing unit, for example:
+To upgrade a host from a checkout on another machine, use the rsync flow above, then restart the existing unit:
 
 ```bash
 rsync -ac --exclude data/ --exclude __pycache__ --exclude '*.pyc' \
     ./src ./run_allsky.py pi@<pi-host>:/home/pi/zenivo/
 ssh pi@<pi-host> 'sudo systemctl restart zenivo'
 ```
-
-For the mini-PC, use `<user>@<minipc-host>:/home/<user>/zenivo/` and `sudo systemctl restart zenivo`.
 
 `install.sh` never stops or restarts a unit with a different name. If a host still has an older
 `allsky-ng` or `allsky-web` unit, the installer warns about it and leaves it untouched: stop and

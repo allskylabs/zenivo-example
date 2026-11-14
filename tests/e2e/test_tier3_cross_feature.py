@@ -26,7 +26,7 @@ from tests.fixtures.astro_reference import (
     reference_detect_meteors,
 )
 from tests.fixtures.api_reference import create_reference_allsky_app, compute_fast_histogram
-from tests.fixtures.sync_reference import ReferenceSyncQueue, create_mock_hoan_uk_app
+from tests.fixtures.sync_reference import ReferenceSyncQueue, create_mock_sync_app
 from fastapi.testclient import TestClient
 
 

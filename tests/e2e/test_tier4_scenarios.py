@@ -5,7 +5,7 @@ Verifies end-to-end mission workflows under realistic observing conditions:
 1. Scenario 1: 24-hour diurnal/nocturnal cycle simulation from bright midday sun through twilight to dark night and back to dawn.
 2. Scenario 2: 8-hour overnight observing run producing multi-frame capture, automated dark subtraction, real-time Keogram, and overnight Startrails.
 3. Scenario 3: Perseid meteor shower simulation with multiple transient streaks occurring over time, verifying accurate detection, clip extraction, and zero false positives from passing aircraft.
-4. Scenario 4: Simulated 30-minute internet outage at the observatory; verifying local storage, zero frame drop, and automated catch-up sync to hoan.uk.
+4. Scenario 4: Simulated 30-minute internet outage at the observatory; verifying local storage, zero frame drop, and automated catch-up sync to sync.example.org.
 """
 
 import os
@@ -23,7 +23,7 @@ from tests.fixtures.astro_reference import (
     reference_detect_meteors,
     reference_star_count_and_cloud_cover,
 )
-from tests.fixtures.sync_reference import ReferenceSyncQueue, create_mock_hoan_uk_app
+from tests.fixtures.sync_reference import ReferenceSyncQueue, create_mock_sync_app
 from fastapi.testclient import TestClient
 
 
@@ -173,8 +173,8 @@ class TestTier4RealWorldScenarios:
         db_path = os.path.join(temp_output_dir, "test_outage_scenario.db")
         queue = ReferenceSyncQueue(db_path)
 
-        mock_hoan = create_mock_hoan_uk_app(network_online=False)
-        client = TestClient(mock_hoan)
+        mock_sync = create_mock_sync_app(network_online=False)
+        client = TestClient(mock_sync)
 
         # 1. Observatory operates offline: queue items
         for i in range(20):
@@ -191,7 +191,7 @@ class TestTier4RealWorldScenarios:
         assert stats_offline["pending"] == 23
 
         # 2. Re-establish network connectivity
-        mock_hoan.state.network_online = True
+        mock_sync.state.network_online = True
 
         # 3. Catch-up worker flushes queue in priority order
         pending_items = queue.fetch_pending(limit=50)

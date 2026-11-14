@@ -55,8 +55,9 @@ Notes on the table:
 - Rows 1, 2 and 3 are the only ones that are on in a fresh install. Row 2 sends only the position rounded to
   0.5 degrees; if that still matters to you, switch it off in Settings, Integrations (`radiosondes_enabled`).
 - Row 6 uses the public web endpoints of Flightradar24, not an official API, and sends a browser-like
-  `User-Agent`, `Origin` and `Referer` (`FR24_HEADERS` in `src/analytics/fr24.py`). Check that this is
-  allowed by their terms before turning it on.
+  `User-Agent`, `Origin` and `Referer` (`FR24_HEADERS` in `src/analytics/fr24.py`). These endpoints are not an official public API of
+  Flightradar24. The feed is off by default; enabling it is the station owner's responsibility under Flightradar24's
+  terms, and a subscription token is the supported way for account holders.
 - A visitor can make the server contact rows 1 to 4 and 6 by opening a page that needs the data; a visitor
   cannot choose the destination. Guest map boxes for row 6 are snapped to a 1-degree grid and must lie within
   500 km of the station (`normalize_guest_bounds`).
@@ -373,7 +374,9 @@ Retention rules are in [CONFIGURATION.md](CONFIGURATION.md#retention-and-storage
 - **Plain HTTP by default**; TLS is your reverse proxy's job.
 - **Station name and location name are shown as typed** to guests and, if you share, in the card.
 - **Flightradar24 and OpenFlights data** come from unofficial or third-party sources; availability and terms
-  are theirs.
+  are theirs. The Flightradar24 integration uses web endpoints that are not an official API (row 6).
+- **Licences of bundled and loaded third-party components** (libraries, fonts, star and map data, data feeds) are
+  listed in [THIRD_PARTY.md](../THIRD_PARTY.md).
 
 ## 9. How to verify these claims yourself
 

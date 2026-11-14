@@ -222,6 +222,27 @@ def _admin_cli(args) -> bool:
     return True
 
 
+def saved_station_position(path):
+    """(lat, lon) saved in station_config.json, or None when the station has no real position yet.
+
+    Read defensively: a missing, unreadable or placeholder (0, 0, source "default") file gives None."""
+    import json
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        lat = float(cfg["latitude_deg"])
+        lon = float(cfg["longitude_deg"])
+    except Exception:
+        return None
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        return None
+    if lat == 0.0 and lon == 0.0:
+        return None
+    if str(cfg.get("geo_source") or "") in ("default", "default_fallback"):
+        return None
+    return lat, lon
+
+
 def main():
     args = parse_args()
     if _admin_cli(args):
@@ -283,7 +304,10 @@ def main():
     from src.calibration.auto_exposure import calculate_solar_elevation
     init_exp = args.exposure
     init_gain = args.gain
-    if init_exp <= 0.25 and init_gain == 12.0 and calculate_solar_elevation(21.0285, 105.8542) >= -2.0:
+    saved_pos = saved_station_position(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "station_config.json")
+    )
+    if init_exp <= 0.25 and init_gain == 12.0 and saved_pos and calculate_solar_elevation(*saved_pos) >= -2.0:
         init_exp = 0.0006
         init_gain = 0.0
     logger.info(

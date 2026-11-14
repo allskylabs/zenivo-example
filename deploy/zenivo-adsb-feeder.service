@@ -1,5 +1,6 @@
+# Example unit; adapt user and paths before use.
 [Unit]
-Description=Zenivo ADS-B feeder to virtuallab3d
+Description=Zenivo ADS-B feeder
 After=zenivo.service network-online.target
 Wants=network-online.target
 # Starts only once the key file exists (the user creates it on the Pi, never in git)

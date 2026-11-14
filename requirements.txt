@@ -4,3 +4,9 @@ cryptography>=38
 pillow-avif-plugin>=1.5.0
 sgp4>=2.23
 urllib3>=1.26
+fastapi
+uvicorn
+websockets
+opencv-python-headless
+requests
+httpx

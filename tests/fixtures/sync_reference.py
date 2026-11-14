@@ -1,6 +1,6 @@
 """
-Authoritative Reference SQLite Sync Queue and Mock hoan.uk Ingestion Server for AC4 Testing.
-Derived directly from ORIGINAL_REQUEST.md § R4, PROJECT.md § 4, and survey_hoan_uk.md § 4.
+Authoritative Reference SQLite Sync Queue and Mock sync.example.org Ingestion Server for AC4 Testing.
+Derived directly from ORIGINAL_REQUEST.md § R4, PROJECT.md § 4, and the sync survey § 4.
 """
 
 import os
@@ -162,11 +162,11 @@ class ReferenceSyncQueue:
             }
 
 
-def create_mock_hoan_uk_app(network_online: bool = True) -> FastAPI:
+def create_mock_sync_app(network_online: bool = True) -> FastAPI:
     """
-    Mock hoan.uk ingestion API matching server/api/routes/allskyIngest.js exactly.
+    Mock sync.example.org ingestion API matching server/api/routes/allskyIngest.js exactly.
     """
-    app = FastAPI(title="Mock hoan.uk Ingestion API", version="1.0.0")
+    app = FastAPI(title="Mock sync.example.org Ingestion API", version="1.0.0")
     app.state.network_online = network_online
     app.state.received_frames = []
     app.state.received_telemetry = []
@@ -178,7 +178,7 @@ def create_mock_hoan_uk_app(network_online: bool = True) -> FastAPI:
         if not app.state.network_online:
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                content={"error": "Network unreachable or hoan.uk offline"},
+                content={"error": "Network unreachable or sync.example.org offline"},
             )
         return await call_next(request)
 
@@ -194,7 +194,7 @@ def create_mock_hoan_uk_app(network_online: bool = True) -> FastAPI:
             raise HTTPException(status_code=413, detail="Payload exceeds 10MB ceiling")
 
         record = {
-            "device_id": x_device_id or "hoan-uk-hanoi",
+            "device_id": x_device_id or "example-station",
             "size_bytes": len(content),
             "exposure_sec": float(x_exposure_sec or 0.0),
             "gain_db": float(x_gain_db or 0.0),

@@ -12,9 +12,14 @@ estimates cloud cover, detects sky events, assists focusing and plate-solves the
 It runs on a Raspberry Pi 4 (1.8 GB RAM) as well as on a laptop or mini-PC. Low CPU and memory use
 is the main design constraint: heavy analysis is sampled, never done per frame.
 
-**Privacy and trust:** no telemetry, no auto-update, no remote control, no default password. Every outbound
-connection, third-party load and stored file is listed, with its source file, in
-[docs/TRANSPARENCY.md](docs/TRANSPARENCY.md).
+## Privacy in short
+
+- No telemetry, no call home, no auto-update, no remote control, no licence check.
+- No default password: the admin account is created on first start with a one-time setup code ([docs/SECURITY.md](docs/SECURITY.md)).
+- Guests can watch but not change anything, and see the station position rounded.
+- Community sharing, the Flightradar24 feed, the sync target and the remote plate solver are off until you switch them on.
+- Every outbound connection, third-party browser load and stored file is listed with its source file in
+  [docs/TRANSPARENCY.md](docs/TRANSPARENCY.md). A few public-data lookups (satellite orbits, weather balloons, airports) are on by default and listed there.
 
 ## Features
 
@@ -26,17 +31,26 @@ connection, third-party load and stored file is listed, with its source file, in
 - **Products**: keogram, startrails and timelapse per day, plus a timelapse builder for a date range.
 - **Analytics**: cloud cover (clear / scattered / overcast) with history, star count, rain detection
   on the dome, sky events (meteor, plane, satellite, flash, cloud change) by night and by day.
-- **Traffic**: ADS-B aircraft (local receiver, and a Flightradar24 feed that is off until you switch it on), satellite passes from TLEs,
+- **Traffic**: ADS-B aircraft (local receiver, and an optional Flightradar24 feed, see the note below), satellite passes from TLEs,
   radiosondes (position sent to SondeHub rounded to 0.5 degrees, with an off switch), an aircraft/satellite log of what crossed the camera view.
   Daytime birds, insects and aircraft are detected locally with their own settings. Every Settings card saves itself on change.
 - **Focus assistant**: HFR and contrast measurement on a region of interest, motorised lens control
   and autofocus for supported Raspberry Pi lenses.
 - **Plate solving**: local bright-star solver, with a remote blind-solve fallback; sky and obstruction mask.
 - **Sky pages**: observer sky view, Flights 3D and Satellites 3D, OBS browser source and dock.
-- **Community** (opt-in, off by default): share a signed station card with other Zenivo stations by gossip, no central server, and see them on a map; see [docs/COMMUNITY.md](docs/COMMUNITY.md).
 - **Admin login**: one admin password protects every change and the logs; guests can watch and see the station location rounded. First start: read the setup code with `cat data/admin_setup_code.txt` and open `/login`; see [docs/SECURITY.md](docs/SECURITY.md).
 - **Storage**: AVIF frame archive, age and size based retention, extra directories to prune.
 - **Sync**: optional push of frames and telemetry to a remote sync server (off unless you pass `--sync-target`).
+
+**Flightradar24 note:** the integration uses Flightradar24's web endpoints, which are not an official public API. It is off by
+default; enabling it is the station owner's responsibility under Flightradar24's terms, and a subscription token is the supported
+way for account holders.
+
+## Community network
+
+Optional and off by default. Stations that opt in share a signed station card (the fields are listed in [docs/COMMUNITY.md](docs/COMMUNITY.md) and TRANSPARENCY.md section 4)
+with each other by gossip, with no central server, and appear on a map. A new station needs one reachable address to start from:
+two built-in seed stations are listed in [docs/COMMUNITY.md](docs/COMMUNITY.md) and can be removed or replaced.
 
 ## Supported cameras
 
@@ -56,26 +70,27 @@ connection, third-party load and stored file is listed, with its source file, in
 - `ffmpeg` for timelapse videos (Zenivo falls back to OpenCV without it).
 - About 8 GB of free disk space for the default retention policy.
 
-## Quick start
+## Quick start (simulator, no camera)
 
-With the simulator (no camera needed):
-
-```bash
-git clone https://github.com/hoanb1/zenivo.git zenivo
-cd zenivo
-./install.sh --no-systemd --camera simulator
-.venv/bin/python run_allsky.py --camera simulator --port 8080   # add --host 0.0.0.0 to open it on the LAN
-```
-
-With a real camera, installed as a systemd service:
+Python 3.10 or newer on Linux (the camera backends are Linux only):
 
 ```bash
-./install.sh --camera auto --port 8080
+git clone https://github.com/hoanb1/zenivo.git && cd zenivo
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python run_allsky.py --camera simulator --port 8080
 ```
 
-Open `http://<host>:8080/`. First run: nobody can change settings until you set the admin password. Read the one-time
-setup code with `cat data/admin_setup_code.txt` and enter it at `/login`. Full steps are in [docs/INSTALL.md](docs/INSTALL.md).
-Check the running version with `curl http://localhost:8080/api/version`.
+Open `http://127.0.0.1:8080/` (add `--host 0.0.0.0` to open it on the LAN). First run: nobody can change settings until you set the
+admin password. Read the one-time setup code with `cat data/admin_setup_code.txt` and enter it at `/login`.
+Check the running version with `curl http://127.0.0.1:8080/api/version`.
+
+## Install on a Raspberry Pi or a mini-PC
+
+```bash
+./install.sh --camera auto --port 8080      # venv, dependencies and a systemd unit named "zenivo"
+```
+
+Full steps (camera access, time zone, nginx, ADS-B feeder, upgrades, uninstall) are in [docs/INSTALL.md](docs/INSTALL.md).
 
 ## Pages
 
@@ -102,7 +117,9 @@ Check the running version with `curl http://localhost:8080/api/version`.
 | [docs/SECURITY.md](docs/SECURITY.md) | Admin login, what guests can do, setup code, sessions, location rounding |
 | [docs/SDD.md](docs/SDD.md) | Software design: architecture, capture cycle, data layout, sync, deployment |
 | [docs/BRAND.md](docs/BRAND.md) | Name, logo, colours, typography, voice |
-| [deploy/README.md](deploy/README.md) | Which deployment file is for what |
+| [deploy/README.md](deploy/README.md) | Which deployment file is for what (examples to adapt) |
+| [THIRD_PARTY.md](THIRD_PARTY.md) | Licences and sources of every bundled or loaded third-party component and data set |
+| [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | How to contribute, report a vulnerability, behave |
 | [CHANGELOG.md](CHANGELOG.md) | Release notes |
 
 ## Development
@@ -112,8 +129,7 @@ python3 -m pytest -q
 ```
 
 Some hardware tests open a real camera if one is connected. Stop a running instance first, or run
-single test files while iterating. A few tests fail at 1.0.0; see "Known issues" in
-[CHANGELOG.md](CHANGELOG.md).
+single test files while iterating. See [CONTRIBUTING.md](CONTRIBUTING.md) for the test and privacy rules.
 
 The navigation, brand block and page head of every HTML page are generated from one definition:
 
@@ -140,7 +156,7 @@ The Python code is documented in [docs/SDD.md](docs/SDD.md).
 Some identifiers keep the original "allsky" name for compatibility with running installs and with
 the remote sync server. They are not renamed: logger names `allsky.*`, the browser storage key
 `allsky.ui.prefs.v1`, upload paths `/uploads/allsky/...`, the sync API `/api/allsky/ingest/*`,
-environment variables `ALLSKY_*` and the script name `run_allsky.py`. Live hosts use the unit `zenivo` and the folder `~/zenivo`; a legacy symlink `~/allsky-ng` is kept for old scripts.
+environment variables `ALLSKY_*` and the script name `run_allsky.py`. Installs use the unit `zenivo` and the folder `~/zenivo`; older installs may keep a symlink `~/allsky-ng` for old scripts.
 
 ## Versioning
 
@@ -150,4 +166,4 @@ UI sidebar. Release notes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-Not yet specified; all rights reserved by the author until one is added.
+[MIT](LICENSE). Third-party components and data keep their own licences: see [THIRD_PARTY.md](THIRD_PARTY.md).

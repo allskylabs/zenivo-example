@@ -335,22 +335,22 @@ class TestOutageSimulationAndCircuitBreaker:
 
         def dynamic_send_telemetry(payload):
             if not network_online[0]:
-                raise ConnectionError("Host unreachable: 192.168.3.24:3000")
+                raise ConnectionError("Host unreachable: sync.example.org:443")
             return {"success": True}
 
         def dynamic_send_frame(*args, **kwargs):
             if not network_online[0]:
-                raise ConnectionError("Host unreachable: 192.168.3.24:3000")
+                raise ConnectionError("Host unreachable: sync.example.org:443")
             return {"success": True, "url": "/uploads/allsky/current/image.webp"}
 
         def dynamic_send_event(*args, **kwargs):
             if not network_online[0]:
-                raise ConnectionError("Host unreachable: 192.168.3.24:3000")
+                raise ConnectionError("Host unreachable: sync.example.org:443")
             return {"success": True, "event_id": "meteor_test"}
 
         def dynamic_send_summary(*args, **kwargs):
             if not network_online[0]:
-                raise ConnectionError("Host unreachable: 192.168.3.24:3000")
+                raise ConnectionError("Host unreachable: sync.example.org:443")
             return {"success": True, "url": "/uploads/allsky/keograms/latest.jpg"}
 
         mock_client.send_telemetry.side_effect = dynamic_send_telemetry
@@ -465,7 +465,7 @@ class TestSQLInjectionAndPayloadFuzzingOnSyncQueue:
         q = SyncQueue(db_file)
 
         large_payload = {
-            "station": "hoan-uk-hanoi",
+            "station": "example-station",
             "blob": "A" * (2 * 1024 * 1024),  # 2MB string
             "stars": list(range(10000)),
         }

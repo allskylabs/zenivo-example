@@ -219,7 +219,7 @@ class TestGuestRounding:
 
     def test_guest_view_rounds_station_and_strips_secrets(self):
         payload = {"station": {"latitude_deg": 21.0285, "longitude_deg": 105.8542, "elevation_m": 20,
-                               "adsb": {"host": "192.168.2.48", "fr24_token": "t", "az_offset_deg": 1.5}},
+                               "adsb": {"host": "192.168.1.50", "fr24_token": "t", "az_offset_deg": 1.5}},
                    "satellites": {"station": {"lat": 21.0285, "lon": 105.8542}},
                    "aircraft": [{"lat": 21.0285, "lon": 105.8542}]}
         out = guest_view(payload, 0.1)

@@ -269,7 +269,7 @@ def test_short_exposure_twilight_strobe_and_ramp_is_plane():
 
 
 def test_strobe_streak_on_overcast_sky_is_a_plane():
-    """Real frames (sky.hoan.uk, 08 Nov 2026 19:31-19:33, 100% cloud): an aircraft strobe lit the overcast deck.
+    """Real frames (a live station, 08 Nov 2026 19:31-19:33, 100% cloud): an aircraft strobe lit the overcast deck.
     Glow around the dashes made the streak look fat and fuzzy; it was dropped as 'not a meteor'."""
     import json
     import os

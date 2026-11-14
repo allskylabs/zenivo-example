@@ -1,5 +1,5 @@
 // Meteor layer: meteors spawn in the equatorial (J2000) frame so a shower radiant turns with the stars, and fly along great
-// circles away from the radiant (short near it, longest ~60 deg away). Ported in spirit from hoan.uk sky3d/meteorLayer.js.
+// circles away from the radiant (short near it, longest ~60 deg away). Written for Zenivo.
 import { mat3MulVec, radecToVec } from '@astrophoto/sky-engine';
 import type { Mat3, Vec3 } from '@astrophoto/sky-engine';
 import { activeShowers, DEG } from './astro';

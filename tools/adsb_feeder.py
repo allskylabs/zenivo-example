@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Push the Pi's live aircraft list to virtuallab3d (snapshot replaces the previous one).
+"""Push the live aircraft list to an ingest endpoint you choose (snapshot replaces the previous one).
 
 Reads the local allsky API and POSTs it as JSON. A failed push is dropped, never queued; repeated failures
 back off. Config comes from the environment (systemd EnvironmentFile, never committed):
-  VLAB_URL        full ingest URL, e.g. https://staging.virtuallab3d.com/api/v1/sky/aircraft
+  VLAB_URL        full ingest URL, e.g. https://sync.example.org/api/v1/sky/aircraft
   VLAB_KEY        service key (Bearer, scope sky:ingest)
   VLAB_INTERVAL   seconds between pushes (default 3, min 2)
   ALLSKY_URL      local API base (default http://127.0.0.1:8095)

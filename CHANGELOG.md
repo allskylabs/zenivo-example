@@ -24,7 +24,7 @@ All notable changes to Zenivo are recorded here. The format follows
 - The Flightradar24 feed is off until `adsb.fr24_enabled` is set (opt-in outbound connection).
 - A fresh install no longer ships a city: the factory station is "My station" at 0, 0 (`src/defaults.py`). Saved configs are unaffected.
 - Three.js import maps on the 3D flights and satellites pages carry Subresource Integrity hashes.
-- Removed the leftover hoan.uk radiosonde link and wording; `GET /api/events` rejects `limit` above 100 unless `brief=true`.
+- Removed a leftover third-party radiosonde link and wording; `GET /api/events` rejects `limit` above 100 unless `brief=true`.
 
 ### Fixed
 
@@ -114,7 +114,7 @@ Other known limits:
 - The API has no authentication. Bind to `127.0.0.1` behind a reverse proxy, or use a trusted network.
 - The sync client has no persistent queue: frames missed during an outage are not re-sent.
 - `--reload` is parsed but not passed to uvicorn.
-- The default `--sync-target` is `http://localhost:3005`; pass `--sync-target ""` on installs without a hoan.uk server.
+- The default `--sync-target` is `http://localhost:3005`; pass `--sync-target ""` on installs without a sync server.
 - No licence has been chosen: all rights are reserved by the author until one is added.
 
 ## Before 1.0.0
@@ -132,7 +132,7 @@ Main steps, newest first:
   fisheye lens model for the sky overlay; J2000 catalogue precessed to the date of observation.
 - **ADS-B and traffic**: local SBS-1 receiver and Flightradar24 feed, aircraft overlay on the live
   view, satellite overlay with SGP4, SondeHub radiosonde tracking, an ADS-B feeder service for
-  virtuallab3d.
+  an external ingest endpoint.
 - **Storage**: frames archived as AVIF with JPEG fallback and a conversion tool.
 - **Live review**: frame viewer with an event timeline on the cloud chart; every sky event keeps a
   clean archived frame.

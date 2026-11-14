@@ -1,4 +1,5 @@
-# Example from the author's own station; adapt before use.
+# Example unit (a Raspberry Pi 4 behind a reverse proxy, with a sync target and extra prune directories).
+# Adapt user, paths, port and targets before use; deploy/zenivo.service is the template that install.sh fills.
 [Unit]
 Description=Zenivo all-sky observatory
 After=network-online.target
@@ -8,9 +9,9 @@ Wants=network-online.target
 User=pi
 Group=video
 WorkingDirectory=/home/pi/zenivo
-ExecStart=/home/pi/zenivo/.venv/bin/python run_allsky.py --host 127.0.0.1 --port 8095 --camera auto --sync-target http://127.0.0.1:3000 --sync-interval 60 --log-level warning --no-access-log \
-    --prune-dir /home/pi/hoan.uk/uploads/allsky/archive:3 \
-    --prune-dir /home/pi/hoan.uk/uploads/allsky/events:90
+ExecStart=/home/pi/zenivo/.venv/bin/python run_allsky.py --host 127.0.0.1 --port 8095 --camera auto --sync-target https://sync.example.org --sync-interval 60 --log-level warning --no-access-log \
+    --prune-dir /path/to/archive:3 \
+    --prune-dir /path/to/events:90
 Restart=always
 RestartSec=10
 Nice=5

@@ -1008,7 +1008,7 @@
                         <div class="field-grid adsb-grid">
                             <div class="field">
                                 <label for="adsb-host">ADS-B receiver (SBS-1 feed)</label>
-                                <input type="text" id="adsb-host" placeholder="e.g. 192.168.2.48" maxlength="253" />
+                                <input type="text" id="adsb-host" placeholder="e.g. 192.168.1.50" maxlength="253" />
                             </div>
                             <div class="field">
                                 <label for="adsb-port">Port</label>
@@ -1053,6 +1053,9 @@
                         <p class="field-note">
                             Off by default. When on, this station asks flightradar24.com for the aircraft positions around it; without credentials the public feed is used.
                             Credentials are stored on this station only (token and e-mail in data/station_config.json, the password in memory only, never shown again).
+                        </p>
+                        <p class="field-note">
+                            This uses Flightradar24's web endpoints, which are not an official public API. You are responsible for using it within Flightradar24's terms; a subscription token is the supported way for account holders.
                         </p>
                     </fieldset>
                     <fieldset class="settings-group sondes-block" data-admin>

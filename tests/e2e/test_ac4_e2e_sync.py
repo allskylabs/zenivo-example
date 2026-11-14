@@ -1,15 +1,15 @@
 """
 Acceptance Criteria 4 E2E Test Suite:
-End-to-End Resilient Sync with hoan.uk (192.168.3.24) Verification.
+End-to-End Resilient Sync with sync.example.org Verification.
 
 Verifies:
 1. AC4.1: SQLite WAL queue persistence and priority-based ordering (Meteor > Summary > Frame > Telemetry).
 2. AC4.2: Multipart frame upload to /api/allsky/ingest/frame with device headers.
-3. AC4.3: Telemetry JSON push to /api/allsky/ingest/telemetry matching hoan.uk schema.
+3. AC4.3: Telemetry JSON push to /api/allsky/ingest/telemetry matching sync.example.org schema.
 4. AC4.4: Meteor event package upload to /api/allsky/ingest/event with trajectory metadata.
 5. AC4.5: Summary products upload to /api/allsky/ingest/summary (Keogram, Startrails, Timelapse).
 6. AC4.6: Resilient offline recovery during network dropout: exponential backoff with jitter and 100% zero data loss catch-up flush.
-7. AC4.7: Backward compatibility and zero-emoji invariant for hoan.uk platform.
+7. AC4.7: Backward compatibility and zero-emoji invariant for sync.example.org platform.
 """
 
 import os
@@ -18,19 +18,19 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.fixtures.sync_reference import ReferenceSyncQueue, create_mock_hoan_uk_app
+from tests.fixtures.sync_reference import ReferenceSyncQueue, create_mock_sync_app
 
 
 @pytest.fixture
-def mock_hoan_uk():
-    """Mock hoan.uk ingestion API app."""
-    return create_mock_hoan_uk_app(network_online=True)
+def mock_sync_server():
+    """Mock sync.example.org ingestion API app."""
+    return create_mock_sync_app(network_online=True)
 
 
 @pytest.fixture
-def hoan_client(mock_hoan_uk):
-    """Test client pointing to mock hoan.uk."""
-    return TestClient(mock_hoan_uk)
+def sync_client(mock_sync_server):
+    """Test client pointing to mock sync.example.org."""
+    return TestClient(mock_sync_server)
 
 
 class TestAC4ResilientSync:
@@ -66,7 +66,7 @@ class TestAC4ResilientSync:
         assert pending[3]["event_type"] == "telemetry"
         assert pending[3]["priority"] == 10
 
-    def test_ac4_multipart_frame_upload(self, hoan_client):
+    def test_ac4_multipart_frame_upload(self, sync_client):
         """
         AC4 Requirement:
         POST /api/allsky/ingest/frame receives binary image and camera metadata headers.
@@ -74,24 +74,24 @@ class TestAC4ResilientSync:
         fake_jpeg = b"\xff\xd8" + (b"\x00" * 5000) + b"\xff\xd9"
         files = {"image": ("latest.jpg", fake_jpeg, "image/jpeg")}
         headers = {
-            "X-Device-Id": "hoan-uk-hanoi",
+            "X-Device-Id": "example-station",
             "X-Exposure-Sec": "4.00",
             "X-Gain-Db": "36.0",
         }
 
-        response = hoan_client.post("/api/allsky/ingest/frame", files=files, headers=headers)
+        response = sync_client.post("/api/allsky/ingest/frame", files=files, headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
         assert "url" in data
 
-    def test_ac4_telemetry_upload_contract(self, hoan_client):
+    def test_ac4_telemetry_upload_contract(self, sync_client):
         """
         AC4 Requirement:
-        POST /api/allsky/ingest/telemetry delivers metrics payload matching hoan.uk HUD requirements.
+        POST /api/allsky/ingest/telemetry delivers metrics payload matching sync.example.org HUD requirements.
         """
         telemetry_payload = {
-            "deviceId": "hoan-uk-hanoi",
+            "deviceId": "example-station",
             "timestamp": "2026-10-14T23:15:00.000Z",
             "status": "online",
             "mode": "night",
@@ -115,12 +115,12 @@ class TestAC4ResilientSync:
             },
         }
 
-        response = hoan_client.post("/api/allsky/ingest/telemetry", json=telemetry_payload)
+        response = sync_client.post("/api/allsky/ingest/telemetry", json=telemetry_payload)
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
 
-    def test_ac4_meteor_event_upload(self, hoan_client):
+    def test_ac4_meteor_event_upload(self, sync_client):
         """
         AC4 Requirement:
         POST /api/allsky/ingest/event uploads detected meteor metadata and cropped image.
@@ -142,13 +142,13 @@ class TestAC4ResilientSync:
         files = {"image": ("crop.jpg", fake_crop, "image/jpeg")}
         data = {"metadata": json.dumps(event_metadata)}
 
-        response = hoan_client.post("/api/allsky/ingest/event", data=data, files=files)
+        response = sync_client.post("/api/allsky/ingest/event", data=data, files=files)
         assert response.status_code == 200
         res = response.json()
         assert res["success"] is True
         assert res["event_id"] == "meteor_20261014_214512_001"
 
-    def test_ac4_summary_products_upload(self, hoan_client):
+    def test_ac4_summary_products_upload(self, sync_client):
         """
         AC4 Requirement:
         POST /api/allsky/ingest/summary uploads daily astronomical summary products.
@@ -157,13 +157,13 @@ class TestAC4ResilientSync:
         files = {"file": ("keogram.jpg", fake_keogram, "image/jpeg")}
         data = {"type": "keogram", "date": "2026-10-14"}
 
-        response = hoan_client.post("/api/allsky/ingest/summary", data=data, files=files)
+        response = sync_client.post("/api/allsky/ingest/summary", data=data, files=files)
         assert response.status_code == 200
         res = response.json()
         assert res["success"] is True
         assert "keogram" in res["url"]
 
-    def test_ac4_offline_resilient_recovery_zero_data_loss(self, mock_hoan_uk, hoan_client, temp_output_dir):
+    def test_ac4_offline_resilient_recovery_zero_data_loss(self, mock_sync_server, sync_client, temp_output_dir):
         """
         AC4 Mandatory Acceptance Criteria:
         Simulate an extended network outage:
@@ -179,14 +179,14 @@ class TestAC4ResilientSync:
             queue.enqueue("telemetry", payload={"index": i, "temp": 20.0 + i})
 
         # 2. SEVER NETWORK (Simulate Internet outage at observatory)
-        mock_hoan_uk.state.network_online = False
+        mock_sync_server.state.network_online = False
 
         # Attempt to flush queue while offline
         pending_items = queue.fetch_pending(limit=10)
         assert len(pending_items) == 5
 
         for item in pending_items:
-            res = hoan_client.post("/api/allsky/ingest/telemetry", json=item["payload"])
+            res = sync_client.post("/api/allsky/ingest/telemetry", json=item["payload"])
             assert res.status_code == 503
             queue.mark_failed(item["id"], error_msg="HTTP 503 Offline")
 
@@ -202,7 +202,7 @@ class TestAC4ResilientSync:
         assert total_pending == 7
 
         # 4. RESTORE NETWORK (Internet reconnects)
-        mock_hoan_uk.state.network_online = True
+        mock_sync_server.state.network_online = True
 
         # Flush all pending items (simulating sync daemon catch-up worker)
         # Note: in real backoff, next_retry_at is updated; in testing, force immediate dispatch
@@ -216,18 +216,18 @@ class TestAC4ResilientSync:
         delivered_count = 0
         for item in to_flush:
             if item["event_type"] == "meteor_event":
-                res = hoan_client.post(
+                res = sync_client.post(
                     "/api/allsky/ingest/event",
                     data={"metadata": json.dumps(item["payload"])},
                 )
             elif item["event_type"] == "frame_latest":
                 fake_jpeg = b"\xff\xd8" + (b"\x00" * 100) + b"\xff\xd9"
-                res = hoan_client.post(
+                res = sync_client.post(
                     "/api/allsky/ingest/frame",
                     files={"image": ("test.jpg", fake_jpeg, "image/jpeg")},
                 )
             else:
-                res = hoan_client.post("/api/allsky/ingest/telemetry", json=item["payload"])
+                res = sync_client.post("/api/allsky/ingest/telemetry", json=item["payload"])
 
             assert res.status_code == 200
             queue.mark_completed(item["id"])
@@ -239,14 +239,14 @@ class TestAC4ResilientSync:
         assert final_stats["completed"] == 7
         assert final_stats["total"] == 7, "Zero Data Loss Guarantee Verified!"
 
-    def test_ac4_hoan_uk_zero_emoji_invariant(self, mock_hoan_uk):
+    def test_ac4_sync_server_zero_emoji_invariant(self, mock_sync_server):
         """
         Target Platform Invariant:
         Strictly ZERO Unicode emojis in telemetry, station descriptions, or event metadata.
         """
         payload = {
-            "deviceId": "hoan-uk-hanoi",
-            "name": "hoan.uk Observatory Hanoi",
+            "deviceId": "example-station",
+            "name": "Example Observatory",
             "status": "online",
             "sky": {
                 "star_count": 120,
