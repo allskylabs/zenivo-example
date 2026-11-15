@@ -1018,6 +1018,15 @@
             </div>
 
             <!-- Integrations Card -->
+            <div class="card settings-card" id="data-sources-card" data-sgroup="integrations" data-admin>
+                <div class="card-header">
+                    <h2>Data sources</h2>
+                    <button type="button" class="btn btn-sm btn-outline" id="data-sources-refresh" data-no-autosave title="Check every source again">&#8635; Refresh</button>
+                </div>
+                <p class="description">Everything this station fetches from outside, and whether it works now. Each source can be switched off below; nothing is sent to a source that is off.</p>
+                <div id="data-sources-list" class="data-sources" aria-live="polite"><span class="field-note">Loading…</span></div>
+            </div>
+
             <div class="card settings-card" data-sgroup="integrations">
                 <div class="card-header">
                     <h2>Integrations</h2>
@@ -1109,6 +1118,49 @@
                         <p class="field-note">
                             When on, the station asks api.v2.sondehub.org for the weather balloons within 350 km, about every 20 s while a Live page is open.
                             The position sent is rounded to 0.5° (about 55 km); the exact location never leaves this station.
+                        </p>
+                    </fieldset>
+                    <fieldset class="settings-group sat-block" id="sat-block" data-admin>
+                        <legend>Satellites (CelesTrak orbits)</legend>
+                        <div class="field">
+                            <label class="checkbox-label"><input type="checkbox" id="sat-enabled" checked /> Show satellites on the Live and Sky pages</label>
+                        </div>
+                        <div class="field">
+                            <label>Groups to track</label>
+                            <div class="sat-groups" id="sat-groups">
+                                <label class="checkbox-label"><input type="checkbox" data-sat-group="stations" /> Space stations (ISS, Tiangong)</label>
+                                <label class="checkbox-label"><input type="checkbox" data-sat-group="visual" /> Brightest, naked-eye</label>
+                                <label class="checkbox-label"><input type="checkbox" data-sat-group="weather" /> Weather</label>
+                                <label class="checkbox-label"><input type="checkbox" data-sat-group="noaa" /> NOAA</label>
+                                <label class="checkbox-label"><input type="checkbox" data-sat-group="gps-ops" /> GPS</label>
+                                <label class="checkbox-label"><input type="checkbox" data-sat-group="galileo" /> Galileo</label>
+                                <label class="checkbox-label"><input type="checkbox" data-sat-group="science" /> Science</label>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="sat-refresh">Download orbits every</label>
+                            <select id="sat-refresh">
+                                <option value="6">6 hours</option>
+                                <option value="12">12 hours</option>
+                                <option value="24">24 hours</option>
+                                <option value="72">3 days</option>
+                                <option value="168">7 days</option>
+                            </select>
+                        </div>
+                        <details class="params-summary">
+                            <summary>Advanced: another orbit source</summary>
+                            <div class="field">
+                                <label for="sat-url">TLE address (https, with {group})</label>
+                                <input type="text" id="sat-url" maxlength="300" spellcheck="false" placeholder="https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=tle" />
+                            </div>
+                            <p class="field-note">Leave empty for CelesTrak. The address must be public (https) and return three-line TLE sets for the group named by <code>{group}</code>.</p>
+                        </details>
+                        <div class="settings-actions">
+                            <button type="button" class="btn btn-sm btn-outline" id="sat-refresh-now" data-no-autosave>&#8595; Download now</button>
+                        </div>
+                        <p class="field-note" id="sat-status" aria-live="polite"></p>
+                        <p class="field-note">
+                            When on, the station asks celestrak.org for orbit data (no position is sent). Satellites are computed locally; a long list slows the live view on a small host, so keep only the groups you want to see.
                         </p>
                     </fieldset>
                 </div>
@@ -1567,7 +1619,7 @@
     <script defer src="/static/app/07-cloud.js?v=20261114a"></script>
     <script defer src="/static/app/08-gallery-adsb.js?v=20261115a"></script>
     <script defer src="/static/app/08b-events-live.js?v=20261115a"></script>
-    <script defer src="/static/app/08c-adsb-settings.js?v=20261115a"></script>
+    <script defer src="/static/app/08c-adsb-settings.js?v=20261115b"></script>
     <script defer src="/static/app/09-community.js?v=20261114b"></script>
     <script defer src="/static/app/10-admin.js?v=20261114a"></script>
     <script>

@@ -37,6 +37,7 @@ from src.api.calibration_mixin import CalibrationMixin
 from src.api.products_mixin import ProductsMixin
 from src.api.events_mixin import EventsMixin
 from src.api.traffic_mixin import TrafficMixin
+from src.api.datasources_mixin import DataSourcesMixin
 from src.api.station_mixin import StationMixin
 from src.api.focus_mixin import FocusMixin
 from src.api.lens_mixin import LensMixin
@@ -73,7 +74,7 @@ class _BoundedCache(OrderedDict):
             self.popitem(last=False)
 
 
-class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, StationMixin, FocusMixin, LensMixin, PlateSolveMixin, CameraSelectMixin,
+class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, DataSourcesMixin, StationMixin, FocusMixin, LensMixin, PlateSolveMixin, CameraSelectMixin,
                   CaptureMixin, StatusMixin, ExposureMixin, LifecycleMixin):
     """
     Singleton service managing camera capture lifecycle, telemetry cache,

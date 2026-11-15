@@ -149,6 +149,14 @@ class SkyMaskRequest(BaseModel):
     )
 
 
+class SatellitesConfigRequest(BaseModel):
+    """Satellite overlay settings (Settings > Integrations): which CelesTrak groups, how often, and from where."""
+    enabled: Optional[bool] = None
+    groups: Optional[List[str]] = Field(default=None, max_length=8, description="CelesTrak groups to track")
+    refresh_h: Optional[int] = Field(default=None, ge=1, le=168, description="Hours between orbit downloads")
+    tle_url: Optional[str] = Field(default=None, max_length=300, description="https address with {group}; empty = CelesTrak")
+
+
 class ManualStarSolveRequest(BaseModel):
     """Stars clicked on the live frame (fractions of the displayed image) to find the camera pointing."""
     points: List[List[float]] = Field(..., min_length=4, max_length=80, description="[x, y] fractions, x right, y down")

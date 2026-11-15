@@ -21,7 +21,8 @@ import numpy as np
 
 from src.analytics.adsb import _ecef, frame_xy_from_enu
 
-GROUPS = ("stations", "visual")
+GROUPS = ("stations", "visual")  # default groups
+GROUP_CHOICES = ("stations", "visual", "weather", "noaa", "gps-ops", "galileo", "science")  # CelesTrak groups offered in Settings
 TLE_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=tle"
 REFRESH_S = 24 * 3600.0
 EARTH_R_KM = 6371.0
@@ -63,7 +64,34 @@ class SatelliteTracker:
         self._sats: List[Any] = []  # (name, group, Satrec)
         self._fetched_at = 0.0
         self._fetching = False
+        self.groups: List[str] = list(GROUPS)
+        self.refresh_s = REFRESH_S
+        self.url_template = TLE_URL
+        self.last_error = ""
         self._load_cache()
+
+    def configure(self, groups: Optional[List[str]] = None, refresh_s: Optional[float] = None,
+                  url_template: Optional[str] = None) -> None:
+        """Apply the user's settings; a change of groups or source forces a fresh download."""
+        groups = [g for g in (groups or self.groups) if g in GROUP_CHOICES] or list(GROUPS)
+        url = url_template or TLE_URL
+        with self._lock:
+            changed = groups != self.groups or url != self.url_template
+            self.groups, self.url_template = groups, url
+            if refresh_s:
+                self.refresh_s = float(refresh_s)
+            # Satellites of a group that was switched off disappear at once; a new group arrives with the next download
+            self._sats = [t for t in self._sats if t[1] in self.groups]
+            if changed:
+                self._fetched_at = 0.0
+
+    def refresh_now(self) -> bool:
+        """Start a download now (False when one is already running)."""
+        if self._fetching:
+            return False
+        self._fetching = True
+        threading.Thread(target=self._fetch, daemon=True, name="tle-fetch").start()
+        return True
 
     def _load_cache(self) -> None:
         try:
@@ -92,28 +120,33 @@ class SatelliteTracker:
     def _fetch(self) -> None:
         try:
             tles: List[Dict[str, str]] = []
-            for g in GROUPS:
-                with net_urlopen(TLE_URL.format(group=g), timeout=20) as r:
+            for g in list(self.groups):
+                with net_urlopen(self.url_template.format(group=g), timeout=20) as r:
                     tles += _parse_tle(r.read().decode("ascii", "replace"), g)
-            if tles:
-                now = time.time()
-                self._set_tles(tles, now)
-                os.makedirs(os.path.dirname(self.cache_path), exist_ok=True)
-                with open(self.cache_path, "w") as fh:
-                    json.dump({"fetched_at": now, "tles": tles}, fh)
-        except Exception:
-            self._fetched_at = max(self._fetched_at, time.time() - REFRESH_S + 1800.0)  # retry in 30 min
+            if not tles:
+                raise ValueError("the source returned no TLE records")
+            now = time.time()
+            self._set_tles(tles, now)
+            self.last_error = ""
+            os.makedirs(os.path.dirname(self.cache_path), exist_ok=True)
+            with open(self.cache_path, "w") as fh:
+                json.dump({"fetched_at": now, "tles": tles}, fh)
+        except Exception as exc:
+            self.last_error = f"{type(exc).__name__}: {exc}"[:200]
+            self._fetched_at = max(self._fetched_at, time.time() - self.refresh_s + 1800.0)  # retry in 30 min
         finally:
             self._fetching = False
 
     def _maybe_refresh(self) -> None:
-        if self._fetching or time.time() - self._fetched_at < REFRESH_S:
+        if self._fetching or time.time() - self._fetched_at < self.refresh_s:
             return
         self._fetching = True
         threading.Thread(target=self._fetch, daemon=True, name="tle-fetch").start()
 
     def status(self) -> Dict[str, Any]:
-        return {"count": len(self._sats), "fetched_at": self._fetched_at or None}
+        return {"count": len(self._sats), "fetched_at": self._fetched_at or None, "groups": list(self.groups),
+                "refresh_h": round(self.refresh_s / 3600.0, 2), "error": self.last_error, "fetching": self._fetching,
+                "source": self.url_template.split("/")[2] if self.url_template.count("/") >= 2 else ""}
 
     def _context(self, station: Dict[str, float], when: datetime) -> Dict[str, Any]:
         """Earth rotation, observer and sun for one instant."""

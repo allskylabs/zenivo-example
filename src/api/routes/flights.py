@@ -8,6 +8,7 @@ from fastapi import HTTPException, Query, Request, status, Depends
 from src.api.schemas import (
     AdsbConfigRequest,
     DayObjectsConfigRequest,
+    SatellitesConfigRequest,
 )
 from src.api.service import AllSkyService
 from src.api.routes.common import (router, get_service, public_view, _check_range, _sat_cache, _traffic_cache, _dayobj_cache, GUEST_MAX_SAT_IDS, GUEST_MAX_TRAIL_S)
@@ -162,3 +163,31 @@ def set_adsb_config(req: AdsbConfigRequest, service: AllSkyService = Depends(get
         return service.set_adsb_config(**req.model_dump(exclude_none=True))
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.get("/api/satellites/config")
+def get_satellites_config(service: AllSkyService = Depends(get_service)):
+    """Satellite overlay settings and the state of the orbit download (admin)."""
+    return service.get_satellites_config()
+
+
+@router.post("/api/satellites/config")
+def set_satellites_config(req: SatellitesConfigRequest, service: AllSkyService = Depends(get_service)):
+    """Switch the satellite overlay, choose the CelesTrak groups, the refresh interval and an alternative TLE source."""
+    try:
+        return service.set_satellites_config(enabled=req.enabled, groups=req.groups, refresh_h=req.refresh_h,
+                                             tle_url=req.tle_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/api/satellites/refresh")
+def refresh_satellites(service: AllSkyService = Depends(get_service)):
+    """Download the orbits now instead of waiting for the next scheduled refresh."""
+    return service.refresh_satellites()
+
+
+@router.get("/api/data-sources")
+def get_data_sources(service: AllSkyService = Depends(get_service)):
+    """Every outside data source (ADS-B, FR24, SondeHub, CelesTrak, airports): on or off, working or not (admin)."""
+    return service.get_data_sources()

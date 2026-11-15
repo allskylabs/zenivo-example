@@ -184,6 +184,18 @@ displayed frame and turn with the image when you change the orientation.
 
 ### Integrations
 
+Settings > Integrations starts with **Data sources**, one line per outside source (your ADS-B receiver, the public ADS-B
+fallback, Flightradar24, satellites, weather balloons, airports) with a state: *Working*, *Waiting*, *Problem* or
+*Off*. The same list is `GET /api/data-sources` (admin).
+
+- **Satellites (CelesTrak orbits)**: a switch, the CelesTrak groups to track (space stations and the brightest ones by
+  default; weather, NOAA, GPS, Galileo and science can be added), how often to download the orbits (6 h to 7 days,
+  default 24 h) and **Download now**. Under *Advanced* you can use another orbit source: an `https://` address with
+  `{group}` in it that returns TLE sets; it must resolve to a public address. Stored as `satellites` in
+  `station_config.json` (`enabled`, `groups`, `refresh_h`, `tle_url`). Orbits are cached in
+  `data/uploads/allsky/cache/sat_tle.json`, so the overlay keeps working offline. No position is sent to the source.
+
+
 - **ADS-B receiver**: host and port of an SBS-1 / BaseStation feed (usually port 30003), a switch,
   and the Flightradar24 Enterprise feed (email and password for a login, or a token). Aircraft
   come from your own receiver first. While it delivers nothing, the opt-in public fallback

@@ -185,6 +185,90 @@ if (sondesEnabled) {
     });
 }
 
+// Settings → Satellites (CelesTrak groups, refresh, source) and the Data sources overview
+const satBlock = document.getElementById("sat-block");
+const satEnabled = document.getElementById("sat-enabled");
+const satRefresh = document.getElementById("sat-refresh");
+const satUrl = document.getElementById("sat-url");
+const satStatus = document.getElementById("sat-status");
+const satGroupBoxes = [...document.querySelectorAll("[data-sat-group]")];
+
+function syncSatUI(d) {
+    if (!d || !satBlock) return;
+    satEnabled.checked = !!d.enabled;
+    satGroupBoxes.forEach((b) => { b.checked = (d.groups || []).includes(b.dataset.satGroup); });
+    satRefresh.value = String(d.refresh_h);
+    satUrl.value = d.tle_url || "";
+    const s = d.status || {};
+    const age = s.fetched_at ? `updated ${Math.round((Date.now() / 1000 - s.fetched_at) / 3600)} h ago` : "not downloaded yet";
+    satStatus.textContent = (s.fetching ? "Downloading… " : "") + `${s.count || 0} satellites, ${age}` +
+        (s.error ? `. Last error: ${s.error}` : "");
+}
+
+async function loadSat() {
+    if (!satBlock) return;
+    try {
+        const res = await fetch("/api/satellites/config");
+        if (res.ok) syncSatUI(await res.json());
+    } catch (err) { /* admin only */ }
+}
+
+if (satBlock) {
+    autosave(satBlock, async () => {
+        const groups = satGroupBoxes.filter((b) => b.checked).map((b) => b.dataset.satGroup);
+        if (!groups.length) throw new Error("keep at least one group");
+        syncSatUI(await sendJson("/api/satellites/config", {
+            enabled: satEnabled.checked, groups, refresh_h: Number(satRefresh.value), tle_url: satUrl.value.trim(),
+        }));
+        setTimeout(() => { loadSat(); loadDataSources(); }, 4000);
+    }, { selector: "#sat-enabled, [data-sat-group], #sat-refresh, #sat-url" });
+    document.getElementById("sat-refresh-now").addEventListener("click", async (ev) => {
+        ev.currentTarget.disabled = true;
+        try {
+            const d = await sendJson("/api/satellites/refresh", {});
+            satStatus.textContent = d.started ? "Downloading…" : "A download is already running.";
+            [3000, 9000].forEach((ms) => setTimeout(() => { loadSat(); loadDataSources(); }, ms));
+        } catch (err) {
+            satStatus.textContent = `Could not start the download: ${err.message}`;
+        }
+        ev.currentTarget.disabled = false;
+    });
+}
+
+const dataSourcesList = document.getElementById("data-sources-list");
+const STATE_LABEL = { ok: "Working", waiting: "Waiting", error: "Problem", off: "Off" };
+
+async function loadDataSources() {
+    if (!dataSourcesList) return;
+    try {
+        const res = await fetch("/api/data-sources");
+        if (!res.ok) throw new Error(res.status === 401 ? "sign in as admin" : `HTTP ${res.status}`);
+        const d = await res.json();
+        dataSourcesList.innerHTML = "";
+        d.sources.forEach((s) => {
+            const row = document.createElement("div");
+            row.className = "ds-row";
+            const dot = document.createElement("span");
+            dot.className = `ds-dot ds-${s.state}`;
+            dot.title = STATE_LABEL[s.state] || s.state;
+            const main = document.createElement("div");
+            main.className = "ds-main";
+            const name = document.createElement("strong");
+            name.textContent = s.name;
+            const detail = document.createElement("small");
+            detail.textContent = [STATE_LABEL[s.state], s.detail, s.host].filter(Boolean).join(" · ");
+            main.append(name, detail);
+            row.append(dot, main);
+            dataSourcesList.appendChild(row);
+        });
+    } catch (err) {
+        dataSourcesList.textContent = `Could not load the data sources: ${err.message}`;
+    }
+}
+const dsRefresh = document.getElementById("data-sources-refresh");
+if (dsRefresh) dsRefresh.addEventListener("click", () => { loadDataSources(); loadSat(); loadAdsb(); });
+if (currentPage === "tab-settings") { loadSat(); loadDataSources(); }
+
 // Settings → Detection → daytime objects (birds, insects, aircraft)
 const dayObj = {
     group: document.getElementById("dayobj-group"),
