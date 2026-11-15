@@ -150,3 +150,34 @@ def test_list_devices_includes_qhy(monkeypatch):
     monkeypatch.setattr(qhy, "_get_sdk", lambda: _FakeSdk())
     monkeypatch.setattr(drv, "find_rts5869_device_node", lambda: None)
     assert any(d["id"] == "qhy:0" and d["name"] == "QHY533C" for d in drv.list_camera_devices())
+
+
+def test_scan_reinitialises_the_sdk_when_nothing_is_found_and_none_is_open():
+    class Lib:
+        found, inits, releases = 0, 0, 0
+
+        def ScanQHYCCD(self):
+            return self.found
+
+        def ReleaseQHYCCDResource(self):
+            self.releases += 1
+            return 0
+
+        def InitQHYCCDResource(self):
+            self.inits += 1
+            self.found = 1  # the camera is visible after a fresh init
+            return 0
+
+        def GetQHYCCDId(self, i, buf):
+            buf.value = b"QHY163M-abc"
+            return 0
+
+        def GetQHYCCDModel(self, cam_id, buf):
+            buf.value = b"QHY163M"
+            return 0
+
+    sdk = qhy.QhySdk.__new__(qhy.QhySdk)
+    sdk.lib, sdk._open = Lib(), 0
+    assert sdk.scan() == [("QHY163M-abc", "QHY163M")] and sdk.lib.releases == 1
+    sdk.lib.found, sdk._open = 0, 1  # a camera is open: never release the SDK under it
+    assert sdk.scan() == [] and sdk.lib.releases == 1

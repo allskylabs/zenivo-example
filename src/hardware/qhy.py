@@ -93,12 +93,24 @@ class QhySdk:
         L.GetQHYCCDModel.restype = u32
         L.GetQHYCCDModel.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
         L.ScanQHYCCD.restype = u32
+        L.ReleaseQHYCCDResource.restype = u32
+        self._open = 0
         L.InitQHYCCDResource.restype = u32
         if L.InitQHYCCDResource() != QHYCCD_SUCCESS:
             raise RuntimeError("QHYCCD SDK could not initialise (USB access?)")
 
     def scan(self) -> List[Tuple[str, str]]:
-        """[(camera id, model)] of the attached cameras."""
+        """[(camera id, model)] of the attached cameras. The SDK's USB view can predate a camera plugged in after
+        InitQHYCCDResource, so when nothing is found and no camera is open the resource is released and initialised
+        again (QHY's documented way to pick up a hot-plugged camera) and the scan repeated."""
+        out = self._scan_once()
+        if not out and self._open == 0:
+            self.lib.ReleaseQHYCCDResource()
+            if self.lib.InitQHYCCDResource() == QHYCCD_SUCCESS:
+                out = self._scan_once()
+        return out
+
+    def _scan_once(self) -> List[Tuple[str, str]]:
         out = []
         for i in range(int(self.lib.ScanQHYCCD())):
             buf, mod = ctypes.create_string_buffer(64), ctypes.create_string_buffer(64)
@@ -112,10 +124,12 @@ class QhySdk:
         h = self.lib.OpenQHYCCD(cam_id.encode())
         if not h:
             raise RuntimeError(f"QHY camera {cam_id} could not be opened")
+        self._open += 1
         return h
 
     def close(self, h) -> None:
         self.lib.CloseQHYCCD(h)
+        self._open = max(0, self._open - 1)
 
     def init_camera(self, h) -> None:
         self.lib.SetQHYCCDStreamMode(h, 0)  # single frame
