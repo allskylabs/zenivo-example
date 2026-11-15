@@ -156,3 +156,20 @@ def test_picker_failure_keeps_old_camera(picker_client):
     assert r.status_code == 400
     assert client.get("/api/camera/devices").json()["current"]["type"] == "simulator"
     assert "camera_select" not in service.station_config
+
+
+def test_transient_io_error_is_retried_once(fake_zwoasi):
+    cam = ZwoAsiController()
+    cam.open()
+    real = cam.cam.get_data_after_exposure
+    calls = {"n": 0}
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OSError("Timeout")
+        return real()
+
+    cam.cam.get_data_after_exposure = flaky
+    frame, _ = cam.capture_frame()
+    assert calls["n"] == 2 and frame.shape == (3008, 3008, 3)

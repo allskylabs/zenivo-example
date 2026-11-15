@@ -187,6 +187,20 @@ class ZwoAsiController(CameraDriverInterface):
 
     # ------------------------------------------------------------------
     def _read(self) -> np.ndarray:
+        """One exposure; a transient SDK I/O error (seen once on the first frame after open) is retried once."""
+        try:
+            return self._read_once()
+        except TimeoutError:
+            raise
+        except Exception as exc:
+            logger.warning(f"ZWO exposure error ({exc}); retrying once")
+            try:
+                self.cam.stop_exposure()
+            except Exception:
+                pass
+            return self._read_once()
+
+    def _read_once(self) -> np.ndarray:
         """One exposure, bounded by a deadline so a stuck camera cannot hold the capture lock forever."""
         asi, cam = self._asi, self.cam
         self._apply()
