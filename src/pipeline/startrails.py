@@ -5,7 +5,7 @@ with support for comet-tail decay and horizon masking.
 """
 
 import os
-from typing import List, Optional, Union
+from typing import List, Optional
 import numpy as np
 import cv2
 

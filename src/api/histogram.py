@@ -4,7 +4,7 @@ Computes 256-bin histograms and clipping statistics in < 10ms via subsampling.
 """
 
 import time
-from typing import Dict, Any, List
+from typing import Dict, Any
 import numpy as np
 
 

@@ -24,7 +24,6 @@ Scope:
 
 import math
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any
 import numpy as np
 import pytest
 import cv2
@@ -41,14 +40,10 @@ from src.pipeline.startrails import (
 from src.analytics.meteor import (
     extract_streak_moments,
     detect_meteors,
-    extract_event_crop,
     MeteorDetector,
 )
 from src.analytics.stars_clouds import (
-    detect_stars_blob,
     estimate_stars_and_clouds,
-    detect_stars_and_clouds,
-    StarAndCloudAnalyzer,
 )
 
 

@@ -10,7 +10,6 @@ masked, or a narrow field) to say anything.
 """
 from __future__ import annotations
 
-import math
 from datetime import datetime
 from typing import Any, Dict, Optional
 

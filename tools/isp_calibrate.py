@@ -6,7 +6,7 @@
   isp_calibrate.py build  # writes data/calibration/isp_shading.npz from the two captures
 Use the same ALLSKY_ISP_WB_K / exposure as the running service.
 """
-import os, sys, time
+import os, sys
 import numpy as np
 import cv2
 

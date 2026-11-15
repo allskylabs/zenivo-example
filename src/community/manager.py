@@ -14,7 +14,7 @@ from typing import Any, Callable, Deque, Dict, List, Optional
 from src.community import DEFAULT_SEEDS
 from src.community import card as cardmod
 from src.community import identity as idmod
-from src.community.card import CardError, MAX_CARD_BYTES, PRECISIONS, seed_origin, to_origin
+from src.community.card import CardError, PRECISIONS, seed_origin, to_origin
 from src.community.gossip import GossipWorker
 from src.community.registry import Registry
 from src.community import relay as relaymod

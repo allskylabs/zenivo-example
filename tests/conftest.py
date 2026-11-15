@@ -7,7 +7,6 @@ import sys
 import tempfile
 import sqlite3
 from typing import Generator, Dict, Any, List
-from datetime import datetime, timezone
 
 import pytest
 import numpy as np

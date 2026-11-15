@@ -17,8 +17,6 @@ Verifies:
 import os
 import json
 import math
-from datetime import datetime, timezone
-import pytest
 import numpy as np
 import cv2
 

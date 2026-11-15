@@ -40,3 +40,15 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+
+[tool.ruff]
+line-length = 140
+target-version = "py39"
+extend-exclude = ["src/web", "data"]
+
+[tool.ruff.lint]
+# Real mistakes only (pyflakes): unused imports/variables, undefined names. No style rules.
+select = ["F"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]

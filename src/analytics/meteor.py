@@ -5,7 +5,6 @@ geometric moment analysis (aspect ratio, length, peak DN), and discriminates aga
 """
 
 import math
-import json
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any
 import numpy as np

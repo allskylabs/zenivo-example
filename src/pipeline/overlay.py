@@ -6,7 +6,7 @@ and projects them onto the allsky fisheye image plane using equidistant lens mod
 
 import math
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple
 import numpy as np
 import cv2
 from src.defaults import DEFAULT_LAT, DEFAULT_LON

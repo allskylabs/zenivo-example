@@ -1,7 +1,7 @@
 """Admin login through the real app: locked before setup, sign in/out, default deny, rounding for guests, WebSocket gate."""
 import pytest
 
-from src.auth.manager import AuthManager, COOKIE_NAME
+from src.auth.manager import AuthManager
 from src.auth.policy import safe_next
 
 PW = "a long enough password"

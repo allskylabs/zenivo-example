@@ -12,13 +12,11 @@ import pytest
 import numpy as np
 
 from src.calibration.dark import (
-    DarkCalibrationInterface,
     DarkCalibrationEngine,
     verify_ac1_reduction,
 )
 from src.calibration.stacking import (
     LiveStackingEngine,
-    stack_frames_sigma_clipped,
 )
 from src.calibration.auto_exposure import (
     DayNightProfile,

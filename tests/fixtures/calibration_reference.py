@@ -3,9 +3,8 @@ Authoritative Reference Calibration Engine for IMX335 AllSky Observatory Testing
 Derived directly from ORIGINAL_REQUEST.md § R1, PROJECT.md § 2, and survey_allsky_pipeline.md § 2.
 """
 
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 import numpy as np
-import cv2
 
 
 def reference_create_master_dark(dark_frames: List[np.ndarray]) -> np.ndarray:

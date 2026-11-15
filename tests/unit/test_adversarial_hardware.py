@@ -8,7 +8,6 @@ Probes:
 """
 
 import concurrent.futures
-import math
 import random
 import time
 import numpy as np
@@ -19,27 +18,18 @@ from src.hardware.constants import (
     SENSOR_HEIGHT,
     DEFAULT_HMAX,
     DEFAULT_VMAX,
-    MIN_EXPOSURE_S,
-    MAX_EXPOSURE_S,
-    MIN_GAIN_DB,
-    MAX_GAIN_DB,
     GAIN_STEP_DB,
     MAX_PGC_REG,
     INCK_HZ,
     REG_REGHOLD,
     REG_VMAX_L,
     REG_HMAX_L,
-    XDATA_UNLOCK_ADDR,
-    XDATA_EXPOSURE_MAX_ADDR,
 )
 from src.hardware.registers import (
     calculate_exposure_registers,
     calculate_gain_register,
-    decode_exposure_timing,
-    format_timing_summary,
 )
 from src.hardware.simulator import SimulatedIMX335Controller
-from src.hardware.driver import get_camera_driver
 
 
 class TestAdversarialExposure:

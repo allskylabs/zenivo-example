@@ -6,7 +6,6 @@ Unit tests for Hardware Layer:
 - F4: Hardware Simulator Fallback
 """
 
-import os
 import pytest
 import numpy as np
 
@@ -15,21 +14,9 @@ from src.hardware.constants import (
     SENSOR_HEIGHT,
     DEFAULT_HMAX,
     DEFAULT_VMAX,
-    MIN_EXPOSURE_S,
-    MAX_EXPOSURE_S,
-    MIN_GAIN_DB,
-    MAX_GAIN_DB,
     REG_REGHOLD,
     REG_VMAX_L,
-    REG_VMAX_M,
-    REG_VMAX_H,
     REG_HMAX_L,
-    REG_HMAX_H,
-    REG_SHR0_L,
-    REG_SHR0_M,
-    REG_SHR0_H,
-    REG_PGC_L,
-    REG_PGC_H,
     XDATA_UNLOCK_ADDR,
     XDATA_EXPOSURE_MAX_ADDR,
 )
@@ -235,7 +222,7 @@ class TestDriverFactoryAndHardwareCapture:
         driver = get_camera_driver(prefer_simulator=False)
         is_real = isinstance(driver, RTS5869CameraController)
         try:
-            cfg = driver.set_hardware_exposure(0.1, 12.0)
+            driver.set_hardware_exposure(0.1, 12.0)
             img, meta = driver.capture_frame()
             assert img.shape == (SENSOR_HEIGHT, SENSOR_WIDTH, 3)
             assert img.dtype == np.uint8

@@ -1,6 +1,5 @@
 """Outbound-connection defaults and guest-reachable abuse limits (one representative test per rule)."""
 
-import math
 import sys
 
 import numpy as np

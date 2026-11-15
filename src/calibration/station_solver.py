@@ -7,9 +7,6 @@ to determine all camera, lens, optical center, FOV, tilt, azimuth, and WCS param
 import io
 import json
 import math
-import os
-import subprocess
-import tempfile
 import time
 import urllib.request
 

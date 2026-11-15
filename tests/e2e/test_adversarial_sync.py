@@ -23,15 +23,13 @@ Scope:
    - Backoff delay formula and jitter bounds across thousands of iterations.
 """
 
-import os
 import time
 import json
 import random
 import threading
-import sqlite3
 import pytest
 from typing import List, Dict, Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from src.sync.queue import SyncQueue
 from src.sync.client import SyncClient

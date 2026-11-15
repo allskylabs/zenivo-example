@@ -11,8 +11,6 @@ Verifies end-to-end interactions between interconnected subsystems:
 
 import os
 import time
-import json
-import pytest
 import numpy as np
 import cv2
 
@@ -25,8 +23,8 @@ from tests.fixtures.astro_reference import (
     reference_generate_startrails,
     reference_detect_meteors,
 )
-from tests.fixtures.api_reference import create_reference_allsky_app, compute_fast_histogram
-from tests.fixtures.sync_reference import ReferenceSyncQueue, create_mock_sync_app
+from tests.fixtures.api_reference import create_reference_allsky_app
+from tests.fixtures.sync_reference import ReferenceSyncQueue
 from fastapi.testclient import TestClient
 
 

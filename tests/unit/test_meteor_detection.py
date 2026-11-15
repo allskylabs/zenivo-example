@@ -10,7 +10,6 @@ Tests:
 """
 
 import json
-from datetime import datetime, timezone
 import pytest
 import numpy as np
 import cv2

@@ -9,7 +9,7 @@ Implements DarkCalibrationInterface from PROJECT.md:
 """
 
 import abc
-from typing import List, Dict, Any, Union, Optional
+from typing import List, Dict, Any
 import numpy as np
 
 

@@ -14,7 +14,6 @@ Verifies:
 
 import os
 import json
-import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
@@ -46,10 +45,10 @@ class TestAC4ResilientSync:
         queue = ReferenceSyncQueue(db_path)
 
         # Enqueue in reverse priority order
-        id_telem = queue.enqueue("telemetry", payload={"temp": 24.0})
-        id_frame = queue.enqueue("frame_latest", file_path="/tmp/test_frame.jpg")
-        id_summary = queue.enqueue("summary", payload={"type": "keogram"})
-        id_meteor = queue.enqueue("meteor_event", payload={"event_id": "meteor_001"})
+        queue.enqueue("telemetry", payload={"temp": 24.0})
+        queue.enqueue("frame_latest", file_path="/tmp/test_frame.jpg")
+        queue.enqueue("summary", payload={"type": "keogram"})
+        queue.enqueue("meteor_event", payload={"event_id": "meteor_001"})
 
         # Verify items are fetched in strict priority order (1, 3, 5, 10)
         pending = queue.fetch_pending(limit=10)

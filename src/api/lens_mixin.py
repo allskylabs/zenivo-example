@@ -486,7 +486,6 @@ class LensMixin:
                 try:
                     lim = camera_limits(self.camera)
                     max_gain = float(lim.get("max_gain_db") or 36.0)
-                    gain_ratio = 10.0 ** (max(0.0, max_gain - old_gain) / 20.0)
                     if method in ("stars", "lights"):
                         sweep_exp = min(exp, 0.38)
                     else:

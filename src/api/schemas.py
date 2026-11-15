@@ -3,7 +3,7 @@ Pydantic Request and Response Schemas for IMX335 Edge Web API.
 Adheres to PROJECT.md § Interface Contracts and AC3 verification specifications.
 """
 
-from typing import Dict, Any, List, Literal, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
 

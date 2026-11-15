@@ -4,11 +4,7 @@ Tests SQLite WAL queue persistence, priority queueing, backoff jitter,
 SyncClient multipart/JSON transport, and SyncDaemon circuit breaker/recovery.
 """
 
-import os
 import time
-import json
-import sqlite3
-import pytest
 from unittest.mock import MagicMock, patch
 import requests
 
@@ -32,10 +28,10 @@ class TestSyncQueue:
             assert mode.upper() == "WAL"
 
         # Enqueue with different priorities
-        id_telem = q.enqueue("telemetry", payload={"t": 1}, priority=10)
-        id_frame = q.enqueue("frame_latest", payload={"frame": 1}, priority=5)
-        id_sum = q.enqueue("summary", payload={"type": "keogram"}, priority=3)
-        id_meteor = q.enqueue("meteor_event", payload={"meteor": 1}, priority=1)
+        q.enqueue("telemetry", payload={"t": 1}, priority=10)
+        q.enqueue("frame_latest", payload={"frame": 1}, priority=5)
+        q.enqueue("summary", payload={"type": "keogram"}, priority=3)
+        q.enqueue("meteor_event", payload={"meteor": 1}, priority=1)
 
         pending = q.fetch_pending(limit=10)
         assert len(pending) == 4

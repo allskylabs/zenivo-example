@@ -12,16 +12,12 @@ Covers extreme operating boundaries across all 4 acceptance domains:
 """
 
 import os
-import json
-import pytest
 import numpy as np
 
 from src.hardware.registers import calculate_exposure_registers, calculate_gain_register
-from src.hardware.simulator import SimulatedIMX335Controller
 from src.calibration.dark import DarkCalibrationEngine, verify_ac1_reduction
 from src.calibration.auto_exposure import DayNightAutoExposure, DayNightProfile
 from tests.fixtures.astro_reference import (
-    reference_star_count_and_cloud_cover,
     reference_detect_meteors,
 )
 from tests.fixtures.sync_reference import ReferenceSyncQueue, create_mock_sync_app

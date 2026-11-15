@@ -11,7 +11,7 @@ pixels that turn hot later (temperature, ageing) or at other gains; this catches
 import json
 import os
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import cv2
 import numpy as np

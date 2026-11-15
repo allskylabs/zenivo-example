@@ -6,7 +6,7 @@ and builds diurnal / nocturnal spatio-temporal strips.
 
 import os
 from datetime import datetime
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional
 import numpy as np
 import cv2
 

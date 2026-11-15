@@ -13,7 +13,6 @@ from fastapi.testclient import TestClient
 from src.hardware.simulator import SimulatedIMX335Controller
 from src.api.service import AllSkyService
 from src.api.main import create_app
-from src.api.histogram import compute_fast_histogram
 
 
 @pytest.fixture(scope="module")

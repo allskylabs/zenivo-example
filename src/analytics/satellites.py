@@ -12,7 +12,6 @@ import math
 import os
 import threading
 import time
-import urllib.request
 
 from src.net import urlopen as net_urlopen
 from datetime import datetime, timedelta, timezone

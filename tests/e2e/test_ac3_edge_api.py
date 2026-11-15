@@ -139,7 +139,7 @@ class TestAC3EdgeWebAPI:
         """
         t0 = time.perf_counter()
         response = api_client.get("/api/stream/histogram")
-        elapsed_total_ms = (time.perf_counter() - t0) * 1000.0
+        (time.perf_counter() - t0) * 1000.0
 
         assert response.status_code == 200
         data = response.json()

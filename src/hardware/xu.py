@@ -18,8 +18,6 @@ from .constants import (
     RTS5869_XU_UNIT_ID,
     XU_SELECTOR_CMD,
     XU_SELECTOR_DATA,
-    XDATA_UNLOCK_ADDR,
-    XDATA_EXPOSURE_MAX_ADDR,
 )
 
 

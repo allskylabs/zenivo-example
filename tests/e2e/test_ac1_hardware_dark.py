@@ -15,34 +15,24 @@ Verifies:
 9. AC1.9: Day/Night Auto-Exposure Ephemeris elevation calculation with hysteresis.
 """
 
-import os
 import pytest
 import numpy as np
 
 from src.hardware.constants import (
-    DEFAULT_HMAX,
-    DEFAULT_VMAX,
     XDATA_UNLOCK_ADDR,
     XDATA_EXPOSURE_MAX_ADDR,
     REG_REGHOLD,
     REG_VMAX_L,
-    REG_VMAX_M,
-    REG_VMAX_H,
-    REG_HMAX_L,
-    REG_HMAX_H,
-    REG_SHR0_L,
-    REG_PGC_L,
 )
 from src.hardware.registers import (
     calculate_exposure_registers,
     calculate_gain_register,
-    decode_exposure_timing,
 )
 from src.hardware.simulator import SimulatedIMX335Controller
-from src.hardware.driver import get_camera_driver, CameraDriverInterface
+from src.hardware.driver import get_camera_driver
 from src.calibration.dark import DarkCalibrationEngine, verify_ac1_reduction
 from src.calibration.stacking import LiveStackingEngine
-from src.calibration.auto_exposure import DayNightAutoExposure, calculate_solar_elevation, DayNightProfile
+from src.calibration.auto_exposure import DayNightAutoExposure, DayNightProfile
 
 
 class TestAC1HardwareTimingAndExposure:

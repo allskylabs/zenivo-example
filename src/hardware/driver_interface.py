@@ -3,7 +3,7 @@ Standard Camera Driver Interface definition from PROJECT.md.
 """
 
 import abc
-from typing import Tuple, Dict, Any, Optional
+from typing import Tuple, Dict, Any
 import numpy as np
 
 

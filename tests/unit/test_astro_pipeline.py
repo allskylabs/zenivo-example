@@ -10,7 +10,7 @@ Tests:
 
 import os
 import math
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import pytest
 import numpy as np
 import cv2
@@ -33,8 +33,6 @@ from src.pipeline.overlay import (
     equatorial_to_horizontal,
     project_alt_az_to_fisheye,
     render_celestial_overlay,
-    BRIGHT_STARS_CATALOG,
-    CONSTELLATION_LINES,
 )
 
 

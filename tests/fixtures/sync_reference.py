@@ -3,11 +3,10 @@ Authoritative Reference SQLite Sync Queue and Mock sync.example.org Ingestion Se
 Derived directly from ORIGINAL_REQUEST.md § R4, PROJECT.md § 4, and the sync survey § 4.
 """
 
-import os
 import json
 import sqlite3
 import random
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone, timedelta
 
 from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException, status

@@ -13,7 +13,7 @@ Everything runs on the ROI only (a few hundred px square), so a measurement cost
 
 import time
 from collections import deque
-from typing import Any, Deque, Dict, List, Optional
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np

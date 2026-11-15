@@ -6,7 +6,6 @@ Provides:
 """
 
 import asyncio
-import math
 import struct
 import time
 import json
@@ -14,7 +13,6 @@ from typing import Set, Dict, Any, Optional
 import cv2
 import numpy as np
 from fastapi import WebSocket, WebSocketDisconnect
-from fastapi.responses import StreamingResponse
 
 from src.api.service import AllSkyService
 from src.auth.middleware import can_mutate, is_admin
@@ -299,7 +297,7 @@ def _apply_obs_transform_fallback(frame: np.ndarray, service: AllSkyService) -> 
     replay_url = str(obs.get("replay_url") or "")
     crop_url = str(obs.get("replay_crop_url") or "")
     replay_label = str(obs.get("replay_label") or "")
-    replay_bbox = obs.get("replay_bbox") or []
+    obs.get("replay_bbox") or []
     title_text = str(obs.get("title_text") or "").strip()
     title_sub = str(obs.get("title_sub") or "").strip()
     title_pos = str(obs.get("title_pos") or "bottom-left")

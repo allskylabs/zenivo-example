@@ -16,7 +16,6 @@ from .constants import (
     YUYV_INCK_HZ,
     DEFAULT_YUYV_HMAX,
     DEFAULT_VMAX,
-    BASE_LINE_TIME_S,
     MIN_EXPOSURE_S,
     MAX_EXPOSURE_S,
     MIN_GAIN_DB,

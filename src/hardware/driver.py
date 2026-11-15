@@ -7,7 +7,6 @@ Provides:
 - get_camera_driver(): Factory with automatic simulator fallback when hardware is unavailable.
 """
 
-import abc
 import os
 import time
 import logging

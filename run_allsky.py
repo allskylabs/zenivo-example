@@ -9,7 +9,6 @@ import sys
 import os
 import argparse
 import logging
-import signal
 import time
 
 # Ensure project root is on sys.path

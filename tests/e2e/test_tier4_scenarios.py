@@ -10,18 +10,15 @@ Verifies end-to-end mission workflows under realistic observing conditions:
 
 import os
 import json
-import pytest
 import numpy as np
-import cv2
 
 from src.hardware.simulator import SimulatedIMX335Controller
-from src.calibration.dark import DarkCalibrationEngine, verify_ac1_reduction
+from src.calibration.dark import DarkCalibrationEngine
 from src.calibration.auto_exposure import DayNightAutoExposure, DayNightProfile
 from tests.fixtures.astro_reference import (
     reference_generate_keogram,
     reference_generate_startrails,
     reference_detect_meteors,
-    reference_star_count_and_cloud_cover,
 )
 from tests.fixtures.sync_reference import ReferenceSyncQueue, create_mock_sync_app
 from fastapi.testclient import TestClient
@@ -123,7 +120,6 @@ class TestTier4RealWorldScenarios:
         base_night, _ = synthetic_gen.generate_night_sky(num_stars=60, seed=42)
 
         confirmed_meteors = []
-        false_alarms = []
 
         # Test 5 distinct meteor streaks
         meteor_configs = [

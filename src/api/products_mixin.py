@@ -489,7 +489,6 @@ class ProductsMixin:
             telem.append(rec)
         size = None
         if width:
-            import cv2
             img = frame_codec.read_frame(sel[0])
             if img is not None:
                 h0, w0 = img.shape[:2]

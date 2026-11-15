@@ -14,7 +14,7 @@ Emulates:
 """
 
 import time
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple
 import numpy as np
 
 from .constants import (
@@ -22,7 +22,6 @@ from .constants import (
     SENSOR_HEIGHT,
     DEFAULT_HMAX,
     DEFAULT_VMAX,
-    INCK_HZ,
     XDATA_UNLOCK_ADDR,
     XDATA_EXPOSURE_MAX_ADDR,
     REG_STANDBY,

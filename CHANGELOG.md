@@ -6,6 +6,10 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Code cleanup: removed unused imports and variables, fixed a missing `Tuple` import; added a `ruff` pyflakes-only configuration to `pyproject.toml`.
+
 ## [1.3.0-beta.1] - 2026-11-15
 
 First public beta. Not every feature has been tested; see the notice in the README.

@@ -9,15 +9,13 @@ from datetime import datetime, timezone
 import numpy as np
 import cv2
 
-from fastapi import FastAPI, HTTPException, Query, WebSocket, status
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from src.hardware.simulator import SimulatedIMX335Controller
 from src.hardware.registers import calculate_exposure_registers, calculate_gain_register
 from tests.fixtures.astro_reference import (
-    reference_generate_keogram,
-    reference_generate_startrails,
     reference_star_count_and_cloud_cover,
 )
 
