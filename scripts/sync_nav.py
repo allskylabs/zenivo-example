@@ -41,8 +41,8 @@ HEAD = {
 # (group title or None, items). item = (href, icon entity, label, kind, data-tab) ; kind: "tab" = page of index.html (app.js
 # switches it), "link" = separate page, "blank" = new tab
 NAV = [
-    (None, [("/live", "&#9673;", "Live", "tab", "tab-live")]),
-    ("Sky", [("/sky", "&#10024;", "Sky view", "link", ""),
+    ("Sky", [("/live", "&#9673;", "Live", "tab", "tab-live"),
+             ("/sky", "&#10024;", "Sky view", "link", ""),
              ("/flights3d", "&#9992;", "Flights 3D", "link", ""),
              ("/satellites3d", "&#128752;", "Satellites 3D", "link", ""),
              ("/community", "&#127760;", "Community", "link", "")]),
