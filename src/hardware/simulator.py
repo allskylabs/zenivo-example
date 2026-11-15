@@ -56,12 +56,18 @@ class SimulatedIMX335Controller(CameraDriverInterface):
         height: int = SENSOR_HEIGHT,
         seed: int = 42,
         simulate_real_sleep: bool = False,
+        sky: bool = False,
     ):
         self.width = width
         self.height = height
         self.seed = seed
         self.simulate_real_sleep = simulate_real_sleep
         self.is_open = False
+        # Optional synthetic night sky (stars + faint sky glow) so the live view is not just black noise.
+        # Off by default so register/dark-frame tests keep seeing a pure dark frame; the service simulator turns it on.
+        self.sky = bool(sky)
+        self.lens_covered = False  # set by the dark calibration: a covered lens sees no sky
+        self._stars = self._make_stars() if self.sky else None
 
         # 64KB 8051 XDATA RAM
         self.xdata = bytearray(0x10000)
@@ -94,6 +100,49 @@ class SimulatedIMX335Controller(CameraDriverInterface):
 
         # Initialize default registers
         self._init_default_registers()
+
+    def _make_stars(self, count: int = 420) -> np.ndarray:
+        """Fixed star field inside a round image circle: columns x, y (px from the centre), magnitude."""
+        rng = np.random.default_rng(self.seed + 7)
+        radius = 0.48 * min(self.width, self.height)
+        r = radius * np.sqrt(rng.random(count))
+        a = rng.random(count) * 2.0 * np.pi
+        # Star counts grow about 2.5x per magnitude: draw magnitudes 0..6.2 with that law
+        mag = np.log10(1.0 + rng.random(count) * (10.0 ** (0.4 * 6.2) - 1.0)) / 0.4
+        return np.stack([r * np.cos(a), r * np.sin(a), mag], axis=1).astype(np.float32)
+
+    def _add_sky(self, plane: np.ndarray, exposure_s: float, gain_factor: float) -> None:
+        """Add faint sky glow and Gaussian stars scaled by exposure and gain; the field drifts with the Earth's spin."""
+        h, w = plane.shape
+        radius = 0.48 * min(w, h)
+        yy, xx = np.ogrid[:h, :w]
+        rr2 = (xx - w / 2.0) ** 2 + (yy - h / 2.0) ** 2
+        inside = rr2 < radius * radius
+        # Sky glow: a little brighter towards the horizon, grows with exposure x gain, black outside the circle
+        glow = 0.25 * exposure_s * gain_factor * (0.6 + 0.4 * rr2 / (radius * radius))
+        if 6 <= time.localtime().tm_hour < 18:
+            # Daylight: a bright smooth sky (stars drown in it). The auto exposure uses short exposures by day,
+            # so the glow must be strong enough to give a normal picture at those settings.
+            glow = glow + 11000.0 * exposure_s * gain_factor * (1.0 - 0.35 * rr2 / (radius * radius))
+        plane += np.where(inside, glow, 0.0).astype(np.float32)
+        ang = time.time() * 7.292e-5  # sidereal rate, rad/s
+        c, s = np.cos(ang), np.sin(ang)
+        sx = self._stars[:, 0] * c - self._stars[:, 1] * s + w / 2.0
+        sy = self._stars[:, 0] * s + self._stars[:, 1] * c + h / 2.0
+        sigma = max(1.4, 1.6 * w / 2592.0 * 1.6)
+        reach = int(np.ceil(4 * sigma))
+        k = 60.0 * exposure_s * gain_factor
+        for x, y, m in zip(sx, sy, self._stars[:, 2]):
+            peak = k * 10.0 ** (-0.4 * (float(m) - 2.0)) / (2.0 * np.pi * sigma * sigma)
+            if peak < 0.5:
+                continue
+            x0, y0 = int(round(x)), int(round(y))
+            xs, xe, ys, ye = max(0, x0 - reach), min(w, x0 + reach + 1), max(0, y0 - reach), min(h, y0 + reach + 1)
+            if xs >= xe or ys >= ye:
+                continue
+            gx = np.exp(-((np.arange(xs, xe) - x) ** 2) / (2 * sigma * sigma))
+            gy = np.exp(-((np.arange(ys, ye) - y) ** 2) / (2 * sigma * sigma))
+            plane[ys:ye, xs:xe] += peak * np.outer(gy, gx).astype(np.float32)
 
     def _init_default_registers(self):
         self.active_registers[REG_STANDBY] = 0x00
@@ -274,7 +323,10 @@ class SimulatedIMX335Controller(CameraDriverInterface):
         background = bias + dark_current
         noise = self.rng.normal(0, noise_sigma, (self.height, self.width)).astype(np.float32)
 
-        plane = np.clip(background + noise, 0, 255).astype(np.float32)
+        plane = (background + noise).astype(np.float32)
+        if self._stars is not None and not self.lens_covered:
+            self._add_sky(plane, actual_exp, gain_factor)
+        plane = np.clip(plane, 0, 255)
         frame_bgr = np.zeros((self.height, self.width, 3), dtype=np.uint8)
         frame_bgr[:, :, 0] = plane.astype(np.uint8)  # Blue
         frame_bgr[:, :, 1] = plane.astype(np.uint8)  # Green

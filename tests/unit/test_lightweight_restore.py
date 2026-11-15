@@ -46,7 +46,9 @@ def test_restore_reads_saved_products_not_frames(monkeypatch, tmp_path):
     svc._restore_today_products()
 
     reads = [p for p in reads if str(p).startswith(str(tmp_path))]  # ignore other service threads
-    assert len(reads) == 3  # newest frame (for its shape) + the two dated products
+    # the two dated products are decoded, plus at most the newest frame (for its shape; the frame codec may use
+    # another decoder than cv2.imread, so it is not always counted here); never the whole day's frames
+    assert 2 <= len(reads) <= 3
     assert len(svc.keogram_gen) == 5
     assert [t.isoformat() for t in svc.keogram_gen.timestamps] == [t.isoformat() for t in want_ts]
     got = svc.keogram_gen.get_keogram()

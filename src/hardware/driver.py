@@ -404,7 +404,7 @@ CAMERA_TYPES = ("auto", "rts5869", "picamera", "zwo", "qhy", "v4l2", "simulator"
 
 
 def _simulator(width: int, height: int) -> CameraDriverInterface:
-    sim = SimulatedIMX335Controller(width=width, height=height)
+    sim = SimulatedIMX335Controller(width=width, height=height, sky=True)
     sim.open()
     return sim
 

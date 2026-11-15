@@ -2,6 +2,7 @@
 
 Mixin of AllSkyService (src/api/service.py): methods only, all state lives on the service instance."""
 
+import contextlib
 import os
 import re
 import time
@@ -12,6 +13,19 @@ import cv2
 from src.hardware.v4l2_mmap import demosaic_raw10_bayer
 
 class CalibrationMixin:
+    @contextlib.contextmanager
+    def _lens_covered(self):
+        """A simulated camera sees no sky while the dark frames are taken (a real one has its lens capped)."""
+        cam = self.camera
+        had = hasattr(cam, "lens_covered")
+        if had:
+            cam.lens_covered = True
+        try:
+            yield
+        finally:
+            if had:
+                cam.lens_covered = False
+
 
     def _cleanup_legacy_dark_images(self) -> None:
         """Remove legacy .webp/.png dark preview files once 10-bit RAW (.npy) master darks exist."""
@@ -266,7 +280,7 @@ class CalibrationMixin:
 
         self.activity.info("calibration", f"Master dark started: {num_frames} frames at {exposure_s:.2f}s / {gain_db:.0f} dB")
         try:
-            with self.lock:
+            with self.lock, self._lens_covered():
                 self.camera.set_hardware_exposure(exposure_s, gain_db)
                 dark_frames: List[np.ndarray] = []
                 raw_bayers: List[np.ndarray] = []
@@ -456,7 +470,7 @@ class CalibrationMixin:
                     "updated_at": datetime.now().astimezone().isoformat(),
                 })
 
-                with self.lock:
+                with self.lock, self._lens_covered():
                     self.camera.set_hardware_exposure(exp_s, gain_db)
                     dark_frames: List[np.ndarray] = []
                     raw_bayers: List[np.ndarray] = []

@@ -403,7 +403,7 @@ class SkyEventDetector:
             segs = cv2.HoughLinesP(binary, 1, np.pi / 180, threshold=max(10, min_len // 2),
                                    minLineLength=min_len, maxLineGap=max(6, int(min_len * 1.5)))
             if segs is not None:
-                lines = _merge_segments([tuple(int(v) for v in s[0]) for s in segs[:80]], max_gap=w * 0.12)
+                lines = _merge_segments([tuple(int(v) for v in s) for s in np.asarray(segs).reshape(-1, 4)[:80]], max_gap=w * 0.12)
 
         fat = cv2.dilate(binary, np.ones((3, 3), np.uint8))
         found: List[Dict[str, Any]] = []

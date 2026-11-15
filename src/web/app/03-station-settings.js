@@ -286,9 +286,13 @@ const cameraBadge = document.getElementById("camera-current-badge");
 const cameraRescan = document.getElementById("camera-rescan");
 
 async function loadCameraDevices() {
-    if (!cameraSelect) return;
+    if (!cameraSelect) return 0;
+    let count = 0;
     try {
-        const data = await (await fetch("/api/camera/devices")).json();
+        const res = await fetch("/api/camera/devices");
+        if (!res.ok) throw new Error(res.status === 401 ? "sign in as admin to list cameras" : res.statusText);
+        const data = await res.json();
+        count = (data.devices || []).length;
         cameraSelect.innerHTML = "";
         const cur = data.current || {};
         const add = (value, label) => {
@@ -306,6 +310,7 @@ async function loadCameraDevices() {
     } catch (err) {
         showAlert(stationAlert, `❌ Could not list cameras: ${err.message}`, "error", true);
     }
+    return count;
 }
 
 if (cameraSelect) {
@@ -320,7 +325,16 @@ if (cameraSelect) {
         if (ok) { loadResolutionOptions(); loadStationConfig(); }
     });
 }
-if (cameraRescan) cameraRescan.addEventListener("click", loadCameraDevices);
+if (cameraRescan) {
+    cameraRescan.addEventListener("click", async () => {
+        const note = document.getElementById("camera-scan-note");
+        cameraRescan.disabled = true;
+        if (note) note.textContent = "Scanning for cameras…";
+        const n = await loadCameraDevices();
+        cameraRescan.disabled = false;
+        if (note) note.textContent = n ? `${n} camera${n > 1 ? "s" : ""} found.` : "No camera found (plug it in, check the vendor SDK, then Rescan).";
+    });
+}
 
 async function loadResolutionOptions() {
     if (!outputResSelect) return;

@@ -11,6 +11,12 @@ All notable changes to Zenivo are recorded here. The format follows
 - Settings > Sky Mask: **Auto-detect** proposes the open-sky and obstruction polygons from the current frame (`POST /api/station/sky-mask/auto`); you edit it by hand and press Apply, nothing is stored before that. Drawing the mask by hand works as before.
 - `docs/FIRST_RUN.md`: step-by-step setup after installing (password, time zone, Station & Optics, lens, pointing check, sky mask, optional services). The installer and README point to it.
 
+### Fixed
+
+- The simulator camera drew only noise (a black picture). It now has a synthetic sky: stars that drift, sky glow that follows exposure and gain, and a bright daylight sky by day so the auto exposure settles. Lens-capped dark calibration still sees no stars.
+- Settings > Camera: the Rescan button was unstyled and gave no feedback; it now matches the other buttons and reports how many cameras it found.
+- Meteor, plane and satellite detection failed on OpenCV 5 (`HoughLinesP` result shape); CI now passes on current library versions.
+
 ### Changed
 
 - Large files split without behaviour change: `src/api/routes.py` became the `src/api/routes/` package, `service.py` shrank from 1199 to about 530 lines (four new mixins), `focus.js` became `src/web/focus/*.js`, the sky overlay and gallery scripts and `style.css` were split into parts. CI now also runs on push and lints with `ruff`; issue and pull request templates added.

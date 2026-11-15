@@ -509,13 +509,14 @@
                     Choose which attached camera Zenivo uses (ZWO ASI, IMX335 USB, Raspberry Pi camera, webcam). The choice is saved
                     and used at the next start unless <code>--camera</code> is given on the command line. Switching pauses capture for a few seconds.
                 </p>
-                <div class="settings-grid">
+                <div class="camera-pick">
                     <div class="field">
                         <label for="camera-device">Active camera</label>
                         <select id="camera-device"></select>
                     </div>
-                    <button type="button" class="btn" id="camera-rescan" data-no-autosave>Rescan</button>
+                    <button type="button" class="btn btn-sm btn-outline" id="camera-rescan" data-no-autosave title="Look for cameras plugged in after the page was loaded">&#8635; Rescan</button>
                 </div>
+                <small class="field-note" id="camera-scan-note"></small>
             </div>
 
             <!-- Image Output Card: resolution + orientation -->
@@ -1557,7 +1558,7 @@
     <script src="/static/focus/lens.js?v=20261115a"></script>
     <script defer src="/static/app/01-core.js?v=20261114a"></script>
     <script defer src="/static/app/02-controls-calibration.js?v=20261114a"></script>
-    <script defer src="/static/app/03-station-settings.js?v=20261114a"></script>
+    <script defer src="/static/app/03-station-settings.js?v=20261115b"></script>
     <script defer src="/static/app/04-live-view.js?v=20261115b"></script>
     <script defer src="/static/app/05-sky-overlay.js?v=20261115a"></script>
     <script defer src="/static/app/05b-sky-reticle.js?v=20261115a"></script>
