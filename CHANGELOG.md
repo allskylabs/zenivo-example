@@ -6,6 +6,8 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-15
+
 ### Added
 
 - security: the Flightradar24 account e-mail, password and token in Settings are sent only by the "Send to Flightradar24" button, never by autosave. A browser password manager could fill these fields with the admin sign-in, and autosave then posted it to flightradar24.com as a sign-in attempt. The server now refuses a non-e-mail account value and allows one failed sign-in per minute.
