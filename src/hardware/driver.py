@@ -401,7 +401,7 @@ class RTS5869CameraController(CameraDriverInterface):
             self._sync_capture_mode(self.current_exposure_s)
 
 
-CAMERA_TYPES = ("auto", "rts5869", "picamera", "v4l2", "simulator")
+CAMERA_TYPES = ("auto", "rts5869", "picamera", "zwo", "v4l2", "simulator")
 
 
 def _simulator(width: int, height: int) -> CameraDriverInterface:
@@ -447,7 +447,7 @@ def get_camera_driver(
     Factory: returns the camera driver for `camera_type`.
 
     auto: RTS5869 + IMX335 if attached, else a Raspberry Pi CSI camera (libcamera), else the simulator.
-    Generic UVC webcams need camera_type="v4l2". Any failure to open a live camera falls back to the
+    ZWO ASI cameras need camera_type="zwo" and generic UVC webcams camera_type="v4l2". Any failure to open a live camera falls back to the
     simulator so the web service still comes up.
     """
     camera_type = (camera_type or "auto").lower()
@@ -467,6 +467,12 @@ def get_camera_driver(
             # Pi sensors pick their own native mode unless an explicit size is requested
             size = (width, height) if (width, height) != (SENSOR_WIDTH, SENSOR_HEIGHT) else (None, None)
             candidates.append(("picamera", lambda: PiCameraController(camera_num=camera_index, width=size[0], height=size[1])))
+    # ZWO ASI is opt-in by name too: probing the USB SDK on every "auto" start is slow and needs libASICamera2
+    if camera_type == "zwo":
+        from .zwo import ZwoAsiController
+
+        size = (width, height) if (width, height) != (SENSOR_WIDTH, SENSOR_HEIGHT) else (None, None)
+        candidates.append(("zwo", lambda: ZwoAsiController(camera_num=camera_index, width=size[0], height=size[1])))
     # Generic webcams (e.g. a laptop's built-in camera) are used only when asked for by name: in "auto"
     # they would take over the observatory whenever the IMX335 is briefly missing and archive daytime junk
     if camera_type == "v4l2":

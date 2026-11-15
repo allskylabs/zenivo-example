@@ -59,8 +59,11 @@ two built-in seed stations are listed in [docs/COMMUNITY.md](docs/COMMUNITY.md) 
 1. USB 5 MP Sony Starvis IMX335 on a Realtek RTS5869 bridge (`0bda:5869`), with direct sensor
    register control (exposures up to 90 s, 10-bit RAW).
 2. Raspberry Pi CSI cameras through picamera2/libcamera (for example IMX708 NoIR).
-3. Any V4L2/UVC webcam.
+3. Any V4L2/UVC webcam (only with `--camera v4l2`).
 4. A built-in simulator (tests, demos, no hardware).
+
+ZWO ASI cameras (ASI120 to ASI6200) are selected with `--camera zwo`: they need the `zwoasi` Python package
+and ZWO's `libASICamera2` SDK (see [docs/INSTALL.md](docs/INSTALL.md)).
 
 ## Requirements
 

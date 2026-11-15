@@ -27,6 +27,7 @@ metadata of the versions that `pip install -r requirements.txt` resolved on 2026
 | websockets | BSD-3-Clause | https://github.com/python-websockets/websockets |
 | opencv-python-headless | Apache-2.0 for OpenCV and the packaging; the wheel bundles FFmpeg and other libraries under their own licences (FFmpeg: LGPL-2.1+, see the licence files inside the wheel) | https://github.com/opencv/opencv-python |
 | pytest (development only, `requirements-dev.txt`) | MIT | https://github.com/pytest-dev/pytest |
+| zwoasi (optional, `pip install zwoasi`) and ZWO libASICamera2 SDK (installed by the user, not bundled) | zwoasi: see its repository; SDK: ZWO licence | https://github.com/python-zwoasi/python-zwoasi , https://www.zwoastro.com/software/ (not verified in this repository) |
 | picamera2 (optional, installed from `apt` on a Raspberry Pi, never from pip) | BSD-2-Clause | https://github.com/raspberrypi/picamera2 (not verified in this repository) |
 
 Dependencies of these packages (starlette, pydantic, anyio, certifi and so on) are pulled in by `pip` under their own licences.

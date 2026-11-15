@@ -66,7 +66,7 @@ and [API.md](API.md).
 
 | Package | Responsibility |
 |---|---|
-| `src/hardware` | Camera backends behind `CameraDriverInterface` (`driver_interface.py`): `driver.py` (RTS5869 + factory), `xu.py` (UVC extension unit), `registers.py` (IMX335 timing math), `v4l2_mmap.py` (mmap capture, RAW10 demosaic, ISP shading correction), `picamera.py`, `uvc_generic.py`, `simulator.py`, `constants.py` |
+| `src/hardware` | Camera backends behind `CameraDriverInterface` (`driver_interface.py`): `driver.py` (RTS5869 + factory), `xu.py` (UVC extension unit), `registers.py` (IMX335 timing math), `v4l2_mmap.py` (mmap capture, RAW10 demosaic, ISP shading correction), `picamera.py`, `zwo.py` (ZWO ASI via zwoasi), `uvc_generic.py`, `simulator.py`, `constants.py` |
 | `src/calibration` | `dark.py` (master darks, hot-pixel maps), `auto_exposure.py` (solar elevation, day/night AE), `bright_star_solver.py` (local plate solve), `station_solver.py` (remote blind solve), `stacking.py` (unused by the service) |
 | `src/pipeline` | `keogram.py`, `startrails.py`, `timelapse.py` (encode + banner), `star_boost.py`, `hot_pixels.py`, `highlights.py`, `overlay.py` (not used live; the sky overlay is drawn client-side) |
 | `src/analytics` | `cloud_cover.py`, `cloud_history.py`, `cloud_backfill.py` (CLI), `stars_clouds.py`, `star_clarity.py`, `sky_events.py`, `day_objects.py` (daytime birds, insects, aircraft, rain), `adsb.py`, `adsb_public.py` (public ADS-B fallback), `adsb_contribute.py` (opt-in share of the own receiver with the Zenivo network), `fr24.py`, `aircraft_info.py`, `airports.py`, `satellites.py` (SGP4 from TLEs), `radiosonde.py`, `traffic_log.py`, `focus.py`, `focus_tracker.py`, `meteors.py`, `meteor.py` (legacy, tests only) |
@@ -128,14 +128,16 @@ opens, it falls back to the simulator (unless told not to).
    - **MJPG colour:** `ALLSKY_ISP_WB_K=<kelvin>` locks the camera's own AWB (it drifts magenta under foliage).
      The ISP's radial purple pedestal can be removed per pixel with `tools/isp_calibrate.py` (dark + flat capture
      -> `data/calibration/isp_shading.npz`, applied in `apply_isp_shading`); without the file nothing is applied.
-2. **Pi CSI** (picamera2/libcamera)
+2. **ZWO ASI** (`--camera zwo`, opt-in)
+   - RAW16 to 8-bit BGR (CPU demosaic for colour), manual exposure 32 µs to the camera maximum, gain in 0.1 dB units, optional hardware binning from `--resolution`.
+3. **Pi CSI** (picamera2/libcamera)
    - Full field of view, 2×2-binned mode. AE is off.
    - Range 0 to 24 dB, 0.1 ms to 60 s, at most 5 fps (10 fps in focus mode).
    - Supports motorised lenses (IMX708/IMX519).
-3. **Generic UVC** (OpenCV)
+4. **Generic UVC** (OpenCV)
    - The hardware maximum exposure is 0.5 s. Longer exposures, up to 60 s, are made by summing
      sub-frames.
-4. **Simulator**
+5. **Simulator**
    - Emulates XDATA, the IMX335 registers and a noise model with hot pixels.
    - Used in CI. It is also the runtime fallback when a real camera fails twice in a row.
 

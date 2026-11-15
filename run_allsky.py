@@ -94,15 +94,15 @@ def parse_args():
         "--camera",
         type=str,
         default=os.environ.get("ALLSKY_CAMERA", "auto"),
-        choices=["auto", "rts5869", "picamera", "v4l2", "simulator"],
+        choices=["auto", "rts5869", "picamera", "zwo", "v4l2", "simulator"],
         help="Camera backend: auto (RTS5869 > Pi CSI camera > USB/V4L2 webcam > simulator), "
-        "rts5869, picamera (libcamera/Picamera2), v4l2 (any UVC webcam), simulator",
+        "rts5869, picamera (libcamera/Picamera2), zwo (ZWO ASI via zwoasi + libASICamera2), v4l2 (any UVC webcam), simulator",
     )
     parser.add_argument(
         "--camera-index",
         type=int,
         default=0,
-        help="libcamera camera number for --camera picamera (default: 0)",
+        help="Camera number for --camera picamera (libcamera) or zwo (ASI index) (default: 0)",
     )
     parser.add_argument(
         "--resolution",

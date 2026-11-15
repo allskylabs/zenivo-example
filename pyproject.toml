@@ -27,6 +27,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+zwo = ["zwoasi>=0.1.0"]   # ZWO ASI cameras; also needs ZWO libASICamera2 (see docs/INSTALL.md)
 test = [
     "pytest>=7.0.0",
 ]
