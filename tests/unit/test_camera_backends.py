@@ -125,6 +125,23 @@ def test_factory_auto_selects_picamera_when_no_rts5869(fake_picamera2, monkeypat
     cam.close()
 
 
+def test_factory_rts5869_by_name_finds_the_device_itself(monkeypatch):
+    """Choosing rts5869 in Settings passes no device path: the factory must locate the node, not give up."""
+    made = []
+
+    class Fake:
+        def __init__(self, device_path=None, width=0, height=0):
+            made.append(device_path)
+
+        def open(self):
+            return True
+
+    monkeypatch.setattr(drv, "find_rts5869_device_node", lambda: "/dev/video7")
+    monkeypatch.setattr(drv, "RTS5869CameraController", Fake)
+    drv.get_camera_driver(camera_type="rts5869", fallback_to_simulator=False)
+    assert made == ["/dev/video7"]
+
+
 def test_factory_falls_back_to_simulator(monkeypatch):
     monkeypatch.setattr(drv, "find_rts5869_device_node", lambda: None)
     monkeypatch.setitem(sys.modules, "picamera2", None)  # import fails

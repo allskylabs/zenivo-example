@@ -498,7 +498,7 @@ def get_camera_driver(
 
     candidates = []
     if camera_type in ("auto", "rts5869"):
-        target_dev = device_path if camera_type == "rts5869" else (device_path or find_rts5869_device_node())
+        target_dev = device_path or find_rts5869_device_node()
         if target_dev:
             candidates.append(("rts5869", lambda: RTS5869CameraController(device_path=target_dev, width=width, height=height)))
     if camera_type in ("auto", "picamera"):
