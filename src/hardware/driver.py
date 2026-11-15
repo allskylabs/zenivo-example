@@ -433,6 +433,28 @@ def camera_limits(camera: Any) -> Dict[str, float]:
     return {"min_exposure_s": 0.00015, "max_exposure_s": 90.0, "min_gain_db": 0.0, "max_gain_db": 72.0}
 
 
+_hint_logged: set = set()
+
+
+def camera_hints() -> list:
+    """Reasons a plugged-in camera is not offered (missing SDK or Python package, udev rules), one sentence each.
+    Each new reason is also written to the log once, so a support request can quote it."""
+    hints = []
+    try:
+        from .zwo import zwo_problem
+
+        msg = zwo_problem()
+        if msg:
+            hints.append(msg)
+    except Exception:
+        pass
+    for msg in hints:
+        if msg not in _hint_logged:
+            _hint_logged.add(msg)
+            logger.warning(f"Camera scan: {msg}")
+    return hints
+
+
 def list_camera_devices() -> list:
     """Attached cameras the user can pick: [{"id", "type", "index", "name"}]. Never raises; a missing SDK or
     driver just means none of that kind are listed."""

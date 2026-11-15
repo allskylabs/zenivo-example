@@ -2,7 +2,7 @@
 
 from typing import Any, Dict
 
-from src.hardware.driver import describe_camera, get_camera_driver, list_camera_devices
+from src.hardware.driver import camera_hints, describe_camera, get_camera_driver, list_camera_devices
 
 
 class CameraSelectMixin:
@@ -26,6 +26,7 @@ class CameraSelectMixin:
             "current": {"type": cur_type, "index": index, "id": f"{cur_type}:{index}", "sensor": info.get("sensor"),
                         "width": int(getattr(self.camera, "width", 0) or 0), "height": int(getattr(self.camera, "height", 0) or 0)},
             "devices": devices,
+            "hints": camera_hints(),
             "saved": saved,
         }
 

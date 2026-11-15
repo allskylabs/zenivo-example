@@ -65,6 +65,39 @@ def list_zwo_cameras() -> list:
         return []
 
 
+def usb_vendor_present(vendor_id: str) -> bool:
+    """True when a USB device with this vendor id (e.g. "03c3") is plugged in (Linux sysfs, no driver needed)."""
+    import glob
+
+    for f in glob.glob("/sys/bus/usb/devices/*/idVendor"):
+        try:
+            with open(f) as fh:
+                if fh.read().strip().lower() == vendor_id:
+                    return True
+        except OSError:
+            continue
+    return False
+
+
+def zwo_problem() -> str:
+    """Why no ZWO camera is listed, in words the user can act on; "" when there is no ZWO camera on the USB bus
+    (nothing to explain) or it is listed fine."""
+    if not usb_vendor_present("03c3"):
+        return ""
+    try:
+        asi = _load_asi()
+    except ImportError:
+        return "A ZWO camera is plugged in, but the Python package zwoasi is missing: run .venv/bin/pip install zwoasi, then restart."
+    except Exception as exc:
+        return f"A ZWO camera is plugged in, but ZWO's SDK was not found ({exc}). Install libASICamera2.so (see docs/INSTALL.md) or set ZWO_ASI_LIB."
+    try:
+        if asi.get_num_cameras() > 0:
+            return ""
+    except Exception as exc:
+        return f"A ZWO camera is plugged in, but the SDK failed to list it ({exc})."
+    return "A ZWO camera is plugged in, but the SDK cannot open it: install ZWO's asi.rules into /etc/udev/rules.d/, reload udev and replug the camera (or run the service as a user allowed to use USB)."
+
+
 class ZwoAsiController(CameraDriverInterface):
     """ZWO ASI USB camera with manual long-exposure control."""
 

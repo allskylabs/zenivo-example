@@ -336,3 +336,24 @@ def test_picamera_darkens_below_sensor_floor_with_isp_brightness(fake_picamera2)
     finally:
         _FakeRequest.get_metadata = real_md
     cam.close()
+
+
+def test_zwo_problem_explains_a_plugged_in_camera_that_is_not_listed(monkeypatch):
+    from src.hardware import zwo
+
+    monkeypatch.setattr(zwo, "usb_vendor_present", lambda vid: True)
+    monkeypatch.setitem(sys.modules, "zwoasi", None)  # import fails: wrapper not installed
+    assert "zwoasi" in zwo.zwo_problem()
+    monkeypatch.setattr(zwo, "usb_vendor_present", lambda vid: False)
+    assert zwo.zwo_problem() == ""  # no ZWO camera on the bus: nothing to explain
+
+
+def test_camera_hints_are_logged_once(monkeypatch, caplog):
+    import src.hardware.zwo as zwo
+
+    monkeypatch.setattr(zwo, "zwo_problem", lambda: "ZWO hint X")
+    drv._hint_logged.discard("ZWO hint X")
+    with caplog.at_level("WARNING", logger="imx335.hardware"):
+        assert drv.camera_hints() == ["ZWO hint X"]
+        drv.camera_hints()
+    assert sum("ZWO hint X" in r.message for r in caplog.records) == 1
