@@ -345,7 +345,6 @@ if (cloudChart && currentPage === "tab-live") {
             const inside = f.ts >= e.start_ts - 4 && f.ts <= (e.end_ts || e.start_ts) + 4;
             let bx, by, bw, bh, dim = false;
             if (e.moving_dot && dur > 0) {
-                svgEl("line", { x1: x0 * W, y1: y0 * H, x2: x1 * W, y2: y1 * H, stroke: c, "stroke-width": 1, "stroke-dasharray": "5 4", opacity: 0.45, "vector-effect": "non-scaling-stroke" }, fvBoxes);
                 let pos = found[n];
                 if (!pos) {   // dot not visible in this frame (strobe off / too faint): fall back to the timed position
                     if (!inside) return;
