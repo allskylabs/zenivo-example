@@ -63,8 +63,14 @@ class WhiteBalanceRequest(BaseModel):
 
 class OutputResolutionRequest(BaseModel):
     """Request payload for selecting the output image resolution preset."""
-    width: int = Field(..., ge=320, le=2592, description="Output width in pixels")
-    height: int = Field(..., ge=240, le=1944, description="Output height in pixels")
+    width: int = Field(..., ge=320, le=12000, description="Output width in pixels")
+    height: int = Field(..., ge=240, le=12000, description="Output height in pixels")
+
+
+class CameraSelectRequest(BaseModel):
+    """Request payload for switching the active camera."""
+    type: str = Field(..., pattern="^(auto|rts5869|picamera|zwo|v4l2|simulator)$", description="Camera backend")
+    index: int = Field(0, ge=0, le=15, description="Camera number within that backend")
 
 
 class StarBoostRequest(BaseModel):

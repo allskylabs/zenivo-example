@@ -531,6 +531,7 @@ if (currentPage === "tab-live" || currentPage === "tab-settings") {
     document.addEventListener("visibilitychange", () => { if (!document.hidden) loadStationConfig(); });
 }
 if (currentPage === "tab-settings") {
+    loadCameraDevices();
     loadResolutionOptions();
     loadStarBoost();
     loadPerformance();

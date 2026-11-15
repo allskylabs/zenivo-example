@@ -46,6 +46,7 @@ from src.api.station_mixin import StationMixin
 from src.api.focus_mixin import FocusMixin
 from src.api.lens_mixin import LensMixin
 from src.api.plate_solve_mixin import PlateSolveMixin
+from src.api.camera_select_mixin import CameraSelectMixin
 from src.community.manager import CommunityManager
 from src.auth.manager import AuthManager
 from src.defaults import DEFAULT_LAT, DEFAULT_LON
@@ -73,7 +74,7 @@ class _BoundedCache(OrderedDict):
             self.popitem(last=False)
 
 
-class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, StationMixin, FocusMixin, LensMixin, PlateSolveMixin):
+class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, StationMixin, FocusMixin, LensMixin, PlateSolveMixin, CameraSelectMixin):
     """
     Singleton service managing camera capture lifecycle, telemetry cache,
     calibration routines, and streaming buffers.

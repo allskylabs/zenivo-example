@@ -105,3 +105,54 @@ def test_factory_zwo_and_fallback(fake_zwoasi, monkeypatch):
     assert "Simulated" in drv.get_camera_driver(camera_type="zwo").__class__.__name__
     with pytest.raises(RuntimeError):
         drv.get_camera_driver(camera_type="zwo", fallback_to_simulator=False)
+
+
+# ---------------------------------------------------------------- camera picker (API)
+def test_saved_camera_selection_reads_station_config(tmp_path):
+    import json
+    import run_allsky
+
+    p = tmp_path / "station_config.json"
+    p.write_text(json.dumps({"camera_select": {"type": "zwo", "index": 1}}))
+    assert run_allsky.saved_camera_selection(str(p)) == ("zwo", 1)
+    p.write_text(json.dumps({"camera_select": {"type": "bogus", "index": 0}}))
+    assert run_allsky.saved_camera_selection(str(p)) is None
+    assert run_allsky.saved_camera_selection(str(tmp_path / "missing.json")) is None
+
+
+@pytest.fixture
+def picker_client(fake_zwoasi, tmp_path):
+    from fastapi.testclient import TestClient
+    from src.api.main import create_app
+    from src.api.service import AllSkyService
+    from src.hardware.simulator import SimulatedIMX335Controller
+
+    sim = SimulatedIMX335Controller(width=640, height=480, seed=1)
+    sim.open()
+    AllSkyService.reset_instance()
+    service = AllSkyService.get_instance(camera=sim)
+    service.station_config_path = str(tmp_path / "station_config.json")
+    with TestClient(create_app(camera=sim)) as client:
+        yield client, service
+    service.close()
+    AllSkyService.reset_instance()
+
+
+def test_picker_lists_zwo_and_switches(picker_client, monkeypatch):
+    client, service = picker_client
+    monkeypatch.setattr(drv, "find_rts5869_device_node", lambda: None)
+    data = client.get("/api/camera/devices").json()
+    assert data["current"]["type"] == "simulator"
+    assert any(d["id"] == "zwo:0" and "ASI533" in d["name"] for d in data["devices"])
+
+    out = client.post("/api/camera/select", json={"type": "zwo", "index": 0}).json()
+    assert out["current"]["type"] == "zwo" and out["current"]["width"] == 3008
+    assert service.station_config["camera_select"] == {"type": "zwo", "index": 0}
+
+
+def test_picker_failure_keeps_old_camera(picker_client):
+    client, service = picker_client
+    r = client.post("/api/camera/select", json={"type": "zwo", "index": 3})  # only one camera exists
+    assert r.status_code == 400
+    assert client.get("/api/camera/devices").json()["current"]["type"] == "simulator"
+    assert "camera_select" not in service.station_config

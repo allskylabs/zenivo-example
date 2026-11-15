@@ -24,7 +24,7 @@ Contents: [Pages and static files](#pages-and-static-files) | [Version and statu
 
 Default deny: any request that is not `GET`/`HEAD`/`OPTIONS` needs an admin session, except the open routes below.
 Admin-only reads: `/api/logs`, `/api/logs/download`, `/api/community/settings`, `/api/focus`, `/api/focus/frame`,
-`/api/focus/overview.jpg`, `/api/storage`, `/docs`, `/redoc`, `/openapi.json`. Admin pages: `/settings`,
+`/api/focus/overview.jpg`, `/api/storage`, `/api/camera/devices`, `/docs`, `/redoc`, `/openapi.json`. Admin pages: `/settings`,
 `/calibration`, `/focus`, `/logs`, `/obs/dock` (guests are redirected to `/login?next=<path>`). A state-changing request with an
 `Origin` header that differs from `Host` gets 403.
 
@@ -77,6 +77,8 @@ object of `/api/adsb/aircraft` and `/api/satellites`; the ADS-B receiver address
 | POST | `/api/camera/target-brightness` | Body `value` (0 to 255, or null for the built-in day/night targets): auto-exposure target luma |
 | GET, POST | `/api/camera/orientation` | Image transform: `flip_horizontal`, `flip_vertical`, `rotate_deg` (0 or 180), `rotate_isp_180` (extra 180 degrees for day frames only) |
 | GET, POST | `/api/camera/white-balance` | `mode` (`auto`, `manual`), `r_gain`, `b_gain` (0.4 to 4) |
+| GET | `/api/camera/devices` | Admin. Cameras attached now (`devices`: `id`, `type`, `index`, `name`), the active one (`current`) and the saved choice (`saved`) |
+| POST | `/api/camera/select` | `type` (`auto`, `rts5869`, `picamera`, `zwo`, `v4l2`, `simulator`), `index` 0 to 15. Switches the camera and saves the choice; 400 and the old camera stays when the new one cannot be opened or focus / calibration is running |
 | GET, POST | `/api/camera/resolution` | Output resolution: `width`, `height` (must match a preset) |
 | GET, POST | `/api/camera/star-boost` | `enabled`, `bin` (2 to 4) |
 | GET, POST | `/api/camera/performance` | Performance settings and their limits; see [CONFIGURATION.md](CONFIGURATION.md#performance-profile-for-small-hosts) |

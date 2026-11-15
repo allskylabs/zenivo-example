@@ -260,7 +260,7 @@ every HTTP request and the WebSocket handshake.
 - Every `POST`, `PUT`, `DELETE` and `PATCH` on any other path (default deny), and WebSocket state-changing
   actions (`set_exposure`, `set_gain`, `set_mode`, `trigger_master_dark`, binary commands 1 and 2).
 - These `GET`s (`ADMIN_GET`): `/api/logs`, `/api/logs/download`, `/api/community/settings`, `/api/focus`,
-  `/api/focus/frame`, `/api/focus/overview.jpg`, `/api/storage`, `/docs`, `/redoc`, `/openapi.json`.
+  `/api/focus/frame`, `/api/focus/overview.jpg`, `/api/storage`, `/api/camera/devices`, `/docs`, `/redoc`, `/openapi.json`.
 - These pages (`ADMIN_PAGES`): `/settings`, `/calibration`, `/focus`, `/logs`, `/obs/dock` (with its aliases `/obs/control`, `/dock`) (guests are redirected to `/login`).
 - See the exact station position, the ADS-B receiver address, the Flightradar24 e-mail, the remote solver
   address and the Google Maps key in the settings payloads. Guests get rounded coordinates and these fields

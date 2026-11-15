@@ -17,7 +17,7 @@ Run `python3 run_allsky.py --help` for the flags of the version you have install
 | `--host` | `127.0.0.1` | Network interface to bind (this machine only). Use `0.0.0.0` to open it on the LAN; behind a reverse proxy keep `127.0.0.1` |
 | `--port` | `8080` | TCP port of the web UI and API |
 | `--device` | auto-detected RTS5869, else `/dev/video0` | V4L2 camera device node |
-| `--camera` | `auto` (or `$ALLSKY_CAMERA`) | Camera backend: `auto`, `rts5869`, `picamera`, `zwo`, `v4l2`, `simulator`. `auto` tries RTS5869, then a Pi CSI camera, then a USB/V4L2 webcam, then the simulator |
+| `--camera` | `auto` (or `$ALLSKY_CAMERA`) | Camera backend (when left at `auto`, the camera chosen under Settings > Camera is used): `auto`, `rts5869`, `picamera`, `zwo`, `v4l2`, `simulator`. `auto` tries RTS5869, then a Pi CSI camera, then a USB/V4L2 webcam, then the simulator |
 | `--camera-index` | `0` | Camera number for `--camera picamera` (libcamera) or `--camera zwo` (ASI index) |
 | `--resolution` | camera default | Capture size `WIDTHxHEIGHT`. Defaults: IMX335 2592x1944, Pi camera full-FOV binned mode, webcam maximum |
 | `--simulator` | off | Force the simulated IMX335 controller (tests, CI, demos). Sets `ALLSKY_SIMULATOR=1` |
@@ -99,6 +99,7 @@ Factory defaults (neutral station "My station" at 0, 0, IMX335 sensor, 1.65 mm f
 | `orientation` | Centre RA/Dec, azimuth, altitude, zenith tilt, north position angle, rotation, CD matrix |
 | `image_transform` | `flip_horizontal`, `flip_vertical`, `rotate_deg` (0 or 180); `rotate_isp_180` is added for RTS5869 day frames |
 | `output_resolution` | `width`, `height` of the frames Zenivo outputs (default 2592 x 1944) |
+| `camera_select` | `type`, `index` of the camera chosen under Settings > Camera (used at start when `--camera` is `auto`; absent = auto-detect) |
 
 Keys added when you change the matching setting:
 

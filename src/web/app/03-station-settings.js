@@ -278,6 +278,50 @@ function syncResolutionUI(res) {
     }
 }
 
+// ------------------------------------------------------------------
+// Camera picker (several cameras attached)
+// ------------------------------------------------------------------
+const cameraSelect = document.getElementById("camera-device");
+const cameraBadge = document.getElementById("camera-current-badge");
+const cameraRescan = document.getElementById("camera-rescan");
+
+async function loadCameraDevices() {
+    if (!cameraSelect) return;
+    try {
+        const data = await (await fetch("/api/camera/devices")).json();
+        cameraSelect.innerHTML = "";
+        const cur = data.current || {};
+        const add = (value, label) => {
+            const opt = document.createElement("option");
+            opt.value = value;
+            opt.textContent = label;
+            cameraSelect.appendChild(opt);
+        };
+        (data.devices || []).forEach((d) => add(d.id, d.name));
+        add("simulator:0", "Simulator (no hardware)");
+        const found = Array.from(cameraSelect.options).some((o) => o.value === cur.id);
+        if (!found && cur.id) add(cur.id, cur.sensor || cur.id);
+        cameraSelect.value = cur.id || "simulator:0";
+        if (cameraBadge) cameraBadge.textContent = cur.width ? `${cur.width} × ${cur.height}` : "--";
+    } catch (err) {
+        showAlert(stationAlert, `❌ Could not list cameras: ${err.message}`, "error", true);
+    }
+}
+
+if (cameraSelect) {
+    cameraSelect.addEventListener("change", async () => {
+        const [type, index] = cameraSelect.value.split(":");
+        cameraSelect.disabled = true;
+        const ok = await settingsSave(cameraSelect, async () => {
+            await sendJson("/api/camera/select", { type, index: Number(index) });
+        });
+        cameraSelect.disabled = false;
+        await loadCameraDevices();
+        if (ok) { loadResolutionOptions(); loadStationConfig(); }
+    });
+}
+if (cameraRescan) cameraRescan.addEventListener("click", loadCameraDevices);
+
 async function loadResolutionOptions() {
     if (!outputResSelect) return;
     try {

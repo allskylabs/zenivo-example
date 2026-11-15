@@ -22,6 +22,7 @@ from src.api.schemas import (
     StationLocationRequest,
     ImageTransformRequest,
     OutputResolutionRequest,
+    CameraSelectRequest,
     PerformanceSettingsRequest,
     AdsbConfigRequest,
     EventConfigRequest,
@@ -229,6 +230,21 @@ def set_camera_white_balance(
 ):
     """Set RAW10 white balance: auto (gray-world) or manual R/B gains."""
     return service.set_white_balance(req.mode, req.r_gain, req.b_gain)
+
+
+@router.get("/api/camera/devices")
+def get_camera_devices(service: AllSkyService = Depends(get_service)):
+    """Cameras attached now, the active one and the saved choice (admin)."""
+    return service.list_camera_options()
+
+
+@router.post("/api/camera/select")
+def select_camera(req: CameraSelectRequest, service: AllSkyService = Depends(get_service)):
+    """Switch the active camera and remember the choice."""
+    try:
+        return service.select_camera(req.type, req.index)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
 @router.get("/api/camera/resolution")

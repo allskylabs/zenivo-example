@@ -434,6 +434,41 @@ def camera_limits(camera: Any) -> Dict[str, float]:
     return {"min_exposure_s": 0.00015, "max_exposure_s": 90.0, "min_gain_db": 0.0, "max_gain_db": 72.0}
 
 
+def list_camera_devices() -> list:
+    """Attached cameras the user can pick: [{"id", "type", "index", "name"}]. Never raises; a missing SDK or
+    driver just means none of that kind are listed."""
+    devices = []
+    try:
+        if find_rts5869_device_node():
+            devices.append({"type": "rts5869", "index": 0, "name": "Sony IMX335 (Realtek RTS5869 USB bridge)"})
+    except Exception:
+        pass
+    try:
+        from .picamera import list_picameras
+
+        for i, info in enumerate(list_picameras()):
+            devices.append({"type": "picamera", "index": i, "name": f"Raspberry Pi camera {info.get('Model', i)}"})
+    except Exception:
+        pass
+    try:
+        from .zwo import list_zwo_cameras
+
+        for i, name in enumerate(list_zwo_cameras()):
+            devices.append({"type": "zwo", "index": i, "name": str(name)})
+    except Exception:
+        pass
+    try:
+        from .uvc_generic import find_uvc_device_nodes
+
+        for i, node in enumerate(find_uvc_device_nodes(exclude_ids=("0bda:5869",))):
+            devices.append({"type": "v4l2", "index": i, "name": f"USB/UVC webcam ({node})"})
+    except Exception:
+        pass
+    for d in devices:
+        d["id"] = f"{d['type']}:{d['index']}"
+    return devices
+
+
 def get_camera_driver(
     prefer_simulator: bool = False,
     device_path: Optional[str] = None,
@@ -479,6 +514,8 @@ def get_camera_driver(
         from .uvc_generic import GenericUVCCameraController, find_uvc_device_nodes
 
         nodes = [device_path] if device_path else find_uvc_device_nodes(exclude_ids=("0bda:5869",))
+        if nodes and not device_path and 0 <= camera_index < len(nodes):
+            nodes = nodes[camera_index:]
         if nodes:
             size = (width, height) if (width, height) != (SENSOR_WIDTH, SENSOR_HEIGHT) else (None, None)
             candidates.append(("v4l2", lambda: GenericUVCCameraController(device_path=nodes[0], width=size[0], height=size[1])))

@@ -8,7 +8,8 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Added
 
-- ZWO ASI cameras: `--camera zwo` (`--camera-index N`) through the `zwoasi` wrapper and ZWO's `libASICamera2` SDK (`ZWO_ASI_LIB` sets its path). RAW16 frames are demosaiced to 8-bit BGR (mono sensors give grey), exposure 32 µs to the camera maximum, gain in 0.1 dB units, hardware binning from `--resolution`. Opt-in, never chosen by `auto`. Optional extra: `pip install zwoasi`. Tested against a fake SDK only; not yet on real hardware.
+- ZWO ASI cameras: `--camera zwo` (`--camera-index N`) through the `zwoasi` wrapper and ZWO's `libASICamera2` SDK (`ZWO_ASI_LIB` sets its path). RAW16 frames are demosaiced to 8-bit BGR (mono sensors give grey), exposure 32 µs to the camera maximum, gain in 0.1 dB units, hardware binning from `--resolution`. Opt-in, never chosen by `auto`. Optional extra: `pip install zwoasi`. Tested against a fake SDK, and the real SDK loads and reports no camera; not yet run with a camera attached.
+- Settings > Camera: pick the active camera when several are attached (ZWO ASI, IMX335 USB, Pi camera, webcams). `GET /api/camera/devices` (admin) and `POST /api/camera/select`; the choice is saved (`camera_select` in `station_config.json`) and used at start when `--camera` is `auto`. `--camera-index` now also selects among several `v4l2` webcams. Output resolution limits raised to 12000 px so large sensors can be selected.
 
 ## [1.2.0] - 2026-11-15
 

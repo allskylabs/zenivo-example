@@ -222,6 +222,18 @@ def _admin_cli(args) -> bool:
     return True
 
 
+def saved_camera_selection(path):
+    """(type, index) chosen in the web UI and saved in station_config.json, or None."""
+    import json
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            sel = json.load(f).get("camera_select") or {}
+        t, i = str(sel["type"]), int(sel.get("index", 0))
+    except Exception:
+        return None
+    return (t, i) if t in ("rts5869", "picamera", "zwo", "v4l2", "simulator") and 0 <= i <= 15 else None
+
+
 def saved_station_position(path):
     """(lat, lon) saved in station_config.json, or None when the station has no real position yet.
 
@@ -291,6 +303,14 @@ def main():
     if args.resolution:
         w, h = args.resolution.lower().split("x")
         size = {"width": int(w), "height": int(h)}
+    if args.camera == "auto" and not args.simulator:
+        # No explicit --camera: use the camera chosen in the web UI last time
+        sel = saved_camera_selection(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "station_config.json")
+        )
+        if sel:
+            args.camera, args.camera_index = sel
+            logger.info(f"Using the camera saved from the web UI: {sel[0]} #{sel[1]}")
     camera = get_camera_driver(
         prefer_simulator=args.simulator,
         device_path=args.device,

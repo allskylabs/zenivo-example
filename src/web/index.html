@@ -501,6 +501,25 @@
                 </div>
                 <div class="focus-history" id="settings-focus-history"><span class="text-muted">No focus saved yet.</span></div>
             </div>
+            <!-- Camera Card: pick the active camera when several are attached -->
+            <div class="card settings-card" data-sgroup="image">
+                <div class="card-header">
+                    <h2>Camera</h2>
+                    <span class="badge badge-accent" id="camera-current-badge">--</span>
+                </div>
+                <p class="description">
+                    Choose which attached camera Zenivo uses (ZWO ASI, IMX335 USB, Raspberry Pi camera, webcam). The choice is saved
+                    and used at the next start unless <code>--camera</code> is given on the command line. Switching pauses capture for a few seconds.
+                </p>
+                <div class="settings-grid">
+                    <div class="field">
+                        <label for="camera-device">Active camera</label>
+                        <select id="camera-device"></select>
+                    </div>
+                    <button type="button" class="btn" id="camera-rescan" data-no-autosave>Rescan</button>
+                </div>
+            </div>
+
             <!-- Image Output Card: resolution + orientation -->
             <div class="card settings-card" data-sgroup="image">
                 <div class="card-header">
