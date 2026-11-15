@@ -978,10 +978,12 @@
                 </div>
                 <details class="params-summary" id="sky-mask-editor" open>
                     <summary>Plate-solve sky mask (outline the open sky)</summary>
-                    <p class="field-note">Click on the frame to outline open sky (green) and lit buildings, trees or
-                        poles to ignore (red). The plate solver only uses stars inside the sky and outside obstructions,
+                    <p class="field-note">Press Auto-detect to propose the mask from the current frame (best at night),
+                        or click on the frame to outline open sky (green) and lit buildings, trees or
+                        poles to ignore (red). Nothing is stored until you press Apply, so you can fix the proposal first. The plate solver only uses stars inside the sky and outside obstructions,
                         on top of its own automatic sky detection.</p>
                     <div class="settings-actions">
+                        <button id="mask-auto" class="btn btn-sm btn-outline" type="button" title="Detect the open sky from the current frame, then edit it">✨ Auto-detect</button>
                         <button id="mask-new-sky" class="btn btn-sm btn-outline" type="button">＋ Sky polygon</button>
                         <button id="mask-new-obs" class="btn btn-sm btn-outline" type="button">＋ Obstruction</button>
                         <button id="mask-undo" class="btn btn-sm btn-outline" type="button">↶ Undo point</button>
@@ -1556,7 +1558,7 @@
     <script defer src="/static/app/01-core.js?v=20261114a"></script>
     <script defer src="/static/app/02-controls-calibration.js?v=20261114a"></script>
     <script defer src="/static/app/03-station-settings.js?v=20261114a"></script>
-    <script defer src="/static/app/04-live-view.js?v=20261114a"></script>
+    <script defer src="/static/app/04-live-view.js?v=20261115b"></script>
     <script defer src="/static/app/05-sky-overlay.js?v=20261115a"></script>
     <script defer src="/static/app/05b-sky-reticle.js?v=20261115a"></script>
     <script defer src="/static/app/05c-aircraft-overlay.js?v=20261115a"></script>

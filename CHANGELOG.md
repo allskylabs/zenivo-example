@@ -6,6 +6,11 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Settings > Sky Mask: **Auto-detect** proposes the open-sky and obstruction polygons from the current frame (`POST /api/station/sky-mask/auto`); you edit it by hand and press Apply, nothing is stored before that. Drawing the mask by hand works as before.
+- `docs/FIRST_RUN.md`: step-by-step setup after installing (password, time zone, Station & Optics, lens, pointing check, sky mask, optional services). The installer and README point to it.
+
 ### Changed
 
 - Large files split without behaviour change: `src/api/routes.py` became the `src/api/routes/` package, `service.py` shrank from 1199 to about 530 lines (four new mixins), `focus.js` became `src/web/focus/*.js`, the sky overlay and gallery scripts and `style.css` were split into parts. CI now also runs on push and lints with `ruff`; issue and pull request templates added.

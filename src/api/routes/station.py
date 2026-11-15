@@ -113,6 +113,15 @@ def set_station_sky_mask(req: SkyMaskRequest, service: AllSkyService = Depends(g
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
+@router.post("/api/station/sky-mask/auto")
+def station_sky_mask_auto(service: AllSkyService = Depends(get_service)):
+    """Propose sky and obstruction polygons from the current frame; nothing is saved until you apply them."""
+    try:
+        return service.auto_sky_mask()
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
 @router.post("/api/station/star-align")
 def station_star_align(req: ManualStarSolveRequest, service: AllSkyService = Depends(get_service)):
     """Identify 4+ stars clicked on the live frame and (apply=true) store the camera pointing from them."""

@@ -126,6 +126,8 @@ defaults for the optics keys and removes `bright_star_solution`.
 
 ## Settings pages
 
+New station? Follow the step-by-step [FIRST_RUN.md](FIRST_RUN.md).
+
 Open `/settings`. Every card saves itself when a field changes and shows a status chip in its header; buttons are only for
 actions. Most changes take effect without a restart.
 
@@ -164,7 +166,7 @@ actions. Most changes take effect without a restart.
 
 ### Sky Mask
 
-Draw the polygons that mark the visible sky and the obstructions (trees, buildings). The star
+Press **Auto-detect** to propose the polygons from the current frame (best at night), then correct them by hand and **Apply**. Or draw the polygons that mark the visible sky and the obstructions (trees, buildings). The star
 search and the cloud analysis stay inside the sky polygons. Polygons are stored as fractions of the
 displayed frame and turn with the image when you change the orientation.
 

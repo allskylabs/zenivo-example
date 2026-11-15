@@ -105,6 +105,7 @@ object of `/api/adsb/aircraft` and `/api/satellites`; the ADS-B receiver address
 | POST | `/api/station/star-align` | Identify stars from points picked by hand. Body `points` (4 to 80 `[x, y]` fractions), `apply` |
 | POST | `/api/station/calibration/reset` | Reset lens, sensor and mounting parameters to the camera defaults |
 | GET, POST | `/api/station/sky-mask` | Sky and obstruction polygons (`sky`, `obstruction`) |
+| POST | `/api/station/sky-mask/auto` | No body. Proposes `sky` and `obstruction` polygons and `sky_fraction` from the current frame; saves nothing. 400 when no clear open sky is found |
 
 ## Community
 

@@ -232,6 +232,22 @@ class PlateSolveMixin:
                            f"{len(mask['obstruction'])} obstruction polygon(s)")
         return {"success": True, **self.get_sky_mask()}
 
+    def auto_sky_mask(self) -> Dict[str, Any]:
+        """Propose sky/obstruction polygons from the current frame without saving them.
+
+        The polygons are in the displayed orientation, like the ones the editor draws; the user reviews
+        them and applies them with set_sky_mask. A night frame gives the cleanest result."""
+        from src.calibration.sky_mask_auto import propose_sky_mask
+
+        frame = self.last_frame
+        if frame is None:
+            raise ValueError("No camera frame yet")
+        result = propose_sky_mask(self._apply_image_transform(frame, False))
+        if not result["sky"]:
+            raise ValueError("No clear open-sky region found in this frame (too bright, cloudy or fully obstructed): "
+                             "try again at night or draw the mask by hand")
+        return result
+
     def get_obs_overlay(self) -> Dict[str, Any]:
         """Get current OBS overlay display preferences and toggles."""
         cfg = dict(self.DEFAULT_OBS_OVERLAY)

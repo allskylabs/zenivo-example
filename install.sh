@@ -196,6 +196,6 @@ if [ "$USE_SYSTEMD" -eq 1 ]; then
 else
     echo "Start:      cd $INSTALL_DIR && .venv/bin/python run_allsky.py --port $PORT --camera $CAMERA"
 fi
-echo "Next:       set the time zone (timedatectl), then open Settings > Station & Optics and enter your latitude, longitude and elevation."
+echo "Next:       set the time zone (timedatectl), then follow docs/FIRST_RUN.md (Settings > Station & Optics: latitude, longitude, elevation, lens)."
 echo "Admin:      nobody can change settings until you set the admin password. Read the setup code with: cat $INSTALL_DIR/data/admin_setup_code.txt   then open /login"
 echo "Docs:       docs/INSTALL.md, docs/CONFIGURATION.md, docs/SECURITY.md"

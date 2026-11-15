@@ -389,6 +389,22 @@ if (maskEditor) {
         current.pts.push([Math.round(x * 10000) / 10000, Math.round(y * 10000) / 10000]);
         drawMask();
     });
+    document.getElementById("mask-auto").addEventListener("click", async () => {
+        try {
+            const res = await fetch("/api/station/sky-mask/auto", { method: "POST" });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || res.statusText);
+            current = { kind: "sky", pts: [] };
+            mask.sky = data.sky || [];
+            mask.obstruction = data.obstruction || [];
+            loadMaskFrame();
+            drawMask();
+            showAlert(maskAlert, `✨ Proposed ${mask.sky.length} sky and ${mask.obstruction.length} obstruction polygon(s) covering ` +
+                `${Math.round((data.sky_fraction || 0) * 100)} % of the frame. Check the outline, correct it, then press Apply.`, "success");
+        } catch (err) {
+            showAlert(maskAlert, `❌ Auto-detect failed: ${err.message}`, "error", true);
+        }
+    });
     document.getElementById("mask-new-sky").addEventListener("click", () => { finishCurrent(); current.kind = "sky"; drawMask(); });
     document.getElementById("mask-new-obs").addEventListener("click", () => { finishCurrent(); current.kind = "obstruction"; drawMask(); });
     document.getElementById("mask-undo").addEventListener("click", () => {

@@ -68,7 +68,7 @@ two built-in seed stations are listed in [docs/COMMUNITY.md](docs/COMMUNITY.md) 
 
 ZWO ASI cameras (ASI120 to ASI6200) are selected with `--camera zwo`: they need the `zwoasi` Python package
 and ZWO's `libASICamera2` SDK. QHYCCD cameras use `--camera qhy` and QHY's `libqhyccd` SDK (no Python package).
-See [docs/INSTALL.md](docs/INSTALL.md).
+See [docs/INSTALL.md](docs/INSTALL.md), then [docs/FIRST_RUN.md](docs/FIRST_RUN.md) to set up the station.
 
 ## Requirements
 
@@ -121,6 +121,7 @@ Full steps (camera access, time zone, nginx, ADS-B feeder, upgrades, uninstall) 
 | Document | Contents |
 |----------|----------|
 | [docs/INSTALL.md](docs/INSTALL.md) | Installation on Raspberry Pi OS and Debian/Ubuntu, systemd, nginx, upgrades, uninstall |
+| [docs/FIRST_RUN.md](docs/FIRST_RUN.md) | **After installing**: admin password, time zone, station position (Settings > Station & Optics), lens, pointing check, sky mask, optional services |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | CLI flags, environment variables, `station_config.json`, Settings pages, retention, small-host tuning |
 | [docs/API.md](docs/API.md) | REST, WebSocket and SSE endpoint reference |
 | [docs/TRANSPARENCY.md](docs/TRANSPARENCY.md) | **Everything Zenivo sends, loads, stores and exposes**: every outbound host, browser third parties, community seeds, files on disk, guest vs admin, how to verify |

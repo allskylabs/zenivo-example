@@ -73,7 +73,7 @@ Contents: [Requirements](#requirements) | [Install with install.sh](#install-wit
    On a Raspberry Pi with `python3-picamera2` installed, the installer creates the venv with
    `--system-site-packages` so the venv can import the apt-provided `picamera2`.
 
-5. Open `http://<host>:8080/`. Verify the version:
+5. Open `http://<host>:8080/` and continue with [FIRST_RUN.md](FIRST_RUN.md) (admin password, time zone, station position, lens, sky mask). Verify the version:
 
    ```bash
    curl http://localhost:8080/api/version
