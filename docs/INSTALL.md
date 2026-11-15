@@ -54,8 +54,9 @@ Contents: [Requirements](#requirements) | [Install with install.sh](#install-wit
    ./install.sh
    ```
 
-   `install.sh` checks for Python 3.10+, creates `.venv`, installs the dependencies and installs and
-   starts a systemd unit named `zenivo`. It never touches `data/`.
+   `install.sh` checks for Python 3.10+, creates `.venv`, installs the dependencies and installs,
+   enables and starts a systemd unit named `zenivo` (an already running unit of that name is restarted).
+   It never touches `data/`. It uses `sudo` for the unit file when not run as root.
 
    | Option | Default | Meaning |
    |--------|---------|---------|
@@ -63,7 +64,7 @@ Contents: [Requirements](#requirements) | [Install with install.sh](#install-wit
    | `--port N` | `8080` | Port of the web UI and API |
    | `--host ADDR` | `127.0.0.1` | Bind address of the installed service. Use `0.0.0.0` to open it on the LAN (plain HTTP sends the admin password unencrypted: prefer a TLS reverse proxy) |
    | `--camera NAME` | `auto` | `auto`, `rts5869`, `picamera`, `v4l2` or `simulator` |
-   | `--user NAME` | current user | User that runs the service |
+   | `--user NAME` | `$SUDO_USER`, else the current user | User that runs the service |
    | `--service-name NAME` | `zenivo` | systemd unit name |
    | `--no-systemd` | off | Only create the venv and install dependencies |
    | `--dry-run` | off | Print every action and change nothing |
@@ -77,7 +78,7 @@ Contents: [Requirements](#requirements) | [Install with install.sh](#install-wit
    curl http://localhost:8080/api/version
    ```
 
-   Expected output: `{"product":"Zenivo","version":"1.0.0"}`.
+   Expected output: `{"product":"Zenivo","version":"<installed version>"}` (the version in `src/version.py`, currently `1.2.0`).
 
 6. Set the admin password. Until you do, nobody can change settings. Read the one-time setup code on the
    station and enter it at `http://<host>:8080/login` together with a password of 10 characters or more:
@@ -138,7 +139,7 @@ Add `--device /dev/videoN` to the unit's `ExecStart` if the wrong video node is 
 ## systemd service
 
 `install.sh` renders [`deploy/zenivo.service`](../deploy/zenivo.service) and writes it to
-`/etc/systemd/system/<service-name>.service`. To do the same by hand, copy the template, replace
+`/etc/systemd/system/<service-name>.service` (`ExecStart` runs `.venv/bin/python run_allsky.py --host @HOST@ --port @PORT@ --camera @CAMERA@ --sync-target "" --log-level warning --no-access-log`). To do the same by hand, copy the template, replace
 `@USER@`, `@INSTALL_DIR@`, `@HOST@`, `@PORT@` and `@CAMERA@`, and run:
 
 ```bash
@@ -156,7 +157,7 @@ tail -f ~/zenivo/data/logs/allsky.log     # rotating file log (5 MB x 3), surviv
 sudo systemctl restart zenivo
 ```
 
-The unit runs with `Nice=5` and `MemoryMax=700M`. Raise `MemoryMax` on hosts with more RAM. The
+The unit runs with `Nice=5`, `MemoryMax=700M`, `Restart=always` (`RestartSec=10`), `SupplementaryGroups=video`, `OMP_NUM_THREADS=2` and basic hardening (`NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=full`). Raise `MemoryMax` on hosts with more RAM. [`deploy/zenivo-pi.service`](../deploy/zenivo-pi.service) is a worked example (Pi 4 behind a proxy, port 8095, sync target, `--prune-dir`), not used by `install.sh`. The
 template starts with `--sync-target ""` (sync is off by default anyway); see
 [CONFIGURATION.md](CONFIGURATION.md#command-line-flags).
 
@@ -199,7 +200,7 @@ ingest endpoint of your choice every few seconds.
 
 2. Adapt `deploy/zenivo-adsb-feeder.service` (an example unit): replace `/home/pi/zenivo`
    with your install directory, `User=pi` with your user, and `After=zenivo.service` with your
-   service name. Set `ALLSKY_URL` in `feeder.env` if Zenivo does not listen on `http://127.0.0.1:8095`.
+   service name. The feeder reads Zenivo at `ALLSKY_URL`, default `http://127.0.0.1:8095`: set `ALLSKY_URL` in `feeder.env` to match your `--port` (the installer default is 8080). `VLAB_INTERVAL` is in seconds (default 3, minimum 2).
 
 3. Install and start it.
 
@@ -209,7 +210,7 @@ ingest endpoint of your choice every few seconds.
    sudo systemctl enable --now zenivo-adsb-feeder
    ```
 
-The unit starts only when `feeder.env` exists. The feeder sends the aircraft list without the
+The unit starts only when `feeder.env` exists (`ConditionPathExists`), runs with `Nice=10` and `MemoryMax=64M`. The feeder sends the aircraft list without the
 station position and camera pointing.
 
 ## Upgrading

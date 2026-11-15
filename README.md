@@ -17,7 +17,7 @@ is the main design constraint: heavy analysis is sampled, never done per frame.
 - No telemetry, no call home, no auto-update, no remote control, no licence check.
 - No default password: the admin account is created on first start with a one-time setup code ([docs/SECURITY.md](docs/SECURITY.md)).
 - Guests can watch but not change anything, and see the station position rounded.
-- Community sharing, the Flightradar24 feed, the sync target and the remote plate solver are off until you switch them on.
+- Community sharing, the public ADS-B fallback, contributing your receiver's aircraft to the Zenivo network, the Flightradar24 feed, the sync target and the remote plate solver are off until you switch them on.
 - Every outbound connection, third-party browser load and stored file is listed with its source file in
   [docs/TRANSPARENCY.md](docs/TRANSPARENCY.md). A few public-data lookups (satellite orbits, weather balloons, airports) are on by default and listed there.
 
@@ -31,14 +31,14 @@ is the main design constraint: heavy analysis is sampled, never done per frame.
 - **Products**: keogram, startrails and timelapse per day, plus a timelapse builder for a date range.
 - **Analytics**: cloud cover (clear / scattered / overcast) with history, star count, rain detection
   on the dome, sky events (meteor, plane, satellite, flash, cloud change) by night and by day.
-- **Traffic**: ADS-B aircraft (your own receiver first; an optional public-network fallback, adsb.fi then adsb.lol, off by default; and an optional Flightradar24 feed, see the note below), satellite passes from TLEs,
+- **Traffic**: ADS-B aircraft (your own receiver first; an optional public-network fallback, adsb.fi then adsb.lol, off by default; an optional, off-by-default contribution of your own reception to the Zenivo aircraft network; and an optional Flightradar24 feed, see the note below), satellite passes from TLEs,
   radiosondes (position sent to SondeHub rounded to 0.5 degrees, with an off switch), an aircraft/satellite log of what crossed the camera view.
   Daytime birds, insects and aircraft are detected locally with their own settings. Every Settings card saves itself on change.
 - **Focus assistant**: HFR and contrast measurement on a region of interest, motorised lens control
   and autofocus for supported Raspberry Pi lenses.
 - **Plate solving**: local bright-star solver, with a remote blind-solve fallback; sky and obstruction mask.
 - **Sky pages**: observer sky view, Flights 3D and Satellites 3D, OBS browser source and dock.
-- **Admin login**: one admin password protects every change and the logs; guests can watch and see the station location rounded. First start: read the setup code with `cat data/admin_setup_code.txt` and open `/login`; see [docs/SECURITY.md](docs/SECURITY.md).
+- **Admin login**: one admin password protects every change and the logs; guests can watch and see the station location rounded. First start: read the setup code with `cat data/admin_setup_code.txt` and open `/login`; see [docs/SECURITY.md](docs/SECURITY.md). Lost password: `python3 run_allsky.py --set-admin-password` or `--reset-admin`.
 - **Storage**: AVIF frame archive, age and size based retention, extra directories to prune.
 - **Sync**: optional push of frames and telemetry to a remote sync server (off unless you pass `--sync-target`).
 
@@ -104,7 +104,9 @@ Full steps (camera access, time zone, nginx, ADS-B feeder, upgrades, uninstall) 
 | `/settings` | Image Output, Detection, Station & Optics, Sky Mask, Integrations |
 | `/sky` | Observer sky view (WebGL planetarium with aircraft, satellites, events) |
 | `/flights3d`, `/satellites3d` | 3D views of aircraft and satellites around the station |
-| `/obs`, `/obs/dock` | Clean OBS browser source and its control dock |
+| `/community` | Community map of opted-in stations |
+| `/obs`, `/obs/dock` | Clean OBS browser source (also `/full`, `/live/full`) and its control dock |
+| `/login` | Admin sign-in and first-start setup |
 
 ## Documentation
 
@@ -141,11 +143,11 @@ python3 scripts/sync_nav.py --check  # exit 1 when a page is out of date
 Layout of the web UI:
 
 - `src/web/index.html`: page shell for `/live`, `/gallery`, `/logs`, `/focus`, `/calibration`, `/settings`.
-- `src/web/app/01-core.js` to `08-gallery-adsb.js`: classic scripts that share one global scope and
+- `src/web/app/01-core.js` to `10-admin.js`: classic scripts that share one global scope and
   load in numeric order (core and routing, controls and calibration, station settings, live view,
-  sky overlay, telemetry, cloud, gallery and ADS-B).
+  sky overlay, telemetry, cloud, gallery and ADS-B, community, admin).
 - `src/web/focus.js`, `src/web/activity.js`: the Focus and Activity Log pages.
-- `src/web/sky.html`, `flights3d.html`, `satellites3d.html`, `obs_dock.html`: separate pages.
+- `src/web/sky.html`, `flights3d.html`, `satellites3d.html`, `community.html`, `login.html`, `full.html`, `obs_dock.html`: separate pages.
 - `src/web/tokens.css`, `src/web/style.css`: design tokens and styles.
 - `src/web/brand/`: logo, favicon and manifest.
 

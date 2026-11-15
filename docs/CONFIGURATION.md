@@ -21,7 +21,7 @@ Run `python3 run_allsky.py --help` for the flags of the version you have install
 | `--camera-index` | `0` | libcamera camera number for `--camera picamera` |
 | `--resolution` | camera default | Capture size `WIDTHxHEIGHT`. Defaults: IMX335 2592x1944, Pi camera full-FOV binned mode, webcam maximum |
 | `--simulator` | off | Force the simulated IMX335 controller (tests, CI, demos). Sets `ALLSKY_SIMULATOR=1` |
-| `--exposure` | `0.2` | Starting exposure in seconds before auto-exposure takes over. If the sun is at or above -2 degrees and the defaults are unchanged, the start is 0.6 ms / 0 dB |
+| `--exposure` | `0.2` | Starting exposure in seconds before auto-exposure takes over. If the exposure is 0.25 s or less, the gain is the default 12 dB and the saved station position puts the sun at or above -2 degrees, the start is 0.6 ms / 0 dB |
 | `--gain` | `12.0` | Starting gain in dB before auto-exposure takes over |
 | `--log-level` | `info` | `debug`, `info`, `warning`, `error` |
 | `--sync-target` | empty (sync OFF) | URL of an optional ingestion server that receives frames and telemetry. Empty means nothing is uploaded. When set, one info line at start names the target. The device id sent is `$ZENIVO_DEVICE_ID` or `zenivo-<hostname>` |
@@ -112,9 +112,9 @@ Keys added when you change the matching setting:
 | `event_detection` | Per-type switches: `meteor`, `plane`, `satellite`, `clouds`, `flash` |
 | `performance` | See [Performance profile](#performance-profile-for-small-hosts) |
 | `storage` | Retention policy, see [Retention and storage](#retention-and-storage) |
-| `adsb` | ADS-B receiver `host`, `port`, `enabled`, Flightradar24 switches and token, `record` |
+| `adsb` | `host`, `port` (default 30003), `enabled` (1), `public_fallback` (0), `contribute` (0), `record` (1: read the feed all the time so the 3D map has recent tracks), `fr24_enabled` (0), `fr24_email`, `fr24_token` |
 | `radiosondes_enabled` | 1 (default) or 0: weather balloons from SondeHub on the Live page. 0 stops the outbound request. The position sent is rounded to 0.5 degrees |
-| `traffic_log`, `day_objects` | Retention settings of the aircraft/satellite log, and the daytime object detection settings. `day_objects` keys (defaults, bounds): `enabled` (1), `classes` (`plane`, `bird`, `insect`, `object`), `sensitivity` (`normal`; `low`, `normal`, `high`), `min_blob_area` (2; 1 to 100), `max_blob_area` (700; 5 to 5000), `min_contrast_dn` (none = from the preset; 3 to 100), `retention_days` (14; 1 to 90), `max_mb` (50; 5 to 500) |
+| `traffic_log`, `day_objects` | Aircraft/satellite log (`data/traffic/`; keys and defaults: `enabled` 1, `interval_s` 5, minimum 1, `retention_days` 14, minimum 1, `max_mb` 150, minimum 5) and the daytime object detection settings. `day_objects` keys (defaults, bounds): `enabled` (1), `classes` (`plane`, `bird`, `insect`, `object`), `sensitivity` (`normal`; `low`, `normal`, `high`), `min_blob_area` (2; 1 to 100), `max_blob_area` (700; 5 to 5000), `min_contrast_dn` (none = from the preset; 3 to 100), `retention_days` (14; 1 to 90), `max_mb` (50; 5 to 500) |
 | `obs_overlay` | OBS browser-source overlay options |
 | `google_maps_key` | Optional key that enables Google map layers in Flights 3D |
 | `focus_record`, `focus_history`, `lens_focus` | Focus results, history and motorised-lens state |
@@ -172,7 +172,7 @@ displayed frame and turn with the image when you change the orientation.
 - **Public location precision**: `0` (exact), `0.01` (about 1 km), `0.1` (about 10 km, default) or `1.0` (about 100 km).
   Guests and the community card see the station location rounded to this grid; you see it exact. Stored as
   `public_precision_deg` in `data/community.json`.
-- **Relay previews** (Settings, Community): `relay_previews` in `data/community.json`, default on (turn it off under Settings, Community). While on, this station stores and serves
+- **Relay previews** (Settings, Community): `relay_previews` in `data/community.json`, default on. The same file holds the other community settings (`enabled` off, `name`, `public_url`, `share_thumbnail` on, `share_preview` on, `allow_open` on, `seeds`) (turn it off under Settings, Community). While on, this station stores and serves
   large previews of stations without a public address (up to 100 stations / 25 MB, 24 h; see [COMMUNITY.md](COMMUNITY.md#preview-relays)).
   A station without a public URL needs no setting: it sends its preview to relays automatically while "Share a preview image" and
   "Let visitors enlarge the preview" are on.
@@ -182,8 +182,12 @@ displayed frame and turn with the image when you change the orientation.
 ### Integrations
 
 - **ADS-B receiver**: host and port of an SBS-1 / BaseStation feed (usually port 30003), a switch,
-  and the Flightradar24 Enterprise feed (email and password for a login, or a token). Without a
-  local receiver, aircraft come from Flightradar24 around the station when it is enabled.
+  and the Flightradar24 Enterprise feed (email and password for a login, or a token). Aircraft
+  come from your own receiver first. While it delivers nothing, the opt-in public fallback
+  (`adsb.public_fallback`, off by default) uses a public ADS-B network (adsb.fi, then adsb.lol) and
+  sends the station position rounded to 0.5 degrees. `adsb.contribute` (off by default) shares what
+  your own receiver hears with the Zenivo aircraft network, signed with the station key; it never
+  forwards public-network or Flightradar24 data. Flightradar24 data is added on top when enabled.
   The Flightradar24 feed is off until `adsb.fr24_enabled` is set to 1 (Settings, Integrations, Flightradar24
   block: switch, e-mail, password, token); it is an opt-in outbound connection. The token and the password are
   write-only (never shown again; the password is kept in memory only).
@@ -203,13 +207,13 @@ The retention job runs 30 s after start and then every hour. Defaults:
 | `archive_interval_s` | `30` | Seconds between archived frames (the first 15 frames of a day are taken every 2.5 s) |
 | `max_events_per_day` | `1000` | Events saved per day; more are dropped (protects against false-alarm storms) |
 | `timelapse_refresh_s` | `1800` | Seconds between live timelapse re-encodes |
-| `extra_dirs` | `[]` | `[{"path": ..., "keep_days": N}]`, filled by `--prune-dir` |
+| `extra_dirs` | `[]` | `[{"path": ..., "keep_days": N}]`, filled by `--prune-dir` only (not settable through the API or the saved config) |
 
 The job works in two passes. Age rules delete frame days, dated products and event days older than
 their limits. Size rules then delete the oldest days, never today's data or the `latest.*` files,
 until `data/` is under `max_data_gb` and the free space is above `min_free_gb`. Read the policy with
 `GET /api/storage`, change it with `PUT /api/storage/policy`, run it now with
-`POST /api/storage/cleanup`. Archived frames are AVIF files (`frame_*.avif`, 1296 px wide, quality
+`POST /api/storage/cleanup`. The API accepts `frames_keep_days` 1 to 365, `products_keep_days` 1 to 3650, `max_data_gb` 0.5 to 10000, `min_free_gb` 0.1 to 1000, `archive_interval_s` 5 to 3600 and `timelapse_refresh_s` 60 to 86400; `max_events_per_day` is not settable through it. Archived frames are AVIF files (`frame_*.avif`, 1296 px wide, quality
 62); older `frame_*.jpg` files stay readable.
 
 ## Performance profile for small hosts

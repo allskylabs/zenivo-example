@@ -17,12 +17,14 @@ A card is one JSON object of at most 16 KB:
 
 | Field | Meaning |
 |-------|---------|
+| `v` | Card version (1) |
 | `id`, `pubkey` | Station id (first 16 bytes of the SHA-256 of the public key, hex) and the Ed25519 public key |
 | `name` | Station name (60 characters at most; defaults to the station location name) |
 | `lat`, `lon` | Location rounded to a grid: about 1 km (0.01 deg), about 10 km (0.1 deg, default) or about 100 km (1 deg). Setting the precision to `0` sends the exact position, so leave it on a grid value unless you want that |
 | `url` | Public https address of the station, or null |
 | `camera`, `software` | Sensor name and `Zenivo <version>` |
 | `updated` | Unix time the card was signed |
+| `open`, `preview` | Optional, only with a public URL: `open: false` removes the map's "Open station" link, `preview: true` says `<url>/api/community/preview.jpg` serves a large image (see "What map visitors may do") |
 | `thumb` | Optional preview of at most 8 KB, only for stations without a public URL and only when preview sharing is on |
 | `relays`, `preview_sha`, `preview_t` | Optional, only for a station without a public URL whose large preview is held by relay stations: up to 3 https origins, the SHA-256 of the image that was uploaded and the upload time. Stations that predate these fields reject such a card as having an unknown field, so they do not show that station; cards without these fields are unchanged |
 | `sig` | Ed25519 signature over the card without `sig` (canonical JSON: sorted keys, no spaces, UTF-8) |
@@ -124,7 +126,7 @@ Behind a reverse proxy the announce rate limit sees the proxy address, so all an
 - **Relay abuse**: a relay hosts images chosen by other stations. Mitigations: only a station whose card we know and whose
   key signs the upload (bound to the exact bytes and the time) can store, one image per station, every image is
   decoded and re-encoded here (no metadata, no active content, at most 1280 px), 100 stations / 25 MB / 24 h caps,
-  rate limits before any work, and the owner can turn it off (default) and that deletes everything. Anyone can still create
+  rate limits before any work, and the owner can turn it off (it is on by default) and that deletes everything. Anyone can still create
   new identities, so a relay can briefly host an unwanted picture: it is gone within 24 h.
 - **Key**: the private key lives in `data/community_key.pem` (mode 0600). Deleting it gives the station a new id.
 - Requires the `cryptography` package; without it Community reports "not available" and the rest of Zenivo is unaffected.

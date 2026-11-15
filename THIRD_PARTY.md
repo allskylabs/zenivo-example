@@ -104,4 +104,5 @@ this table is only about the terms of the data. Using a service is the station o
 | Google Map Tiles (`tile.googleapis.com`) | Optional 2D tiles, only with your own Google Maps key | Google Maps Platform terms apply to your key |
 | flagcdn.com, pics.avs.io | Country flags, airline logos | Third-party image services; **licence not verified** |
 | ipwho.is, ipapi.co | Coordinates of your public IP, only when the admin presses "Locate via GPS / IP" | Third-party services under their own terms; **licence not verified** |
+| Zenivo network server (origin of your `remote_solver_url`) | Community ADS-B picture read with `GET /api/v1/adsb/point/...` and, with its own switch, fed by your receiver; off by default | Project service; terms are those of the operator you point `remote_solver_url` at |
 | Community seeds and other stations | Signed station cards | Project data, see [docs/COMMUNITY.md](docs/COMMUNITY.md) |

@@ -341,7 +341,7 @@ Everything else uses the process's default umask: protect the directory itself.
 | `community_key.pem` | Ed25519 private key of the station. Created only when community sharing is first enabled | High | 0600 |
 | `station_config.json` | Exact latitude and longitude, name, optics, sky mask, ADS-B receiver host and port, `public_fallback`, Flightradar24 e-mail and token (the FR24 password is never stored), `radiosondes_enabled`, `day_objects`, `google_maps_key`, `remote_solver_url`, retention and other settings | High | 0600 |
 | `community.json` | Community settings: switch, name, public URL, precision, preview switches, `relay_previews`, seed list. No secrets | Low | default |
-| `community_relay/<station id>.jpg` | While "Relay previews" is on (the default; the folder only fills when a station uploads): large preview images pushed by other stations (re-encoded JPEG, at most 100 files / 25 MB, deleted after 24 h; the folder is emptied when the switch is turned off) | Low | default |
+| `community_relay/<station id>.jpg` | While "Relay previews" is on (the default; the folder only fills when a station uploads): large preview images pushed by other stations (re-encoded JPEG, at most 100 files / 25 MB, deleted after 24 h; the folder is emptied when the switch is turned off) | Low | 0640 |
 | `community_relays.json` | Only for a station without a public URL: the relay stations that hold your preview (origin, last success, failures) | Low | default |
 | `community_peers.json` | Public cards of other stations and remembered station addresses | Low | default |
 | `frames/<date>/` | Archived sky frames (AVIF) and `telemetry.jsonl` (exposure, gain, star count, cloud cover). Kept 7 days by default | Medium | default |

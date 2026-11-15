@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Document version | 1.0.0 (2026-11-13), describes Zenivo 1.0.0 |
+| Document version | 1.1.0 (2026-11-15), describes Zenivo 1.2.0 |
 | Repository | `github.com/hoanb1/zenivo` |
 | Production | https://station.example.org (Raspberry Pi 4, `/home/pi/zenivo`, systemd `zenivo`; legacy symlink `/home/pi/allsky-ng` kept) |
 
@@ -11,7 +11,8 @@
 Zenivo (all-sky observatory software) is the edge software for one all-sky camera. It captures frames and runs auto-exposure
 and dark calibration. It builds the observing products (keogram, startrails, timelapse),
 estimates cloud cover, detects sky events, assists focusing, plate-solves the camera pointing,
-serves a web UI and optionally pushes frames and telemetry to a configured ingestion server (off by default).
+serves a web UI behind a single-admin login and optionally pushes frames and telemetry to a configured ingestion server (off by default).
+It can also take part in the opt-in Community network (signed station cards, section 6.5).
 
 This document covers the edge station only. The remote sync server is a separate project. It provides
 the `/api/allsky/ingest/*` endpoints and the plate solver.
@@ -52,8 +53,10 @@ and [API.md](API.md).
             │ src/analytics     cloud cover/history, sky events, traffic (ADS-B, FR24, │
             │                   satellites, radiosondes), day objects, focus          │
             │ src/storage       AVIF frame codec, retention                           │
+            │ src/auth          admin login, sessions, default-deny policy            │
+            │ src/community     opt-in signed station cards, gossip, preview relay    │
             │ src/api           FastAPI routes, WS/MJPEG/SSE streams, page shell       │
-            │ src/web           UI (index.html + app/01..08-*.js, focus.js, ...)     │
+            │ src/web           UI (index.html + app/01..10-*.js, focus.js, ...)     │
             │ _sync_worker ───► SyncClient ──► sync server /api/allsky/ingest/*            │
             └───────────────────────────────────────────────────────────────────────────┘
  browser ◄── nginx :80 ◄── cloudflared (station.example.org)      data/ (frames, products, logs, config)
@@ -66,14 +69,17 @@ and [API.md](API.md).
 | `src/hardware` | Camera backends behind `CameraDriverInterface` (`driver_interface.py`): `driver.py` (RTS5869 + factory), `xu.py` (UVC extension unit), `registers.py` (IMX335 timing math), `v4l2_mmap.py` (mmap capture, RAW10 demosaic, ISP shading correction), `picamera.py`, `uvc_generic.py`, `simulator.py`, `constants.py` |
 | `src/calibration` | `dark.py` (master darks, hot-pixel maps), `auto_exposure.py` (solar elevation, day/night AE), `bright_star_solver.py` (local plate solve), `station_solver.py` (remote blind solve), `stacking.py` (unused by the service) |
 | `src/pipeline` | `keogram.py`, `startrails.py`, `timelapse.py` (encode + banner), `star_boost.py`, `hot_pixels.py`, `highlights.py`, `overlay.py` (not used live; the sky overlay is drawn client-side) |
-| `src/analytics` | `cloud_cover.py`, `cloud_history.py`, `cloud_backfill.py` (CLI), `stars_clouds.py`, `star_clarity.py`, `sky_events.py`, `day_objects.py` (daytime birds, insects, aircraft, rain), `adsb.py`, `adsb_public.py` (public ADS-B fallback), `fr24.py`, `aircraft_info.py`, `airports.py`, `satellites.py` (SGP4 from TLEs), `radiosonde.py`, `traffic_log.py`, `focus.py`, `focus_tracker.py`, `meteors.py`, `meteor.py` (legacy, tests only) |
-| `src/api` | `main.py` (app factory, page shell, static mounts), `app.py` (re-export of the app), `routes.py` (REST), `stream.py` (WS/MJPEG/SSE), `schemas.py`, `histogram.py`, `service_consts.py`, `service.py` (`AllSkyService` core: state, capture cycle, telemetry) and the mixins that add its methods: `calibration_mixin.py`, `products_mixin.py`, `events_mixin.py`, `traffic_mixin.py`, `station_mixin.py`, `focus_mixin.py`, `lens_mixin.py`, `plate_solve_mixin.py`. The public API of the service is unchanged by the split |
+| `src/analytics` | `cloud_cover.py`, `cloud_history.py`, `cloud_backfill.py` (CLI), `stars_clouds.py`, `star_clarity.py`, `sky_events.py`, `day_objects.py` (daytime birds, insects, aircraft, rain), `adsb.py`, `adsb_public.py` (public ADS-B fallback), `adsb_contribute.py` (opt-in share of the own receiver with the Zenivo network), `fr24.py`, `aircraft_info.py`, `airports.py`, `satellites.py` (SGP4 from TLEs), `radiosonde.py`, `traffic_log.py`, `focus.py`, `focus_tracker.py`, `meteors.py`, `meteor.py` (legacy, tests only) |
+| `src/api` | `main.py` (app factory, page shell, static mounts), `app.py` (re-export of the app), `routes.py` (REST), `stream.py` (WS/MJPEG/SSE), `schemas.py`, `histogram.py`, `service_consts.py`, `guest_view.py` (strips operator-only keys from guest payloads), `ttl_cache.py`, `service.py` (`AllSkyService` core: state, capture cycle, telemetry) and the mixins that add its methods: `calibration_mixin.py`, `products_mixin.py`, `events_mixin.py`, `traffic_mixin.py`, `station_mixin.py`, `focus_mixin.py`, `lens_mixin.py`, `plate_solve_mixin.py`. The public API of the service is unchanged by the split |
+| `src/auth` | Single-admin access control, see [SECURITY.md](SECURITY.md): `manager.py` (scrypt password, hashed session tokens, setup code, login throttling), `policy.py` (`classify()`, the one place that decides guest or admin; CSRF origin check, client key), `middleware.py` (`AuthMiddleware`, applies the policy to HTTP and the WebSocket handshake), `routes.py` (`/api/auth/*`), `rounding.py` (guest rounding of the station position) |
+| `src/community` | Opt-in network of signed station cards, see [COMMUNITY.md](COMMUNITY.md): `identity.py` (Ed25519 key), `card.py` (build and verify), `registry.py` (known cards and contacts), `gossip.py` (15 min rounds), `manager.py` (settings, announce, relay glue), `relay.py` (preview store for stations without a public URL), `netguard.py` (SSRF guard, bounded JSON fetch), `thumb.py` (preview images) |
+| `src/defaults.py` | Neutral factory station (name "My station", 0, 0) |
 | `src/net.py` | Shared outbound HTTPS helper: one SSL context and a keep-alive urllib3 pool reused by every outbound request (certificate verification stays on) |
 | `src/storage` | `frame_codec.py` (AVIF frame read/write, legacy JPEG still readable), `retention.py` (age and size cleanup) |
 | `src/version.py` | Product name and version, the single source (`__version__`, `PRODUCT`) |
 | `src/sync` | `client.py` (used in production), `queue.py` and `daemon.py` (SQLite queue and circuit breaker; tested but not wired up) |
 | `src/activity.py` | User-facing activity log (`data/logs/activity.jsonl`) |
-| `src/web` | Static UI. `index.html` is the shell of `/live`, `/gallery`, `/logs`, `/focus`, `/calibration`, `/settings`; `app/01-core.js` to `08-gallery-adsb.js` are classic scripts with one shared global scope, loaded in numeric order; `focus.js`, `activity.js`, `sky_catalog.js`; separate pages `sky.html`, `flights3d.html`, `satellites3d.html`, `obs_dock.html`, `full.html`; `tokens.css` and `style.css`; `brand/`; `sky/` (built skyview bundle) and `skydata/` (star tiles, catalogues). Navigation, brand block and page head are generated from one definition by `scripts/sync_nav.py` (`--check` verifies) |
+| `src/web` | Static UI. `index.html` is the shell of `/live`, `/gallery`, `/logs`, `/focus`, `/calibration`, `/settings`; `app/01-core.js` to `10-admin.js` (ten, including `09-community.js` and `10-admin.js`) are classic scripts with one shared global scope, loaded in numeric order; `focus.js`, `activity.js`, `auth.js`, `sky_catalog.js`; separate pages `login.html` (with `login.js`), `community.html` (with `community.js`), `sky.html`, `flights3d.html`, `satellites3d.html`, `obs_dock.html`, `full.html`; `tokens.css` and `style.css`; `brand/`; `geo/` (Natural Earth coastlines for the community map); `sky/` (built skyview bundle) and `skydata/` (star tiles, catalogues). Navigation, brand block and page head are generated from one definition by `scripts/sync_nav.py` (`--check` verifies) |
 | `tools/` | `adsb_feeder.py`, `isp_calibrate.py`, `convert_frames_avif.py`, `skyview/` (TypeScript source of the planetarium bundle; the committed bundle in `src/web/sky/` is what ships, and its build needs two sibling repositories that are not published yet, see `tools/skyview/README.md` and `THIRD_PARTY.md`) |
 
 ## 3. Startup
@@ -87,9 +93,9 @@ and [API.md](API.md).
 4. Create the `AllSkyService` singleton.
 5. For a real camera, start the camera watchdog. If the service has fallen back to the
    simulator, the watchdog retries the real camera every 30 s and hot-swaps it in.
-6. Restore saved manual camera settings, build the FastAPI app, apply the `--prune-dir` specs and
+6. Restore saved manual camera settings, build the FastAPI app (security headers, CORS, then `AuthMiddleware` outermost), apply the `--prune-dir` specs and
    start `_sync_worker` if `--sync-target` is set.
-7. Run `uvicorn` as a single process (proxy headers trusted). On exit, stop sync and close the
+7. Run `uvicorn` as a single process (`proxy_headers=True`, `forwarded_allow_ips=127.0.0.1`). On exit, stop sync and close the
    camera.
 
 CLI flags: see [CONFIGURATION.md](CONFIGURATION.md#command-line-flags). Environment variables:
@@ -219,12 +225,12 @@ cloud events.
 ### 6.1 Web UI
 
 One page shell (`index.html`) is served at `/`, `/live`, `/gallery`, `/settings`, `/calibration`,
-`/logs` and `/focus`. The live viewport is pre-sized to the frame's aspect ratio. The eight scripts in
+`/logs` and `/focus`; `/settings`, `/calibration`, `/focus` and `/logs` are admin pages (guests are redirected to `/login`). The live viewport is pre-sized to the frame's aspect ratio. The ten scripts in
 `src/web/app/` (core and routing, controls and calibration, station settings, live view, client-side
-sky overlay, telemetry, cloud chart, gallery/events/ADS-B) share one global scope and run in numeric
+sky overlay, telemetry, cloud chart, gallery/events/ADS-B, community, admin) share one global scope and run in numeric
 order. Each page loads only the data of its own tab. `focus.js` and `activity.js` cover their own
 pages. `sky_catalog.js` holds the constellations, stars and Messier objects. `/sky`, `/flights3d`,
-`/satellites3d`, `/obs` (alias `/full`) and `/obs/dock` are separate pages. The UI keeps viewer
+`/satellites3d`, `/community`, `/login`, `/obs` (aliases `/full`, `/live/full`) and `/obs/dock` (admin, aliases `/obs/control`, `/dock`) are separate pages. The UI keeps viewer
 preferences in `localStorage` under the key `allsky.ui.prefs.v1`. The Red Vision theme
 (`data-theme="red"`) is an alternate token palette, see [BRAND.md](BRAND.md).
 
@@ -252,11 +258,14 @@ preferences in `localStorage` under the key `allsky.ui.prefs.v1`. The Red Vision
 | Products | `GET /api/gallery`, `POST /api/timelapse/generate`, `POST /api/timelapse/build`, `GET /api/events`, `GET/POST /api/events/config`, `/api/frames/*`, `/uploads/...` |
 | Traffic | `GET /api/adsb/aircraft`, `/api/satellites`, `/api/radiosondes`, `/api/traffic`, `/api/day-objects`, `GET/POST /api/adsb`, `GET/POST /api/day-objects/config` |
 | Meta, OBS | `GET /api/version`, `GET/POST /api/obs/overlay`, `POST /api/obs/reload` |
+| Ops | `GET /api/storage`, `POST /api/storage/cleanup`, `PUT /api/storage/policy`, `GET /api/logs`, `/api/logs/download` |
+| Auth | `GET /api/auth/status`, `POST /api/auth/{setup,login,logout,logout-all,password}` |
+| Community | `GET /api/community/{status,card,peers,thumb.jpg,preview.jpg,settings}`, `POST /api/community/{settings,check,announce}`, `GET/POST /api/community/relay/<id>` |
+| Map | `GET /api/map/config`, `/api/map/airports`, `/api/planets` |
 
 The full list is in [API.md](API.md).
-| Ops | `GET /api/storage`, `POST /api/storage/cleanup`, `PUT /api/storage/policy`, `GET /api/logs`, `/api/logs/download` |
 
-Access control is a single-admin login (docs/SECURITY.md): default deny for every change, guests may watch. Bind to 127.0.0.1 behind nginx
+Access control is a single-admin login ([SECURITY.md](SECURITY.md)): default deny for every change, guests may watch. The server binds to 127.0.0.1 by default (`--host`); keep it behind nginx
 and cloudflared (or a trusted network).
 
 ### 6.4 Sync to a remote server
@@ -273,13 +282,24 @@ simply tries again. Failures and recoveries are written to the activity log.
 `SyncQueue` (SQLite WAL, priorities, exponential backoff with jitter, retry times in local time)
 and `SyncDaemon` (circuit breaker) exist and are tested, but are not used in production.
 
+### 6.5 Community and the Zenivo network
+
+Both are opt-in and off by default. Community (`src/community`, [COMMUNITY.md](COMMUNITY.md)) shares an Ed25519-signed station card by
+gossip every 15 minutes with the seed list and known stations, with no central server; stations without a public URL can park a
+large preview on relay stations. `src/analytics/adsb_public.py` can read aircraft from the Zenivo network origin (the origin of
+`remote_solver_url`), then adsb.fi, then adsb.lol, only while the own receiver is silent and the fallback switch is on;
+`src/analytics/adsb_contribute.py` can post the own receiver's aircraft to that origin, signed with the community key. Every outbound
+connection is listed in [TRANSPARENCY.md](TRANSPARENCY.md).
+
 ## 7. Data and configuration
 
-Everything is under `data/` (git-ignored). Dates are local `YYYY-MM-DD`. Files that hold secrets or the station position (`admin*.json`, `admin_setup_code.txt`, `community_key.pem`, `station_config.json`) and their modes are listed in [TRANSPARENCY.md](TRANSPARENCY.md#6-files-stored-on-the-host).
+Everything is under `data/` (git-ignored). Dates are local `YYYY-MM-DD`. Files that hold secrets or the station position (`admin.json`, `admin_sessions.json`, `admin_setup_code.txt`, `community_key.pem`, `station_config.json`) and their modes are listed in [TRANSPARENCY.md](TRANSPARENCY.md#6-files-stored-on-the-host).
 
 ```
 data/
 ├── station_config.json            station settings (see below)
+├── admin.json, admin_sessions.json, admin_setup_code.txt   admin login (0600)
+├── community.json, community_key.pem, community_peers.json, community_relays.json, community_relay/   Community (off by default)
 ├── frames/<date>/frame_*.avif     archived frames, 1296 px (legacy frame_*.jpg still read)
 │               telemetry.jsonl    {filename, timestamp, exposure_s, gain_db, star_count, cloud_cover_pct}
 ├── live/latest.webp               refreshed every ≤120 s
@@ -314,6 +334,7 @@ data/
 | `sky_roi`, `sky_mask` | Sky region and polygons |
 | `star_boost` | Star boost on/off and bin size |
 | `event_detection` | Per-type switches |
+| `remote_solver_url` | Optional remote blind plate solver and Zenivo network origin (empty = nothing is sent) |
 | `performance` | `min_capture_interval_s` 2, `analysis_max_width` 960, `sky_analysis_enabled` 1, `analysis_interval_s` 300, `stream_max_width` 960, `stream_jpeg_quality` 75 |
 | `storage` | Retention policy |
 | `focus_record`, `focus_history`, `lens_focus` | Focus results, history and lens state |
@@ -366,11 +387,11 @@ holds a few hours that are 2026-10-18 in local time.
 
 | Item | Value |
 |---|---|
-| Host | Raspberry Pi 4 (`<pi-host>`), Wi-Fi. An optional ingestion/plate-solver service may run on the same Pi on :3000 |
-| Service | `deploy/zenivo-pi.service` (live unit `zenivo`; new installs use the `deploy/zenivo.service` template through `install.sh`): user `pi`, group `video`, `.venv/bin/python run_allsky.py --host 127.0.0.1 --port 8095 --camera auto --sync-target http://127.0.0.1:3000 --sync-interval 60 --log-level warning --no-access-log --prune-dir …archive:3 --prune-dir …events:90`, `Restart=always`, `Nice=5`, `MemoryMax=700M` |
+| Host | Raspberry Pi 4 (`<pi-host>`), Wi-Fi |
+| Service | `deploy/zenivo-pi.service` (live unit `zenivo`; new installs use the `deploy/zenivo.service` template through `install.sh`): user `pi`, group `video`, `.venv/bin/python run_allsky.py --host 127.0.0.1 --port 8095 --camera auto --sync-target <ingestion url> --sync-interval 60 --log-level warning --no-access-log --prune-dir …archive:3 --prune-dir …events:90`, `Restart=always`, `Nice=5`, `MemoryMax=700M` |
 | Web | `deploy/nginx-zenivo.example.conf`: :80 → 127.0.0.1:8095, WebSocket upgrade, `proxy_buffering off`, 3600 s timeouts. cloudflared maps station.example.org → :80 and is never restarted for allsky |
 | Development instance | Service `zenivo` on port 8080 from the repo checkout |
-| New installs | `./install.sh` creates `.venv`, installs the dependencies and a `zenivo` unit; see [INSTALL.md](INSTALL.md) |
+| New installs | `./install.sh` creates `.venv`, installs the dependencies and a `zenivo` unit (bound to `127.0.0.1` unless `--host` is given); see [INSTALL.md](INSTALL.md) |
 
 To deploy:
 
@@ -383,8 +404,8 @@ Restart the service once per deploy, and run long installs on the Pi with `nohup
 
 ## 10. Testing
 
-`python3 -m pytest -q` runs the full suite (591 tests collected at 1.0.0) under `tests/unit`,
-`tests/e2e` and `tests/integration`. Five tests are known to fail at 1.0.0, see [CHANGELOG.md](../CHANGELOG.md). Synthetic fixtures live in `tests/fixtures` and `conftest.py`.
+`python3 -m pytest -q` runs the full suite under `tests/unit`,
+`tests/e2e` and `tests/integration`. Known failures, if any, are in [CHANGELOG.md](../CHANGELOG.md). Synthetic fixtures live in `tests/fixtures` and `conftest.py`.
 
 Caveat: `test_hardware.py::test_live_camera_capture_if_available` opens a real camera. Modules
 that import `src.api.main` build a service at collection time, which detects the real camera and
@@ -393,11 +414,10 @@ single test files while iterating.
 
 ## 11. Known gaps
 
-- The edge API has a single-admin login (see docs/SECURITY.md); a visitor who is not signed in can only watch.
+- The edge API has a single-admin login ([SECURITY.md](SECURITY.md)); a visitor who is not signed in can only watch. There is no second account and no role other than admin and guest.
 - The sync client does not use the persistent queue, so frames missed during an outage are not
   re-sent.
 - `src/pipeline/overlay.py`, `src/calibration/stacking.py` and `src/analytics/meteor.py` are not
   used by the live service.
 - The `--reload` flag is parsed but not passed to uvicorn.
-- The `--min-capture-interval` help text says the default is 1.0 s, but the code default is 2.0 s.
 - `--sync-target` defaults to empty (sync off); the sync worker only starts when a URL is given.

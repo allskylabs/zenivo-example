@@ -47,6 +47,7 @@ object of `/api/adsb/aircraft` and `/api/satellites`; the ADS-B receiver address
 |--------|------|---------|
 | GET | `/`, `/live`, `/gallery`, `/settings`, `/calibration`, `/logs`, `/focus` | Single-page UI shell (`index.html`) |
 | GET | `/sky`, `/flights3d`, `/satellites3d`, `/community` | Separate pages: observer sky view, Flights 3D, Satellites 3D, Community map |
+| GET | `/login` | Admin sign-in and first-start setup page |
 | GET, HEAD | `/full`, `/live/full`, `/obs` | Clean full-frame live page (OBS browser source) |
 | GET, HEAD | `/obs/dock`, `/obs/control`, `/dock` | OBS dock page (admin: redirects to `/login`) |
 | GET | `/index.html`, `/style.css`, `/static/focus.js` | Shell and legacy asset aliases |
@@ -73,8 +74,8 @@ object of `/api/adsb/aircraft` and `/api/satellites`; the ADS-B receiver address
 | POST | `/api/camera/mode` | Body `mode` (`auto` or `manual`) or `auto` (bool) |
 | POST | `/api/camera/auto` | Toggle auto-exposure |
 | GET, POST | `/api/camera/ae-lock` | Read or set the exposure lock: `lock` (`none`, `exposure`, `gain`, `both`), `value`, `exposure_s`, `gain_db` |
-| POST | `/api/camera/target-brightness` | Body `value` (0 to 255): auto-exposure target luma |
-| GET, POST | `/api/camera/orientation` | Image transform: `flip_horizontal`, `flip_vertical`, `rotate_deg` (0 or 180) |
+| POST | `/api/camera/target-brightness` | Body `value` (0 to 255, or null for the built-in day/night targets): auto-exposure target luma |
+| GET, POST | `/api/camera/orientation` | Image transform: `flip_horizontal`, `flip_vertical`, `rotate_deg` (0 or 180), `rotate_isp_180` (extra 180 degrees for day frames only) |
 | GET, POST | `/api/camera/white-balance` | `mode` (`auto`, `manual`), `r_gain`, `b_gain` (0.4 to 4) |
 | GET, POST | `/api/camera/resolution` | Output resolution: `width`, `height` (must match a preset) |
 | GET, POST | `/api/camera/star-boost` | `enabled`, `bin` (2 to 4) |
@@ -94,7 +95,7 @@ object of `/api/adsb/aircraft` and `/api/satellites`; the ADS-B receiver address
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/api/station/config` | Station coordinates, optics, orientation, solve result |
-| POST | `/api/station/location`, `/api/station/settings` | Save coordinates and manual optics/pointing overrides (`latitude_deg`, `longitude_deg`, `elevation_m`, `location_name`, lens fields, `azimuth_deg`, `altitude_deg`, ...) |
+| POST | `/api/station/location`, `/api/station/settings` | Save coordinates and manual optics/pointing overrides (`latitude_deg`, `longitude_deg`, `elevation_m`, `location_name`, lens fields, `azimuth_deg`, `altitude_deg`, `remote_solver_url` (opt-in remote plate solver; empty = never upload), ...) |
 | POST | `/api/station/auto-locate` | Locate the station by IP geolocation. Query `auto_plate_solve` |
 | POST | `/api/station/plate-solve` | Run a plate solve in the request. Query `fov_hint` |
 | POST | `/api/station/plate-solve/start` | Start a background plate solve. Query `fov_hint`, `mode` (`auto` or `deep`) |
@@ -158,8 +159,8 @@ it, and captures are cached for `max(min_capture_interval_s, 0.9 x exposure)`.
 |--------|------|---------|
 | GET | `/api/gallery` | Keogram, startrails and timelapse items of the day |
 | POST | `/api/gallery/generate`, `/api/timelapse/generate` | Rebuild the day's products. Query `fps` (1 to 60, default 12) |
-| POST | `/api/timelapse/build` | Timelapse over a date range. Query `date_from`, `date_to` (`YYYY-MM-DD`, required), `fps`, `width`, `overlay` |
-| GET | `/api/events`, `/api/events/meteors` | Sky events. Query `limit` (1 to 3000, default 20), `type` (`meteor`, `plane`, `satellite`, `clouds`, `flash`), `since`, `until`, `brief` |
+| POST | `/api/timelapse/build` | Timelapse over a date range. Query `date_from`, `date_to` (`YYYY-MM-DD`, required), `fps` (1 to 60, default 24), `width` (0 to 1920, 0 = native), `overlay` |
+| GET | `/api/events`, `/api/events/meteors` | Sky events. Query `limit` (1 to 3000, default 20; above 100 only with `brief`), `type` (`meteor`, `plane`, `satellite`, `clouds`, `flash`), `since`, `until`, `brief` |
 | GET | `/api/events/img/{day}/{name}` | Event image |
 | GET, POST | `/api/events/config` | Detection switches: `meteor`, `plane`, `satellite`, `clouds`, `flash` |
 
@@ -168,17 +169,17 @@ it, and captures are cached for `max(min_capture_interval_s, 0.9 x exposure)`.
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/api/frames/near` | Archived frame closest to a time. Query `ts` (required) |
-| GET | `/api/frames/span` | Archived frames in a time range. Query `start`, `end` (required), `max` (1 to 1500, default 600) |
+| GET | `/api/frames/span` | Archived frames in a time range. Query `start`, `end` (required), `max` (1 to 1500, default 600); `end` must follow `start` by at most 12 hours (else 400) |
 | GET | `/api/frames/img/{day}/{name}` | An archived frame (`frame_*.avif` or `.jpg`) |
 
 ## Traffic (aircraft, satellites, radiosondes)
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET, POST | `/api/adsb` | ADS-B and Flightradar24 settings: `host`, `port`, `enabled`, `fr24_enabled` (default off), `fr24_email`, `fr24_password` (used once to log in, never stored), `fr24_token`, `radiosondes_enabled` (default on). POST is admin only. Write-only secrets: GET returns only `fr24_has_token` (never the token or password); the e-mail, also in the nested `fr24` object, is blank for guests |
+| GET, POST | `/api/adsb` | ADS-B and Flightradar24 settings: `host`, `port`, `enabled`, `public_fallback` (default off: use adsb.fi, then adsb.lol, while the receiver delivers nothing; sends the station position rounded to 0.5 degrees), `contribute` (default off: share your own receiver's aircraft with the Zenivo network, signed with the station key), `fr24_enabled` (default off), `fr24_email`, `fr24_password` (used once to log in, never stored), `fr24_token`, `radiosondes_enabled` (default on). POST is admin only. Write-only secrets: GET returns only `fr24_has_token` (never the token or password); the receiver `host`, `network_host` and the e-mail (also in the nested `fr24` object) are blank for guests. The answer also has `public_status`, `contribute_status` and `source_in_use` |
 | GET | `/api/adsb/aircraft` | Aircraft now. Query `limit` (1 to 6000, default 30), `trail` (0 to 900 s), `bounds`, `fr24`, `compact` |
 | GET | `/api/adsb/flight/{fr24_id}` | Flight detail for a Flightradar24 id |
-| GET | `/api/satellites` | Satellites now (orbit data from CelesTrak, refreshed daily). Query `track` (minutes), `below`, `limit` (1 to 400, default 60), `ids` (NORAD list), `trail` (0 to 1800 s) |
+| GET | `/api/satellites` | Satellites now (orbit data from CelesTrak, refreshed daily). Query `track` (0 to 120 minutes), `below`, `limit` (1 to 400, default 60), `ids` (NORAD list), `trail` (0 to 1800 s) |
 | GET | `/api/radiosondes` | Radiosondes (SondeHub; the request to SondeHub carries the station position rounded to 0.5 degrees, see [TRANSPARENCY.md](TRANSPARENCY.md#1-outbound-connections-made-by-the-server)). Query `limit` (1 to 200, default 40). The answer has `enabled`; with `radiosondes_enabled` off nothing is requested and `sondes` is empty |
 | GET | `/api/traffic` | Log of aircraft/satellites seen in the camera view. Query `t0`, `t1` (required), `limit` (default 2000) |
 | GET | `/api/traffic/status` | State of the traffic log |
@@ -192,7 +193,7 @@ it, and captures are cached for `max(min_capture_interval_s, 0.9 x exposure)`.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/sky/clouds/history` | Cloud cover history. Query `hours` (default 24), `end`, `max_points` (10 to 5000, default 600) |
+| GET | `/api/sky/clouds/history` | Cloud cover history. Query `hours` (default 24, up to 9600), `end`, `max_points` (10 to 5000, default 600) |
 | GET, POST | `/api/sky/clouds/config` | Sky region `sky_roi`; `reset_reference` forgets the learned clear-sky reference |
 
 ## Storage and logs

@@ -28,10 +28,11 @@ Files in `src/web/brand/` (served at `/static/brand/`):
 | `mark-mono.svg` | One colour (`currentColor`). Print, stamps, single-colour UI, watermarks |
 | `logo-horizontal.svg` | Mark and wordmark on dark backgrounds (Deep Navy, Ink, photos of the night sky). README, docs, splash |
 | `logo-horizontal-light.svg` | Mark and wordmark on white or light backgrounds (uses the darker blue `#0ea5e9`) |
-| `favicon.svg`, `favicon.ico` | Browser tab icon |
+| `favicon.svg`, `favicon.ico` | Browser tab icon (the mark on a Deep Navy rounded tile) |
 | `icon-192.png`, `icon-512.png` | Web app icons referenced by `site.webmanifest` |
 | `apple-touch-icon.png` | 180 x 180 icon for iOS home screens |
 | `og-image.png` | 1200 x 630 social preview image |
+| `version.js` | Script, not an image: fills every `[data-app-version]` element with "Zenivo v<version>" from `/api/version` |
 | `site.webmanifest` | Web app manifest (name, theme colour, icons) |
 
 ### Clear space and minimum size
@@ -67,6 +68,8 @@ Files in `src/web/brand/` (served at `/static/brand/`):
 | Amber | `#f59e0b` | `--brand-amber`, `--warning` | Warnings |
 | Meteor | `#ef4444` | `--brand-meteor`, `--danger` | Errors and destructive actions |
 
+`tokens.css` also defines spacing (`--space-1` to `--space-6`: 4, 8, 12, 16, 24 px), radii (`--radius-sm` 6 px, `--radius-md` 8 px, `--radius-pill`), `--sidebar-w` (240 px) and short aliases used by `obs_dock.html` (`--bg`, `--card`, `--input`, `--hover`, `--border`, `--text`, `--muted`, `--green`, `--amber`, `--red`).
+
 The accent tint for selected backgrounds is `--accent-bg` (Zenivo Blue at 16 % opacity).
 Use colour for meaning, not decoration: green, amber and red mean good, caution and problem.
 Never rely on colour alone; add text or an icon.
@@ -88,9 +91,11 @@ nothing on screen is blue or green.
 | `--text-muted` | `#8a2e2e` |
 | `--accent` | `#ff4d4d` |
 | `--accent-hover` | `#cc3333` |
+| `--accent-bg` | `rgba(255, 77, 77, 0.16)` |
 | `--success` | `#d94a4a` |
 | `--warning` | `#ff7a5c` |
 | `--danger` | `#ff2d2d` |
+| `--hover` | `#2a0a0a` |
 
 Any new component must read these tokens, never hard-coded hex values, so it works in both themes.
 
@@ -101,8 +106,9 @@ Any new component must read these tokens, never hard-coded hex values, so it wor
 | UI | Inter (fallbacks: system sans-serif) | Headings, labels, body text. Base size 14 px, minimum 12 px |
 | Numbers and telemetry | JetBrains Mono (fallbacks: system monospace) | Exposure, gain, coordinates, times, counters |
 
-Tokens: `--font-sans`, `--font-mono`, `--font-size-body`, `--font-size-min`. Fonts are not bundled;
-the stacks fall back to the system fonts. Use the mono face for values that change, so digits
+Tokens: `--font-sans`, `--font-mono`, `--font-size-body`, `--font-size-min`. Fonts are not bundled:
+most pages load Inter (400 to 700) and JetBrains Mono (400, 600) from Google Fonts, see
+[TRANSPARENCY.md](TRANSPARENCY.md#2-third-party-loads-by-the-browser); without them, or on pages that do not load them, the stacks fall back to the system fonts. Use the mono face for values that change, so digits
 do not jump.
 
 ## Voice
