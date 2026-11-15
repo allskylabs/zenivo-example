@@ -79,7 +79,7 @@ Contents: [Requirements](#requirements) | [Install with install.sh](#install-wit
    curl http://localhost:8080/api/version
    ```
 
-   Expected output: `{"product":"Zenivo","version":"<installed version>"}` (the version in `src/version.py`, currently `1.2.0`).
+   Expected output: `{"product":"Zenivo","version":"<installed version>"}` (the version in `src/version.py`, currently `1.3.0b1`).
 
 6. Set the admin password. Until you do, nobody can change settings. Read the one-time setup code on the
    station and enter it at `http://<host>:8080/login` together with a password of 10 characters or more:

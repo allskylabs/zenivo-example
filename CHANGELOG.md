@@ -6,6 +6,10 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.3.0-beta.1] - 2026-11-15
+
+First public beta. Not every feature has been tested; see the notice in the README.
+
 ### Added
 
 - ZWO ASI cameras: `--camera zwo` (`--camera-index N`) through the `zwoasi` wrapper and ZWO's `libASICamera2` SDK (`ZWO_ASI_LIB` sets its path). RAW16 frames are demosaiced to 8-bit BGR (mono sensors give grey), exposure 32 µs to the camera maximum, gain in 0.1 dB units, hardware binning from `--resolution`. Opt-in, never chosen by `auto`. Optional extra: `pip install zwoasi`. Tested against a fake SDK, and the real SDK loads and reports no camera; not yet run with a camera attached.

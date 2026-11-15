@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Document version | 1.1.0 (2026-11-15), describes Zenivo 1.2.0 |
+| Document version | 1.1.0 (2026-11-15), describes Zenivo 1.3.0-beta.1 |
 | Repository | `github.com/hoanb1/zenivo` |
 | Production | https://station.example.org (Raspberry Pi 4, `/home/pi/zenivo`, systemd `zenivo`; legacy symlink `/home/pi/allsky-ng` kept) |
 
