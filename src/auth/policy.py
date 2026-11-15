@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from http.cookies import SimpleCookie
 from typing import Mapping, Optional
 from urllib.parse import urlsplit
 
@@ -94,16 +93,19 @@ def needs_origin_check(method: str, path: str) -> bool:
 
 
 def session_token(headers: Mapping[str, str]) -> Optional[str]:
+    """The session cookie value. Parsed by hand: http.cookies.SimpleCookie drops EVERY cookie after one it cannot
+    parse (e.g. a Google `g_state={"i_l":0,...}` JSON cookie left on localhost), which silently signed the admin out."""
     raw = headers.get("cookie")
     if not raw:
         return None
-    try:
-        jar = SimpleCookie()
-        jar.load(raw)
-    except Exception:
-        return None
-    morsel = jar.get(COOKIE_NAME)
-    return morsel.value if morsel else None
+    for part in raw.split(";"):
+        name, sep, value = part.strip().partition("=")
+        if sep and name == COOKIE_NAME:
+            value = value.strip()
+            if len(value) >= 2 and value[0] == value[-1] == '"':
+                value = value[1:-1]
+            return value or None
+    return None
 
 
 def safe_next(value: Optional[str]) -> str:

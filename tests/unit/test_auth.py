@@ -201,6 +201,13 @@ class TestPolicy:
         assert policy.session_token({"cookie": "a=b; zenivo_session=tok"}) == "tok"
         assert policy.session_token({}) is None
 
+    def test_cookie_survives_unparseable_neighbours(self):
+        # Google's g_state JSON cookie on the same host used to make the whole header unreadable
+        raw = 'g_state={"i_l":0,"i_e":{"x":24}}; _ga=GA1.1.2; zenivo_session=tok; other=1'
+        assert policy.session_token({"cookie": raw}) == "tok"
+        assert policy.session_token({"cookie": 'zenivo_session="q"'}) == "q"
+        assert policy.session_token({"cookie": "zenivo_sessionX=no; a=zenivo_session=no"}) is None
+
     @pytest.mark.parametrize("action,admin,ok", [
         ("ping", False, True), ("get_telemetry", False, True), ("get_status", False, True),
         ("set_exposure", False, False), ("anything_new", False, False), ("", False, False),
