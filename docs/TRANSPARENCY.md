@@ -125,7 +125,7 @@ Details:
   `src/web/community.html`. Browsers that do not support import-map integrity load those two three.js
   modules unchecked.
 - Links that only open when you click them (not loaded automatically): `globe.adsbexchange.com`,
-  `sondehub.org`, `www.flightradar24.com`, `www.n2yo.com` (`src/web/app/08-gallery-adsb.js`,
+  `sondehub.org`, `www.flightradar24.com`, `www.n2yo.com` (`src/web/app/08b-events-live.js`,
   `src/web/flights3d.html`, `src/web/satellites3d.html`).
 - `/login` and the full-frame live page (`/full`, `/live/full`, `/obs`) load nothing from other hosts. The
   main UI pages (`/`, `/live`, `/gallery`, `/settings`, `/calibration`, `/focus`, `/logs` are all served from

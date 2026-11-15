@@ -1,0 +1,148 @@
+/* ---------------- Activity log & toasts ---------------- */
+.log-badge {
+    display: inline-block;
+    min-width: 1.3em;
+    padding: 0 0.35em;
+    margin-left: 0.3em;
+    border-radius: 999px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    text-align: center;
+}
+.log-summary, .log-storage { padding: 0.5rem 1rem; color: var(--text-muted); font-size: 0.85rem; }
+.log-list { list-style: none; margin: 0; padding: 0 0.5rem 1rem; max-height: 70vh; overflow-y: auto; }
+.log-item {
+    display: grid;
+    grid-template-columns: 9.5rem 5.5rem 6.5rem 1fr;
+    gap: 0.5rem;
+    padding: 0.45rem 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.85rem;
+    align-items: baseline;
+}
+.log-time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.log-level { font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }
+.log-cat { color: var(--text-muted); }
+.log-msg { overflow-wrap: anywhere; }
+.log-repeat { color: var(--text-muted); font-size: 0.75rem; margin-left: 0.4rem; }
+.lvl-info .log-level { color: var(--accent); }
+.lvl-success .log-level { color: var(--success); }
+.lvl-warning .log-level { color: var(--warning); }
+.lvl-error .log-level { color: var(--danger); }
+.lvl-error { background: rgba(239, 68, 68, 0.06); }
+@media (max-width: 700px) {
+    .log-item { grid-template-columns: 1fr 1fr; }
+    .log-msg { grid-column: 1 / -1; }
+}
+.toast-stack {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 1000;
+    max-width: min(26rem, calc(100vw - 2rem));
+}
+.toast {
+    background: var(--bg-card-sub);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--accent);
+    border-radius: 6px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.85rem;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+}
+.toast.lvl-success { border-left-color: var(--success); }
+.toast.lvl-warning { border-left-color: var(--warning); }
+.toast.lvl-error { border-left-color: var(--danger); }
+.toast strong { display: block; font-size: 0.75rem; text-transform: uppercase; margin-bottom: 0.15rem; }
+.log-badge[hidden] { display: none; }
+.toast span { overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+@media (max-width: 768px) {
+    /* phone: toasts sit above the tab bar, compact, at most 2 (see activity.js) */
+    .toast-stack { left: 0.5rem; right: 0.5rem; bottom: calc(4.2rem + env(safe-area-inset-bottom, 0px)); max-width: none; }
+    .toast { padding: 0.4rem 0.6rem; font-size: 0.78rem; }
+    .toast span { -webkit-line-clamp: 2; }
+}
+
+/* Cloud cover history chart */
+.cloud-card .card-header { flex-wrap: wrap; gap: 0.5rem; }
+.cloud-ranges { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.btn-range {
+    background: var(--bg-card-sub);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+}
+.btn-range:hover { color: var(--text-primary); border-color: var(--accent); }
+.btn-range.active { color: var(--bg-primary); background: var(--accent); border-color: var(--accent); }
+.cloud-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.25rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+.cloud-summary strong { color: var(--text-primary); font-family: var(--font-mono); }
+.cloud-legend { margin-left: auto; display: inline-flex; align-items: center; gap: 0.35rem; color: var(--text-muted); }
+.cloud-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; }
+.cloud-legend .lg-night { background: rgba(148, 163, 184, 0.14); border: 1px solid rgba(148, 163, 184, 0.25); margin-left: 0.5rem; }
+.cloud-legend .lg-low { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--accent); background: var(--bg-card); margin-left: 0.5rem; }
+.cloud-chart-wrap { position: relative; width: 100%; }
+#cloud-chart { display: block; width: 100%; height: 260px; touch-action: pan-y; }
+#cloud-chart .grid { stroke: rgba(255, 255, 255, 0.06); stroke-width: 1; }
+#fv-chart .grid { stroke: rgba(255, 255, 255, 0.06); stroke-width: 1; }
+#cloud-chart .axis-label { fill: var(--text-muted); font-size: 12px; font-family: var(--font-mono); }
+#fv-chart .axis-label { fill: var(--text-muted); font-size: 12px; font-family: var(--font-mono); }
+#cloud-chart .night-band { fill: rgba(148, 163, 184, 0.09); }
+#fv-chart .night-band { fill: rgba(148, 163, 184, 0.09); }
+#cloud-chart .cc-area { fill: rgba(56, 189, 248, 0.12); }
+#fv-chart .cc-area { fill: rgba(56, 189, 248, 0.12); }
+#cloud-chart .cc-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+#fv-chart .cc-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+#cloud-chart .cc-low { fill: var(--bg-card); stroke: var(--accent); stroke-width: 2; }
+#fv-chart .cc-low { fill: var(--bg-card); stroke: var(--accent); stroke-width: 2; }
+#cloud-chart .crosshair { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3; }
+#fv-chart .crosshair { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3; }
+#cloud-chart .hover-dot { fill: var(--accent); stroke: var(--bg-card); stroke-width: 2; }
+#fv-chart .hover-dot { fill: var(--accent); stroke: var(--bg-card); stroke-width: 2; }
+.cloud-tooltip {
+    position: absolute;
+    top: 8px;
+    pointer-events: none;
+    background: var(--bg-card-sub);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.cloud-tooltip strong { color: var(--text-primary); font-size: 0.95rem; }
+.cloud-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 1rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+.cloud-empty.hidden, .cloud-tooltip.hidden { display: none; }
+@media (max-width: 700px) {
+    #cloud-chart { height: 200px; }
+    .cloud-legend { margin-left: 0; flex-wrap: wrap; row-gap: 0.25rem; max-width: 100%; }
+}
+

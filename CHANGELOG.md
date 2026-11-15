@@ -8,6 +8,7 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Changed
 
+- Large files split without behaviour change: `src/api/routes.py` became the `src/api/routes/` package, `service.py` shrank from 1199 to about 530 lines (four new mixins), `focus.js` became `src/web/focus/*.js`, the sky overlay and gallery scripts and `style.css` were split into parts. CI now also runs on push and lints with `ruff`; issue and pull request templates added.
 - Code cleanup: removed unused imports and variables, fixed a missing `Tuple` import; added a `ruff` pyflakes-only configuration to `pyproject.toml`.
 
 ## [1.3.0-beta.1] - 2026-11-15

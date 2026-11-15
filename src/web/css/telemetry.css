@@ -1,0 +1,197 @@
+/* Telemetry HUD Gauges */
+.gauge-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+
+.gauge-box {
+    background: var(--bg-card-sub);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.gauge-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.gauge-number {
+    font-size: 1.15rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    margin-top: 0.2rem;
+}
+
+.registers-box {
+    margin-top: 1rem;
+    background: #020408;
+    border-radius: 6px;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--border-color);
+}
+
+.reg-title {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+}
+
+.registers-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.registers-row strong {
+    color: var(--accent);
+}
+
+/* Badges & Alerts */
+.badge {
+    background: var(--bg-card-sub);
+    border: 1px solid var(--border-color);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+}
+
+.badge-accent {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.badge-success {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: var(--success);
+    color: var(--success);
+}
+
+.badge-warning {
+    background: rgba(245, 158, 11, 0.15);
+    border-color: var(--warning);
+    color: var(--warning);
+}
+
+.badge-danger {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.alert-box {
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    margin-top: 0.75rem;
+    font-family: var(--font-mono);
+}
+
+.alert-success {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid var(--success);
+    color: var(--success);
+}
+
+.alert-info {
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+}
+
+.alert-error {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+}
+
+/* Calibration Form & Live Progress Panel */
+.description {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.calibration-form .form-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.calibration-form .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 180px;
+}
+
+.calibration-form label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.calibration-form input[type="number"] {
+    background: var(--bg-card-sub);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.45rem 0.65rem;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+}
+
+.calibration-status-panel {
+    background: var(--bg-card-sub);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+}
+
+.calibration-status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.82rem;
+    margin-bottom: 0.5rem;
+    gap: 1rem;
+}
+
+.mono-val {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.progress-track {
+    width: 100%;
+    height: 8px;
+    background: #020408;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--success));
+    transition: width 0.3s ease;
+}
+
+.hidden {
+    display: none !important;
+}
+

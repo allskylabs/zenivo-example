@@ -56,7 +56,7 @@ and [API.md](API.md).
             │ src/auth          admin login, sessions, default-deny policy            │
             │ src/community     opt-in signed station cards, gossip, preview relay    │
             │ src/api           FastAPI routes, WS/MJPEG/SSE streams, page shell       │
-            │ src/web           UI (index.html + app/01..10-*.js, focus.js, ...)     │
+            │ src/web           UI (index.html + app/01..10-*.js, focus/*.js, ...)     │
             │ _sync_worker ───► SyncClient ──► sync server /api/allsky/ingest/*            │
             └───────────────────────────────────────────────────────────────────────────┘
  browser ◄── nginx :80 ◄── cloudflared (station.example.org)      data/ (frames, products, logs, config)
@@ -232,7 +232,7 @@ One page shell (`index.html`) is served at `/`, `/live`, `/gallery`, `/settings`
 `/logs` and `/focus`; `/settings`, `/calibration`, `/focus` and `/logs` are admin pages (guests are redirected to `/login`). The live viewport is pre-sized to the frame's aspect ratio. The ten scripts in
 `src/web/app/` (core and routing, controls and calibration, station settings, live view, client-side
 sky overlay, telemetry, cloud chart, gallery/events/ADS-B, community, admin) share one global scope and run in numeric
-order. Each page loads only the data of its own tab. `focus.js` and `activity.js` cover their own
+order. Each page loads only the data of its own tab. `focus/*.js` and `activity.js` cover their own
 pages. `sky_catalog.js` holds the constellations, stars and Messier objects. `/sky`, `/flights3d`,
 `/satellites3d`, `/community`, `/login`, `/obs` (aliases `/full`, `/live/full`) and `/obs/dock` (admin, aliases `/obs/control`, `/dock`) are separate pages. The UI keeps viewer
 preferences in `localStorage` under the key `allsky.ui.prefs.v1`. The Red Vision theme

@@ -154,9 +154,9 @@ Layout of the web UI:
 - `src/web/app/01-core.js` to `10-admin.js`: classic scripts that share one global scope and
   load in numeric order (core and routing, controls and calibration, station settings, live view,
   sky overlay, telemetry, cloud, gallery and ADS-B, community, admin).
-- `src/web/focus.js`, `src/web/activity.js`: the Focus and Activity Log pages.
+- `src/web/focus/*.js` (six files sharing `window.ZenivoFocus`), `src/web/activity.js`: the Focus and Activity Log pages (`src/web/focus.js` is an empty legacy alias).
 - `src/web/sky.html`, `flights3d.html`, `satellites3d.html`, `community.html`, `login.html`, `full.html`, `obs_dock.html`: separate pages.
-- `src/web/tokens.css`, `src/web/style.css`: design tokens and styles.
+- `src/web/tokens.css`, `src/web/style.css` (a list of `@import`s of `src/web/css/*.css`, in cascade order): design tokens and styles.
 - `src/web/brand/`: logo, favicon and manifest.
 
 The Python code is documented in [docs/SDD.md](docs/SDD.md).

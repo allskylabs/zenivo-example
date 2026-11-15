@@ -1,3 +1,4 @@
 # Development and test tools (not needed to run Zenivo)
 -r requirements.txt
 pytest>=7.0.0
+ruff>=0.5

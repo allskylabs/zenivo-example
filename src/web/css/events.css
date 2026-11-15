@@ -1,0 +1,343 @@
+/* Plate-solve sky mask editor */
+.mask-canvas-wrap {
+    position: relative;
+    margin-top: 0.5rem;
+}
+.mask-canvas-wrap img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+.mask-canvas-wrap canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    touch-action: manipulation;
+}
+.focus-history tr.near td { color: var(--text-muted); text-decoration: line-through; }
+.focus-history tr.near td:last-child { text-decoration: none; }
+.focus-af-start { display: flex; margin-top: 0.4rem; }
+.focus-af-start[hidden] { display: none; }
+.focus-afmf button { min-width: 3.2rem; font-weight: 700; }
+#focus-lens-card.lens-af #focus-lens-slider { opacity: 0.55; }
+#focus-lens-card.lens-af .focus-lens-nudge { opacity: 0.45; }
+.focus-lens-status { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+
+/* Flight named by ADS-B on aircraft events */
+.flight-tag {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.flight-tag:hover { text-decoration: underline; }
+.flight-meta { color: var(--text-secondary); }
+.adsb-grid { margin-top: 0.75rem; }
+
+/* Event detail viewer */
+body.no-scroll { overflow: hidden; }
+
+.event-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(2, 4, 8, 0.88);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.event-viewer.hidden { display: none; }
+
+.ev-panel {
+    width: min(1180px, 100%);
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 1rem 1.25rem 1.25rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.ev-head {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.9rem;
+}
+
+.ev-pill {
+    --pill: var(--accent);
+    display: inline-block;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--pill);
+    background: color-mix(in srgb, var(--pill) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--pill) 45%, transparent);
+}
+
+.ev-head .ev-pill { font-size: 0.95rem; padding: 0.3rem 0.85rem; }
+
+.ev-when { display: flex; flex-direction: column; line-height: 1.25; }
+.ev-when strong { font-size: 0.95rem; }
+.ev-when span { font-size: 0.78rem; color: var(--text-secondary); }
+
+.ev-nav {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.ev-nav button {
+    background: var(--bg-card-sub);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+.ev-nav button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.ev-nav button:disabled { opacity: 0.35; cursor: default; }
+.ev-pos { font-size: 0.78rem; color: var(--text-secondary); font-family: var(--font-mono); min-width: 3.5rem; text-align: center; }
+
+.ev-images {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 0.9rem;
+}
+
+.ev-images.single { grid-template-columns: 1fr; }
+
+.ev-fig {
+    margin: 0;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+}
+
+.ev-fig[hidden] { display: none; }
+
+.ev-fig img {
+    width: 100%;
+    height: min(52vh, 460px);
+    object-fit: contain;
+    display: block;
+}
+
+.ev-fig-crop img { image-rendering: auto; }
+
+.ev-fig figcaption {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    padding: 0.35rem 0.6rem;
+    background: var(--bg-card-sub);
+}
+
+.ev-summary {
+    margin: 1rem 0 0.8rem;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--text-primary);
+}
+
+.ev-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.5rem;
+    margin: 0;
+}
+
+.ev-facts div {
+    background: var(--bg-card-sub);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.45rem 0.65rem;
+}
+
+.ev-facts dt { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.ev-facts dd { margin: 0.1rem 0 0; font-size: 0.85rem; font-family: var(--font-mono); }
+
+.ev-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.9rem; }
+.ev-actions a[hidden] { display: none; }
+
+@media (max-width: 760px) {
+    .event-viewer { padding: 0; align-items: stretch; }
+    .ev-panel { max-height: 100vh; border-radius: 0; padding: 0.75rem 0.9rem 1rem; }
+    .ev-images { grid-template-columns: 1fr; }
+    .ev-fig img { height: auto; max-height: 42vh; }
+    .ev-nav { margin-left: 0; width: 100%; justify-content: flex-end; }
+}
+
+/* Clickable event rows / items */
+.event-row { cursor: pointer; }
+.event-row:hover td { background: rgba(56, 189, 248, 0.05); }
+.live-event { cursor: pointer; border-left: 3px solid var(--pill, var(--accent)); transition: border-color 0.15s, background 0.15s; }
+.live-event:hover, .live-event:focus-visible { background: color-mix(in srgb, var(--pill, var(--accent)) 8%, var(--bg-card-sub)); outline: none; }
+.live-event .ev-type { color: var(--pill, var(--text-primary)); }
+
+/* Flights overhead (ADS-B) */
+.flights-card { display: flex; flex-direction: column; max-height: 420px; }
+.flights-card[hidden] { display: none; }
+.flights-status { font-size: 0.75rem; color: var(--text-secondary); margin: -0.25rem 0 0.6rem; }
+.flights-list { list-style: none; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; min-height: 0; }
+.flight {
+    padding: 0.4rem 0.6rem;
+    border-radius: 8px;
+    background: var(--bg-card-sub);
+    border: 1px solid var(--border-color);
+}
+.flight.in-view { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg-card-sub)); }
+.fl-top { display: flex; align-items: center; gap: 0.45rem; font-size: 0.85rem; }
+.fl-hdg { display: inline-block; color: var(--text-secondary); font-size: 0.8rem; line-height: 1; }
+.fl-where { margin-left: auto; font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; }
+.fl-inview { color: var(--accent); font-weight: 600; }
+.fl-meta { display: flex; gap: 0.9rem; font-size: 0.75rem; color: var(--text-secondary); font-family: var(--font-mono); margin-top: 0.1rem; }
+.focus-stats-card { justify-content: center; margin-top: 0.5rem; }
+.focus-score .focus-statline { margin-top: 0.4rem; font-size: 0.75rem; text-align: center; }
+.focus-af-row[hidden] { display: none; }
+.focus-af-row select { flex: 1; min-width: 0; }
+
+/* Capture info (time / exposure / gain / brightness) shown over images instead of burned into them */
+.frame-info {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 4;
+    padding: 4px 7px;
+    border-radius: 5px;
+    background: rgba(2, 6, 23, 0.62);
+    color: #e2e8f0;
+    font: 500 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: pre;
+    pointer-events: none;
+}
+.frame-info[hidden] { display: none; }
+.frame-info .frame-event { color: #ffcc66; font-weight: 600; }
+/* Live viewport: LIVE pill on top, capture info under it, the sky-overlay badge under that (nothing stacked on anything) */
+.viewport-wrapper > .frame-info { top: 44px; left: 12px; }
+.vp-status .vp-exp { display: none; }   /* exposure and gain are in the capture info already */
+.product-media .frame-info { font-size: 12px; top: 6px; left: 6px; }
+
+/* By Day: one collapsible block per local day */
+.day-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.day-notice {
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+.day-block {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.day-summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    list-style: none;
+    font-weight: 600;
+}
+
+.day-summary::-webkit-details-marker {
+    display: none;
+}
+
+.day-summary::before {
+    content: "\25B8";
+    color: var(--text-muted);
+}
+
+.day-block[open] > .day-summary::before {
+    content: "\25BE";
+}
+
+.day-date {
+    font-family: var(--font-mono);
+}
+
+.day-meta {
+    font-size: 0.75rem;
+    font-weight: 400;
+}
+
+.day-body {
+    padding: 0 1rem 1rem;
+}
+
+.day-actions {
+    margin-bottom: 0.6rem;
+}
+
+.day-products {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.day-products > video,
+.day-tile {
+    position: relative;
+    display: block;
+    aspect-ratio: 4 / 3;
+    width: 100%;
+    background: #020408;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.day-products video,
+.day-tile img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.day-tile span {
+    position: absolute;
+    left: 0.4rem;
+    bottom: 0.3rem;
+    font-size: 0.75rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 4px;
+    background: rgba(2, 4, 8, 0.75);
+    color: var(--text-primary);
+}
+
+.day-empty {
+    font-size: 0.8rem;
+    margin: 0.5rem 0 0;
+}
+
+.day-block .events-table-wrapper {
+    margin-top: 0;
+}
+

@@ -1,0 +1,254 @@
+/* Modern Astronomy Dark-Mode Observatory Theme */
+/* Design tokens (Night Sky palette, spacing, radii, fonts, Red Vision theme) live in /static/tokens.css */
+
+/* Red Vision: the palette comes from [data-theme="red"] in tokens.css; keep imagery monochrome red too */
+[data-theme="red"] .viewport-wrapper img,
+[data-theme="red"] .viewport-wrapper canvas,
+[data-theme="red"] .gallery-container img,
+[data-theme="red"] video {
+    filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-50deg) brightness(0.8);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: var(--font-size-body, 14px);
+    line-height: 1.5;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header & Navbar */
+.navbar {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.nav-brand h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.sensor-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+.pulse-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.nav-metrics {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.nav-pill {
+    background: var(--bg-card-sub);
+    border: 1px solid var(--border-color);
+    padding: 0.25rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.pill-label {
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.pill-value {
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
+
+/* Tab Bar */
+.tab-bar {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 1.5rem;
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.tab-bar .tab-btn { white-space: nowrap; flex-shrink: 0; }
+
+.tab-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    padding: 0.75rem 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    color: var(--text-primary);
+}
+
+.tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+/* Container & Layout */
+.container {
+    flex: 1;
+    padding: 1.5rem;
+    max-width: 1600px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.main-viewport-col, .controls-col { min-width: 0; }
+
+.live-events-card {
+    display: flex;
+    flex-direction: column;
+    max-height: 440px;
+}
+
+.live-events-status {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin: -0.25rem 0 0.75rem;
+}
+
+.live-events-status .dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 0.35rem;
+    background: var(--text-muted);
+    vertical-align: middle;
+}
+
+.live-events-status .dot.on { background: var(--success); box-shadow: 0 0 6px var(--success); }
+
+.live-events-list {
+    list-style: none;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-right: -0.4rem;
+    padding-right: 0.4rem;
+}
+
+.live-event {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 0.6rem;
+    align-items: center;
+    padding: 0.45rem;
+    border-radius: 8px;
+    background: var(--bg-card-sub);
+    border: 1px solid var(--border-color);
+}
+
+.live-event.fresh { animation: event-in 2.5s ease-out; border-color: var(--accent); }
+
+@keyframes event-in {
+    from { background: rgba(56, 189, 248, 0.25); }
+    to { background: var(--bg-card-sub); }
+}
+
+.live-event img, .live-event .no-thumb {
+    width: 64px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 4px;
+    background: #000;
+    display: block;
+}
+
+.live-event .ev-type { font-size: 0.82rem; font-weight: 600; }
+.live-event .ev-time { font-size: 0.75rem; color: var(--text-secondary); font-family: var(--font-mono); }
+.live-event .ev-detail {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.live-events-empty {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 1.5rem 0.5rem;
+}
+
+.live-events-more {
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+    color: var(--accent);
+    text-decoration: none;
+    text-align: right;
+}
+
+@media (max-width: 1024px) {
+    .dashboard-grid { grid-template-columns: 1fr; }
+}
+

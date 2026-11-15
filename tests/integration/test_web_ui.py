@@ -91,6 +91,12 @@ class TestWebUIStaticAssets:
         assert res.status_code == 200
         assert "text/css" in res.headers["content-type"]
         css = res.text
+        # style.css is a list of @imports of css/*.css parts: follow them
+        import re
+        for part in re.findall(r'@import url\("(/static/css/[^"?]+)', css):
+            sub = web_client.get(part)
+            assert sub.status_code == 200 and "text/css" in sub.headers["content-type"]
+            css += sub.text
         # Red vision palette lives in tokens.css; style.css holds the layout classes
         assert "viewport-wrapper" in css
         assert "histogram-card" in css

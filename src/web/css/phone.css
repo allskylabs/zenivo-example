@@ -1,0 +1,52 @@
+/* ===== Phone (<=768px): 5-tab bar, More sheet, slim top bar, compact live ===== */
+.m-tabbar, .m-sheet, .m-sheet-backdrop { display: none; }
+@media (max-width: 768px) {
+    .sidebar { display: none; }
+    .app-main { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+    /* Slim top bar: Zenivo, Online dot, local time, Red Vision */
+    .navbar { padding: 0 12px; gap: 8px; }
+    .nav-metrics { margin-left: auto; gap: 12px; }
+    .nav-metrics .nav-div, .nav-metrics .nav-mode, .nav-metrics .nav-utc, .nav-brand .brand-mark, .nav-metrics .nav-clock .clock-label, #nav-fps { display: none; }
+    .nav-metrics .rv-label { display: inline; }
+    .rv-toggle { min-height: 36px; min-width: 36px; }
+    /* Bottom bar */
+    .m-tabbar {
+        display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+        background: var(--bg-card); border-top: 1px solid var(--border-color); padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .m-tab {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 56px;
+        background: none; border: 0; border-top: 2px solid transparent; color: var(--text-secondary); text-decoration: none;
+        font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
+    }
+    .m-tab .m-ic { font-size: 18px; line-height: 1; }
+    .m-tab.active { color: var(--accent); border-top-color: var(--accent); }
+    /* More sheet */
+    .m-sheet-backdrop { display: block; position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.5); }
+    .m-sheet {
+        display: flex; flex-direction: column; position: fixed; left: 0; right: 0; bottom: 0; z-index: 80; max-height: 80vh; overflow-y: auto;
+        background: var(--bg-card); border-top: 1px solid var(--border-color); border-radius: 16px 16px 0 0;
+        padding: 8px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+    .m-sheet[hidden], .m-sheet-backdrop[hidden] { display: none; }
+    .m-sheet-grip { width: 36px; height: 4px; border-radius: 2px; background: var(--border-color); margin: 4px auto 8px; }
+    .m-sheet-title { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); padding: 12px 8px 4px; }
+    .m-sheet-item {
+        display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 0 8px; border: 0; background: none;
+        color: var(--text-primary); font: inherit; font-size: 15px; text-decoration: none; text-align: left; border-radius: 8px; cursor: pointer;
+    }
+    .m-sheet-item.active { color: var(--accent); }
+    .m-sheet-item:active { background: var(--bg-card-sub); }
+    .m-sheet-rv.btn-primary .rv-track { background: var(--danger); border-color: var(--danger); }
+    .m-sheet-rv.btn-primary .rv-knob { transform: translateX(16px); background: #fff; }
+    /* Compact live */
+    .viewport-wrapper { aspect-ratio: 1 / 1; }
+    #tab-live .telemetry-card .gauge-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    #tab-live .telemetry-card .gauge-box:not(.gauge-key) { display: none; }
+    #tab-live .telemetry-card .gauge-number { font-size: 16px; }
+    #exposure-card > summary.card-header { min-height: 44px; }
+    .chip-preset, .btn-lock, .cloud-ranges .btn-range { min-height: 36px; }
+    .btn-preset, .btn-preset-gain { min-height: 36px; }
+    .btn, button.btn { min-height: 36px; }
+}
+
