@@ -24,11 +24,13 @@ from src.analytics.adsb import _ecef, frame_xy_from_enu
 GROUPS = ("stations", "visual")  # default groups
 GROUP_CHOICES = ("stations", "visual", "weather", "noaa", "gps-ops", "galileo", "science")  # CelesTrak groups offered in Settings
 TLE_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=tle"
+SATNOGS_URL = "https://db.satnogs.org/api/tle/?format=3le"  # one file for every satellite in SatNOGS DB (no groups)
+SATNOGS_GROUP = "satnogs"
 REFRESH_S = 24 * 3600.0
 EARTH_R_KM = 6371.0
 WGS84_A_KM = 6378.137
 WGS84_E2 = 6.69437999014e-3
-MAX_SATS = 400
+MAX_SATS = 2500
 
 
 def _parse_tle(text: str, group: str) -> List[Dict[str, str]]:
@@ -36,6 +38,8 @@ def _parse_tle(text: str, group: str) -> List[Dict[str, str]]:
     out = []
     for i in range(0, len(lines) - 2, 3):
         name, l1, l2 = lines[i].strip(), lines[i + 1], lines[i + 2]
+        if name.startswith("0 "):  # 3le format (SatNOGS) prefixes the name with "0 "
+            name = name[2:].strip()
         if l1.startswith("1 ") and l2.startswith("2 "):
             out.append({"name": name, "l1": l1, "l2": l2, "group": group})
     return out
@@ -67,6 +71,7 @@ class SatelliteTracker:
         self.groups: List[str] = list(GROUPS)
         self.refresh_s = REFRESH_S
         self.url_template = TLE_URL
+        self._single = False  # the source serves everything in one file (SatNOGS)
         self.last_error = ""
         self._load_cache()
 
@@ -78,10 +83,12 @@ class SatelliteTracker:
         with self._lock:
             changed = groups != self.groups or url != self.url_template
             self.groups, self.url_template = groups, url
+            self._single = "{group}" not in url
             if refresh_s:
                 self.refresh_s = float(refresh_s)
             # Satellites of a group that was switched off disappear at once; a new group arrives with the next download
-            self._sats = [t for t in self._sats if t[1] in self.groups]
+            keep = [SATNOGS_GROUP] if self._single else self.groups
+            self._sats = [t for t in self._sats if t[1] in keep]
             if changed:
                 self._fetched_at = 0.0
 
@@ -120,8 +127,10 @@ class SatelliteTracker:
     def _fetch(self) -> None:
         try:
             tles: List[Dict[str, str]] = []
-            for g in list(self.groups):
-                with net_urlopen(self.url_template.format(group=g), timeout=20) as r:
+            sources = [(self.url_template, SATNOGS_GROUP)] if self._single else [
+                (self.url_template.format(group=g), g) for g in list(self.groups)]
+            for url, g in sources:
+                with net_urlopen(url, timeout=30) as r:
                     tles += _parse_tle(r.read().decode("ascii", "replace"), g)
             if not tles:
                 raise ValueError("the source returned no TLE records")

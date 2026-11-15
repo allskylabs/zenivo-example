@@ -93,3 +93,38 @@ def test_data_sources_lists_every_feed(client_service):
     assert by["satellites"]["enabled"] is True
     for s in d["sources"]:
         assert s["state"] in ("ok", "waiting", "error", "off") and s["where"]
+
+
+def test_satnogs_source_is_one_file_and_strips_3le_names(tmp_path, monkeypatch):
+    import io
+
+    body = ("0 ISS (ZARYA)\n"
+            "1 25544U 98067A   26318.94812295  .00009771  00000-0  18276-3 0  9991\n"
+            "2 25544  51.6323 274.0377 0007413  26.4902 333.6464 15.49382049595126\n")
+    asked = []
+
+    class Resp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def fake(url, timeout=0):
+        asked.append(url)
+        return Resp(body.encode())
+
+    monkeypatch.setattr(sats, "net_urlopen", fake)
+    t = sats.SatelliteTracker(str(tmp_path / "tle.json"))
+    t.configure(groups=["stations", "visual"], url_template=sats.SATNOGS_URL)
+    t._fetching = True
+    t._fetch()
+    assert asked == [sats.SATNOGS_URL] and t.status()["count"] == 1 and t._sats[0][0] == "ISS (ZARYA)"
+    assert t._sats[0][1] == sats.SATNOGS_GROUP and t.status()["source"] == "db.satnogs.org"
+
+
+def test_source_setting_is_saved_and_validated(client_service):
+    client, _ = client_service
+    r = client.post("/api/satellites/config", json={"source": "satnogs"})
+    assert r.status_code == 200 and r.json()["source"] == "satnogs"
+    assert client.post("/api/satellites/config", json={"source": "nope"}).status_code == 422

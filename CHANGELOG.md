@@ -13,7 +13,7 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Added (Integrations)
 
-- Settings > Integrations: a **Data sources** overview (state of ADS-B, public fallback, Flightradar24, satellites, weather balloons, airports) and a **Satellites** panel: switch, CelesTrak groups (stations, brightest, weather, NOAA, GPS, Galileo, science), refresh interval, Download now, and an optional alternative TLE source. New `GET/POST /api/satellites/config`, `POST /api/satellites/refresh`, `GET /api/data-sources`.
+- Settings > Integrations: a **Data sources** overview (state of ADS-B, public fallback, Flightradar24, satellites, weather balloons, airports) and a **Satellites** panel: switch, CelesTrak groups (stations, brightest, weather, NOAA, GPS, Galileo, science), refresh interval, Download now, an optional alternative TLE source, and an optional **SatNOGS DB** orbit source (about 1700 satellites in one file). New `GET/POST /api/satellites/config`, `POST /api/satellites/refresh`, `GET /api/data-sources`.
 
 ### Fixed
 

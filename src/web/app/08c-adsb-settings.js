@@ -190,6 +190,8 @@ const satBlock = document.getElementById("sat-block");
 const satEnabled = document.getElementById("sat-enabled");
 const satRefresh = document.getElementById("sat-refresh");
 const satUrl = document.getElementById("sat-url");
+const satSource = document.getElementById("sat-source");
+const satGroupsField = document.getElementById("sat-groups-field");
 const satStatus = document.getElementById("sat-status");
 const satGroupBoxes = [...document.querySelectorAll("[data-sat-group]")];
 
@@ -199,6 +201,8 @@ function syncSatUI(d) {
     satGroupBoxes.forEach((b) => { b.checked = (d.groups || []).includes(b.dataset.satGroup); });
     satRefresh.value = String(d.refresh_h);
     satUrl.value = d.tle_url || "";
+    satSource.value = d.source || "celestrak";
+    satGroupsField.hidden = satSource.value === "satnogs" && !satUrl.value;
     const s = d.status || {};
     const age = s.fetched_at ? `updated ${Math.round((Date.now() / 1000 - s.fetched_at) / 3600)} h ago` : "not downloaded yet";
     satStatus.textContent = (s.fetching ? "Downloading… " : "") + `${s.count || 0} satellites, ${age}` +
@@ -215,13 +219,15 @@ async function loadSat() {
 
 if (satBlock) {
     autosave(satBlock, async () => {
+        satGroupsField.hidden = satSource.value === "satnogs" && !satUrl.value.trim();
         const groups = satGroupBoxes.filter((b) => b.checked).map((b) => b.dataset.satGroup);
         if (!groups.length) throw new Error("keep at least one group");
         syncSatUI(await sendJson("/api/satellites/config", {
             enabled: satEnabled.checked, groups, refresh_h: Number(satRefresh.value), tle_url: satUrl.value.trim(),
+            source: satSource.value,
         }));
         setTimeout(() => { loadSat(); loadDataSources(); }, 4000);
-    }, { selector: "#sat-enabled, [data-sat-group], #sat-refresh, #sat-url" });
+    }, { selector: "#sat-enabled, [data-sat-group], #sat-refresh, #sat-url, #sat-source" });
     document.getElementById("sat-refresh-now").addEventListener("click", async (ev) => {
         ev.currentTarget.disabled = true;
         try {

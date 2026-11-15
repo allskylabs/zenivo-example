@@ -4,7 +4,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional
 
-SAT_DEFAULTS = {"enabled": 1, "groups": ["stations", "visual"], "refresh_h": 24, "tle_url": ""}
+SAT_DEFAULTS = {"enabled": 1, "groups": ["stations", "visual"], "refresh_h": 24, "tle_url": "", "source": "celestrak"}
 REFRESH_CHOICES_H = (6, 12, 24, 72, 168)
 
 
@@ -24,8 +24,10 @@ class DataSourcesMixin:
 
     def _apply_satellite_config(self) -> None:
         cfg = self._satellite_settings()
-        self._sat_tracker.configure(groups=cfg["groups"], refresh_s=float(cfg["refresh_h"]) * 3600.0,
-                                    url_template=cfg["tle_url"] or None)
+        from src.analytics.satellites import SATNOGS_URL
+
+        url = cfg["tle_url"] or (SATNOGS_URL if cfg["source"] == "satnogs" else None)
+        self._sat_tracker.configure(groups=cfg["groups"], refresh_s=float(cfg["refresh_h"]) * 3600.0, url_template=url)
 
     def get_satellites_config(self) -> Dict[str, Any]:
         from src.analytics.satellites import GROUP_CHOICES, TLE_URL
@@ -35,7 +37,8 @@ class DataSourcesMixin:
                 "default_url": TLE_URL, "status": self._sat_tracker_get().status()}
 
     def set_satellites_config(self, enabled: Optional[bool] = None, groups: Optional[List[str]] = None,
-                              refresh_h: Optional[int] = None, tle_url: Optional[str] = None) -> Dict[str, Any]:
+                              refresh_h: Optional[int] = None, tle_url: Optional[str] = None,
+                              source: Optional[str] = None) -> Dict[str, Any]:
         from src.analytics.satellites import GROUP_CHOICES
         from src.community import netguard
 
@@ -47,6 +50,10 @@ class DataSourcesMixin:
             if bad or not groups:
                 raise ValueError(f"groups must be one or more of: {', '.join(GROUP_CHOICES)}")
             cfg["groups"] = [g for g in GROUP_CHOICES if g in groups]
+        if source is not None:
+            if source not in ("celestrak", "satnogs"):
+                raise ValueError("source must be celestrak or satnogs")
+            cfg["source"] = source
         if refresh_h is not None:
             if int(refresh_h) not in REFRESH_CHOICES_H:
                 raise ValueError(f"refresh_h must be one of {list(REFRESH_CHOICES_H)}")
@@ -66,7 +73,7 @@ class DataSourcesMixin:
         self._sat_tracker_get()
         self._apply_satellite_config()
         self.activity.info("station", f"Satellite settings saved: {'on' if cfg['enabled'] else 'off'}, "
-                           f"groups {', '.join(cfg['groups'])}, refresh {cfg['refresh_h']} h")
+                           f"source {cfg['source']}, groups {', '.join(cfg['groups'])}, refresh {cfg['refresh_h']} h")
         return {"success": True, **self.get_satellites_config()}
 
     def refresh_satellites(self) -> Dict[str, Any]:
@@ -110,10 +117,10 @@ class DataSourcesMixin:
         sat = self.get_satellites_config()
         ss = sat["status"]
         if not sat["enabled"]:
-            add("satellites", "Satellites (CelesTrak orbits)", False, "off", "Off", "", "integrations")
+            add("satellites", "Satellites", False, "off", "Off", "", "integrations")
         else:
             age = f"updated {int((now - ss['fetched_at']) / 3600)} h ago" if ss.get("fetched_at") else "not downloaded yet"
-            add("satellites", "Satellites (CelesTrak orbits)", True, "error" if ss.get("error") and not ss["count"] else "ok" if ss["count"] else "waiting",
+            add("satellites", "Satellites (" + ("SatNOGS" if sat.get("source") == "satnogs" and not sat.get("tle_url") else "CelesTrak") + " orbits)", True, "error" if ss.get("error") and not ss["count"] else "ok" if ss["count"] else "waiting",
                 f"{ss['count']} satellites, {age}" + (f". Last error: {ss['error']}" if ss.get("error") else ""), ss.get("source") or "", "integrations")
         sondes_on = bool(adsb.get("radiosondes_enabled"))
         feed = getattr(self, "_sonde_feed", None)

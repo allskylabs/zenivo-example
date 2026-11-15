@@ -1121,11 +1121,19 @@
                         </p>
                     </fieldset>
                     <fieldset class="settings-group sat-block" id="sat-block" data-admin>
-                        <legend>Satellites (CelesTrak orbits)</legend>
+                        <legend>Satellites (orbits)</legend>
                         <div class="field">
                             <label class="checkbox-label"><input type="checkbox" id="sat-enabled" checked /> Show satellites on the Live and Sky pages</label>
                         </div>
                         <div class="field">
+                            <label for="sat-source">Orbit source</label>
+                            <select id="sat-source">
+                                <option value="celestrak">CelesTrak (choose groups)</option>
+                                <option value="satnogs">SatNOGS DB (community catalogue, about 1700 satellites)</option>
+                            </select>
+                            <p class="field-note">SatNOGS (db.satnogs.org) is an open, volunteer-run satellite database. It serves one file with every satellite, about 250 KB per download, so the groups below do not apply. Only the request itself is sent, never your position.</p>
+                        </div>
+                        <div class="field" id="sat-groups-field">
                             <label>Groups to track</label>
                             <div class="sat-groups" id="sat-groups">
                                 <label class="checkbox-label"><input type="checkbox" data-sat-group="stations" /> Space stations (ISS, Tiangong)</label>
@@ -1619,7 +1627,7 @@
     <script defer src="/static/app/07-cloud.js?v=20261114a"></script>
     <script defer src="/static/app/08-gallery-adsb.js?v=20261115a"></script>
     <script defer src="/static/app/08b-events-live.js?v=20261115a"></script>
-    <script defer src="/static/app/08c-adsb-settings.js?v=20261115b"></script>
+    <script defer src="/static/app/08c-adsb-settings.js?v=20261115c"></script>
     <script defer src="/static/app/09-community.js?v=20261114b"></script>
     <script defer src="/static/app/10-admin.js?v=20261114a"></script>
     <script>

@@ -154,7 +154,8 @@ class SatellitesConfigRequest(BaseModel):
     enabled: Optional[bool] = None
     groups: Optional[List[str]] = Field(default=None, max_length=8, description="CelesTrak groups to track")
     refresh_h: Optional[int] = Field(default=None, ge=1, le=168, description="Hours between orbit downloads")
-    tle_url: Optional[str] = Field(default=None, max_length=300, description="https address with {group}; empty = CelesTrak")
+    tle_url: Optional[str] = Field(default=None, max_length=300, description="https address with {group}; empty = the chosen source")
+    source: Optional[str] = Field(default=None, pattern="^(celestrak|satnogs)$", description="Orbit source: CelesTrak groups or the SatNOGS DB catalogue")
 
 
 class ManualStarSolveRequest(BaseModel):

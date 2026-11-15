@@ -176,7 +176,7 @@ def set_satellites_config(req: SatellitesConfigRequest, service: AllSkyService =
     """Switch the satellite overlay, choose the CelesTrak groups, the refresh interval and an alternative TLE source."""
     try:
         return service.set_satellites_config(enabled=req.enabled, groups=req.groups, refresh_h=req.refresh_h,
-                                             tle_url=req.tle_url)
+                                             tle_url=req.tle_url, source=req.source)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
