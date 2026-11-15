@@ -682,11 +682,14 @@
         drawLensChart();
         drawTimeStreamChart();
     }
+    const timeDetails = document.getElementById("focus-time-details");
+    if (timeDetails) timeDetails.addEventListener("toggle", () => requestAnimationFrame(drawChart));
 
     function drawLensChart() {
         if (!lensChart || !lensChartCtx) return;
         const dpr = window.devicePixelRatio || 1;
         const w = lensChart.clientWidth, h = lensChart.clientHeight;
+        if (!w || !h) return;  // hidden (collapsed or other tab): nothing to draw
         if (lensChart.width !== Math.round(w * dpr) || lensChart.height !== Math.round(h * dpr)) {
             lensChart.width = Math.round(w * dpr);
             lensChart.height = Math.round(h * dpr);
@@ -709,6 +712,7 @@
         if (!timeChart || !timeChartCtx) return;
         const dpr = window.devicePixelRatio || 1;
         const w = timeChart.clientWidth, h = timeChart.clientHeight;
+        if (!w || !h) return;  // collapsed: skip the per-frame redraw entirely
         if (timeChart.width !== Math.round(w * dpr) || timeChart.height !== Math.round(h * dpr)) {
             timeChart.width = Math.round(w * dpr);
             timeChart.height = Math.round(h * dpr);
