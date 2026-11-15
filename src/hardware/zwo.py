@@ -18,12 +18,12 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 
 from .driver_interface import CameraDriverInterface
+from .rawconv import raw16_to_bgr8
 
 logger = logging.getLogger("allsky.zwo")
 
-# ASI BayerPattern (0 RGGB, 1 BGGR, 2 GRBG, 3 GBRG) -> OpenCV code name (OpenCV names the pattern by its
-# second row/column offset, so RGGB data is COLOR_BayerBG2BGR)
-_BAYER_CV = {0: "COLOR_BayerBG2BGR", 1: "COLOR_BayerRG2BGR", 2: "COLOR_BayerGB2BGR", 3: "COLOR_BayerGR2BGR"}
+# ASI BayerPattern id -> pattern name
+_BAYER_NAME = {0: "RGGB", 1: "BGGR", 2: "GRBG", 3: "GBRG"}
 
 _LIB_CANDIDATES = (
     "/usr/local/lib/libASICamera2.so",
@@ -225,14 +225,7 @@ class ZwoAsiController(CameraDriverInterface):
             self.open()
         t0 = time.time()
         raw = self._read()
-        if self.is_color:
-            import cv2
-
-            bgr16 = cv2.cvtColor(raw, getattr(cv2, _BAYER_CV.get(self.bayer, _BAYER_CV[0])))
-            frame = (bgr16 >> 8).astype(np.uint8)
-        else:
-            grey = (raw >> 8).astype(np.uint8)
-            frame = np.repeat(grey[:, :, None], 3, axis=2)
+        frame = raw16_to_bgr8(raw, _BAYER_NAME.get(self.bayer, "RGGB") if self.is_color else None)
         now = time.time()
         delta_ms = (now - self._last_ts) * 1000.0 if self._last_ts else (now - t0) * 1000.0
         self._last_ts = now

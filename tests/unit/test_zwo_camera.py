@@ -132,6 +132,7 @@ def picker_client(fake_zwoasi, tmp_path):
     AllSkyService.reset_instance()
     service = AllSkyService.get_instance(camera=sim)
     service.station_config_path = str(tmp_path / "station_config.json")
+    service.station_config.pop("camera_select", None)  # the repo data/ may hold a choice made in the UI
     with TestClient(create_app(camera=sim)) as client:
         yield client, service
     service.close()

@@ -63,7 +63,8 @@ two built-in seed stations are listed in [docs/COMMUNITY.md](docs/COMMUNITY.md) 
 4. A built-in simulator (tests, demos, no hardware).
 
 ZWO ASI cameras (ASI120 to ASI6200) are selected with `--camera zwo`: they need the `zwoasi` Python package
-and ZWO's `libASICamera2` SDK (see [docs/INSTALL.md](docs/INSTALL.md)).
+and ZWO's `libASICamera2` SDK. QHYCCD cameras use `--camera qhy` and QHY's `libqhyccd` SDK (no Python package).
+See [docs/INSTALL.md](docs/INSTALL.md).
 
 ## Requirements
 

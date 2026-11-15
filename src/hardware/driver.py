@@ -401,7 +401,7 @@ class RTS5869CameraController(CameraDriverInterface):
             self._sync_capture_mode(self.current_exposure_s)
 
 
-CAMERA_TYPES = ("auto", "rts5869", "picamera", "zwo", "v4l2", "simulator")
+CAMERA_TYPES = ("auto", "rts5869", "picamera", "zwo", "qhy", "v4l2", "simulator")
 
 
 def _simulator(width: int, height: int) -> CameraDriverInterface:
@@ -458,6 +458,13 @@ def list_camera_devices() -> list:
     except Exception:
         pass
     try:
+        from .qhy import list_qhy_cameras
+
+        for i, name in enumerate(list_qhy_cameras()):
+            devices.append({"type": "qhy", "index": i, "name": str(name)})
+    except Exception:
+        pass
+    try:
         from .uvc_generic import find_uvc_device_nodes
 
         for i, node in enumerate(find_uvc_device_nodes(exclude_ids=("0bda:5869",))):
@@ -508,6 +515,11 @@ def get_camera_driver(
 
         size = (width, height) if (width, height) != (SENSOR_WIDTH, SENSOR_HEIGHT) else (None, None)
         candidates.append(("zwo", lambda: ZwoAsiController(camera_num=camera_index, width=size[0], height=size[1])))
+    if camera_type == "qhy":
+        from .qhy import QhyController
+
+        size = (width, height) if (width, height) != (SENSOR_WIDTH, SENSOR_HEIGHT) else (None, None)
+        candidates.append(("qhy", lambda: QhyController(camera_num=camera_index, width=size[0], height=size[1])))
     # Generic webcams (e.g. a laptop's built-in camera) are used only when asked for by name: in "auto"
     # they would take over the observatory whenever the IMX335 is briefly missing and archive daytime junk
     if camera_type == "v4l2":

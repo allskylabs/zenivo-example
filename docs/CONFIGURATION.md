@@ -17,8 +17,8 @@ Run `python3 run_allsky.py --help` for the flags of the version you have install
 | `--host` | `127.0.0.1` | Network interface to bind (this machine only). Use `0.0.0.0` to open it on the LAN; behind a reverse proxy keep `127.0.0.1` |
 | `--port` | `8080` | TCP port of the web UI and API |
 | `--device` | auto-detected RTS5869, else `/dev/video0` | V4L2 camera device node |
-| `--camera` | `auto` (or `$ALLSKY_CAMERA`) | Camera backend (when left at `auto`, the camera chosen under Settings > Camera is used): `auto`, `rts5869`, `picamera`, `zwo`, `v4l2`, `simulator`. `auto` tries RTS5869, then a Pi CSI camera, then a USB/V4L2 webcam, then the simulator |
-| `--camera-index` | `0` | Camera number for `--camera picamera` (libcamera) or `--camera zwo` (ASI index) |
+| `--camera` | `auto` (or `$ALLSKY_CAMERA`) | Camera backend (when left at `auto`, the camera chosen under Settings > Camera is used): `auto`, `rts5869`, `picamera`, `zwo`, `qhy`, `v4l2`, `simulator`. `auto` tries RTS5869, then a Pi CSI camera, then a USB/V4L2 webcam, then the simulator |
+| `--camera-index` | `0` | Camera number for `--camera picamera` (libcamera) or `--camera zwo` / `qhy` (camera index) |
 | `--resolution` | camera default | Capture size `WIDTHxHEIGHT`. Defaults: IMX335 2592x1944, Pi camera full-FOV binned mode, webcam maximum |
 | `--simulator` | off | Force the simulated IMX335 controller (tests, CI, demos). Sets `ALLSKY_SIMULATOR=1` |
 | `--exposure` | `0.2` | Starting exposure in seconds before auto-exposure takes over. If the exposure is 0.25 s or less, the gain is the default 12 dB and the saved station position puts the sun at or above -2 degrees, the start is 0.6 ms / 0 dB |

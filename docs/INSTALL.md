@@ -64,7 +64,7 @@ Contents: [Requirements](#requirements) | [Install with install.sh](#install-wit
    | `--dir PATH` | the repo directory | Install directory (must contain `run_allsky.py`) |
    | `--port N` | `8080` | Port of the web UI and API |
    | `--host ADDR` | `127.0.0.1` | Bind address of the installed service. Use `0.0.0.0` to open it on the LAN (plain HTTP sends the admin password unencrypted: prefer a TLS reverse proxy) |
-   | `--camera NAME` | `auto` | `auto`, `rts5869`, `picamera`, `zwo`, `v4l2` or `simulator` |
+   | `--camera NAME` | `auto` | `auto`, `rts5869`, `picamera`, `zwo`, `qhy`, `v4l2` or `simulator` |
    | `--user NAME` | `$SUDO_USER`, else the current user | User that runs the service |
    | `--service-name NAME` | `zenivo` | systemd unit name |
    | `--no-systemd` | off | Only create the venv and install dependencies |
@@ -130,6 +130,7 @@ Stop it with Ctrl+C, then install the service as described below.
 | USB IMX335 (RTS5869, `0bda:5869`) | The user needs read/write access to `/dev/video*`: `sudo usermod -aG video <user>`, then log in again. The shipped unit adds the `video` group itself. Check with `lsusb \| grep 0bda:5869` and `ls -l /dev/video*` |
 | Raspberry Pi CSI | `sudo apt install python3-picamera2`, create the venv with `--system-site-packages`, enable the camera in `raspi-config` if needed. Test with `rpicam-hello --list-cameras` |
 | ZWO ASI | Install the ASI SDK from zwoastro.com (software > "ASI Camera SDK"): copy `lib/<arch>/libASICamera2.so` to `/usr/local/lib` and run `sudo ldconfig`, install the SDK's `asi.rules` into `/etc/udev/rules.d/` and replug the camera. Then `.venv/bin/pip install zwoasi` and start with `--camera zwo` (`--camera-index N` for several cameras, or pick one under Settings > Camera; the choice is saved and used at the next start when `--camera` is left at `auto`). Set `ZWO_ASI_LIB=/path/libASICamera2.so` if the library is elsewhere. Frames are read as RAW16, demosaiced on the CPU (colour models) and reduced to 8 bit; `--resolution` selects hardware binning. Gain is in 0.1 dB units; exposure from 32 µs up to the camera maximum |
+| QHY | Install QHYCCD's SDK from qhyccd.com so that `libqhyccd.so` is on the loader path (or set `QHY_SDK_LIB=/path/libqhyccd.so`) and its `85-qhyccd.rules` in `/etc/udev/rules.d/`, then replug the camera. No Python package is needed (Zenivo calls the SDK through ctypes). Start with `--camera qhy` (`--camera-index N` for several) or pick it under Settings > Camera. Single-frame mode, 16-bit transfer, colour sensors demosaiced on the CPU. QHY gain is in SDK units: Zenivo maps the camera's range onto 0 to 30 "dB", a monotonic scale for auto-exposure, not a calibrated gain. Mono sensors use hardware 2x2 binning when `--resolution` asks for half size or less |
 | Other UVC webcam | Same `video` group as the USB camera. Use `--camera v4l2` |
 | None | `--camera simulator` |
 

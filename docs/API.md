@@ -78,7 +78,7 @@ object of `/api/adsb/aircraft` and `/api/satellites`; the ADS-B receiver address
 | GET, POST | `/api/camera/orientation` | Image transform: `flip_horizontal`, `flip_vertical`, `rotate_deg` (0 or 180), `rotate_isp_180` (extra 180 degrees for day frames only) |
 | GET, POST | `/api/camera/white-balance` | `mode` (`auto`, `manual`), `r_gain`, `b_gain` (0.4 to 4) |
 | GET | `/api/camera/devices` | Admin. Cameras attached now (`devices`: `id`, `type`, `index`, `name`), the active one (`current`) and the saved choice (`saved`) |
-| POST | `/api/camera/select` | `type` (`auto`, `rts5869`, `picamera`, `zwo`, `v4l2`, `simulator`), `index` 0 to 15. Switches the camera and saves the choice; 400 and the old camera stays when the new one cannot be opened or focus / calibration is running |
+| POST | `/api/camera/select` | `type` (`auto`, `rts5869`, `picamera`, `zwo`, `qhy`, `v4l2`, `simulator`), `index` 0 to 15. Switches the camera and saves the choice; 400 and the old camera stays when the new one cannot be opened or focus / calibration is running |
 | GET, POST | `/api/camera/resolution` | Output resolution: `width`, `height` (must match a preset) |
 | GET, POST | `/api/camera/star-boost` | `enabled`, `bin` (2 to 4) |
 | GET, POST | `/api/camera/performance` | Performance settings and their limits; see [CONFIGURATION.md](CONFIGURATION.md#performance-profile-for-small-hosts) |
