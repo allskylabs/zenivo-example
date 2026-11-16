@@ -323,6 +323,7 @@ def test_manual_star_align_identifies_clicked_stars(monkeypatch):
     monkeypatch.setattr(svc, "_save_station_config", lambda: None)
     svc.station_config.pop("sky_mask", None)
     svc.station_config["image_transform"] = {}
+    svc.station_config["latitude_deg"], svc.station_config["longitude_deg"] = LAT, LON  # not the host's own saved location
     svc.station_config["camera_sensor"] = {"width_px": 1296, "height_px": 972, "pixel_pitch_um": 2.8}
     w, h, f, cx, cy, k = 1296, 972, 442.0, 664.0, 490.0, -0.02
     stars = [s for s in bss.load_bright_star_catalog() if s["mag"] <= 2.6]
