@@ -206,9 +206,12 @@ class GossipWorker:
                         # also carries OUR card further down, which says nothing about who answered.
                         if first and own_id and good.get("id") == own_id:
                             res["self"] = True  # this address is this very station (its own public URL)
+                        answered_by_itself = first and good.get("id") != own_id
                         first = False
                         if self.manager.merge_card(good):
                             new += 1
+                        if answered_by_itself:
+                            self.manager.note_seen(good)   # the station that answered is up right now
                     ok += 1
                     res["ok"] = True
                     if not allow_private:  # owner seeds stay in the settings; only strictly checked addresses are remembered

@@ -122,6 +122,22 @@ class TestRegistry:
         other.load()
         assert [c["id"] for c in other.cards()] == [card["id"]]  # reloaded cards are re-verified
 
+    def test_last_seen_is_local_survives_reload_and_needs_a_known_card(self, tmp_path, ident):
+        reg = Registry(str(tmp_path / "peers.json"), own_id="me")
+        card = make(ident)
+        reg.note_seen(card["id"], 5)                              # unknown id: ignored
+        assert reg.seen_map() == {}
+        reg.merge(card)
+        reg.note_seen(card["id"], 1234)
+        reg.note_seen("me", 1234)                                 # never for our own id
+        assert reg.seen_map() == {card["id"]: 1234}
+        reg.save()
+        other = Registry(str(tmp_path / "peers.json"), own_id="me")
+        other.load()
+        assert other.seen_map() == {card["id"]: 1234}
+        other.clear()
+        assert other.seen_map() == {}
+
     def test_expiry(self, tmp_path):
         reg = Registry(str(tmp_path / "p.json"))
         now = time.time()
@@ -295,6 +311,7 @@ class _Mgr:
     def contacts(self): return []
     def merge_card(self, c): self.merged.append(c["id"]); return True
     def note_contact(self, u): self.contacts_noted.append(u)
+    def note_seen(self, c): self.seen = getattr(self, "seen", []) + [c["id"]]
     def save_registry(self): pass
     def relay_sweep(self): return 0
     def relay_wanted(self): return False
@@ -314,6 +331,7 @@ def test_round_counts_peers_that_know_us(tmp_path, ident):
     w = GossipWorker(_Mgr(mine), fetch=knows_us)
     r = w.run_round()
     assert r["others_ok"] == 1 and w.last_targets[0]["self"] is False
+    assert w.manager.seen == [theirs["id"]]   # only the replying station is marked alive, not the cards it carries
     assert urls[0] == "https://peer.example.org/api/community/peers"  # origin only, the typed path is gone
     w2 = GossipWorker(_Mgr(mine), fetch=lambda url, **kw: {"cards": [mine, theirs]})
     assert w2.run_round()["others_ok"] == 0 and w2.last_targets[0]["self"] is True  # we dialled ourselves

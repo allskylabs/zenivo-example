@@ -236,6 +236,9 @@ class CommunityManager:
         held = self.relay_held()
         if held:
             out["relayed"] = held
+        seen = self._registry.seen_map() if self._registry is not None else {}
+        if seen:
+            out["seen"] = seen   # unsigned and local: when each station last reached us (the page shows it as "last seen")
         return out
 
     def peers_json(self) -> bytes:
@@ -243,7 +246,7 @@ class CommunityManager:
         own = self.own_card()
         version = self._registry.version if self._registry is not None else 0
         sig = own.get("sig") if own else None
-        version = (version, self._relay.version if self._relay is not None else 0)
+        version = (version, self._relay.version if self._relay is not None else 0, int(time.time() // 60))
         now = time.monotonic()
         with self._lock:
             c = self._peers_cache
@@ -253,6 +256,13 @@ class CommunityManager:
         with self._lock:
             self._peers_cache = (now, version, sig, body)
         return body
+
+    def note_seen(self, card: Dict[str, Any]) -> None:
+        """`card` came from its own station (announce, or the first card of its /peers reply). A live station re-signs at
+        least every CARD_MAX_AGE_S, so an older card is a replay and says nothing about the station being up."""
+        if self._registry is None or time.time() - card.get("updated", 0) > CARD_MAX_AGE_S + 900:
+            return
+        self._registry.note_seen(card.get("id"))
 
     def merge_card(self, card: Dict[str, Any]) -> bool:
         """Merge an already verified card."""
@@ -281,6 +291,7 @@ class CommunityManager:
         self._ensure()
         card = cardmod.verify(raw_card)
         self.merge_card(card)
+        self.note_seen(card)
         if self._identity is None or card.get("id") != self._identity.id:
             self._inbound.append(now)  # proof that another station can reach this one
         self._registry.save(force=False)  # cheap: a no-op unless something changed and 30 s have passed

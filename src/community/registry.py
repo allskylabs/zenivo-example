@@ -50,6 +50,7 @@ class Registry:
         self._first_seen: Dict[str, int] = {}
         self._refreshed: Set[str] = set()
         self._contacts: Dict[str, int] = {}  # origin -> last time it answered
+        self._seen: Dict[str, int] = {}      # id -> last time that station itself reached us (announce) or answered us
         self._dirty = False
         self._last_save = 0.0
         self.version = 0  # bumped whenever the card set changes (cache key for the /peers payload)
@@ -62,6 +63,7 @@ class Registry:
             cards = data.get("cards") if isinstance(data, dict) else None
             contacts = data.get("contacts") if isinstance(data, dict) else None
             first = data.get("first_seen") if isinstance(data, dict) else None
+            seen = data.get("seen") if isinstance(data, dict) else None
             refreshed = data.get("refreshed") if isinstance(data, dict) else None
         except (OSError, ValueError):
             return
@@ -82,6 +84,10 @@ class Registry:
                         self._first_seen[cid] = int(ts)
             if isinstance(refreshed, list):
                 self._refreshed |= {c for c in refreshed if isinstance(c, str) and c in self._cards}
+            if isinstance(seen, dict):
+                for cid, ts in seen.items():
+                    if cid in self._cards and isinstance(ts, (int, float)) and not isinstance(ts, bool):
+                        self._seen[cid] = int(ts)
             self._dirty = False
 
     def merge(self, card: Dict[str, Any], now: Optional[float] = None) -> bool:
@@ -115,6 +121,8 @@ class Registry:
             self._cards = {c: self._cards[c] for c in keep}
         for cid in [c for c in self._first_seen if c not in self._cards]:
             del self._first_seen[cid]
+        for cid in [c for c in self._seen if c not in self._cards]:
+            del self._seen[cid]
         self._refreshed &= set(self._cards)
 
     def _add_contact(self, url: str, ts: int, now: float) -> None:
@@ -133,6 +141,19 @@ class Registry:
         if len(self._contacts) > MAX_CONTACTS:
             newest = sorted(self._contacts.items(), key=lambda kv: kv[1], reverse=True)[:MAX_CONTACTS]
             self._contacts = dict(newest)
+
+    def note_seen(self, cid: str, now: Optional[float] = None) -> None:
+        """Record that station `cid` itself just reached us (its announce) or answered us. Local metadata, not a card
+        field: a card's `updated` only says when it was last signed (up to 6 h ago for a station that is running fine)."""
+        now = time.time() if now is None else now
+        with self._lock:
+            if cid in self._cards and cid != self.own_id:
+                self._seen[cid] = int(now)
+                self._dirty = True
+
+    def seen_map(self) -> Dict[str, int]:
+        with self._lock:
+            return dict(self._seen)
 
     def note_contact(self, url: str, now: Optional[float] = None) -> None:
         """Remember that `url` answered a round (the caller has already passed it through the SSRF guard)."""
@@ -173,6 +194,7 @@ class Registry:
             self._first_seen.clear()
             self._refreshed.clear()
             self._contacts.clear()
+            self._seen.clear()
             self._dirty = True
             self.version += 1
 
@@ -184,7 +206,8 @@ class Registry:
             if not self._dirty or (not force and now - self._last_save < SAVE_INTERVAL_S):
                 return
             payload = json.dumps({"cards": list(self._cards.values()), "contacts": self._contacts,
-                                  "first_seen": self._first_seen, "refreshed": sorted(self._refreshed)},
+                                  "first_seen": self._first_seen, "refreshed": sorted(self._refreshed),
+                                  "seen": self._seen},
                                  separators=(",", ":"), allow_nan=False)
             self._dirty = False
             self._last_save = now

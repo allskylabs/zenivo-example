@@ -48,6 +48,11 @@ A station that cannot be reached is skipped (counted in the status line, never a
 are dropped and at most 500 are kept (when full, ids that never refreshed their card and were first seen last go first, so a flood of new ids cannot push out long-known stations; `first_seen` is local metadata in the file, never part of a card or the `/peers` payload). A card's `url` must be an origin (`https://host[:port]`, no path, query, fragment or credentials); a path or trailing slash typed in Settings is dropped. Known stations are stored in `data/community_peers.json`, settings in
 `data/community.json`.
 
+A card's `updated` is only when it was last signed (on a healthy station up to 6 hours ago). So each station also keeps
+a local **last seen** per station: the time that station itself announced to it or answered its round (an announced card older than
+6 hours 15 minutes is a replay and does not count). The community page shows "Last seen" from it and falls back to the
+card time for a station it never heard from directly. It is stored in `data/community_peers.json` and is not part of any card.
+
 ## Preview relays
 
 A station without a public URL (behind NAT, outbound only) cannot be asked for its large preview, so it parks the

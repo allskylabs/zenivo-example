@@ -169,6 +169,7 @@
 
     // Large-preview candidates for a station without a public address: the copy this station holds, then its relays
     let relayed = {};
+    let seenMap = {};
     const STATION_ID = /^[0-9a-f]{32}$/;
     function relaySources(card) {
         const out = [];
@@ -183,13 +184,21 @@
         return out;
     }
 
+    // "Updated" is when the card was last signed (up to 6 h ago on a healthy station); "last seen" is when the station
+    // itself last reached this one, so it is the better sign of life. Falls back to the card time when we never heard it.
+    function seenText(card, isOwn) {
+        if (isOwn) return "online now";
+        const t = Number(seenMap[card.id]);
+        return Number.isFinite(t) && t > 0 ? `last seen ${agoText(t)}` : `updated ${agoText(card.updated)}`;
+    }
+
     function popupFor(card, isOwn) {
         const box = el("div", "cm-pop");
         if (isOwn) box.appendChild(el("div", "own", "This station"));
         box.appendChild(el("h3", "", String(card.name || "Unnamed station")));
         if (card.camera) box.appendChild(el("div", "meta", String(card.camera)));
         if (card.software) box.appendChild(el("div", "meta", String(card.software)));
-        box.appendChild(el("div", "meta", `Updated ${agoText(card.updated)}`));
+        box.appendChild(el("div", "meta", seenText(card, isOwn).replace(/^./, (c) => c.toUpperCase())));
         const base = httpsUrl(card.url);
         let src = null;
         if (base) src = base.replace(/\/+$/, "") + "/api/community/thumb.jpg";
@@ -254,7 +263,7 @@
             const btn = el("button");
             btn.type = "button";
             btn.appendChild(el("span", isOwn ? "nm you" : "nm", `${String(card.name || "Unnamed station")}${isOwn ? " (this station)" : ""}`));
-            btn.appendChild(el("span", "sub", [card.camera, `updated ${agoText(card.updated)}`].filter(Boolean).join(" · ")));
+            btn.appendChild(el("span", "sub", [card.camera, seenText(card, isOwn)].filter(Boolean).join(" · ")));
             btn.addEventListener("click", () => {
                 map.flyTo([card.lat, card.lon], Math.max(map.getZoom(), 6));
                 marker.openPopup();
@@ -301,6 +310,7 @@
             const data = res.ok ? await res.json() : { cards: [] };
             cards = Array.isArray(data.cards) ? data.cards : [];
             relayed = data.relayed && typeof data.relayed === "object" ? data.relayed : {};
+            seenMap = data.seen && typeof data.seen === "object" ? data.seen : {};
             if (!popupOpen) drawMarkers();
         } catch (err) {
             showEmpty("unavailable", "Could not load the stations. Retrying.");
