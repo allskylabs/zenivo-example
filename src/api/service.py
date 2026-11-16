@@ -423,6 +423,8 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
             "conf": stats.get("confidence", 0.0),
             "stars": int(stats.get("star_count", 0)),
             "sun": round(sun_elev, 1),
+            "clar": stats.get("star_clarity"),
+            "shift": stats.get("star_shift_px"),
         })
         if not is_pytest and stats.get("cloud_cover_pct") is not None:
             try:

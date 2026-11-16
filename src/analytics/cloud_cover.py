@@ -331,7 +331,8 @@ def analyze_cloud_cover(
     if star_ref is not None and sun_elev < -12.0:
         try:
             sc = star_clarity(frame, star_ref["solution"], star_ref["lat"], star_ref["lon"], star_ref["when"], valid)
-            result.update(stars_expected=sc["expected"], stars_seen=sc["seen"], star_clarity=sc["clarity"])
+            result.update(stars_expected=sc["expected"], stars_seen=sc["seen"], star_clarity=sc["clarity"],
+                          star_shift_px=sc.get("shift_px"))
             if sc["clarity"] is not None:
                 # A clear sky shows about CLEAR_STAR_FRACTION of the catalogue stars above the glow
                 cc = max(cc, max(0.0, 1.0 - sc["clarity"] / CLEAR_STAR_FRACTION))
