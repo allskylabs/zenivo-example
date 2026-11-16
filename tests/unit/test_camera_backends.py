@@ -357,3 +357,13 @@ def test_camera_hints_are_logged_once(monkeypatch, caplog):
         assert drv.camera_hints() == ["ZWO hint X"]
         drv.camera_hints()
     assert sum("ZWO hint X" in r.message for r in caplog.records) == 1
+
+
+def test_qhy_problem_explains_missing_sdk_and_stays_quiet_without_camera(monkeypatch):
+    from src.hardware import qhy, zwo
+
+    monkeypatch.setattr(zwo, "usb_vendor_present", lambda vid: vid == "1618")
+    monkeypatch.setattr(qhy, "_get_sdk", lambda: (_ for _ in ()).throw(RuntimeError("libqhyccd not found")))
+    assert "QHY_SDK_LIB" in qhy.qhy_problem()
+    monkeypatch.setattr(zwo, "usb_vendor_present", lambda vid: False)
+    assert qhy.qhy_problem() == ""

@@ -204,6 +204,24 @@ def list_qhy_cameras() -> List[str]:
         return []
 
 
+def qhy_problem() -> str:
+    """Why no QHY camera is listed, as an instruction; "" when none is plugged in (nothing to explain) or it is listed."""
+    from .zwo import usb_vendor_present
+
+    if not usb_vendor_present("1618"):
+        return ""
+    try:
+        sdk = _get_sdk()
+    except Exception as exc:
+        return f"A QHY camera is plugged in, but QHYCCD's SDK was not found ({exc}). Install libqhyccd.so (see docs/INSTALL.md) or set QHY_SDK_LIB."
+    try:
+        if sdk.scan():
+            return ""
+    except Exception as exc:
+        return f"A QHY camera is plugged in, but the SDK failed to list it ({exc})."
+    return "A QHY camera is plugged in, but the SDK cannot open it: install QHYCCD's 85-qhyccd.rules into /etc/udev/rules.d/, reload udev and replug the camera."
+
+
 class QhyController(CameraDriverInterface):
     """QHYCCD USB camera, single-frame mode with manual exposure."""
 

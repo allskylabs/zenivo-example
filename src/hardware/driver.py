@@ -440,14 +440,13 @@ def camera_hints() -> list:
     """Reasons a plugged-in camera is not offered (missing SDK or Python package, udev rules), one sentence each.
     Each new reason is also written to the log once, so a support request can quote it."""
     hints = []
-    try:
-        from .zwo import zwo_problem
-
-        msg = zwo_problem()
-        if msg:
-            hints.append(msg)
-    except Exception:
-        pass
+    for mod, fn in (("zwo", "zwo_problem"), ("qhy", "qhy_problem")):
+        try:
+            msg = getattr(__import__(f"{__package__}.{mod}", fromlist=[fn]), fn)()
+            if msg:
+                hints.append(msg)
+        except Exception:
+            pass
     for msg in hints:
         if msg not in _hint_logged:
             _hint_logged.add(msg)

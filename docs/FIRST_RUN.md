@@ -43,7 +43,7 @@ Check: the `Local` clock at the top of the page shows your local time.
 
 Settings > Image Output > **Camera**. The list shows every camera Zenivo can see (IMX335 USB, Pi camera,
 ZWO ASI, QHY, webcams). Choose one; the choice is saved and used at start when the service runs with
-`--camera auto`. **Rescan** looks again after you plug a camera in. ZWO and QHY need their vendor SDK first,
+`--camera auto`. **Rescan** looks again after you plug a camera in; when a ZWO or QHY camera is plugged in but not offered, the line under Rescan (and `grep "Camera scan" data/allsky.log`) says why: missing `zwoasi` package, missing vendor SDK, or missing udev rules. ZWO and QHY need their vendor SDK first,
 see [INSTALL.md](INSTALL.md#camera-access).
 
 Check: the Live page shows the picture within a few seconds.

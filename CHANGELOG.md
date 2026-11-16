@@ -17,6 +17,9 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Fixed
 
+- A plugged-in ZWO or QHY camera that is not offered now says why (missing `zwoasi`, missing vendor SDK, missing udev rules) under Rescan and once in the log (`Camera scan: ...`).
+- Choosing `rts5869` under Settings > Camera no longer fails with "no usable camera" (the device node is now found automatically).
+- Satellites 3D zooms out far enough to show GEO and high-orbit satellites; the event viewer no longer draws a dashed path across the moving object.
 - The simulator camera drew only noise (a black picture). It now has a synthetic sky: stars that drift, sky glow that follows exposure and gain, and a bright daylight sky by day so the auto exposure settles. Lens-capped dark calibration still sees no stars.
 - Settings > Camera: the Rescan button was unstyled and gave no feedback; it now matches the other buttons and reports how many cameras it found.
 - Meteor, plane and satellite detection failed on OpenCV 5 (`HoughLinesP` result shape); CI now passes on current library versions.
