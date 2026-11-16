@@ -19,6 +19,15 @@ logger = logging.getLogger("imx335.api")
 
 class CaptureMixin:
 
+    def _log_exposure_warning(self) -> None:
+        """One activity-log line when the lock warning appears or changes kind (not on every frame)."""
+        w = self.exposure_warning()
+        kind = w["kind"] if w else None
+        if kind != getattr(self, "_last_exposure_warning", None):
+            self._last_exposure_warning = kind
+            if w:
+                self.activity.warning("camera", w["message"])
+
     AE_STATE_MAX_AGE_S = 2 * 3600.0   # a restart within this time resumes the last auto exposure / gain
     AE_STATE_SAVE_EVERY_S = 20.0
 
@@ -213,6 +222,8 @@ class CaptureMixin:
             display = self._star_boost_frame(frame, meta.get("capture_path") == "raw10") if not self.focus.active else frame
             # Time / exposure / gain / brightness reach viewers via telemetry (HTML overlay), not the pixels
             self.last_brightness = round(frame_brightness(frame), 1)
+            if not is_pytest:
+                self._log_exposure_warning()
             self.display_frame, self._display_frame_ts = display, self.last_capture_time
 
             # Update cached snapshots after RAW10 subtraction + demosaic. A full-res WebP encode costs

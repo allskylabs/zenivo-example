@@ -65,15 +65,43 @@ class ExposureMixin:
         self.activity.info("camera", f"Exposure mode set to {self.mode.upper()}")
         return {"success": True, "mode": self.mode}
 
+    # Picture-brightness limits for the lock warning (frame mean, 0-255)
+    WARN_BRIGHT = 215.0          # washed out: highlights clip
+    WARN_DARK_DAY = 25.0         # sun up or twilight: a frame this dark is wrong
+    WARN_DARK_NIGHT = 4.0        # night: practically black
+    WARN_OFF_TARGET = 0.4        # locked target missed by more than 40% (and 25 levels)
+
+    def exposure_warning(self) -> Optional[Dict[str, str]]:
+        """A hint when something is locked (exposure, gain or the target brightness; manual = both) and the picture is
+        far too dark or too bright, because auto exposure cannot correct what is held. None when nothing is locked
+        or the brightness is fine."""
+        ae, br = self.auto_exposure, self.last_brightness
+        locks = "both" if self.mode == "manual" else ae.lock_name()
+        if br is None or not (locks or ae.target_brightness is not None):
+            return None
+        held = {"both": "Exposure and gain are locked", "exposure": "Exposure is locked", "gain": "Gain is locked"}.get(
+            locks or "") or f"Target brightness is locked at {float(ae.target_brightness):.0f}"
+        night = float(getattr(ae, "solar_elevation", -20.0)) < -6.0
+        if br > self.WARN_BRIGHT:
+            return {"kind": "bright", "message": f"Picture too bright ({br:.0f}/255). {held}: lower it or let Auto work."}
+        if br < (self.WARN_DARK_NIGHT if night else self.WARN_DARK_DAY):
+            return {"kind": "dark", "message": f"Picture too dark ({br:.0f}/255). {held}: raise it or let Auto work."}
+        t = ae.target_brightness
+        if t is not None and abs(br - t) > max(25.0, self.WARN_OFF_TARGET * t) and locks:
+            return {"kind": "off_target", "message": f"Brightness {br:.0f} is far from the target {t:.0f}. {held}, so Auto cannot reach it."}
+        return None
+
     def get_ae_lock(self) -> Dict[str, Any]:
         """Which knobs are held: manual mode is both locked, auto may hold one of them."""
         if self.mode == "manual":
             return {"lock": "both", "exposure_s": float(self.camera.current_exposure_s),
                     "gain_db": float(self.camera.current_gain_db),
-                    "target_brightness": self.auto_exposure.target_brightness, "brightness": self.last_brightness}
+                    "target_brightness": self.auto_exposure.target_brightness, "brightness": self.last_brightness,
+                    "warning": self.exposure_warning()}
         ae = self.auto_exposure
         return {"lock": ae.lock_name(), "exposure_s": ae.lock_exposure_s, "gain_db": ae.lock_gain_db,
-                "target_brightness": ae.target_brightness, "brightness": self.last_brightness}
+                "target_brightness": ae.target_brightness, "brightness": self.last_brightness,
+                "warning": self.exposure_warning()}
 
     def set_target_brightness(self, value: Optional[float]) -> Dict[str, Any]:
         """Lock the auto-exposure target for the frame's mean brightness (0-255), or None for the built-in targets."""

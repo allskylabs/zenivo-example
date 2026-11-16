@@ -88,7 +88,17 @@ function syncModeButtons(modeStr) {
     btnLockGain.setAttribute("aria-pressed", isLocked("gain") ? "true" : "false");
 }
 
+function showExposureWarning(info) {
+    // A held exposure/gain/target with a picture far too dark or bright: tell everyone, not only the admin
+    const pill = document.getElementById("vp-warn");
+    if (!pill) return;
+    const w = info && info.warning;
+    pill.classList.toggle("hidden", !w);
+    if (w) { pill.textContent = w.kind === "bright" ? "TOO BRIGHT" : w.kind === "dark" ? "TOO DARK" : "OFF TARGET"; pill.title = w.message; }
+}
+
 function syncAeLock(info) {
+    showExposureWarning(info);
     // A lock change is on its way to the server: older pushed/polled states must not undo the click
     if (state.lockPending) return;
     state.aeLock = (info && info.lock) || null;

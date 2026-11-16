@@ -56,3 +56,21 @@ def test_save_is_throttled(tmp_path):
     s._save_ae_state(2.0, 12.0)
     s._save_ae_state(3.0, 14.0)
     assert json.load(open(tmp_path / "ae_state.json"))["exposure_s"] == 2.0
+
+
+def test_exposure_warning_only_when_something_is_locked():
+    from types import SimpleNamespace
+    from src.api.exposure_mixin import ExposureMixin as M
+    ae = SimpleNamespace(target_brightness=None, solar_elevation=-30.0, lock_name=lambda: None)
+    svc = SimpleNamespace(mode="auto", auto_exposure=ae, last_brightness=250.0, **{k: getattr(M, k) for k in
+                          ("WARN_BRIGHT", "WARN_DARK_DAY", "WARN_DARK_NIGHT", "WARN_OFF_TARGET")})
+    warn = lambda: M.exposure_warning(svc)
+    assert warn() is None                                  # auto: AE will correct it
+    ae.lock_name = lambda: "exposure"
+    assert warn()["kind"] == "bright"
+    svc.last_brightness = 1.0
+    assert warn()["kind"] == "dark"
+    svc.last_brightness = 60.0
+    assert warn() is None
+    ae.target_brightness = 130.0
+    assert warn()["kind"] == "off_target"
