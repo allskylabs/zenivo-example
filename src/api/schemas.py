@@ -375,3 +375,8 @@ class TimezoneRequest(BaseModel):
 
 class UpdateSettingsRequest(BaseModel):
     auto_check: bool = Field(True, description="Check for a new release once a day")
+
+
+class WeatherSettingsRequest(BaseModel):
+    enabled: Optional[bool] = Field(None, description="Fetch weather and forecast for the station position (Open-Meteo)")
+    refresh_min: Optional[int] = Field(None, description="Refresh interval in minutes: 15, 30, 60 or 180")

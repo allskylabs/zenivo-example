@@ -64,6 +64,9 @@ object of `/api/adsb/aircraft` and `/api/satellites`; the ADS-B receiver address
 | GET | `/api/telemetry` | Real-time telemetry: exposure, gain, star count, cloud cover, histograms |
 | GET | `/api/stream/histogram` | Current R, G, B and luma histograms (256 bins) with statistics and clipping |
 | GET | `/api/planets` | Planet positions for the overlay |
+| GET | `/api/weather` | Weather around the station from Open-Meteo: `enabled`, `available`, `current` (`temp_c`, `humidity_pct`, `dew_point_c`, `cloud_pct`, `precip_mm`, `wind_ms`, `gust_ms`, `wind_dir_deg`, `pressure_hpa`, `visibility_m`, `summary`, `is_day`), `hourly` (next 48 h: `t`, `temp_c`, `cloud_pct`, `precip_prob_pct`, `precip_mm`, `wind_ms`, `visibility_m`, `summary`), `outlook` (`clear_hours_next_12`, `mean_cloud_next_12_pct`, `rain_expected_next_12`), `fetched_at`, `age_s`, `error`. Empty (`available: false`) while off |
+| POST | `/api/weather/settings` | Admin. `{enabled, refresh_min}` (15, 30, 60 or 180); off by default |
+| POST | `/api/weather/refresh` | Admin. Fetch now |
 | GET | `/api/update/status` | Installed and latest known version, `available`, `auto_check`, `install` (`git` or `files`), `systemd`, `apply` (progress of a running update), `last_update`, `backups` |
 | POST | `/api/update/check` | Ask GitHub for the newest release now (admin) |
 | POST | `/api/update/settings` | `{"auto_check": true|false}`: the daily check, on by default (admin) |

@@ -9,6 +9,7 @@ from src.api.schemas import (
     AdsbConfigRequest,
     DayObjectsConfigRequest,
     SatellitesConfigRequest,
+    WeatherSettingsRequest,
 )
 from src.api.service import AllSkyService
 from src.api.routes.common import (router, get_service, public_view, _check_range, _sat_cache, _traffic_cache, _dayobj_cache, GUEST_MAX_SAT_IDS, GUEST_MAX_TRAIL_S)
@@ -191,3 +192,27 @@ def refresh_satellites(service: AllSkyService = Depends(get_service)):
 def get_data_sources(service: AllSkyService = Depends(get_service)):
     """Every outside data source (ADS-B, FR24, SondeHub, CelesTrak, airports): on or off, working or not (admin)."""
     return service.get_data_sources()
+
+
+# Weather and forecast around the station (src/weather.py): reading is public, switching it on is admin
+@router.get("/api/weather")
+def get_weather(service: AllSkyService = Depends(get_service)):
+    """Current conditions and the next 48 h for the station position (empty until the admin enables it)."""
+    return service.weather.status()
+
+
+@router.post("/api/weather/settings")
+def set_weather_settings(req: WeatherSettingsRequest, service: AllSkyService = Depends(get_service)):
+    """Turn the weather source on or off and pick the refresh interval (admin)."""
+    try:
+        service.weather.set_settings(req.enabled, req.refresh_min)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    service.activity.info("station", f"Weather source {'on' if service.weather.settings()['enabled'] else 'off'}")
+    return service.weather.status()
+
+
+@router.post("/api/weather/refresh")
+def refresh_weather(service: AllSkyService = Depends(get_service)):
+    """Fetch the weather now instead of waiting for the next refresh (admin)."""
+    return {"started": service.weather.refresh_async(), **service.weather.status()}

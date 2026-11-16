@@ -317,12 +317,19 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
         self.updater = UpdateManager(
             os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")), self.output_dir,
             lambda: self.station_config.get("update") or {}, self._save_update_settings)
+        # Weather around the station (Open-Meteo): off until the admin turns it on in Settings > Integrations
+        from src.weather import WeatherManager
+        self.weather = WeatherManager(
+            self.output_dir, lambda: self.station_config.get("weather") or {}, self._save_weather_settings,
+            lambda: (self.station_config.get("latitude_deg"), self.station_config.get("longitude_deg"))
+            if self.station_config.get("latitude_deg") is not None and self.station_config.get("longitude_deg") is not None else None)
         if not os.environ.get("PYTEST_CURRENT_TEST"):
             threading.Thread(target=self._retention_worker, name="retention", daemon=True).start()
             threading.Thread(target=self._background_capture_worker, name="bg-capture", daemon=True).start()
             threading.Thread(target=self._traffic_worker, name="traffic-log", daemon=True).start()
             self.community.start()  # no-op while Community is off
             self.updater.start_background()
+            self.weather.start_background()
 
         # Initial capture to prime caches
         self._prime_cache()
@@ -396,6 +403,10 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
 
 
 
+
+    def _save_weather_settings(self, cfg: Dict[str, Any]) -> None:
+        self.station_config["weather"] = cfg
+        self._save_station_config()
 
     def _save_update_settings(self, cfg: Dict[str, Any]) -> None:
         self.station_config["update"] = cfg

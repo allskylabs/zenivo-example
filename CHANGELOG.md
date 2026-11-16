@@ -8,6 +8,10 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Added
 
+- Weather and forecast around the station (Settings > Integrations > Weather and forecast, off by default): current conditions and the next 48 h from Open-Meteo (free, no key; the position is rounded to 0.1°), with a "clear hours in the next 12" outlook. New `GET /api/weather` (public), `POST /api/weather/{settings,refresh}` (admin); listed under Data sources.
+- A warning (pill on the live picture) when the picture is too dark or too bright while exposure, gain or the target brightness is locked.
+- The header and tab title show the station name when one is set. Community map: online / idle / offline icons, popups kept in view, the whole world fits on phones.
+
 - Settings > Admin > Service: **Restart Zenivo** restarts the program from the web (for a camera that returns black pictures or hangs). Under systemd the service is brought back by `Restart=always`; run by hand it re-runs the same command line. New `POST /api/system/restart` (admin).
 - Software update: the station checks GitHub for a new release once a day (on by default, switch in Settings > Admin; nothing about the station is sent). The admin installs it with one click (**Update now**): the release is downloaded, checked, the program files are backed up and swapped (data, settings and the virtual environment are never touched), changed Python requirements are installed and the service restarts. **Go back to the previous version** restores the backup. A git checkout is updated with `git merge --ff-only`. New `GET /api/update/status`, `POST /api/update/{check,settings,apply,rollback}` (the last four need the admin).
 - Station timezone: Settings > Station has a **Station timezone** list (the operating system's zone by default, a whole-hour offset from the station coordinates, or any IANA zone). The clock, observing day and file names follow it, and the web UI shows the station's time instead of a fixed UTC+7 (daylight saving included). New `POST /api/station/timezone`; `timezone` and `timezone_info` in `GET /api/station/config`.

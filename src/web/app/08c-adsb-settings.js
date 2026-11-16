@@ -351,3 +351,45 @@ if (dayObj.group) {
         setInterval(loadDayObjStatus, 60000);
     }
 }
+
+// Settings → Weather and forecast (Open-Meteo): switch + refresh, plus the current conditions and the next hours
+const wxBlock = document.getElementById("wx-block");
+if (wxBlock) {
+    const wxEnabled = document.getElementById("wx-enabled"), wxRefresh = document.getElementById("wx-refresh");
+    const wxNow = document.getElementById("wx-now"), wxHours = document.getElementById("wx-hours");
+    const compass = (d) => ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round((d || 0) / 45) % 8];
+    const fmt = (v, u, nd = 0) => (v == null ? "–" : Number(v).toFixed(nd) + u);
+    function syncWx(d) {
+        if (!d) return;
+        wxEnabled.checked = !!d.enabled;
+        wxRefresh.value = String(d.refresh_min);
+        wxNow.textContent = ""; wxHours.textContent = "";
+        if (!d.enabled) return;
+        if (!d.available) { wxNow.textContent = d.error ? `Could not load: ${d.error}` : (d.fetching ? "Loading…" : "Waiting for the first answer…"); return; }
+        const c = d.current;
+        wxNow.textContent = `${c.summary || "Now"} · ${fmt(c.temp_c, "°C", 1)} · cloud ${fmt(c.cloud_pct, "%")} · humidity ${fmt(c.humidity_pct, "%")} · ` +
+            `wind ${fmt(c.wind_ms, " m/s", 1)} ${compass(c.wind_dir_deg)} · ${fmt(c.pressure_hpa, " hPa")} · visibility ${fmt(c.visibility_m == null ? null : c.visibility_m / 1000, " km", 0)}` +
+            ` — next 12 h: ${d.outlook.clear_hours_next_12} clear hours${d.outlook.rain_expected_next_12 ? ", rain likely" : ""} (updated ${Math.round(d.age_s / 60)} min ago)`;
+        (d.hourly || []).slice(0, 24).forEach((h) => {
+            const cell = document.createElement("div");
+            cell.className = "wx-h";
+            cell.title = `${h.summary || ""} · rain ${fmt(h.precip_prob_pct, "%")}`;
+            const t = new Date(h.t * 1000);
+            cell.textContent = `${String(t.getUTCHours()).padStart(2, "0")}h ${fmt(h.cloud_pct, "%")}`;
+            cell.style.opacity = String(1 - Math.min(1, (h.cloud_pct || 0) / 140));
+            wxHours.appendChild(cell);
+        });
+    }
+    async function loadWx() {
+        try { const r = await fetch("/api/weather"); if (r.ok) syncWx(await r.json()); } catch (err) { /* offline */ }
+    }
+    autosave(wxBlock, async () => {
+        syncWx(await sendJson("/api/weather/settings", { enabled: wxEnabled.checked, refresh_min: Number(wxRefresh.value) }));
+        [4000, 10000].forEach((ms) => setTimeout(() => { loadWx(); if (typeof loadDataSources === "function") loadDataSources(); }, ms));
+    }, { selector: "#wx-enabled, #wx-refresh" });
+    document.getElementById("wx-refresh-now").addEventListener("click", async () => {
+        try { syncWx(await sendJson("/api/weather/refresh", {})); } catch (err) { wxNow.textContent = `Could not start: ${err.message}`; }
+        [4000, 10000].forEach((ms) => setTimeout(loadWx, ms));
+    });
+    if (currentPage === "tab-settings") loadWx();
+}

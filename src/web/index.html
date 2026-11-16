@@ -1122,6 +1122,28 @@
                             The position sent is rounded to 0.5° (about 55 km); the exact location never leaves this station.
                         </p>
                     </fieldset>
+                    <fieldset class="settings-group" id="wx-block" data-admin>
+                        <legend>Weather and forecast</legend>
+                        <div class="field">
+                            <label class="checkbox-label"><input type="checkbox" id="wx-enabled" /> Show the weather and 48 h forecast around the station</label>
+                        </div>
+                        <div class="field">
+                            <label for="wx-refresh">Refresh</label>
+                            <select id="wx-refresh">
+                                <option value="15">every 15 min</option><option value="30">every 30 min</option>
+                                <option value="60">every hour</option><option value="180">every 3 hours</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <button type="button" class="btn btn-sm btn-outline" id="wx-refresh-now" data-no-autosave>&#8635; Update now</button>
+                        </div>
+                        <div id="wx-now" class="wx-now" aria-live="polite"></div>
+                        <div id="wx-hours" class="wx-hours" aria-label="Next hours"></div>
+                        <p class="field-note">
+                            Off by default. When on, the station asks api.open-meteo.com (free, no account) for the weather at its position, rounded to 0.1° (about 11 km);
+                            no name, address or picture is sent. Same data at <code>GET /api/weather</code>.
+                        </p>
+                    </fieldset>
                     <fieldset class="settings-group sat-block" id="sat-block" data-admin>
                         <legend>Satellites (orbits)</legend>
                         <div class="field">
@@ -1651,7 +1673,7 @@
     <script defer src="/static/app/07-cloud.js?v=20261115b"></script>
     <script defer src="/static/app/08-gallery-adsb.js?v=20261115a"></script>
     <script defer src="/static/app/08b-events-live.js?v=20261115a"></script>
-    <script defer src="/static/app/08c-adsb-settings.js?v=20261115c"></script>
+    <script defer src="/static/app/08c-adsb-settings.js?v=20261117a"></script>
     <script defer src="/static/app/09-community.js?v=20261114b"></script>
     <script defer src="/static/app/10-admin.js?v=20261117a"></script>
     <script>

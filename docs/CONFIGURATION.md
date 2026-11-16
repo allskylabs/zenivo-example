@@ -100,6 +100,7 @@ Factory defaults (neutral station "My station" at 0, 0, IMX335 sensor, 1.65 mm f
 | `image_transform` | `flip_horizontal`, `flip_vertical`, `rotate_deg` (0 or 180); `rotate_isp_180` is added for RTS5869 day frames |
 | `output_resolution` | `width`, `height` of the frames Zenivo outputs (default 2592 x 1944) |
 | `timezone` | Station time zone: absent = the operating system zone, `coords` = whole-hour offset from the longitude, or an IANA name (`America/Chicago`). The clock, observing day and file names follow it; set it in Settings > Station & Optics |
+| `weather` | `enabled` (default 0), `refresh_min` (15, 30, 60 or 180; default 30): weather and 48 h forecast from Open-Meteo (Settings > Integrations). Cache: `data/cache/weather.json` |
 | `update` | `auto_check` (default true): daily check for a new release (Settings > Admin > Software update) |
 | `camera_select` | `type`, `index` of the camera chosen under Settings > Camera (used at start when `--camera` is `auto`; absent = auto-detect) |
 

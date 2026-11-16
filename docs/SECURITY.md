@@ -18,6 +18,8 @@ security model.
 | WebSocket commands that change state (`set_exposure`, `set_gain`, `set_mode`, `trigger_master_dark`, ASC1 commands) | refused: `{"type":"error","code":"auth","message":"Sign in as admin"}` | yes |
 | Every `POST`/`PUT`/`DELETE` under `/api/` | refused with 401 | yes |
 | `GET /api/update/status` (installed and latest version) | yes | yes |
+| `GET /api/weather` (weather and forecast near the station) | yes | yes |
+| `POST /api/weather/settings`, `POST /api/weather/refresh` | no | yes |
 | Check for an update, switch the daily check, **install an update**, roll back, **restart the service**, set the station time zone (`POST /api/update/*`, `/api/system/restart`, `/api/station/timezone`) | refused with 401 (default deny, no allowlist entry) | yes |
 | `GET /api/logs`, `/api/logs/download`, `/api/community/settings`, `/api/focus`, `/api/focus/frame`, `/api/focus/overview.jpg`, `/api/storage`, `/api/camera/devices`, `/docs`, `/redoc`, `/openapi.json` | 401 | yes (`ADMIN_GET` in `src/auth/policy.py`) |
 | Pages `/settings`, `/calibration`, `/focus`, `/logs`, `/obs/dock` (also `/obs/control`, `/dock`) | redirect to `/login?next=...` | yes |

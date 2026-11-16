@@ -129,6 +129,11 @@ class DataSourcesMixin:
             or ("Off" if not sondes_on else f"last answer {int(now - feed._fetched)} s ago" if feed is not None and getattr(feed, "_fetched", 0)
                 else "Waiting for the first request (a Live page must be open)"),
             "api.v2.sondehub.org" if sondes_on else "", "integrations")
+        w = self.weather.status()
+        add("weather", "Weather and forecast (Open-Meteo)", w["enabled"],
+            ("error" if w["error"] and not w["available"] else "ok" if w["available"] else "waiting") if w["enabled"] else "off",
+            (w["error"] or (f"updated {int(w['age_s'] / 60)} min ago, {w['current']['summary'] or 'no summary'}" if w["available"] else "Waiting for the first answer"))
+            if w["enabled"] else "Off: nothing is sent", w["host"] if w["enabled"] else "", "integrations")
         apath = os.path.join(self.output_dir, "cache", "airports_near.json")
         have = os.path.isfile(apath)
         add("airports", "Airports and runways (OurAirports)", True, "ok" if have else "waiting",
