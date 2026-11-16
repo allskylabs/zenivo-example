@@ -19,6 +19,9 @@ URL = (f"https://{HOST}/v1/forecast?latitude={{lat}}&longitude={{lon}}&timezone=
        "&current=temperature_2m,relative_humidity_2m,dew_point_2m,cloud_cover,precipitation,wind_speed_10m,wind_gusts_10m,"
        "wind_direction_10m,surface_pressure,visibility,weather_code,is_day"
        "&hourly=temperature_2m,cloud_cover,precipitation_probability,precipitation,wind_speed_10m,visibility,weather_code")
+FALLBACK_HOST = "api.met.no"
+FALLBACK_URL = f"https://{FALLBACK_HOST}/weatherapi/locationforecast/2.0/compact?lat={{lat}}&lon={{lon}}"
+UA = "Zenivo/1.3 (+https://github.com/hoanb1/zenivo)"   # MET Norway asks every client to identify itself
 REFRESH_CHOICES_MIN = (15, 30, 60, 180)
 DEFAULTS = {"enabled": 0, "refresh_min": 30}
 HOURS = 48
@@ -93,6 +96,53 @@ def parse(payload: Dict[str, Any], now: Optional[float] = None) -> Dict[str, Any
     return {"current": current, "hourly": hourly, "outlook": outlook}
 
 
+def parse_metno(payload: Dict[str, Any], now: Optional[float] = None) -> Dict[str, Any]:
+    """MET Norway locationforecast (compact) -> the same shape as parse(). It has no visibility or rain probability."""
+    from datetime import datetime, timezone
+    series = ((payload.get("properties") or {}).get("timeseries")) if isinstance(payload, dict) else None
+    if not isinstance(series, list) or not series:
+        raise ValueError("unexpected answer from the weather service")
+    now = time.time() if now is None else now
+
+    def ts(s: str) -> float:
+        return datetime.fromisoformat(s.replace("Z", "+00:00")).astimezone(timezone.utc).timestamp()
+
+    def summary(entry: Dict[str, Any]) -> str:
+        sym = ((entry.get("data") or {}).get("next_1_hours") or (entry.get("data") or {}).get("next_6_hours") or {}).get("summary", {}).get("symbol_code", "")
+        return sym.split("_")[0].replace("lightrain", "light rain").replace("heavyrain", "heavy rain").replace("partlycloudy", "partly cloudy").capitalize() if sym else ""
+
+    hourly: List[Dict[str, Any]] = []
+    first = None
+    for e in series:
+        try:
+            t = ts(e["time"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if t < now - 3600:
+            continue
+        d = (e.get("data") or {}).get("instant", {}).get("details", {})
+        nxt = (e.get("data") or {}).get("next_1_hours") or {}
+        first = first or (e, d)
+        hourly.append({"t": t, "temp_c": _num(d.get("air_temperature")), "cloud_pct": _num(d.get("cloud_area_fraction"), 0),
+                       "precip_prob_pct": None, "precip_mm": _num((nxt.get("details") or {}).get("precipitation_amount")),
+                       "wind_ms": _num(d.get("wind_speed")), "visibility_m": None, "summary": summary(e)})
+        if len(hourly) >= HOURS:
+            break
+    if not first:
+        raise ValueError("no forecast hours in the answer")
+    e0, d0 = first
+    current = {"temp_c": _num(d0.get("air_temperature")), "humidity_pct": _num(d0.get("relative_humidity"), 0),
+               "dew_point_c": _num(d0.get("dew_point_temperature")), "cloud_pct": _num(d0.get("cloud_area_fraction"), 0),
+               "precip_mm": hourly[0]["precip_mm"], "wind_ms": _num(d0.get("wind_speed")), "gust_ms": None,
+               "wind_dir_deg": _num(d0.get("wind_from_direction"), 0), "pressure_hpa": _num(d0.get("air_pressure_at_sea_level"), 0),
+               "visibility_m": None, "code": None, "summary": summary(e0), "is_day": None}
+    nxt12 = [h for h in hourly[:12] if h["cloud_pct"] is not None]
+    outlook = {"clear_hours_next_12": sum(1 for h in nxt12 if h["cloud_pct"] <= 30 and (h["precip_mm"] or 0) < 0.3),
+               "mean_cloud_next_12_pct": round(sum(h["cloud_pct"] for h in nxt12) / len(nxt12)) if nxt12 else None,
+               "rain_expected_next_12": any((h["precip_mm"] or 0) >= 0.3 for h in hourly[:12])}
+    return {"current": current, "hourly": hourly, "outlook": outlook}
+
+
 class WeatherManager:
     def __init__(self, data_dir: str, get_settings: Callable[[], Dict[str, Any]], save_settings: Callable[[Dict[str, Any]], None],
                  get_position: Callable[[], Optional[tuple]]):
@@ -103,10 +153,12 @@ class WeatherManager:
         self.fetched_at = 0.0
         self.error = ""
         self.fetching = False
+        self.provider = HOST
         try:
             with open(self.path, encoding="utf-8") as f:
                 saved = json.load(f)
             self.data, self.fetched_at = saved.get("data"), float(saved.get("fetched_at") or 0)
+            self.provider = saved.get("provider") or HOST
         except (OSError, ValueError):
             pass
 
@@ -129,8 +181,8 @@ class WeatherManager:
 
     def status(self) -> Dict[str, Any]:
         cfg = self.settings()
-        out: Dict[str, Any] = {"enabled": bool(cfg["enabled"]), "refresh_min": cfg["refresh_min"], "provider": "Open-Meteo",
-                               "host": HOST, "refresh_choices_min": list(REFRESH_CHOICES_MIN), "fetching": self.fetching,
+        out: Dict[str, Any] = {"enabled": bool(cfg["enabled"]), "refresh_min": cfg["refresh_min"], "provider": "MET Norway" if self.provider == FALLBACK_HOST else "Open-Meteo",
+                               "host": self.provider, "refresh_choices_min": list(REFRESH_CHOICES_MIN), "fetching": self.fetching,
                                "fetched_at": self.fetched_at or None, "error": self.error or None, "available": False}
         if cfg["enabled"] and self.data:
             out.update(self.data)
@@ -144,18 +196,25 @@ class WeatherManager:
             self.error = "Set the station latitude and longitude first"
             return False
         lat, lon = round(float(pos[0]), 1), round(float(pos[1]), 1)   # about 11 km: the station is not located exactly
-        try:
-            _, body, _ = net.pooled_get(URL.format(lat=lat, lon=lon), {"User-Agent": "Zenivo", "Accept": "application/json"}, 15.0)
-            data = parse(json.loads(body))
-        except Exception as exc:  # network, HTTP, JSON or shape: keep the last good answer, show why
-            self.error = str(exc)[:200]
+        data, used, err = None, HOST, ""
+        # Open-Meteo first; its free tier is per IP address, so a shared address can hit the daily limit (HTTP 429):
+        # then MET Norway answers instead. On any failure the last good answer is kept and the reason shown.
+        for host, url, fn in ((HOST, URL, parse), (FALLBACK_HOST, FALLBACK_URL, parse_metno)):
+            try:
+                _, body, _ = net.pooled_get(url.format(lat=lat, lon=lon), {"User-Agent": UA, "Accept": "application/json"}, 15.0)
+                data, used = fn(json.loads(body)), host
+                break
+            except Exception as exc:
+                err = (err + "; " if err else "") + f"{host}: {str(exc)[:80]}"
+        if data is None:
+            self.error = err[:240]
             return False
         with self.lock:
-            self.data, self.fetched_at, self.error = data, time.time(), ""
+            self.data, self.fetched_at, self.error, self.provider = data, time.time(), "", used
             try:
                 os.makedirs(os.path.dirname(self.path), exist_ok=True)
                 with open(self.path + ".tmp", "w", encoding="utf-8") as f:
-                    json.dump({"data": data, "fetched_at": self.fetched_at}, f)
+                    json.dump({"data": data, "fetched_at": self.fetched_at, "provider": self.provider}, f)
                 os.replace(self.path + ".tmp", self.path)
             except OSError:
                 pass

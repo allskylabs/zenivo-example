@@ -36,3 +36,25 @@ def test_settings_validate_and_default_off(tmp_path):
     import pytest
     with pytest.raises(ValueError):
         m.set_settings(refresh_min=7)
+
+
+def test_metno_parse_and_fallback_when_open_meteo_refuses(tmp_path, monkeypatch):
+    import json
+    base = int(datetime(2026, 11, 17, 12, tzinfo=timezone.utc).timestamp())
+    ts = [{"time": datetime.fromtimestamp(base + 3600 * i, timezone.utc).strftime("%Y-%m-%dT%H:00:00Z"),
+           "data": {"instant": {"details": {"air_temperature": 21.0, "cloud_area_fraction": 10.0, "relative_humidity": 70,
+                                            "wind_speed": 2.0, "wind_from_direction": 90, "air_pressure_at_sea_level": 1010}},
+                    "next_1_hours": {"summary": {"symbol_code": "partlycloudy_day"}, "details": {"precipitation_amount": 0.0}}}}
+          for i in range(60)]
+    out = wx.parse_metno({"properties": {"timeseries": ts}}, now=base)
+    assert out["current"]["summary"] == "Partly cloudy" and len(out["hourly"]) == wx.HOURS and out["outlook"]["clear_hours_next_12"] == 12
+
+    def fake_get(url, headers, timeout):
+        if "open-meteo" in url:
+            raise OSError("HTTP Error 429")
+        return 200, json.dumps({"properties": {"timeseries": ts}}).encode(), {}
+    monkeypatch.setattr(wx.net, "pooled_get", fake_get)
+    monkeypatch.setattr(wx.time, "time", lambda: base)
+    s = {"enabled": 1}
+    m = wx.WeatherManager(str(tmp_path), lambda: s, s.update, lambda: (21.1, 105.4))
+    assert m.refresh() and m.status()["provider"] == "MET Norway" and m.status()["available"]
