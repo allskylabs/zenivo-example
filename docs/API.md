@@ -216,7 +216,7 @@ it, and captures are cached for `max(min_capture_interval_s, 0.9 x exposure)`.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET, POST | `/api/obs/overlay` | OBS overlay settings (`sky_overlay`, `sky_labels`, `grid_overlay`, `sun_moon`, `badge`, `adsb_overlay`, `events_overlay`, `fit`, `bg`, `night_vision`, `opacity`, `zoom`, `pan_x`, ...). A change is broadcast to connected viewers |
+| GET, POST | `/api/obs/overlay` | OBS overlay settings (`sky_overlay`, `sky_labels`, `grid_overlay`, `sun_moon`, `badge`, `adsb_overlay`, `events_overlay`, `fit`, `res` (`stream`, default: same size as /live; `full`: the output resolution), `bg`, `night_vision`, `opacity`, `zoom`, `pan_x`, ...). A change is broadcast to connected viewers |
 | POST | `/api/obs/reload` | Tell connected OBS browser sources to reload |
 
 ## WebSocket `/ws/live`

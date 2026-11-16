@@ -44,6 +44,7 @@ def test_obs_overlay_get_defaults(api_client):
     assert "badge" in data
     assert "fit" in data
     assert "bg" in data
+    assert data["res"] == "stream"   # same picture size as /live unless the dock says otherwise
 
 
 def test_obs_overlay_post_update(api_client):

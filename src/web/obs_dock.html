@@ -217,6 +217,7 @@
                 </div>
                 <div class="row">
                     <button type="button" id="btn-fit" class="btn-sm btn-wide" title="Toggle 16:9 Cover / 4:3 Original">16:9 Cover</button>
+                    <button type="button" id="btn-res" class="btn-sm btn-wide" title="Picture size sent to /obs: same as /live, or the full output resolution">Size: as /live</button>
                     <button type="button" id="btn-bg" class="btn-sm btn-wide" title="Toggle Black / Transparent background">Black BG</button>
                 </div>
                 <div class="row">
@@ -404,6 +405,8 @@
 
                 $("btn-fit").textContent = state.fit === "contain" ? "4:3 Original" : "16:9 Cover";
                 $("btn-fit").classList.toggle("active", state.fit === "contain");
+                $("btn-res").textContent = state.res === "full" ? "Size: full" : "Size: as /live";
+                $("btn-res").classList.toggle("active", state.res === "full");
                 $("btn-bg").textContent = state.bg === "transparent" ? "Alpha" : "Black BG";
                 $("btn-bg").classList.toggle("active", state.bg === "transparent");
 
@@ -576,6 +579,7 @@
                 sky_overlay: false, sky_labels: false, grid_overlay: false, sun_moon: false, adsb_overlay: false, events_overlay: false, badge: false
             }, "Preset: Raw video"));
 
+            $("btn-res").addEventListener("click", () => pushPatch({ res: state.res === "full" ? "stream" : "full" }));
             $("btn-fit").addEventListener("click", () => pushPatch({ fit: state.fit === "contain" ? "cover" : "contain" }));
             $("btn-bg").addEventListener("click", () => pushPatch({ bg: state.bg === "transparent" ? "black" : "transparent" }));
 

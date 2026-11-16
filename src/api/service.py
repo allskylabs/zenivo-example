@@ -156,6 +156,7 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
         "replay_crop_url": "",
         "replay_label": "",
         "replay_bbox": [],
+        "res": "stream",   # picture size sent to /obs: "stream" (same as /live) or "full" (output resolution)
     }
 
     def __init__(self, camera: Optional[CameraDriverInterface] = None):

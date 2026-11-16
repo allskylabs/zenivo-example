@@ -284,6 +284,7 @@ class ObsOverlayRequest(BaseModel):
     adsb_overlay: Optional[bool] = Field(None, description="Show live ADS-B aircraft positions on sky")
     events_overlay: Optional[bool] = Field(None, description="Show recent meteor/aircraft streak lines on sky")
     fit: Optional[str] = Field(None, pattern="^(cover|contain)$", description="Framing fit mode")
+    res: Optional[str] = Field(None, pattern="^(stream|full)$", description="Picture size: stream (same as /live) or full output resolution")
     bg: Optional[str] = Field(None, pattern="^(black|transparent)$", description="Background fill mode")
     night_vision: Optional[bool] = Field(None, description="Night vision / red lighting mode")
     opacity: Optional[float] = Field(None, ge=0.0, le=1.0, description="Overlay opacity level (0.0 to 1.0)")

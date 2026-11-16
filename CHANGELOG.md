@@ -8,6 +8,7 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Added
 
+- OBS: the picture size of `/obs` is now the same as `/live` by default, and the OBS Dock has a **Size** button to send the full output resolution instead (`res`: `stream` or `full` in `/api/obs/overlay`; `?res=full|stream` in the URL still overrides it). Before, `/obs` always asked for the full frame unless `?res=stream` was in the URL.
 - Community: stations show **Last seen** (when the station itself last announced to this one or answered a round) instead of the card's signing time, which could be up to 6 hours old on a healthy station. New local `seen` map in `/api/community/peers`; nothing changes in the cards.
 - Settings > Sky Mask: **Auto-detect** proposes the open-sky and obstruction polygons from the current frame (`POST /api/station/sky-mask/auto`); you edit it by hand and press Apply, nothing is stored before that. Drawing the mask by hand works as before.
 - `docs/FIRST_RUN.md`: step-by-step setup after installing (password, time zone, Station & Optics, lens, pointing check, sky mask, optional services). The installer and README point to it.
