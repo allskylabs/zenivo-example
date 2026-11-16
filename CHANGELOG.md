@@ -11,6 +11,10 @@ All notable changes to Zenivo are recorded here. The format follows
 - Settings > Sky Mask: **Auto-detect** proposes the open-sky and obstruction polygons from the current frame (`POST /api/station/sky-mask/auto`); you edit it by hand and press Apply, nothing is stored before that. Drawing the mask by hand works as before.
 - `docs/FIRST_RUN.md`: step-by-step setup after installing (password, time zone, Station & Optics, lens, pointing check, sky mask, optional services). The installer and README point to it.
 
+### Added (camera SDK)
+
+- `scripts/install_camera_sdk.sh zwo|qhy|all` and `install.sh --camera-sdk`: installs `zwoasi`, the vendor library and the udev rules for ZWO ASI / QHY cameras in one step (downloaded from a pinned INDI 3rd-party commit when you run it). `install.sh --camera` now accepts `zwo` and `qhy`.
+
 ### Added (Integrations)
 
 - Settings > Integrations: a **Data sources** overview (state of ADS-B, public fallback, Flightradar24, satellites, weather balloons, airports) and a **Satellites** panel: switch, CelesTrak groups (stations, brightest, weather, NOAA, GPS, Galileo, science), refresh interval, Download now, an optional alternative TLE source, and an optional **SatNOGS DB** orbit source (about 1700 satellites in one file). New `GET/POST /api/satellites/config`, `POST /api/satellites/refresh`, `GET /api/data-sources`.

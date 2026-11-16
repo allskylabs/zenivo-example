@@ -14,6 +14,7 @@ RUN_USER="${SUDO_USER:-$(id -un)}"
 SERVICE_NAME="zenivo"
 USE_SYSTEMD=1
 DRY_RUN=0
+CAMERA_SDK=""
 
 usage() {
     cat <<'EOF'
@@ -26,7 +27,8 @@ Options:
   --dir PATH            Install directory containing run_allsky.py (default: the directory of this script)
   --port N              TCP port of the web UI and API (default: 8080)
   --host ADDR           Bind address (default: 127.0.0.1, this machine only; use 0.0.0.0 to open it on the LAN, or keep 127.0.0.1 behind a reverse proxy)
-  --camera NAME         auto | rts5869 | picamera | v4l2 | simulator (default: auto)
+  --camera NAME         auto | rts5869 | picamera | zwo | qhy | v4l2 | simulator (default: auto)
+  --camera-sdk NAME     zwo | qhy | all: also download and install that vendor SDK and udev rules (scripts/install_camera_sdk.sh; needs sudo)
   --user NAME           Linux user that runs the service (default: the current user)
   --service-name NAME   systemd unit name without ".service" (default: zenivo)
   --no-systemd          Only create the virtual environment and install the dependencies
@@ -37,6 +39,7 @@ Examples:
   ./install.sh --dry-run
   ./install.sh --camera picamera --port 8095 --host 127.0.0.1
   ./install.sh --no-systemd
+  ./install.sh --camera zwo --camera-sdk zwo
 EOF
 }
 
@@ -49,6 +52,7 @@ while [ $# -gt 0 ]; do
         --port) [ $# -ge 2 ] || die "--port needs a value"; PORT="$2"; shift 2 ;;
         --host) [ $# -ge 2 ] || die "--host needs a value"; HOST="$2"; shift 2 ;;
         --camera) [ $# -ge 2 ] || die "--camera needs a value"; CAMERA="$2"; shift 2 ;;
+        --camera-sdk) [ $# -ge 2 ] || die "--camera-sdk needs a value"; CAMERA_SDK="$2"; shift 2 ;;
         --user) [ $# -ge 2 ] || die "--user needs a value"; RUN_USER="$2"; shift 2 ;;
         --service-name) [ $# -ge 2 ] || die "--service-name needs a value"; SERVICE_NAME="$2"; shift 2 ;;
         --no-systemd) USE_SYSTEMD=0; shift ;;
@@ -59,8 +63,12 @@ while [ $# -gt 0 ]; do
 done
 
 case "$CAMERA" in
-    auto|rts5869|picamera|v4l2|simulator) ;;
-    *) die "--camera must be one of: auto, rts5869, picamera, v4l2, simulator" ;;
+    auto|rts5869|picamera|zwo|qhy|v4l2|simulator) ;;
+    *) die "--camera must be one of: auto, rts5869, picamera, zwo, qhy, v4l2, simulator" ;;
+esac
+case "$CAMERA_SDK" in
+    ""|zwo|qhy|all) ;;
+    *) die "--camera-sdk must be one of: zwo, qhy, all" ;;
 esac
 case "$PORT" in
     ''|*[!0-9]*) die "--port must be a number" ;;
@@ -136,6 +144,14 @@ fi
 info "Installing Python dependencies"
 run "$VENV/bin/python" -m pip install --upgrade pip
 run "$VENV/bin/python" -m pip install -r "$REQ"
+
+# 4b. Vendor SDK for ZWO / QHY cameras (opt-in: downloads files, needs sudo)
+if [ -n "$CAMERA_SDK" ]; then
+    SDK_ARGS=("$CAMERA_SDK" --venv "$VENV")
+    [ "$DRY_RUN" -eq 1 ] && SDK_ARGS+=(--dry-run)
+    info "Installing the $CAMERA_SDK camera SDK"
+    "$SCRIPT_DIR/scripts/install_camera_sdk.sh" "${SDK_ARGS[@]}"
+fi
 
 # 5. systemd
 if [ "$USE_SYSTEMD" -eq 1 ]; then
