@@ -64,6 +64,12 @@ object of `/api/adsb/aircraft` and `/api/satellites`; the ADS-B receiver address
 | GET | `/api/telemetry` | Real-time telemetry: exposure, gain, star count, cloud cover, histograms |
 | GET | `/api/stream/histogram` | Current R, G, B and luma histograms (256 bins) with statistics and clipping |
 | GET | `/api/planets` | Planet positions for the overlay |
+| GET | `/api/update/status` | Installed and latest known version, `available`, `auto_check`, `install` (`git` or `files`), `systemd`, `apply` (progress of a running update), `last_update`, `backups` |
+| POST | `/api/update/check` | Ask GitHub for the newest release now (admin) |
+| POST | `/api/update/settings` | `{"auto_check": true|false}`: the daily check, on by default (admin) |
+| POST | `/api/update/apply` | Download, verify, back up and install the latest release in the background, then restart. 409 when already up to date, already running or a master dark is running (admin) |
+| POST | `/api/update/rollback` | Put the program files saved before the last update back and restart (admin) |
+| POST | `/api/system/restart` | Restart the service in about 2 s (admin). 409 while a master dark calibration runs |
 
 ## Camera
 
@@ -96,7 +102,8 @@ object of `/api/adsb/aircraft` and `/api/satellites`; the ADS-B receiver address
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/station/config` | Station coordinates, optics, orientation, solve result |
+| GET | `/api/station/config` | Station coordinates, optics, orientation, solve result, `timezone` (setting) and `timezone_info` (`name`, `offset_min`, what the clock and observing day follow) |
+| POST | `/api/station/timezone` | `{"timezone": ""}` for the operating system zone (default), `"coords"` for a whole-hour offset from the longitude, or an IANA name such as `"America/Chicago"` (admin) |
 | POST | `/api/station/location`, `/api/station/settings` | Save coordinates and manual optics/pointing overrides (`latitude_deg`, `longitude_deg`, `elevation_m`, `location_name`, lens fields, `azimuth_deg`, `altitude_deg`, `remote_solver_url` (opt-in remote plate solver; empty = never upload), ...) |
 | POST | `/api/station/auto-locate` | Locate the station by IP geolocation. Query `auto_plate_solve` |
 | POST | `/api/station/plate-solve` | Run a plate solve in the request. Query `fov_hint` |
@@ -132,6 +139,7 @@ Opt-in station sharing, see [COMMUNITY.md](COMMUNITY.md). All of it is off until
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/api/live/snapshot.jpg`, `/api/snapshot.jpg` | Current frame as JPEG |
+| GET | `/api/live/frame.jpg` | The live viewer picture over plain HTTP (same size and quality as the WebSocket stream), with `ETag`; `If-None-Match` of the last tag gives 304. The page polls it, with `/api/telemetry`, when WebSockets do not hold |
 | GET | `/api/live/snapshot.webp`, `/api/snapshot.webp` | Current frame as WebP |
 | GET | `/api/stream/mjpeg`, `/api/live/mjpeg` | MJPEG stream. Query `fps` (0.5 to 30, default 5), `downscale` (320 to 2592, default 960), `limit` (frames) |
 | GET | `/api/stream/sse`, `/api/sse` | Server-sent events with telemetry. Query `interval` (0.25 to 10 s, default 1) |

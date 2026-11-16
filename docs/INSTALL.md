@@ -227,7 +227,10 @@ cp ~/zenivo/data/station_config.json ~/station_config.json.bak-$(date +%Y%m%d%H%
 # 2a. Upgrade a git checkout
 cd ~/zenivo && git pull
 
-# 2b. Or deploy from another machine: sync the code only, never data/
+# 2b. Or, from the web (admin): Settings > Admin > Software update > Update now (steps 1 to 4 are done for you)
+#     The station checks for new releases once a day (switch it off there); installing is always by hand.
+
+# 2c. Or deploy from another machine: sync the code only, never data/
 rsync -ac --exclude data/ --exclude __pycache__ --exclude '*.pyc' \
     ./src ./run_allsky.py user@host:/home/user/zenivo/
 

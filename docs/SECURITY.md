@@ -17,6 +17,8 @@ security model.
 | WebSocket `/ws/live`: connect, frames, telemetry, `ping`, `get_*` | yes | yes |
 | WebSocket commands that change state (`set_exposure`, `set_gain`, `set_mode`, `trigger_master_dark`, ASC1 commands) | refused: `{"type":"error","code":"auth","message":"Sign in as admin"}` | yes |
 | Every `POST`/`PUT`/`DELETE` under `/api/` | refused with 401 | yes |
+| `GET /api/update/status` (installed and latest version) | yes | yes |
+| Check for an update, switch the daily check, **install an update**, roll back, **restart the service**, set the station time zone (`POST /api/update/*`, `/api/system/restart`, `/api/station/timezone`) | refused with 401 (default deny, no allowlist entry) | yes |
 | `GET /api/logs`, `/api/logs/download`, `/api/community/settings`, `/api/focus`, `/api/focus/frame`, `/api/focus/overview.jpg`, `/api/storage`, `/api/camera/devices`, `/docs`, `/redoc`, `/openapi.json` | 401 | yes (`ADMIN_GET` in `src/auth/policy.py`) |
 | Pages `/settings`, `/calibration`, `/focus`, `/logs`, `/obs/dock` (also `/obs/control`, `/dock`) | redirect to `/login?next=...` | yes |
 | `GET /api/adsb` receiver address and Flightradar24 account e-mail | blank | shown |
@@ -126,6 +128,17 @@ HTTPS so the cookie is `Secure`. Keep passing the original `Host` header (the CS
 ## Proxy headers
 
 `CF-Connecting-IP`, `X-Forwarded-For`, `X-Forwarded-Host` and `X-Forwarded-Proto` are believed only when the TCP peer is loopback (a proxy or tunnel on the same host); from any other peer they are written by the client and ignored. Behind a loopback proxy the client address is `CF-Connecting-IP`, else the right-most `X-Forwarded-For` hop (the one your proxy appended). Bind to `127.0.0.1` when a local proxy is the only way in; if the service listens on a LAN address, direct clients cannot spoof these headers, but a proxy on another host is not trusted either and all its clients share its address.
+
+## Software update
+
+A station checks the public GitHub releases list of the project once a day (switch in Settings > Admin; the
+request carries only `Zenivo/<version>`). It never installs anything by itself: **Update now** is an admin `POST`.
+The release archive is downloaded over HTTPS from GitHub, refused if it is larger than 120 MB, contains links or
+paths outside its folder, or does not hold the announced version; the new `src/` must byte-compile before any file
+is replaced. The program files are backed up first (the last three backups are kept in `data/update_backup/`),
+`data/`, the virtual environment and `vendor/` are never touched, and **Go back to the previous version** restores
+the backup. The same default-deny rule protects `POST /api/system/restart`. Run Zenivo under systemd so that it comes
+back after an update or a restart; run by hand it re-runs its own command line.
 
 ## Outbound connections and third-party loads
 

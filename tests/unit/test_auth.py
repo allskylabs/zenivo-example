@@ -247,3 +247,12 @@ def test_obs_dock_is_an_admin_page_and_obs_preview_is_public():
     for path in ("/obs/dock", "/obs/control", "/dock"):
         assert policy.classify("GET", path, {}, "127.0.0.1") == policy.PAGE
     assert policy.classify("GET", "/obs", {}, "127.0.0.1") == policy.PUBLIC
+
+
+def test_update_restart_and_timezone_changes_are_admin_only():
+    from src.auth.policy import ADMIN, PUBLIC, classify
+
+    for path in ("/api/update/check", "/api/update/apply", "/api/update/rollback", "/api/update/settings",
+                 "/api/system/restart", "/api/station/timezone"):
+        assert classify("POST", path, {}, "203.0.113.5") == ADMIN
+    assert classify("GET", "/api/update/status", {}, "203.0.113.5") == PUBLIC

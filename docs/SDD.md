@@ -76,6 +76,8 @@ and [API.md](API.md).
 | `src/defaults.py` | Neutral factory station (name "My station", 0, 0) |
 | `src/net.py` | Shared outbound HTTPS helper: one SSL context and a keep-alive urllib3 pool reused by every outbound request (certificate verification stays on) |
 | `src/storage` | `frame_codec.py` (AVIF frame read/write, legacy JPEG still readable), `retention.py` (age and size cleanup) |
+| `src/updater.py` | Release check (GitHub, daily), admin-started update with backup and rollback, `restart_process()` |
+| `src/station_tz.py` | Station time zone (`TZ` + `tzset`: OS zone, from the longitude, or an IANA name) |
 | `src/version.py` | Product name and version, the single source (`__version__`, `PRODUCT`) |
 | `src/sync` | `client.py` (used in production), `queue.py` and `daemon.py` (SQLite queue and circuit breaker; tested but not wired up) |
 | `src/activity.py` | User-facing activity log (`data/logs/activity.jsonl`) |

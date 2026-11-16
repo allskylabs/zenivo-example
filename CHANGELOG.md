@@ -28,6 +28,7 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Fixed
 
+- Cloud cover at night: the star check scaled the catalogue positions from the optical centre instead of the frame size the pointing was solved on, which put every star about 15 px off and made a clear night read 30 to 50% cloud (and 100% before the shift search). It now uses the solved frame size; a re-solved station sees 0.98 to 1.0 of its catalogue stars on a clear night. Solutions without `frame_width` keep the old scaling.
 - Content-Security-Policy (report-only) no longer reports Cloudflare's analytics beacon, which Cloudflare adds in front of some stations.
 - Live page behind a proxy that drops WebSockets: after two sockets that fail to open or hold, the page switches to plain `fetch` polling (`GET /api/live/frame.jpg`, the same picture as the stream, 304 when unchanged, plus `/api/telemetry`), keeps a single request in flight instead of reopening sockets, remembers the bad network for 15 minutes and only probes the socket now and then (1 to 10 min apart). The old SSE + MJPEG fallback, which also hung behind such proxies, is gone.
 - The Timelapse builder is shown to the admin only (the server already refused it for guests).

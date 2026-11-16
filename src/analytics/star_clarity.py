@@ -45,7 +45,7 @@ def star_clarity(frame: np.ndarray, solution: Dict[str, Any], lat: float, lon: f
     gray8 = np.clip(gray, 0, 255).astype(np.uint8)
     h, w = gray8.shape
     cx0, cy0 = solution["optical_center_px"]
-    k = w / (2.0 * cx0)
+    k = w / float(solution.get("frame_width") or 2.0 * cx0)
     f, cx, cy = float(solution["focal_px"]) * k, cx0 * k, cy0 * k
     stars = [s for s in bss.load_deep_catalog() if s["mag"] <= max_mag]
     aa = bss.stars_alt_az(stars, lat, lon, when)
