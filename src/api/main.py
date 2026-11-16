@@ -29,13 +29,13 @@ _ASSET_URL = re.compile(r'((?:src|href)=")(/static/[^"?#]+|/style\.css)\?v=[^"]*
 # inline scripts/styles included) and only reports; nothing is blocked. See docs/SECURITY.md.
 _CSP_REPORT_ONLY = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://unpkg.com; "
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://unpkg.com https://static.cloudflareinsights.com; "
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unpkg.com; "
     "font-src 'self' data: https://fonts.gstatic.com; "
     "img-src 'self' data: blob: https://server.arcgisonline.com https://s3.amazonaws.com https://tile.googleapis.com "
     "https://flagcdn.com https://pics.avs.io; "
     "connect-src 'self' ws: wss: https://server.arcgisonline.com https://s3.amazonaws.com https://tile.googleapis.com "
-    "https://cdn.jsdelivr.net https://unpkg.com; "
+    "https://cdn.jsdelivr.net https://unpkg.com https://cloudflareinsights.com; "
     "worker-src 'self' blob:; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'"
 )
 SECURITY_HEADERS = (

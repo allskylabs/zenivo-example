@@ -157,3 +157,4 @@
 .focus-chart-details > summary.focus-chart-head { cursor: pointer; }
 .focus-chart-details:not([open]) { align-self: start; }
 .focus-chart-details:not([open]) .focus-chart-head { margin-bottom: 0; }
+.side-sub.has-update::after { content: " \25CF"; color: var(--accent, #38bdf8); font-size: 0.8em; }

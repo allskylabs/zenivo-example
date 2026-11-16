@@ -142,6 +142,10 @@ class TestAC3EdgeWebAPI:
         if again.status_code == 304:
             assert not again.content
 
+    def test_update_status_endpoint(self, api_client):
+        data = api_client.get("/api/update/status").json()
+        assert data["current"] and data["available"] in (True, False) and data["auto_check"] is True
+
     def test_ac3_histogram_256_bins_and_performance(self, api_client):
         """
         AC3 Mandatory Requirement:

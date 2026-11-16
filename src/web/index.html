@@ -1247,6 +1247,28 @@
                             </select>
                         </div>
                     </fieldset>
+                    <fieldset class="settings-group" id="restart-box">
+                        <legend>Service</legend>
+                        <div class="field">
+                            <button type="button" class="btn btn-sm btn-outline" id="btn-restart">Restart Zenivo</button>
+                        </div>
+                        <p class="field-note">Restarts the program (about 30 seconds offline), e.g. when the camera returns black pictures or stops answering. Capture, auto exposure and the sky mask pick up where they were.</p>
+                        <p class="field-note" id="restart-status" aria-live="polite"></p>
+                    </fieldset>
+                    <fieldset class="settings-group" id="update-box">
+                        <legend>Software update</legend>
+                        <p class="field-note" id="upd-line">Checking&hellip;</p>
+                        <div class="field">
+                            <label><input type="checkbox" id="upd-auto" checked /> Check for updates automatically (once a day, from GitHub; nothing about this station is sent)</label>
+                        </div>
+                        <div class="field">
+                            <button type="button" class="btn btn-sm btn-outline" id="upd-check">Check now</button>
+                            <button type="button" class="btn btn-sm btn-primary" id="upd-apply" hidden>Update now</button>
+                            <button type="button" class="btn btn-sm btn-outline" id="upd-rollback" hidden>Go back to the previous version</button>
+                        </div>
+                        <p class="field-note" id="upd-notes" hidden></p>
+                        <p class="field-note" id="upd-status" aria-live="polite"></p>
+                    </fieldset>
                     <fieldset class="settings-group">
                         <legend>Password and sessions</legend>
                         <form id="admin-password-form" autocomplete="on">
@@ -1630,7 +1652,7 @@
     <script defer src="/static/app/08b-events-live.js?v=20261115a"></script>
     <script defer src="/static/app/08c-adsb-settings.js?v=20261115c"></script>
     <script defer src="/static/app/09-community.js?v=20261114b"></script>
-    <script defer src="/static/app/10-admin.js?v=20261114a"></script>
+    <script defer src="/static/app/10-admin.js?v=20261117a"></script>
     <script>
     // Settings sub-navigation: one section at a time, driven by the URL hash (/settings#detection)
     (function () {

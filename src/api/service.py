@@ -312,11 +312,17 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
         # Single-admin login (src/auth): until a password exists everything that changes or leaks stays locked
         self.auth = AuthManager(self.output_dir)
         self.auth.ensure_setup_code()
+        # Software update: daily release check (on by default), applied only by the admin (src/updater.py)
+        from src.updater import UpdateManager
+        self.updater = UpdateManager(
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")), self.output_dir,
+            lambda: self.station_config.get("update") or {}, self._save_update_settings)
         if not os.environ.get("PYTEST_CURRENT_TEST"):
             threading.Thread(target=self._retention_worker, name="retention", daemon=True).start()
             threading.Thread(target=self._background_capture_worker, name="bg-capture", daemon=True).start()
             threading.Thread(target=self._traffic_worker, name="traffic-log", daemon=True).start()
             self.community.start()  # no-op while Community is off
+            self.updater.start_background()
 
         # Initial capture to prime caches
         self._prime_cache()
@@ -390,6 +396,10 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
 
 
 
+
+    def _save_update_settings(self, cfg: Dict[str, Any]) -> None:
+        self.station_config["update"] = cfg
+        self._save_station_config()
 
     def _sky_stats(self, frame: np.ndarray, is_pytest: bool, meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Star count / cloud cover, at most once per analysis_interval_s; each sample goes to the cloud history."""

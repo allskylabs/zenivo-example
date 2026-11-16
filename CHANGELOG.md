@@ -8,6 +8,8 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Added
 
+- Settings > Admin > Service: **Restart Zenivo** restarts the program from the web (for a camera that returns black pictures or hangs). Under systemd the service is brought back by `Restart=always`; run by hand it re-runs the same command line. New `POST /api/system/restart` (admin).
+- Software update: the station checks GitHub for a new release once a day (on by default, switch in Settings > Admin; nothing about the station is sent). The admin installs it with one click (**Update now**): the release is downloaded, checked, the program files are backed up and swapped (data, settings and the virtual environment are never touched), changed Python requirements are installed and the service restarts. **Go back to the previous version** restores the backup. A git checkout is updated with `git merge --ff-only`. New `GET /api/update/status`, `POST /api/update/{check,settings,apply,rollback}` (the last four need the admin).
 - Station timezone: Settings > Station has a **Station timezone** list (the operating system's zone by default, a whole-hour offset from the station coordinates, or any IANA zone). The clock, observing day and file names follow it, and the web UI shows the station's time instead of a fixed UTC+7 (daylight saving included). New `POST /api/station/timezone`; `timezone` and `timezone_info` in `GET /api/station/config`.
 - Auto exposure resumes from the last exposure and gain when the service restarts within 2 hours, so the picture brightness does not jump after a restart.
 - Satellites 3D shows the station and your own coordinates, with **Station** / **You** buttons to switch the view point; the station is the default and the browser location no longer moves the view on its own.
@@ -26,6 +28,7 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Fixed
 
+- Content-Security-Policy (report-only) no longer reports Cloudflare's analytics beacon, which Cloudflare adds in front of some stations.
 - Live page behind a proxy that drops WebSockets: after two sockets that fail to open or hold, the page switches to plain `fetch` polling (`GET /api/live/frame.jpg`, the same picture as the stream, 304 when unchanged, plus `/api/telemetry`), keeps a single request in flight instead of reopening sockets, remembers the bad network for 15 minutes and only probes the socket now and then (1 to 10 min apart). The old SSE + MJPEG fallback, which also hung behind such proxies, is gone.
 - The Timelapse builder is shown to the admin only (the server already refused it for guests).
 - Cloud cover: the dark rim and corners outside a fisheye lens circle are no longer judged as sky.

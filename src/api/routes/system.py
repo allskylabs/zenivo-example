@@ -10,6 +10,7 @@ from src.api.guest_view import strip_keys
 from src.api.schemas import (
     StoragePolicyRequest,
     ObsOverlayRequest,
+    UpdateSettingsRequest,
 )
 from src.api.service import AllSkyService
 from src.api.routes.common import (router, get_service)
@@ -104,3 +105,55 @@ async def reload_obs_overlay():
     except Exception:
         pass
     return {"success": True}
+
+
+# ----------------------------------------------------------------------
+# Software update (src/updater.py): reading is public, everything that changes needs the admin
+# ----------------------------------------------------------------------
+@router.get("/api/update/status")
+def get_update_status(service: AllSkyService = Depends(get_service)):
+    """Current and latest known version, whether an update is available, the progress of a running update."""
+    return service.updater.status()
+
+
+@router.post("/api/update/check")
+def check_for_update(service: AllSkyService = Depends(get_service)):
+    """Ask GitHub for the newest release now."""
+    return service.updater.check()
+
+
+@router.post("/api/update/settings")
+def set_update_settings(req: UpdateSettingsRequest, service: AllSkyService = Depends(get_service)):
+    """Daily automatic check on or off (default on). Applying an update is never automatic."""
+    service.updater.set_settings(req.auto_check)
+    return service.updater.status()
+
+
+@router.post("/api/update/apply")
+def apply_update(service: AllSkyService = Depends(get_service)):
+    """Download, verify and install the latest release in the background, then restart the service."""
+    if service.calibration_status.get("state") == "running":
+        raise HTTPException(status_code=409, detail="A master dark calibration is running: update when it is done")
+    try:
+        return service.updater.apply()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+
+@router.post("/api/update/rollback")
+def rollback_update(service: AllSkyService = Depends(get_service)):
+    """Restore the program files saved before the last update and restart."""
+    try:
+        return service.updater.rollback()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+
+@router.post("/api/system/restart")
+def restart_service(service: AllSkyService = Depends(get_service)):
+    """Restart Zenivo (admin): for a camera that returns black frames or hangs. The page is offline for ~30 s."""
+    from src.updater import restart_process
+    if service.calibration_status.get("state") == "running":
+        raise HTTPException(status_code=409, detail="A master dark calibration is running: restart when it is done")
+    service.activity.warning("system", "Restart requested from the web UI")
+    return {"success": True, "restarting_in_s": 2, "method": restart_process(2.0)}

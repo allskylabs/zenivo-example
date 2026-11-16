@@ -371,3 +371,7 @@ class CommunitySettingsRequest(BaseModel):
 
 class TimezoneRequest(BaseModel):
     timezone: str = Field("", max_length=64, description='"" (the operating system zone), "coords" or an IANA name')
+
+
+class UpdateSettingsRequest(BaseModel):
+    auto_check: bool = Field(True, description="Check for a new release once a day")

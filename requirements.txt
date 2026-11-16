@@ -10,3 +10,4 @@ websockets
 opencv-python-headless
 requests
 httpx
+packaging>=23.0
