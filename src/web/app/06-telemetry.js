@@ -254,62 +254,65 @@ function renderBinaryFrameBlob(blob) {
     liveImg.src = objUrl;
 }
 
-// Guest MJPEG streams are closed by the server after ~10 min without an error event,
-// so while an <img> shows /api/stream/mjpeg re-set its src (cache-busted) a bit earlier.
-let mjpegRefreshTimer = null;
-function setMjpegSrc(img) {
-    if (!img) return;
-    img.src = "/api/stream/mjpeg?t=" + Date.now();
-    if (mjpegRefreshTimer) clearInterval(mjpegRefreshTimer);
-    mjpegRefreshTimer = setInterval(() => {
-        if (img.src.includes("/api/stream/mjpeg")) img.src = "/api/stream/mjpeg?t=" + Date.now();
-        else clearMjpegRefresh();
-    }, 9 * 60 * 1000);
-}
-function clearMjpegRefresh() {
-    if (mjpegRefreshTimer) clearInterval(mjpegRefreshTimer);
-    mjpegRefreshTimer = null;
-}
+// ------------------------------------------------------------------
+// Plain-HTTP fallback (fetch polling) for networks / proxies that drop WebSockets.
+// One request at a time, never more than one connection open: /api/live/frame.jpg (the same picture as the
+// WebSocket, 304 when unchanged) and /api/telemetry; /api/status every few rounds.
+// ------------------------------------------------------------------
+const POLL = { on: false, timer: 0, ctl: null, etag: "", n: 0, fails: 0 };
 
-function stopSSEFallback() {
-    clearMjpegRefresh();
-    if (state.sseSource) {
-        try {
-            state.sseSource.close();
-        } catch (e) {}
-        state.sseSource = null;
-    }
+function stopSSEFallback() {   // name kept: every caller means "stop the fallback"
+    POLL.on = false;
+    clearTimeout(POLL.timer);
+    if (POLL.ctl) { try { POLL.ctl.abort(); } catch (e) {} POLL.ctl = null; }
 }
 
 function startSSEFallback() {
-    if (state.sseSource || state.wsConnected || typeof EventSource === "undefined") return;
+    if (POLL.on || state.wsConnected || state.streamPaused) return;
+    POLL.on = true;
+    POLL.fails = 0;
+    if (hudStreamMode) hudStreamMode.textContent = "HTTP polling (fetch)";
+    pollLive();
+}
+
+async function pollLive() {
+    if (!POLL.on) return;
+    let wait = 1500;
+    const ctl = new AbortController();
+    POLL.ctl = ctl;
+    const kill = setTimeout(() => ctl.abort(), 20000);
     try {
-        const es = new EventSource("/api/stream/sse");
-        state.sseSource = es;
-        if (hudStreamMode) {
-            hudStreamMode.textContent = "SSE Push + MJPEG";
+        const hdr = POLL.etag ? { "If-None-Match": POLL.etag } : {};
+        const fr = await fetch("/api/live/frame.jpg", { signal: ctl.signal, cache: "no-store", headers: hdr });
+        if (fr.status === 200) {
+            POLL.etag = fr.headers.get("ETag") || "";
+            renderBinaryFrameBlob(await fr.blob());
+        } else if (fr.status !== 304) {
+            throw new Error("frame " + fr.status);
         }
-        if (liveImg && !liveImg.src.includes("/api/stream/mjpeg")) {
-            setMjpegSrc(liveImg);
+        const tr = await fetch("/api/telemetry", { signal: ctl.signal, cache: "no-store" });
+        if (tr.ok) {
+            const t = await tr.json();
+            updateTelemetryUI(t);
+            if (t.ae_lock && !state.dragging && !state.lockPending) { syncModeButtons(t.mode); syncAeLock(t.ae_lock); }
+            // a long exposure delivers a new picture only every few seconds: do not ask more often
+            const exp = Number(t.exposure_s);
+            if (isFinite(exp) && exp > 1.5) wait = Math.min(8000, exp * 700);
         }
-        es.onmessage = (ev) => {
-            try {
-                const msg = JSON.parse(ev.data);
-                if (msg.telemetry) updateTelemetryUI(msg.telemetry);
-                if (msg.data) updateTelemetryUI(msg.data);
-                if (msg.status) updateStatusUI(msg.status);
-                if (msg.type === "obs_overlay" && msg.settings) {
-                    if (chkSkyOverlay && typeof msg.settings.sky_overlay === "boolean") chkSkyOverlay.checked = msg.settings.sky_overlay;
-                    if (chkSkyLabels && typeof msg.settings.sky_labels === "boolean") chkSkyLabels.checked = msg.settings.sky_labels;
-                    if (chkGridOverlay && typeof msg.settings.grid_overlay === "boolean") chkGridOverlay.checked = msg.settings.grid_overlay;
-                    drawReticle();
-                }
-            } catch (e) {}
-        };
-        es.onerror = () => {
-            stopSSEFallback();
-        };
-    } catch (e) {}
+        if (POLL.n++ % 4 === 0) {
+            const sr = await fetch("/api/status", { signal: ctl.signal, cache: "no-store" });
+            if (sr.ok) updateStatusUI(await sr.json());
+        }
+        POLL.fails = 0;
+    } catch (e) {
+        if (!POLL.on) return;
+        POLL.fails++;
+        wait = Math.min(15000, 2000 * POLL.fails);
+        if (navStatus && POLL.fails >= 3) navStatus.textContent = "Offline";
+    } finally {
+        clearTimeout(kill);
+    }
+    if (POLL.on) POLL.timer = setTimeout(pollLive, wait);
 }
 
 const SKY_CODE_NAMES = ["clear", "mostly_clear", "scattered", "broken", "overcast", "unknown", "overexposed", "disabled"];
@@ -421,9 +424,31 @@ function unpackAndRenderAsb1Packet(buf) {
     }
 }
 
-function initWebSocket() {
+// WebSocket health: a socket that never opens or drops within 8 s counts as a failure. After two in a row the page
+// switches to fetch polling and only tries the socket again now and then (1, 2, 4 ... up to 10 min), staying on
+// it only once it has delivered a picture; a bad network is remembered for 15 min so a reload starts on polling.
+const WS_BAD_KEY = "zenivo.wsBadUntil";
+const wsHealth = { fails: 0, retryMs: 60000, openedAt: 0, gotData: false, retryTimer: 0 };
+
+function wsKnownBad() {
+    try { return Number(localStorage.getItem(WS_BAD_KEY) || 0) > Date.now(); } catch (e) { return false; }
+}
+function markWsBad() {
+    try { localStorage.setItem(WS_BAD_KEY, String(Date.now() + 15 * 60 * 1000)); } catch (e) {}
+}
+function markWsGood() {
+    try { localStorage.removeItem(WS_BAD_KEY); } catch (e) {}
+}
+
+function initWebSocket(isRetry) {
     // Hidden tab: stream is paused; an already-open socket (or pending reconnect) is not duplicated
     if (state.streamPaused || state.ws) return;
+    clearTimeout(wsHealth.retryTimer);
+    if (!isRetry && wsKnownBad()) {   // this network dropped sockets a moment ago: poll, probe the socket later
+        startSSEFallback();
+        wsHealth.retryTimer = setTimeout(() => initWebSocket(true), wsHealth.retryMs);
+        return;
+    }
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${proto}//${window.location.host}/ws/live?binary=1`;
     let ws;
@@ -432,16 +457,23 @@ function initWebSocket() {
         ws = new WebSocket(wsUrl);
         ws.binaryType = "arraybuffer";
         state.ws = ws;
+        wsHealth.openedAt = 0;
+        wsHealth.gotData = false;
 
         ws.onopen = () => {
+            wsHealth.openedAt = Date.now();
             state.wsConnected = true;
-            stopSSEFallback();
-            if (hudStreamMode) {
-                hudStreamMode.textContent = "Binary WebSocket (ASB1)";
-            }
         };
 
         ws.onmessage = (event) => {
+            if (!wsHealth.gotData && event.data instanceof ArrayBuffer) {   // the socket really carries pictures
+                wsHealth.gotData = true;
+                stopSSEFallback();
+                if (hudStreamMode) hudStreamMode.textContent = "Binary WebSocket (ASB1)";
+                setTimeout(() => {   // still delivering 8 s later: this network holds sockets
+                    if (state.ws === ws && wsHealth.gotData) { wsHealth.fails = 0; wsHealth.retryMs = 60000; markWsGood(); }
+                }, 8000);
+            }
             if (event.data instanceof ArrayBuffer) {
                 unpackAndRenderAsb1Packet(event.data);
             } else if (typeof event.data === "string") {
@@ -464,11 +496,28 @@ function initWebSocket() {
         };
 
         ws.onclose = () => {
+            const stable = wsHealth.gotData && Date.now() - wsHealth.openedAt > 8000;
             state.wsConnected = false;
             state.ws = null;
             if (state.streamPaused) return; // closed on purpose while the tab is hidden
-            startSSEFallback();
-            setTimeout(initWebSocket, 2500);
+            if (stable) {   // a healthy socket that dropped: reconnect at once
+                wsHealth.fails = 0;
+                wsHealth.retryMs = 60000;
+                markWsGood();
+                startSSEFallback();
+                wsHealth.retryTimer = setTimeout(() => initWebSocket(true), 1500);
+                return;
+            }
+            wsHealth.fails++;
+            if (wsHealth.fails >= 2) {   // sockets do not hold here: fetch polling, rare probes of the socket
+                markWsBad();
+                startSSEFallback();
+                wsHealth.retryTimer = setTimeout(() => initWebSocket(true), wsHealth.retryMs);
+                wsHealth.retryMs = Math.min(600000, wsHealth.retryMs * 2);
+            } else {
+                startSSEFallback();
+                wsHealth.retryTimer = setTimeout(() => initWebSocket(true), 2500);
+            }
         };
 
         ws.onerror = () => {
@@ -476,7 +525,9 @@ function initWebSocket() {
         };
     } catch (e) {
         state.wsConnected = false;
+        state.ws = null;
         startSSEFallback();
+        wsHealth.retryTimer = setTimeout(() => initWebSocket(true), wsHealth.retryMs);
     }
 }
 
@@ -487,13 +538,12 @@ if (currentPage === "tab-live") {
         if (document.hidden) {
             state.streamPaused = true;
             stopSSEFallback();
+            clearTimeout(wsHealth.retryTimer);
             if (state.ws) {
                 try {
                     state.ws.close();
                 } catch (e) {}
             }
-            clearMjpegRefresh();
-            if (liveImg && liveImg.src.includes("/api/stream/mjpeg")) liveImg.removeAttribute("src");
         } else if (state.streamPaused) {
             state.streamPaused = false;
             initWebSocket();

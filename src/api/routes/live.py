@@ -31,6 +31,36 @@ def get_snapshot_webp(service: AllSkyService = Depends(get_service)):
         raise HTTPException(status_code=500, detail=f"WebP snapshot generation failed: {e}")
 
 
+@router.get("/api/live/frame.jpg")
+def get_live_frame_jpeg(request: Request, service: AllSkyService = Depends(get_service)):
+    """
+    The live viewer picture over plain HTTP, for browsers whose network drops WebSockets: the same size and quality as
+    the WebSocket stream (Settings > Performance), encoded once per camera frame and shared by all viewers.
+    ETag = capture time, so polling an unchanged frame costs a 304.
+    """
+    from src.api.stream import _encode_stream_jpeg
+    try:
+        service.capture_frame()
+        frame, frame_ts = service.get_display_frame()
+        if frame is None:
+            raise RuntimeError("no frame yet")
+        perf = service.performance
+        key = (frame_ts, int(perf["stream_max_width"]), int(perf["stream_jpeg_quality"]))
+        etag = '"%s-%s-%s"' % key
+        if request.headers.get("if-none-match") == etag:
+            return Response(status_code=304, headers={**_NO_STORE, "ETag": etag})
+        cached = getattr(service, "_http_frame_cache", None)
+        if cached is None or cached[0] != key:
+            jpg = _encode_stream_jpeg(frame, key[1], key[2])
+            if not jpg:
+                raise RuntimeError("JPEG compression failed")
+            service._http_frame_cache = cached = (key, jpg)
+        return Response(content=cached[1], media_type="image/jpeg",
+                        headers={**_NO_STORE, "ETag": etag, "X-Capture-Ts": str(frame_ts)})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Live frame failed: {e}")
+
+
 @router.get("/api/live/snapshot.jpg")
 @router.get("/api/snapshot.jpg")
 def get_snapshot_jpeg(service: AllSkyService = Depends(get_service)):

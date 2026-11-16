@@ -26,6 +26,7 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Fixed
 
+- Live page behind a proxy that drops WebSockets: after two sockets that fail to open or hold, the page switches to plain `fetch` polling (`GET /api/live/frame.jpg`, the same picture as the stream, 304 when unchanged, plus `/api/telemetry`), keeps a single request in flight instead of reopening sockets, remembers the bad network for 15 minutes and only probes the socket now and then (1 to 10 min apart). The old SSE + MJPEG fallback, which also hung behind such proxies, is gone.
 - The Timelapse builder is shown to the admin only (the server already refused it for guests).
 - Cloud cover: the dark rim and corners outside a fisheye lens circle are no longer judged as sky.
 - Cloud cover: the star-visibility check (catalogue stars expected vs seen) now searches a small shift (up to 4% of the width) around the stored star-solved pointing. A mount that had drifted ~15 px made it see 0 of 34 stars on a clear night and report ~100% cloud. With no clear shift (real cloud) the stored pointing is used as before.

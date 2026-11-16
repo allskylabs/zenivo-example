@@ -132,6 +132,16 @@ class TestAC3EdgeWebAPI:
         assert content[:2] == b"\xff\xd8"
         assert content[-2:] == b"\xff\xd9"
 
+    def test_live_frame_over_http_with_etag(self, api_client):
+        """The fetch-polling fallback: a JPEG with an ETag, and 304 when that frame is still the latest."""
+        first = api_client.get("/api/live/frame.jpg")
+        assert first.status_code == 200 and first.content[:2] == b"\xff\xd8"
+        etag = first.headers["etag"]
+        again = api_client.get("/api/live/frame.jpg", headers={"If-None-Match": etag})
+        assert again.status_code in (200, 304)
+        if again.status_code == 304:
+            assert not again.content
+
     def test_ac3_histogram_256_bins_and_performance(self, api_client):
         """
         AC3 Mandatory Requirement:
