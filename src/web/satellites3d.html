@@ -280,9 +280,11 @@
             <button id="left-toggle" title="Show / hide panels">▾</button>
         </div>
         <div class="row"><span id="sky"></span><span id="tle"></span></div>
+        <div class="row" id="locs"><span id="loc-st"></span><span id="loc-me"></span></div>
         <div class="btns">
             <button id="btn-labels" class="on" title="Satellite name labels">Labels</button>
-            <button id="btn-home" title="Back to the station">Station</button>
+            <button id="btn-home" title="Back to the station (the default view point)">Station</button>
+            <button id="btn-me" title="Your own position, from the browser location">You</button>
         </div>
         <div class="legend">
             <span><i style="background:#22d3ee"></i>Naked-eye visible</span>
@@ -425,7 +427,7 @@
         const km = (v) => `${Math.round(v).toLocaleString()} km`;
         const stateOf = (a) => (a.visible ? "visible" : a.sunlit ? "sunlit" : "shadow");
 
-        let station = null, camera = null, sunAlt = null, me = null;   // me: the viewer's own position [lat, lon], from the browser
+        let station = null, camera = null, sunAlt = null, me = null, locMode = "station";   // me: the viewer's own position [lat, lon], from the browser
         const sats = new Map();             // norad -> state
         let selected = null;
         let camMode = null;   // camera following the selected satellite
@@ -671,7 +673,7 @@
             sunAlt = d.sun_alt_deg;
             if (d.station && !station) {
                 station = d.station; camera = d.camera || null;
-                updateCamFoot();
+                updateCamFoot(); updateLocs();
             }
             if (!station) return;
             const list = d.satellites || [];
@@ -872,8 +874,9 @@
             renderer.setClearColor(0x02030a, 1);
             const gscene = new THREE.Scene();
             const gcam = new THREE.PerspectiveCamera(40, 1, 0.1, 1000);
-            let home = null;   // where the view opens: last aim, else the viewer's own position, else the station
-            try { const a = JSON.parse(pref("aim", "null")); if (Array.isArray(a) && isFinite(a[0]) && isFinite(a[1])) home = a; } catch (e) { /* none */ }
+            let home = null;   // where the view opens: the station, or the viewer's own position when that was chosen last
+            locMode = pref("loc", "station") === "me" ? "me" : "station";
+            try { const m = JSON.parse(pref("me", "null")); if (locMode === "me" && Array.isArray(m) && isFinite(m[0]) && isFinite(m[1])) home = m; } catch (e) { /* none */ }
             if (home) gcam.position.set(...ecef(home[0], home[1], 0)).setLength(GLOBE_DIST); else gcam.position.set(GLOBE_DIST, 0, 0);
             const controls = new OrbitControls(gcam, canvas);
             Object.assign(controls, { enablePan: true, screenSpacePanning: true, minDistance: GLOBE_MIN, maxDistance: GLOBE_MAX, zoomSpeed: 0.8 });
@@ -958,11 +961,13 @@
             g.aimed = !!home;
             globe = g;
             try { const m = JSON.parse(pref("me", "null")); if (Array.isArray(m) && isFinite(m[0]) && isFinite(m[1])) me = m; } catch (e) { /* none */ }
+            updateLocs();
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition((pos) => {
                     me = [pos.coords.latitude, pos.coords.longitude];
                     setPref("me", JSON.stringify([+me[0].toFixed(3), +me[1].toFixed(3)]));
-                    if (globe && !globe.aimed) aimAt(me[0], me[1]);
+                    updateLocs();
+                    if (globe && !globe.aimed && locMode === "me") aimAt(me[0], me[1]);
                 }, () => { /* refused or unavailable: the station is used */ }, { timeout: 6000, maximumAge: 3600000 });
             }
             resizeGlobe();
@@ -1181,8 +1186,20 @@
             globe.stationGeo.setDrawRange(0, 1);
             globe.stationMarked = true;
         }
+        const fmtLL = (p) => `${Math.abs(p[0]).toFixed(3)}${p[0] >= 0 ? "N" : "S"} ${Math.abs(p[1]).toFixed(3)}${p[1] >= 0 ? "E" : "W"}`;
+        function updateLocs() {   // both positions, the chosen one in bold
+            const st = $("loc-st"), mm = $("loc-me");
+            if (!st || !mm) return;
+            st.textContent = station ? `Station ${fmtLL([station.lat, station.lon])}` : "";
+            mm.textContent = me ? `You ${fmtLL(me)}` : "You: location not shared";
+            st.style.fontWeight = locMode === "station" ? "700" : "400";
+            mm.style.fontWeight = locMode === "me" ? "700" : "400";
+            $("btn-home").classList.toggle("on", locMode === "station");
+            $("btn-me").classList.toggle("on", locMode === "me");
+        }
         function aimGlobe() {   // the Station button
             if (!globe || !station) return;
+            locMode = "station"; setPref("loc", "station"); updateLocs();
             markStation();
             aimAt(station.lat, station.lon);
         }
@@ -1314,7 +1331,8 @@
                 }
             }
             placeLabels(cands);
-            const mp = me || (station ? [station.lat, station.lon] : null), meEl = $("me");   // the viewer's own spot, else the station
+            const mp = locMode === "me" && me ? me : (station ? [station.lat, station.lon] : null), meEl = $("me");   // the chosen view point: the station (default) or the viewer's own spot
+            meEl.querySelector("b").textContent = locMode === "me" && me ? "You" : "Station";
             let meShown = false;
             if (mp) {
                 v.set(...ecef(mp[0], mp[1], 0.05));
@@ -1502,6 +1520,12 @@
         $("sort").onchange = (e) => { sortBy = e.target.value; setPref("sort", sortBy); renderList(); };
         $("btn-labels").classList.toggle("on", showLabels);
         $("btn-labels").onclick = (e) => { showLabels = e.target.classList.toggle("on"); setPref("labels", showLabels ? "1" : "0"); };
+        $("btn-me").onclick = () => {
+            if (!me) { $("status").textContent = "Your location is not shared by the browser"; return; }
+            locMode = "me"; setPref("loc", "me"); updateLocs();
+            stopCamera();
+            aimAt(me[0], me[1]);
+        };
         $("btn-home").onclick = () => {
             stopCamera();
             aimGlobe();

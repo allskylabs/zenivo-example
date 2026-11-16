@@ -8,6 +8,9 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Added
 
+- Station timezone: Settings > Station has a **Station timezone** list (the operating system's zone by default, a whole-hour offset from the station coordinates, or any IANA zone). The clock, observing day and file names follow it, and the web UI shows the station's time instead of a fixed UTC+7 (daylight saving included). New `POST /api/station/timezone`; `timezone` and `timezone_info` in `GET /api/station/config`.
+- Auto exposure resumes from the last exposure and gain when the service restarts within 2 hours, so the picture brightness does not jump after a restart.
+- Satellites 3D shows the station and your own coordinates, with **Station** / **You** buttons to switch the view point; the station is the default and the browser location no longer moves the view on its own.
 - OBS: the picture size of `/obs` is now the same as `/live` by default, and the OBS Dock has a **Size** button to send the full output resolution instead (`res`: `stream` or `full` in `/api/obs/overlay`; `?res=full|stream` in the URL still overrides it). Before, `/obs` always asked for the full frame unless `?res=stream` was in the URL.
 - Community: stations show **Last seen** (when the station itself last announced to this one or answered a round) instead of the card's signing time, which could be up to 6 hours old on a healthy station. New local `seen` map in `/api/community/peers`; nothing changes in the cards.
 - Settings > Sky Mask: **Auto-detect** proposes the open-sky and obstruction polygons from the current frame (`POST /api/station/sky-mask/auto`); you edit it by hand and press Apply, nothing is stored before that. Drawing the mask by hand works as before.
@@ -23,6 +26,8 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Fixed
 
+- The Timelapse builder is shown to the admin only (the server already refused it for guests).
+- Cloud cover: the dark rim and corners outside a fisheye lens circle are no longer judged as sky.
 - Cloud cover: the star-visibility check (catalogue stars expected vs seen) now searches a small shift (up to 4% of the width) around the stored star-solved pointing. A mount that had drifted ~15 px made it see 0 of 34 stars on a clear night and report ~100% cloud. With no clear shift (real cloud) the stored pointing is used as before.
 - A plugged-in ZWO or QHY camera that is not offered now says why (missing `zwoasi`, missing vendor SDK, missing udev rules) under Rescan and once in the log (`Camera scan: ...`).
 - Choosing `rts5869` under Settings > Camera no longer fails with "no usable camera" (the device node is now found automatically).

@@ -164,9 +164,7 @@ function updateStationUI(st) {
     }
 
     const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
-    let tz = "";
-    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) {}
-    setVal("st-f-tz", tz || "--");
+    setupTimezoneSelect(st);
     setVal("st-f-sensor", sensor.sensor_model || "Sony Starvis IMX335");
     setVal("st-f-pixel", Number(sensor.pixel_pitch_um || 2.0).toFixed(1));
     setVal("st-f-lens", optics.lens_model || "Fisheye AllSky");
@@ -470,3 +468,39 @@ Object.entries(perfFields).forEach(([key, el]) => {
         if (!ok) loadPerformance();
     });
 });
+
+
+// Station timezone: the operating system's (default), a whole-hour offset from the longitude, or any IANA zone
+function setupTimezoneSelect(st) {
+    const sel = document.getElementById("st-f-tz");
+    if (!sel) return;
+    const info = st.timezone_info || {};
+    if (!sel.dataset.ready) {
+        sel.dataset.ready = "1";
+        let zones = [];
+        try { zones = Intl.supportedValuesOf("timeZone"); } catch (e) { /* older browser: the typed list below */ }
+        const opts = [["", "Server (operating system)"], ["coords", "From station coordinates"], ...zones.map((z) => [z, z])];
+        sel.innerHTML = opts.map(([v, t]) => `<option value="${escapeHtml(v)}">${escapeHtml(t)}</option>`).join("");
+        sel.addEventListener("change", async () => {
+            try {
+                const res = await fetch("/api/station/timezone", {
+                    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timezone: sel.value }),
+                });
+                const d = await res.json();
+                if (!res.ok) throw new Error(d.detail || res.status);
+                setStationTz(d.timezone_info);
+                setupTimezoneSelect({ timezone: d.timezone, timezone_info: d.timezone_info });
+                if (typeof updateClock === "function") updateClock();
+            } catch (e) {
+                const note = document.getElementById("st-f-tz-note");
+                if (note) note.textContent = `Could not change the timezone: ${e.message || e}`;
+            }
+        });
+    }
+    const want = st.timezone || "";
+    if (![...sel.options].some((o) => o.value === want)) sel.add(new Option(want, want));
+    sel.value = want;
+    const m = info.offset_min;
+    const note = document.getElementById("st-f-tz-note");
+    if (note && typeof m === "number") note.textContent = `Now UTC${m >= 0 ? "+" : "-"}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ":" + String(Math.abs(m) % 60).padStart(2, "0") : ""}${info.name ? " · " + info.name : ""}`;
+}

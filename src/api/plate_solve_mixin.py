@@ -19,9 +19,33 @@ class PlateSolveMixin:
         """Return station coordinates and astrometric camera/lens calibration parameters. The Flightradar24 token and
         password are write-only: they never leave the station (GET /api/adsb reports only whether a token is set)."""
         out = dict(self.station_config)
+        out["timezone"] = self.timezone_info["setting"]
+        out["timezone_info"] = self.timezone_info
         if isinstance(out.get("adsb"), dict):
             out["adsb"] = {k: v for k, v in out["adsb"].items() if k not in ("fr24_token", "fr24_password")}
         return out
+
+    def _apply_timezone(self) -> Dict[str, Any]:
+        from src import station_tz
+
+        self.timezone_info = station_tz.apply(str(self.station_config.get("timezone") or ""),
+                                              float(self.station_config.get("longitude_deg", 0.0)))
+        return self.timezone_info
+
+    def set_timezone(self, tz: str) -> Dict[str, Any]:
+        """Station time zone: "" = the operating system's, "coords" = from the longitude, or an IANA name."""
+        from src import station_tz
+
+        tz = (tz or "").strip()
+        if tz and tz != "coords" and not station_tz.valid_name(tz):
+            raise ValueError(f"Unknown time zone '{tz}'")
+        if tz:
+            self.station_config["timezone"] = tz
+        else:
+            self.station_config.pop("timezone", None)
+        info = self._apply_timezone()
+        self._save_station_config()
+        return {"success": True, "timezone": info["setting"], "timezone_info": info}
 
     def update_station_location(
         self,
@@ -120,6 +144,8 @@ class PlateSolveMixin:
                 sol["roll_deg"] = float(orientation.get("north_position_angle_deg", sol.get("roll_deg", 0.0)))
                 sol["manual_override"] = True
 
+        if longitude_deg is not None and self.station_config.get("timezone") == "coords":
+            self._apply_timezone()
         self._save_station_config()
 
         self.activity.success(

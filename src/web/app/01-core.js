@@ -184,13 +184,38 @@ function rafDebounced(fn) {
         });
     };
 }
-// The server does not publish its zone; day buckets are the station's local day (README rule: +07),
-// so every wall-clock display uses this ONE offset instead of the viewer's browser timezone.
-const STATION_UTC_OFFSET_MIN = 7 * 60;
+// Every wall-clock display uses the STATION's zone (the server publishes it in /api/station/config:
+// timezone_info = {name: IANA or null, offset_min}), never the viewer's browser zone. Until it arrives the
+// browser's own offset is used.
+let STATION_TZ_NAME = null;
+let STATION_UTC_OFFSET_MIN = -new Date().getTimezoneOffset();
+// Offset (minutes) of the station zone at instant d: follows daylight saving when the zone has a name
+function stationOffsetMin(d) {
+    if (STATION_TZ_NAME) {
+        try {
+            const p = {};
+            for (const x of new Intl.DateTimeFormat("en-US", { timeZone: STATION_TZ_NAME, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" }).formatToParts(d)) p[x.type] = x.value;
+            return Math.round((Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - Math.floor(d.getTime() / 1000) * 1000) / 60000);
+        } catch (e) { /* unknown to this browser: the fixed offset */ }
+    }
+    return STATION_UTC_OFFSET_MIN;
+}
 // Date whose getUTC* fields read as station wall-clock time
 function stationDate(d) {
-    return new Date(d.getTime() + STATION_UTC_OFFSET_MIN * 60000);
+    return new Date(d.getTime() + stationOffsetMin(d) * 60000);
 }
+function makeTzLabel() {
+    const m = stationOffsetMin(new Date());
+    return `UTC${m >= 0 ? "+" : "-"}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ":" + String(Math.abs(m) % 60).padStart(2, "0") : ""}`;
+}
+let tzLabel = makeTzLabel();
+function setStationTz(info) {
+    if (!info || typeof info.offset_min !== "number") return;
+    STATION_TZ_NAME = info.name || null;
+    STATION_UTC_OFFSET_MIN = info.offset_min;
+    tzLabel = makeTzLabel();
+}
+fetch("/api/station/config").then((r) => (r.ok ? r.json() : null)).then((st) => { if (st) setStationTz(st.timezone_info); }).catch(() => {});
 function fmtLocalIso(iso, timeOnly) {
     const d = new Date(iso);
     if (isNaN(d)) return iso || "";
@@ -199,10 +224,6 @@ function fmtLocalIso(iso, timeOnly) {
     const hms = `${p(sd.getUTCHours())}:${p(sd.getUTCMinutes())}:${p(sd.getUTCSeconds())}`;
     return timeOnly ? hms : `${sd.getUTCFullYear()}-${p(sd.getUTCMonth() + 1)}-${p(sd.getUTCDate())} ${hms}`;
 }
-const tzLabel = (() => {
-    const m = STATION_UTC_OFFSET_MIN;
-    return `UTC${m >= 0 ? "+" : "-"}${Math.floor(Math.abs(m) / 60)}${Math.abs(m) % 60 ? ":" + String(Math.abs(m) % 60).padStart(2, "0") : ""}`;
-})();
 
 // Capture info (time / exposure / gain / brightness) is drawn as HTML over images, never into pixels
 function fmtExposure(exp) {

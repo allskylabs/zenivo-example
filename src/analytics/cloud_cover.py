@@ -180,10 +180,13 @@ class CloudReference:
 _mask_cache: Dict[Any, np.ndarray] = {}
 
 
-def sky_work_mask(shape: Tuple[int, int], sky_polygons: Optional[dict], roi: Sequence[float]) -> np.ndarray:
+def sky_work_mask(shape: Tuple[int, int], sky_polygons: Optional[dict], roi: Sequence[float],
+                  circle: Optional[Sequence[float]] = None) -> np.ndarray:
     """Boolean sky mask at the work size: sky polygons inside the ROI, minus the info stamp corner,
-    eroded by a pixel so walls and roof edges do not bleed in."""
-    key = (tuple(shape), repr(sky_polygons), tuple(round(float(v), 4) for v in roi))
+    eroded by a pixel so walls and roof edges do not bleed in. `circle` = (cx, cy, r) as fractions of the frame
+    width/height/width: the lens image circle, so the dark rim and corners outside it are never judged."""
+    key = (tuple(shape), repr(sky_polygons), tuple(round(float(v), 4) for v in roi),
+           tuple(round(float(v), 3) for v in circle) if circle else None)
     m = _mask_cache.get(key)
     if m is not None:
         return m
@@ -195,6 +198,9 @@ def sky_work_mask(shape: Tuple[int, int], sky_polygons: Optional[dict], roi: Seq
         r = np.zeros_like(m)
         r[int(y0 * h):max(int(y0 * h) + 1, round(y1 * h)), int(x0 * w):max(int(x0 * w) + 1, round(x1 * w))] = 1
         m &= r
+    if circle:
+        yy, xx = np.mgrid[0:h, 0:w]
+        m &= ((xx + 0.5 - circle[0] * w) ** 2 + (yy + 0.5 - circle[1] * h) ** 2) <= (circle[2] * w) ** 2
     sx0, sy0, sx1, sy1 = STAMP_BOX
     m[int(sy0 * h):math.ceil(sy1 * h), int(sx0 * w):math.ceil(sx1 * w)] = 0
     m = cv2.erode(m, np.ones((3, 3), np.uint8)) > 0
@@ -211,6 +217,7 @@ def cloud_map(
     roi: Sequence[float] = (0.0, 0.0, 1.0, 1.0),
     template: Optional[np.ndarray] = None,
     want_residuals: bool = False,
+    circle: Optional[Sequence[float]] = None,
 ) -> Dict[str, Any]:
     """Per-pixel cloud mask of one frame at the work size.
 
@@ -224,7 +231,7 @@ def cloud_map(
     small = cv2.resize(frame, (ww, wh), interpolation=cv2.INTER_AREA).astype(np.float32)
     if small.ndim == 2:
         small = np.repeat(small[:, :, None], 3, axis=2)
-    sky = sky_work_mask((wh, ww), sky_polygons, roi)
+    sky = sky_work_mask((wh, ww), sky_polygons, roi, circle)
     out: Dict[str, Any] = {"cloud": None, "valid": None, "sky_frac": 0.0, "saturated_frac": 0.0,
                            "sky_level": 0.0, "res_c": None, "res_l": None}
     if not sky.any():
@@ -272,6 +279,7 @@ def analyze_cloud_cover(
     sky_polygons: Optional[dict] = None,
     count_stars: bool = True,
     star_ref: Optional[Dict[str, Any]] = None,
+    circle: Optional[Sequence[float]] = None,
 ) -> Dict[str, Any]:
     """
     Estimate cloud cover of one frame.
@@ -284,6 +292,7 @@ def analyze_cloud_cover(
         reference: learned clear-sky template, updated in place on dark nights (None: no template).
         sky_polygons: station sky mask ({"sky": [...], "obstruction": [...]} in frame fractions).
         count_stars: at night also count the stars in the sky (reported only).
+        circle: lens image circle (cx, cy, r) in fractions of the frame (width, height, width); outside it is not sky.
         star_ref: {"solution", "lat", "lon", "when"} (star-solved pointing, station, aware datetime). At night
             the catalogue stars that should be visible are looked for; a sky showing far fewer than expected
             (thin cloud, haze, a uniform overcast the colour map cannot see) raises the cloud cover.
@@ -304,7 +313,7 @@ def analyze_cloud_cover(
             if reference.template is not None:
                 template = reference.template.copy()
             learned = reference.night_samples >= MIN_TEMPLATE_SAMPLES
-    cm = cloud_map(frame, night, sky_polygons, roi, template, want_residuals=learn)
+    cm = cloud_map(frame, night, sky_polygons, roi, template, want_residuals=learn, circle=circle)
     result: Dict[str, Any] = {"method": "night" if night else "day", "star_count": 0,
                               "sky_fraction": round(cm["sky_frac"], 3), "sky_brightness": None}
     if cm["sky_level"] > 0:

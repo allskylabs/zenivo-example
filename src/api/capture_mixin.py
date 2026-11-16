@@ -2,6 +2,7 @@
 
 Mixin of AllSkyService (src/api/service.py): methods only, all state lives on the service instance."""
 
+import json
 import logging
 import os
 import time
@@ -17,6 +18,47 @@ logger = logging.getLogger("imx335.api")
 
 
 class CaptureMixin:
+
+    AE_STATE_MAX_AGE_S = 2 * 3600.0   # a restart within this time resumes the last auto exposure / gain
+    AE_STATE_SAVE_EVERY_S = 20.0
+
+    def _ae_state_path(self) -> str:
+        return os.path.join(self.output_dir, "ae_state.json")
+
+    def _save_ae_state(self, exposure_s: float, gain_db: float, is_pytest: bool = False) -> None:
+        """Remember the auto exposure / gain (at most every 20 s) so a restart does not begin from the camera default."""
+        now = time.time()
+        if is_pytest or now - getattr(self, "_ae_state_saved", 0.0) < self.AE_STATE_SAVE_EVERY_S:
+            return
+        self._ae_state_saved = now
+        try:
+            tmp = self._ae_state_path() + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump({"t": round(now, 1), "exposure_s": float(exposure_s), "gain_db": float(gain_db)}, fh)
+            os.replace(tmp, self._ae_state_path())
+        except OSError:
+            pass
+
+    def _restore_ae_state(self) -> bool:
+        """After a short stop, start from the last auto exposure / gain: no sudden brightness jump on restart."""
+        if os.environ.get("PYTEST_CURRENT_TEST") or self.mode != "auto":
+            return False
+        try:
+            with open(self._ae_state_path(), encoding="utf-8") as fh:
+                st = json.load(fh)
+            age = time.time() - float(st["t"])
+            exp, gain = float(st["exposure_s"]), float(st["gain_db"])
+            lim = camera_limits(self.camera)
+            if not (0.0 <= age <= self.AE_STATE_MAX_AGE_S) or not (
+                    float(lim.get("min_exposure_s") or 0.0) <= exp <= float(lim.get("max_exposure_s") or 1e9)
+                    and float(lim.get("min_gain_db") or 0.0) <= gain <= float(lim.get("max_gain_db") or 1e9)):
+                return False
+            self.camera.set_hardware_exposure(exp, gain)
+            self.auto_exposure.exposure_s, self.auto_exposure.gain_db = exp, gain
+            self.activity.info("capture", f"Resumed the last auto exposure {exp:.4g}s, gain {gain:.1f} dB ({int(age // 60)} min old)")
+            return True
+        except (OSError, ValueError, KeyError, TypeError):
+            return False
 
     def capture_frame(self, force_refresh: bool = False) -> Tuple[np.ndarray, Dict[str, Any]]:
         """
@@ -154,6 +196,7 @@ class CaptureMixin:
                         frame, live_camera=not is_pytest
                     )
                     self.camera.set_hardware_exposure(new_exp, new_gain)
+                    self._save_ae_state(new_exp, new_gain, is_pytest)
                     self.last_metadata["auto_exposure"] = ae_telem
                     profile = ae_telem.get("profile")
                     if profile and profile != self._last_profile and not is_pytest:

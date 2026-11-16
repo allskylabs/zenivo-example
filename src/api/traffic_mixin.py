@@ -166,6 +166,21 @@ class TrafficMixin:
         return {"solution": sol, "lat": self.auto_exposure.lat, "lon": self.auto_exposure.lon,
                 "when": datetime.now().astimezone()}
 
+    def _lens_circle(self) -> Optional[tuple]:
+        """Fisheye image circle (cx, cy, r) as fractions of the frame (width, height, width), from the star solution:
+        the 90 degree radius of an equidistant lens. None for other lenses or without a solution."""
+        sol = self.station_config.get("bright_star_solution") or {}
+        try:
+            if not sol.get("success") or sol.get("projection") != "equidistant":
+                return None
+            cx, cy = (float(v) for v in sol["optical_center_px"])
+            fw = float(sol.get("frame_width") or 2.0 * cx)
+            fh = float(sol.get("frame_height") or 2.0 * cy)
+            r = float(sol["focal_px"]) * 1.5708 * 0.97 / fw   # a little inside, the rim itself is soft
+            return (cx / fw, cy / fh, r) if 0.2 < r < 0.8 else None
+        except (KeyError, TypeError, ValueError):
+            return None
+
     def _overlay_solution(self) -> Optional[Dict[str, Any]]:
         """Star-solved camera pointing for sky overlays, with the manual boresight correction applied."""
         sol = self.station_config.get("bright_star_solution") or {}

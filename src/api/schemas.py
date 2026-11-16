@@ -367,3 +367,7 @@ class CommunitySettingsRequest(BaseModel):
             if url not in out:
                 out.append(url)
         return out
+
+
+class TimezoneRequest(BaseModel):
+    timezone: str = Field("", max_length=64, description='"" (the operating system zone), "coords" or an IANA name')

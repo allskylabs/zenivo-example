@@ -237,6 +237,9 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
             os.makedirs(d, exist_ok=True)
         self.station_config_path = os.path.join(self.output_dir, "station_config.json")
         self.station_config: Dict[str, Any] = self._load_station_config()
+        self.timezone_info: Dict[str, Any] = {"setting": "", "name": None, "offset_min": 0}
+        self._apply_timezone()
+        self._restore_ae_state()
         wb = self.station_config.get("white_balance") or {}
         configure_white_balance(wb.get("mode", "auto"), wb.get("r_gain"), wb.get("b_gain"))
         self.auto_exposure.lat = float(self.station_config.get("latitude_deg", DEFAULT_LAT))
@@ -413,6 +416,7 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
             stats = analyze_cloud_cover(
                 analysis_frame, exposure_s, gain_db, sun_elev, roi=self.sky_roi, reference=self.cloud_reference,
                 sky_polygons=self.station_config.get("sky_mask"), star_ref=self._star_ref(),
+                circle=self._lens_circle(),
             )
         except Exception:
             stats = {"star_count": 0, "cloud_cover_pct": None, "status": "unknown", "method": "", "confidence": 0.0}

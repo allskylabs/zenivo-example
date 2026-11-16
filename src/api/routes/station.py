@@ -5,6 +5,7 @@ Station setup, sky mask and astrometric plate-solving endpoints.
 from fastapi import HTTPException, Query, Request, status, Depends
 
 from src.api.schemas import (
+    TimezoneRequest,
     StationLocationRequest,
     SkyMaskRequest,
     ManualStarSolveRequest,
@@ -84,6 +85,15 @@ def auto_locate_station(
     Does not run plate-solving unless auto_plate_solve=True.
     """
     return service.auto_locate_station(auto_plate_solve=auto_plate_solve)
+
+
+@router.post("/api/station/timezone")
+def set_station_timezone(req: TimezoneRequest, service: AllSkyService = Depends(get_service)):
+    """Time zone of the station: "" = the operating system's, "coords" = whole-hour offset from the longitude, or an IANA name."""
+    try:
+        return service.set_timezone(req.timezone)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.post("/api/station/plate-solve")

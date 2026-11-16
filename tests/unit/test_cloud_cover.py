@@ -131,3 +131,11 @@ def test_cloud_api_roundtrip(monkeypatch):
     assert client.post("/api/sky/clouds/config", json={"sky_roi": [0.5, 0, 0.52, 1]}).status_code == 400
     assert client.post("/api/sky/clouds/config", json={"reset_reference": True}).json()["reference"]["night_samples"] == 0
     AllSkyService.reset_instance()
+
+
+def test_lens_circle_keeps_the_dark_rim_out_of_the_judged_sky():
+    from src.analytics.cloud_cover import sky_work_mask
+
+    full = sky_work_mask((60, 80), None, (0, 0, 1, 1))
+    disc = sky_work_mask((60, 80), None, (0, 0, 1, 1), circle=(0.5, 0.5, 0.35))
+    assert disc.sum() < full.sum() * 0.7 and disc[30, 40] and not disc[2, 2] and not disc[30, 2]
