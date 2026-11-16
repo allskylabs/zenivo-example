@@ -22,14 +22,28 @@ from src.calibration import bright_star_solver as bss
 MIN_EXPECTED = 5
 PEAK_SIGMA = 4.5
 MIN_ALT_DEG = 8.0
+MAX_SHIFT_FRAC = 0.04  # pointing drift searched, as a share of the frame width
+
+
+def _peak_map(gray8: np.ndarray) -> np.ndarray:
+    """True where a 5x5 core stands out of its surroundings: peak above 4.5 noise sigma (and 6 DN)."""
+    bg = cv2.medianBlur(gray8, 25)
+    sigma = np.maximum(1.4826 * cv2.medianBlur(cv2.absdiff(gray8, bg), 25).astype(np.float32), 1.0)
+    core = cv2.dilate(gray8, np.ones((5, 5), np.uint8)).astype(np.float32)
+    return (core - bg.astype(np.float32)) > np.maximum(PEAK_SIGMA * sigma, 6.0)
 
 
 def star_clarity(frame: np.ndarray, solution: Dict[str, Any], lat: float, lon: float, when: datetime,
                  sky_mask: Optional[np.ndarray] = None, max_mag: float = 3.4) -> Dict[str, Any]:
-    """Expected vs seen catalogue stars in one frame (any size; the solution's pixel scale is rescaled)."""
+    """Expected vs seen catalogue stars in one frame (any size; the solution's pixel scale is rescaled).
+
+    The stored pointing drifts a little (a nudged mount, a re-solve at another size), so the projected
+    star positions are searched over a small shift: the shift where clearly more stars stand out than at
+    chance is used. Without such a shift (cloud, no stars) the stored pointing is used as is.
+    """
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) if frame.ndim == 3 else frame
-    gray = gray.astype(np.float32)
-    h, w = gray.shape
+    gray8 = np.clip(gray, 0, 255).astype(np.uint8)
+    h, w = gray8.shape
     cx0, cy0 = solution["optical_center_px"]
     k = w / (2.0 * cx0)
     f, cx, cy = float(solution["focal_px"]) * k, cx0 * k, cy0 * k
@@ -42,24 +56,35 @@ def star_clarity(frame: np.ndarray, solution: Dict[str, Any], lat: float, lon: f
     R = pointing_rotation(solution["pointing_az_deg"], solution["pointing_alt_deg"], solution.get("roll_deg", 0.0))
     xy, ok = bss._project(R, enu, f, cx, cy, solution.get("projection", "rectilinear"),
                           float(solution.get("distortion_k") or 0.0))
-    mags = np.array([s["mag"] for s in stars])[keep]
     margin = 14
-    expected = seen = 0
-    for (x, y), good, mag in zip(xy, ok, mags):
-        if not good or not (margin <= x < w - margin and margin <= y < h - margin):
+    pts = []
+    for x, y in xy[ok]:
+        if not (margin <= x < w - margin and margin <= y < h - margin):
             continue
         xi, yi = int(round(x)), int(round(y))
         if sky_mask is not None:
             my, mx = sky_mask.shape
             if not sky_mask[min(my - 1, yi * my // h), min(mx - 1, xi * mx // w)]:
                 continue
-        expected += 1
-        core = gray[yi - 2:yi + 3, xi - 2:xi + 3]
-        ring = gray[yi - 12:yi + 13, xi - 12:xi + 13].copy()
-        ring[8:17, 8:17] = np.nan
-        bg = float(np.nanmedian(ring))
-        sigma = max(1.4826 * float(np.nanmedian(np.abs(ring - bg))), 1.0)
-        if float(core.max()) - bg > max(PEAK_SIGMA * sigma, 6.0):
-            seen += 1
-    clarity = round(seen / expected, 2) if expected >= MIN_EXPECTED else None
-    return {"expected": expected, "seen": seen, "clarity": clarity}
+        pts.append((xi, yi))
+    expected = len(pts)
+    if expected < MIN_EXPECTED:
+        return {"expected": expected, "seen": 0, "clarity": None}
+    peak = _peak_map(gray8)
+    px = np.array([p[0] for p in pts])
+    py = np.array([p[1] for p in pts])
+    r = max(8, int(MAX_SHIFT_FRAC * w))
+    shifts = np.arange(-r, r + 1)
+    counts = np.zeros((shifts.size, shifts.size), np.int32)  # [dy, dx]
+    for i, dy in enumerate(shifts):
+        yy = np.clip(py + dy, 0, h - 1)
+        for j, dx in enumerate(shifts):
+            counts[i, j] = int(peak[yy, np.clip(px + dx, 0, w - 1)].sum())
+    seen0 = int(counts[r, r])
+    bi, bj = np.unravel_index(int(np.argmax(counts)), counts.shape)
+    best, chance = int(counts[bi, bj]), float(np.median(counts))
+    seen, shift = seen0, (0, 0)
+    # a real shift lights up many stars at once; noise peaks give a few at random
+    if best > seen0 and best >= max(MIN_EXPECTED, chance + 4.0 + 3.0 * chance ** 0.5):
+        seen, shift = best, (int(shifts[bj]), int(shifts[bi]))
+    return {"expected": expected, "seen": seen, "clarity": round(seen / expected, 2), "shift_px": shift}

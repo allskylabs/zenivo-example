@@ -23,6 +23,7 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Fixed
 
+- Cloud cover: the star-visibility check (catalogue stars expected vs seen) now searches a small shift (up to 4% of the width) around the stored star-solved pointing. A mount that had drifted ~15 px made it see 0 of 34 stars on a clear night and report ~100% cloud. With no clear shift (real cloud) the stored pointing is used as before.
 - A plugged-in ZWO or QHY camera that is not offered now says why (missing `zwoasi`, missing vendor SDK, missing udev rules) under Rescan and once in the log (`Camera scan: ...`).
 - Choosing `rts5869` under Settings > Camera no longer fails with "no usable camera" (the device node is now found automatically).
 - Satellites 3D zooms out far enough to show GEO and high-orbit satellites; the event viewer no longer draws a dashed path across the moving object.

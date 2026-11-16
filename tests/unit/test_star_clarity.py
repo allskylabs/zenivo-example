@@ -32,3 +32,15 @@ def test_clarity_is_full_with_stars_and_zero_without():
     for x, y in pos:
         lit[y - 1:y + 2, x - 1:x + 2] = 200
     assert star_clarity(lit, SOL, LAT, LON, WHEN)["clarity"] >= 0.9
+
+
+def test_drifted_pointing_still_finds_the_stars():
+    pos = _star_positions()
+    rng = np.random.default_rng(2)
+    sky = (rng.normal(40, 2, (648, 1152))).clip(0, 255).astype(np.uint8)
+    lit = sky.copy()
+    for x, y in pos:  # the camera moved: every star sits 14 px right / 9 px up of where the solution says
+        lit[y - 10:y - 7, x + 13:x + 16] = 200
+    got = star_clarity(lit, SOL, LAT, LON, WHEN)
+    dx, dy = got["shift_px"]  # a 5x5 peak window makes shifts within 2 px of the true one equivalent
+    assert got["clarity"] >= 0.8 and abs(dx - 14) <= 3 and abs(dy + 9) <= 3
