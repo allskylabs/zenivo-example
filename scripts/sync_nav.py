@@ -83,7 +83,7 @@ def render_head(name):
              f'<meta property="og:title" content="{title}">', f'<meta property="og:description" content="{desc}">',
              f'<meta property="og:image" content="{img}">', '<meta name="twitter:card" content="summary_large_image">',
              '<script src="/static/auth.js?v=1"></script>',
-             '<script src="/static/brand/version.js?v=1" defer></script>', "<!-- head-brand:end -->"]
+             '<script src="/static/brand/version.js?v=2" defer></script>', "<!-- head-brand:end -->"]
     return "\n    ".join(lines)
 
 

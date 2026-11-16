@@ -52,12 +52,20 @@
     const tone = (name, fallback) => (css.getPropertyValue(name) || "").trim() || fallback;
     const world = L.latLngBounds([-85, -180], [85, 180]);
     const map = L.map("cmap", {
-        minZoom: 2, maxZoom: 9, preferCanvas: true, maxBounds: world.pad(0.1), maxBoundsViscosity: 0.8,
+        minZoom: 0.5, zoomSnap: 0.25, maxZoom: 9, preferCanvas: true, maxBounds: world.pad(0.6), maxBoundsViscosity: 0.6,
         attributionControl: false,
     }).setView([20, 10], 2);
+    // The whole world must fit the box, also on a phone: the lowest zoom is the one that shows it all (not a fixed 2)
+    function fitMinZoom() {
+        const z = Math.max(0.5, map.getBoundsZoom(L.latLngBounds([-60, -180], [80, 180]), true));
+        map.setMinZoom(z);
+        if (map.getZoom() < z) map.setZoom(z);
+    }
     L.control.attribution({ prefix: false }).addAttribution("Land, lakes, rivers: Natural Earth (public domain)").addTo(map);
     // The map box gets its final size after the shell lays out (and on rotation): tell Leaflet, or the map lands off-centre
-    if (window.ResizeObserver) new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById("cmap"));
+    if (window.ResizeObserver) new ResizeObserver(() => { map.invalidateSize(); fitMinZoom(); }).observe(document.getElementById("cmap"));
+    fitMinZoom();
+    if (map.getMinZoom() > 2) map.setView([20, 10], map.getMinZoom());
     const ink = tone("--text-muted", "#64748b"), landFill = tone("--border-color", "#1e293b");
     const sea = tone("--bg-primary", "#0a0f1c");
     const gridLines = (step, lim) => {
@@ -192,11 +200,20 @@
         return Number.isFinite(t) && t > 0 ? `last seen ${agoText(t)}` : `updated ${agoText(card.updated)}`;
     }
 
+    // online: heard from within 15 min; idle: within 6 h (a card is re-signed that often); offline: older or never
+    function stationState(card, isOwn) {
+        if (isOwn) return "online";
+        const t = Number(seenMap[card.id]) || Number(card.updated) || 0;
+        const age = Date.now() / 1000 - (t > 1e12 ? t / 1000 : t);
+        return !t ? "offline" : age < 900 ? "online" : age < 21600 ? "idle" : "offline";
+    }
     function popupFor(card, isOwn) {
         const box = el("div", "cm-pop");
         if (isOwn) box.appendChild(el("div", "own", "This station"));
         box.appendChild(el("h3", "", String(card.name || "Unnamed station")));
         if (card.camera) box.appendChild(el("div", "meta", String(card.camera)));
+        const stt = stationState(card, isOwn);
+        box.appendChild(el("div", `cm-state ${stt}`, stt === "online" ? "Online" : stt === "idle" ? "Idle" : "Offline"));
         if (card.software) box.appendChild(el("div", "meta", String(card.software)));
         box.appendChild(el("div", "meta", seenText(card, isOwn).replace(/^./, (c) => c.toUpperCase())));
         const base = httpsUrl(card.url);
@@ -253,16 +270,21 @@
         const pts = [];
         for (const card of valid) {
             const isOwn = card.id === ownId;
-            const marker = L.circleMarker([card.lat, card.lon], {
-                radius: isOwn ? 10 : 7, weight: isOwn ? 3 : 2, color: isOwn ? cssVar("--text-primary") : accent,
-                fillColor: isOwn ? accent : other, fillOpacity: 0.9,
+            const st = stationState(card, isOwn);
+            const marker = L.marker([card.lat, card.lon], {
+                icon: L.divIcon({ className: "cm-mk", iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -12],
+                    html: `<span class="cm-dot ${st}${isOwn ? " own" : ""}"></span>` }),
+                title: `${String(card.name || "Station")} (${st})`, keyboard: true,
             }).addTo(layer);
-            marker.bindPopup(() => popupFor(card, isOwn), { maxWidth: 340 });
+            marker.bindPopup(() => popupFor(card, isOwn), { maxWidth: 340, keepInView: true, autoPanPaddingTopLeft: [16, 24], autoPanPaddingBottomRight: [16, 24] });
             pts.push([card.lat, card.lon]);
             const item = el("li");
             const btn = el("button");
             btn.type = "button";
-            btn.appendChild(el("span", isOwn ? "nm you" : "nm", `${String(card.name || "Unnamed station")}${isOwn ? " (this station)" : ""}`));
+            const nm = el("span", isOwn ? "nm you" : "nm");
+            nm.appendChild(el("i", `cm-led ${st}`));
+            nm.appendChild(document.createTextNode(`${String(card.name || "Unnamed station")}${isOwn ? " (this station)" : ""}`));
+            btn.appendChild(nm);
             btn.appendChild(el("span", "sub", [card.camera, seenText(card, isOwn)].filter(Boolean).join(" · ")));
             btn.addEventListener("click", () => {
                 map.flyTo([card.lat, card.lon], Math.max(map.getZoom(), 6));

@@ -18,7 +18,7 @@
     <meta property="og:image" content="/static/brand/og-image.png">
     <meta name="twitter:card" content="summary_large_image">
     <script src="/static/auth.js?v=1"></script>
-    <script src="/static/brand/version.js?v=1" defer></script>
+    <script src="/static/brand/version.js?v=2" defer></script>
     <!-- head-brand:end -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
@@ -39,6 +39,20 @@
         #cmap .leaflet-container a { color: var(--accent); }
         #cmap .leaflet-control-attribution { background: color-mix(in srgb, var(--bg-card) 85%, transparent); color: var(--text-secondary); }
         .cm-pop { font: 13px/1.45 var(--font-sans); width: min(300px, 70vw); }
+        .cm-mk { background: none; border: 0; }
+        .cm-dot { position: relative; display: block; width: 14px; height: 14px; margin: 6px; border-radius: 50%; border: 2px solid var(--bg-primary); box-shadow: 0 0 0 1px rgba(255,255,255,.35); }
+        .cm-dot.online { background: #22c55e; }
+        .cm-dot.online::after { content: ""; position: absolute; inset: -7px; border-radius: 50%; border: 2px solid #22c55e; opacity: .6; animation: cm-pulse 2s ease-out infinite; }
+        .cm-dot.idle { background: #f59e0b; }
+        .cm-dot.offline { background: transparent; border: 2px solid #94a3b8; box-shadow: none; }
+        .cm-dot.own { box-shadow: 0 0 0 3px var(--accent); }
+        @keyframes cm-pulse { from { transform: scale(.6); opacity: .8; } to { transform: scale(1.5); opacity: 0; } }
+        @media (prefers-reduced-motion: reduce) { .cm-dot.online::after { animation: none; } }
+        .cm-led { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; vertical-align: baseline; }
+        .cm-led.online { background: #22c55e; } .cm-led.idle { background: #f59e0b; } .cm-led.offline { border: 2px solid #94a3b8; }
+        .cm-state { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin: 2px 0; }
+        .cm-state.online { color: #22c55e; } .cm-state.idle { color: #f59e0b; } .cm-state.offline { color: #94a3b8; }
+        .cm-pop img { max-height: 38vh; object-fit: contain; }
         .cm-zoom { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
         .cm-light { position: fixed; inset: 0; z-index: 5000; background: rgba(0, 0, 0, 0.88); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; }
         .cm-light-fig { margin: 0; max-width: 100%; max-height: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 0; }
@@ -73,7 +87,7 @@
         }
         @media (max-width: 768px) {
             .community { flex-direction: column; }
-            #cmap-wrap { flex: none; height: 55vh; min-height: 280px; }
+            #cmap-wrap { flex: none; height: 62vh; height: 62dvh; min-height: 300px; }
             #clist { width: 100%; flex: none; border-left: 0; border-top: 1px solid var(--border-color); overflow: visible; }
         }
     </style>
@@ -184,6 +198,6 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="/static/community.js?v=2"></script>
+    <script src="/static/community.js?v=3"></script>
 </body>
 </html>
