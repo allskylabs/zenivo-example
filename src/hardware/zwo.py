@@ -25,7 +25,10 @@ logger = logging.getLogger("allsky.zwo")
 # ASI BayerPattern id -> pattern name
 _BAYER_NAME = {0: "RGGB", 1: "BGGR", 2: "GRBG", 3: "GBRG"}
 
+_VENDOR_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "vendor", "lib", "libASICamera2.so")  # install_camera_sdk.sh puts it here (no root needed)
+
 _LIB_CANDIDATES = (
+    _VENDOR_LIB,
     "/usr/local/lib/libASICamera2.so",
     "/usr/lib/libASICamera2.so",
     "/usr/lib/aarch64-linux-gnu/libASICamera2.so",

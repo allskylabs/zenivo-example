@@ -34,7 +34,10 @@ _BAYER_NAME = {1: "GBRG", 2: "GRBG", 3: "BGGR", 4: "RGGB"}
 
 GAIN_DB_SPAN = 30.0
 
+_VENDOR_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "vendor", "lib", "libqhyccd.so")  # install_camera_sdk.sh puts it here (no root needed)
+
 _LIB_CANDIDATES = (
+    _VENDOR_LIB,
     "/usr/lib/x86_64-linux-gnu/libqhyccd.so",
     "/usr/lib/aarch64-linux-gnu/libqhyccd.so",
     "/usr/local/lib/libqhyccd.so",

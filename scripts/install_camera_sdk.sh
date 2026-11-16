@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Installs the vendor SDK a ZWO ASI or QHY camera needs, so Zenivo can see the camera.
 #
-#   scripts/install_camera_sdk.sh zwo|qhy|all [--venv DIR] [--dry-run]
+#   scripts/install_camera_sdk.sh zwo|qhy|all [--venv DIR] [--no-udev] [--dry-run]
 #
-# What it does (needs sudo for the system part):
-#   - zwo: pip install zwoasi into the venv, libASICamera2.so -> /usr/local/lib, udev rules -> /etc/udev/rules.d
-#   - qhy: libqhyccd.so -> /usr/local/lib, udev rules -> /etc/udev/rules.d (no Python package is needed)
+# What it does:
+#   - zwo: pip install zwoasi into the venv, libASICamera2.so -> <zenivo>/vendor/lib (no root needed)
+#   - qhy: libqhyccd.so -> <zenivo>/vendor/lib (no Python package is needed)
+#   - udev rules -> /etc/udev/rules.d (needs sudo; without it the exact command is printed, and many systems
+#     let you open the camera without the rules anyway)
 # The libraries and rules come from the INDI 3rd-party repository (https://github.com/indilib/indi-3rdparty),
 # which redistributes the vendors' SDKs; the ZWO SDK is MIT licensed, QHY's is QHYCCD's own licence (read
 # libqhy/ in that repository). Nothing is downloaded unless you run this script. Pinned to one commit so the files
@@ -17,6 +19,7 @@ BASE="https://raw.githubusercontent.com/indilib/indi-3rdparty/$INDI_REF"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="$SCRIPT_DIR/.venv"
 DRY_RUN=0
+UDEV=1
 WHAT=""
 
 die() { echo "install_camera_sdk.sh: error: $*" >&2; exit 1; }
@@ -27,6 +30,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         zwo|qhy|all) WHAT="$1"; shift ;;
         --venv) [ $# -ge 2 ] || die "--venv needs a value"; VENV="$2"; shift 2 ;;
+        --no-udev) UDEV=0; shift ;;
         --dry-run) DRY_RUN=1; shift ;;
         -h|--help) sed -n 2,14p "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) die "unknown option: $1 (use: zwo | qhy | all, --venv DIR, --dry-run)" ;;
@@ -57,11 +61,33 @@ install_lib() {  # install_lib FOLDER REMOTE_NAME LIBNAME RULES_REMOTE RULES_NAM
     if [ "$DRY_RUN" -eq 0 ]; then
         head -c 4 "$TMP/$lib" | grep -q "ELF" || die "$lib is not a Linux library (download failed?)"
     fi
-    run $SUDO install -m 0755 "$TMP/$lib" "/usr/local/lib/$lib"
-    run $SUDO install -m 0644 "$TMP/$rules_name" "/etc/udev/rules.d/$rules_name"
-    run $SUDO ldconfig
-    run $SUDO udevadm control --reload-rules
-    run $SUDO udevadm trigger
+    run mkdir -p "$SCRIPT_DIR/vendor/lib"
+    run install -m 0755 "$TMP/$lib" "$SCRIPT_DIR/vendor/lib/$lib"
+    local cmd="install -m 0644 $TMP/$rules_name /etc/udev/rules.d/$rules_name && udevadm control --reload-rules && udevadm trigger"
+    if [ "$UDEV" -eq 0 ]; then
+        mkdir -p "$SCRIPT_DIR/vendor"; cp "$TMP/$rules_name" "$SCRIPT_DIR/vendor/$rules_name" 2>/dev/null || true
+        echo "note: udev rules skipped (--no-udev); the file is in $SCRIPT_DIR/vendor/ if you need it"
+    elif [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] sudo sh -c '$cmd'"
+    elif [ "$(id -u)" -eq 0 ] || sudo -n true 2>/dev/null; then
+        $SUDO sh -c "$cmd"
+    elif [ -t 0 ]; then
+        echo
+        echo "The udev rules go into /etc/udev/rules.d/, which needs administrator rights (sudo)."
+        printf "Install them now? sudo will ask for your password. [Y/n] "
+        read -r ans
+        case "$ans" in
+            n|N|no|NO) mkdir -p "$SCRIPT_DIR/vendor"; cp "$TMP/$rules_name" "$SCRIPT_DIR/vendor/$rules_name"
+                       echo "Skipped. Later, if the camera is not found, run:"
+                       echo "  sudo install -m 0644 $SCRIPT_DIR/vendor/$rules_name /etc/udev/rules.d/ && sudo udevadm control --reload-rules && sudo udevadm trigger" ;;
+            *) sudo sh -c "$cmd" || die "sudo failed; run this yourself: sudo sh -c '$cmd'" ;;
+        esac
+    else
+        mkdir -p "$SCRIPT_DIR/vendor"; cp "$TMP/$rules_name" "$SCRIPT_DIR/vendor/$rules_name"
+        echo "note: sudo needs a password and there is no terminal to ask for it, so the udev rules were not installed."
+        echo "If the camera is not found, run:"
+        echo "  sudo install -m 0644 $SCRIPT_DIR/vendor/$rules_name /etc/udev/rules.d/ && sudo udevadm control --reload-rules && sudo udevadm trigger"
+    fi
 }
 
 if [ "$WHAT" = "zwo" ] || [ "$WHAT" = "all" ]; then

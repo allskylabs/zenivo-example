@@ -13,7 +13,7 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Added (camera SDK)
 
-- `scripts/install_camera_sdk.sh zwo|qhy|all` and `install.sh --camera-sdk`: installs `zwoasi`, the vendor library and the udev rules for ZWO ASI / QHY cameras in one step (downloaded from a pinned INDI 3rd-party commit when you run it). `install.sh --camera` now accepts `zwo` and `qhy`.
+- `scripts/install_camera_sdk.sh zwo|qhy|all` and `install.sh --camera-sdk`: installs `zwoasi`, the vendor library (into `vendor/lib`, no root) and the udev rules (asks before using sudo) for ZWO ASI / QHY cameras in one step (downloaded from a pinned INDI 3rd-party commit when you run it). `install.sh --camera` now accepts `zwo` and `qhy`.
 
 ### Added (Integrations)
 

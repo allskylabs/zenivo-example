@@ -28,7 +28,7 @@ Options:
   --port N              TCP port of the web UI and API (default: 8080)
   --host ADDR           Bind address (default: 127.0.0.1, this machine only; use 0.0.0.0 to open it on the LAN, or keep 127.0.0.1 behind a reverse proxy)
   --camera NAME         auto | rts5869 | picamera | zwo | qhy | v4l2 | simulator (default: auto)
-  --camera-sdk NAME     zwo | qhy | all: also download and install that vendor SDK and udev rules (scripts/install_camera_sdk.sh; needs sudo)
+  --camera-sdk NAME     zwo | qhy | all: also download that vendor SDK (into vendor/lib) and its udev rules; asks before using sudo, which only the udev rules need
   --user NAME           Linux user that runs the service (default: the current user)
   --service-name NAME   systemd unit name without ".service" (default: zenivo)
   --no-systemd          Only create the virtual environment and install the dependencies
@@ -66,6 +66,7 @@ case "$CAMERA" in
     auto|rts5869|picamera|zwo|qhy|v4l2|simulator) ;;
     *) die "--camera must be one of: auto, rts5869, picamera, zwo, qhy, v4l2, simulator" ;;
 esac
+if [ -z "$CAMERA_SDK" ] && { [ "$CAMERA" = "zwo" ] || [ "$CAMERA" = "qhy" ]; }; then CAMERA_SDK="$CAMERA"; fi
 case "$CAMERA_SDK" in
     ""|zwo|qhy|all) ;;
     *) die "--camera-sdk must be one of: zwo, qhy, all" ;;

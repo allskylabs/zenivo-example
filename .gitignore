@@ -8,3 +8,6 @@ __pycache__/
 pip.log
 feeder.env
 .claude/
+
+# vendor camera SDKs fetched by scripts/install_camera_sdk.sh
+/vendor/
