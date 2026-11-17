@@ -58,11 +58,54 @@ ADMIN_HREFS = {"/logs", "/focus", "/calibration", "/obs/dock"}
 SETTINGS = [("image", "Image Output"), ("detection", "Detection"), ("station", "Station &amp; Optics"),
             ("skymask", "Sky Mask"), ("integrations", "Integrations"), ("community", "Community"),
             ("admin", "Admin")]
-# phone tab bar: 4 tabs + More (the rest lives in the sheet)
-MOBILE = [("/live", "&#9673;", "Live", "/live,/,/index.html"), ("/sky", "&#10024;", "Sky", "/sky"),
-          ("/flights3d", "&#9992;", "Flights", "/flights3d"), ("/gallery", "&#9638;", "Archive", "/gallery,/logs")]
+# Line icons (24x24, stroke = currentColor) for the phone tab bar and the Menu sheet tiles
+ICONS = {
+    "camera": '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/>',
+    "star": '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+    "nav": '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
+    "calendar": '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+    "menu": '<path d="M4 6h16M4 12h16M4 18h16"/>',
+    "globe": '<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>',
+    "pin": '<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
+    "clock": '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    "search": '<circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/>',
+    "bars": '<path d="M12 20V10M18 20V4M6 20v-4"/>',
+    "bolt": '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+    "home": '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+    "shield": '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    "plus": '<path d="M12 5v14M5 12h14"/>',
+    "lock": '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+    "play": '<polygon points="6 4 20 12 6 20 6 4"/>',
+    "users": '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
+}
+
+
+def icon(name, cls="m-svg", size=22):
+    return (f'<svg class="{cls}" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+            f'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{ICONS[name]}</svg>')
+
+
+# phone tab bar: Live / Sky / Overhead (= the Flights page) / Archive / Menu (the rest lives in the Menu sheet)
+MOBILE = [("/live", "camera", "Live", "/live,/,/index.html"), ("/sky", "star", "Sky", "/sky"),
+          ("/flights3d", "nav", "Overhead", "/flights3d"), ("/gallery", "calendar", "Archive", "/gallery,/logs")]
 MORE_PATHS = "/satellites3d,/community,/focus,/calibration,/settings,/obs"
-SHEET = [("/satellites3d", "Satellites 3D"), ("/community", "Community"), ("/logs", "Activity Log"), ("/focus", "Focus"), ("/calibration", "Master Dark")]
+# Menu sheet groups: (title, admin-only group, [(href, icon, label, tone, admin item, new tab)])
+MENU = [
+    ("Explore", False, [("/satellites3d", "globe", "Satellites 3D", "accent", False, False),
+                        ("/community", "pin", "Community", "accent", False, False),
+                        ("/logs", "clock", "Activity log", "accent", True, False)]),
+    ("Camera", True, [("/focus", "search", "Focus", "violet", True, False),
+                      ("/calibration", "camera", "Master dark", "violet", True, False),
+                      ("/settings#image", "bars", "Image output", "violet", True, False),
+                      ("/settings#detection", "bolt", "Detection", "violet", True, False)]),
+    ("Station", True, [("/settings#station", "home", "Station &amp; optics", "ok", True, False),
+                       ("/settings#skymask", "shield", "Sky mask", "ok", True, False),
+                       ("/settings#integrations", "plus", "Integrations", "ok", True, False),
+                       ("/settings#community", "users", "Community sharing", "ok", True, False),
+                       ("/settings#admin", "lock", "Admin", "ok", True, False)]),
+    ("Streaming", False, [("/obs/dock", "play", "OBS dock", "warn", True, False),
+                          ("/obs", "play", "OBS preview", "warn", False, True)]),
+]
 
 
 def render_brand():
@@ -83,7 +126,8 @@ def render_head(name):
              f'<meta property="og:title" content="{title}">', f'<meta property="og:description" content="{desc}">',
              f'<meta property="og:image" content="{img}">', '<meta name="twitter:card" content="summary_large_image">',
              '<script src="/static/auth.js?v=1"></script>',
-             '<script src="/static/brand/version.js?v=4" defer></script>', "<!-- head-brand:end -->"]
+             '<script src="/static/brand/version.js?v=4" defer></script>',
+             '<script src="/static/shell.js?v=1" defer></script>', "<!-- head-brand:end -->"]
     return "\n    ".join(lines)
 
 
@@ -116,26 +160,34 @@ def render(current, is_index):
     o += ['                </div>', '            </div>', '        </nav>',
           '        <div class="side-foot"><span id="app-version" data-app-version>Zenivo</span>'
           '<br><a class="side-auth" href="/login" data-auth-link>Sign in</a></div>', '    </aside>', '',
-          '    <!-- Phone navigation (<=768px): 4 tabs + More sheet, same routes as the sidebar -->',
+          '    <!-- Phone navigation (<=768px): 4 tabs + Menu sheet, same routes as the sidebar -->',
           '    <nav class="m-tabbar" id="m-tabbar" aria-label="Mobile navigation">']
-    o += [f'        <a class="m-tab" href="{h}" data-mpath="{p}"><span class="m-ic">{i}</span><span class="m-txt">{t}</span></a>'
+    o += [f'        <a class="m-tab" href="{h}" data-mpath="{p}"><span class="m-ic">{icon(i)}</span><span class="m-txt">{t}</span></a>'
           for h, i, t, p in MOBILE]
     o += [f'        <button class="m-tab" type="button" id="m-more-btn" aria-haspopup="dialog" aria-expanded="false" '
-          f'aria-controls="m-more-sheet" data-mpath="{MORE_PATHS}"><span class="m-ic">&#8943;</span><span class="m-txt">More</span></button>',
+          f'aria-controls="m-more-sheet" data-mpath="{MORE_PATHS}"><span class="m-ic">{icon("menu")}</span><span class="m-txt">Menu</span></button>',
           '    </nav>', '    <div class="m-sheet-backdrop" id="m-sheet-backdrop" hidden></div>',
-          '    <div class="m-sheet" id="m-more-sheet" role="dialog" aria-label="More" hidden>',
-          '        <div class="m-sheet-grip" aria-hidden="true"></div>']
-    o += [f'        <a class="m-sheet-item" href="{h}" data-mpath="{h}"{" data-admin" if h in ADMIN_HREFS else ""}>{t}</a>'
-          for h, t in SHEET]
-    o.append('        <div class="m-sheet-title" data-admin>Settings</div>')
-    o += [f'        <a class="m-sheet-item" href="/settings#{k}" data-admin>{t}</a>' for k, t in SETTINGS]
-    o += ['        <div class="m-sheet-title">Broadcast</div>', '        <a class="m-sheet-item" href="/obs/dock" data-admin>OBS Dock</a>',
-          '        <a class="m-sheet-item" href="/obs" target="_blank" rel="noopener">OBS Preview</a>',
-          '        <button class="m-sheet-item m-sheet-rv" type="button" id="m-rv-toggle" role="switch" aria-checked="false">'
-          '<span>Red Vision</span><span class="rv-track"><span class="rv-knob"></span></span></button>',
-          '        <div class="m-sheet-foot"><a class="side-auth" href="/login" data-auth-link>Sign in</a>'
-          '<span id="app-version-m" data-app-version>Zenivo</span></div>',
-          '    </div>', '    <!-- nav:end -->']
+          '    <div class="m-sheet" id="m-more-sheet" role="dialog" aria-modal="true" aria-label="Menu" hidden>',
+          '        <div class="m-sheet-grip" aria-hidden="true"></div>',
+          '        <div class="m-st"><i class="m-st-dot" aria-hidden="true"></i><div class="m-st-txt"><strong class="m-st-name" id="m-st-name">Zenivo</strong>'
+          '<span class="m-st-sub">Online &middot; <span id="app-version-m" data-app-version>Zenivo</span></span></div>'
+          '<a class="m-signin" href="/login" data-auth-link>Sign in</a></div>',
+          '        <div class="m-quick">',
+          '            <button class="m-qtile m-sheet-rv" type="button" id="m-rv-toggle" role="switch" aria-checked="false"><b>Red vision</b><span id="m-rv-state">Off</span></button>',
+          '            <button class="m-qtile" type="button" id="m-fs-btn"><b>Fullscreen</b><span>Live view</span></button>',
+          '            <button class="m-qtile" type="button" id="m-share-btn"><b>Share</b><span id="m-share-sub">Station link</span></button>',
+          '        </div>']
+    for title, admin_grp, items in MENU:
+        o.append(f'        <section class="m-group"{" data-admin" if admin_grp else ""}>')
+        o.append(f'            <h3 class="m-sheet-title">{title}{"<span>admin</span>" if admin_grp else ""}</h3>')
+        o.append('            <div class="m-grid">')
+        for h, ic, label, tone, adm, blank in items:
+            path = h.split("#")[0]
+            attrs = (f' data-mpath="{path}"' if "#" not in h else "") + (" data-admin" if adm and not admin_grp else "")
+            attrs += ' target="_blank" rel="noopener"' if blank else ""
+            o.append(f'                <a class="m-tile m-sheet-item tone-{tone}" href="{h}"{attrs}>{icon(ic, "m-svg", 20)}<span>{label}</span></a>')
+        o += ['            </div>', '        </section>']
+    o += ['    </div>', '    <!-- nav:end -->']
     return "\n".join(o)
 
 
@@ -153,9 +205,23 @@ def patch(text, current, is_index):
     return text[:a] + "    " + block + text[e:]
 
 
+MHEAD = ('<!-- mhead:start (generated by scripts/sync_nav.py) -->\n'
+         '        <div class="m-head"><i class="m-head-dot" id="m-head-dot" aria-hidden="true"></i><span class="m-head-name" id="m-head-name">Zenivo</span>'
+         '<span class="m-head-clock" id="m-head-clock"></span></div>\n        <!-- mhead:end -->')
+
+
+def patch_mhead(text):
+    """Phone header (one line: status dot, station name, clock): generated into every page's <header class="navbar">."""
+    if "<!-- mhead:start" in text:
+        return re.sub(r"<!-- mhead:start.*?<!-- mhead:end -->", lambda m: MHEAD, text, flags=re.S)
+    tag = '<header class="navbar">'
+    i = text.find(tag)
+    return text if i < 0 else text[:i + len(tag)] + "\n        " + MHEAD + text[i + len(tag):]
+
+
 def patch_page(name, text, current, is_index):
     if name not in NO_NAV:
-        text = patch(text, current, is_index)
+        text = patch_mhead(patch(text, current, is_index))
     text = re.sub(r"<!-- brand:start.*?<!-- brand:end -->", lambda m: render_brand(), text, flags=re.S)
     return re.sub(r"<!-- head-brand:start.*?<!-- head-brand:end -->", lambda m: render_head(name), text, flags=re.S)
 

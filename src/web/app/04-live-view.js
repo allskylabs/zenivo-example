@@ -585,7 +585,7 @@ if (alignBox) {
 // ------------------------------------------------------------------
 // Live View Controls
 // ------------------------------------------------------------------
-btnRefreshFrame.addEventListener("click", () => {
+if (btnRefreshFrame) btnRefreshFrame.addEventListener("click", () => {
     const label = btnRefreshFrame.textContent;
     const done = () => {
         btnRefreshFrame.disabled = false;
@@ -633,6 +633,7 @@ function applyView(persist = true) {
     viewportContainer.classList.add("zoomable");
     viewportContainer.classList.toggle("zoomed", view.zoom > 1.001);
     if (btnZoomReset) btnZoomReset.textContent = `${Math.round(view.zoom * 100)}%`;
+    if (window.zenAfterView) window.zenAfterView();   // the info card's ring marker follows the picture (app/08d-live-ui.js)
     if (persist) {
         savePrefs({ zoom: view.zoom, zoomCx: view.cx, zoomCy: view.cy });
         // Re-render the overlay at the new density once zooming settles
@@ -672,23 +673,34 @@ if (viewportContainer && zoomStage) {
         { passive: false }
     );
 
-    // Click toggles zoom (3× at the clicked point / back to fit); a drag or pinch is not a click
+    // A click or tap (no drag, no pinch) picks the object under it (app/08d-live-ui.js); a second one within 0.3 s zooms
+    // (3x at that point, or back to fit). Zoom is also on the - / + pill, the wheel and the pinch.
     let tapStart = null;
+    let lastTap = null;
+    const NO_TAP = ".zoom-controls, .vp-bar, .sel-ring, button, label, input";
     viewportContainer.addEventListener("click", (e) => {
-        if (e.target.closest(".zoom-controls, .vp-chips, .vp-actions, button, label, input") || !tapStart) return;
+        if (e.target.closest(NO_TAP) || !tapStart) return;
         const moved = Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y);
         const wasMulti = tapStart.multi;
         tapStart = null;
         if (moved > 6 || wasMulti) return;
         const rect = viewportContainer.getBoundingClientRect();
-        zoomAt(view.zoom > 1.001 ? 1 : 3, e.clientX - rect.left, e.clientY - rect.top);
+        const px = e.clientX - rect.left, py = e.clientY - rect.top;
+        const now = Date.now();
+        if (lastTap && now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) {
+            lastTap = null;
+            zoomAt(view.zoom > 1.001 ? 1 : 3, px, py);
+            return;
+        }
+        lastTap = { t: now, x: e.clientX, y: e.clientY };
+        if (window.zenTapSelect) window.zenTapSelect(px, py);
     });
 
     // Drag to pan, two-finger pinch to zoom
     const pointers = new Map();
     let pinchStart = null;
     viewportContainer.addEventListener("pointerdown", (e) => {
-        if (e.target.closest(".zoom-controls, .vp-chips, .vp-actions, button, label, input")) return;
+        if (e.target.closest(NO_TAP)) return;
         if (pointers.size === 0) tapStart = { x: e.clientX, y: e.clientY, multi: false };
         else if (tapStart) tapStart.multi = true;
         pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });

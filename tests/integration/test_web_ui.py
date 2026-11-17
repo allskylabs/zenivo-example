@@ -132,7 +132,8 @@ class TestWebUIDOMStructure:
     def test_live_view_elements(self, html_content):
         assert 'id="live-stream-img"' in html_content
         assert 'id="reticle-canvas"' in html_content
-        assert 'id="btn-refresh-frame"' in html_content
+        assert 'id="btn-layers"' in html_content
+        assert 'id="obj-card"' in html_content
         assert 'id="btn-fullscreen"' in html_content
         assert 'id="chk-grid-overlay"' in html_content
 

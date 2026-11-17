@@ -10,20 +10,26 @@
     --brand-meteor: #ef4444;     /* Meteor: danger / error */
 
     /* Surfaces & text */
-    --bg-primary: var(--brand-navy);
-    --bg-card: var(--brand-ink);
-    --bg-card-sub: #131d31;
-    --border-color: #1e293b;
-    --text-primary: var(--brand-starlight);
-    --text-secondary: #94a3b8;
+    --bg-primary: #0b1220;
+    --bg-card: #121b2d;
+    --bg-card-sub: #162238;
+    --border-color: #1f2c44;
+    --text-primary: #e6edf7;
+    --text-secondary: #8fa3bf;
     --text-muted: #64748b;
     /* Accent & status */
     --accent: var(--brand-blue);
     --accent-hover: #0284c7;
     --accent-bg: rgba(56, 189, 248, 0.16);
-    --success: var(--brand-aurora);
-    --warning: var(--brand-amber);
+    --success: #34d399;
+    --warning: #fbbf24;
     --danger: var(--brand-meteor);
+    --violet: #a78bfa;
+    --sheet-bg: #111a2c;
+    --divider: #1b2740;
+    --radius-card: 20px;
+    --radius-tile: 14px;
+    --font-num: var(--font-mono);   /* Space Grotesk is not bundled: numbers use the mono face */
     /* Spacing */
     --space-1: 4px;
     --space-2: 8px;
@@ -70,4 +76,7 @@
     --warning: #ff7a5c;
     --danger: #ff2d2d;
     --hover: #2a0a0a;
+    --violet: #cc4444;
+    --sheet-bg: #140404;
+    --divider: #3a0e0e;
 }

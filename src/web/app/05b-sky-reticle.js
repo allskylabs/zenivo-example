@@ -14,6 +14,8 @@ function drawReticle() {
     const ctx = reticleCanvas.getContext("2d");
     ctx.setTransform(pxRatio, 0, 0, pxRatio, 0, 0);
     ctx.clearRect(0, 0, w, h);
+    // Everything drawn below is also registered here (stage px) so a tap on the picture can pick it (app/08d-live-ui.js)
+    const hits = (window.zenSkyHits = []);
     if (typeof drawAircraft === "function") drawAircraft();
 
     const showSky = chkSkyOverlay ? chkSkyOverlay.checked : true;
@@ -685,6 +687,7 @@ function drawReticle() {
             const pt = projectRaDecToCanvas(dso.ra, dso.dec);
             if (!pt.visible || pt.alt < 5.0) return;
             visibleMessier.push({ ...dso, x: pt.x, y: pt.y, alt: pt.alt });
+            if (showSky) hits.push({ kind: "dso", id: dso.id, name: dso.name, mag: dso.mag, ra: dso.ra, dec: dso.dec, x: pt.x, y: pt.y, alt: pt.alt, az: pt.az });
             if (showSky) {
                 const r = 4.5 * u;
                 const diamond = () => {
@@ -730,6 +733,9 @@ function drawReticle() {
             const rRing = reticleRadius(mag);
             const prominent = mag <= 1.5;
             const hasTicks = mag <= 1.0;
+            if ((showSky && mag <= 3.0) || (showLabels && star.name && mag <= 2.55)) {
+                hits.push({ kind: star.planet ? "planet" : "star", name: star.name, bayer: star.bayer, con: star.con, mag, ra: star.ra, dec: star.dec, x: pt.x, y: pt.y, alt: pt.alt, az: pt.az });
+            }
 
             if (showSky && mag <= 3.0) {
                 const b = Math.max(0.32, starWeight(mag));
@@ -831,6 +837,7 @@ function drawReticle() {
                 const by = con.y - bh / 2 + oy * u;
                 if (!placeBox(bx, by, bw, bh)) continue;
                 roundedRect(bx, by, bw, bh, 5 * u);
+                hits.push({ kind: "con", id: con.id, name: con.name, common: con.common, alt: con.alt, x: bx + bw / 2, y: by + bh / 2, hw: bw / 2, hh: bh / 2 });
                 ctx.fillStyle = "rgba(15, 23, 42, 0.46)";
                 ctx.fill();
                 ctx.strokeStyle = "rgba(56, 189, 248, 0.30)";
@@ -895,6 +902,7 @@ function drawReticle() {
                     ctx.stroke();
                 }
             }
+            hits.push({ kind: b.key, name: b.key === "sun" ? "Sun" : "Moon", illum: b.key === "moon" ? sm.moon.illum : null, x: pt.x, y: pt.y, alt: pt.alt, az: pt.az });
             ctx.fillStyle = b.text;
             ctx.fillText(`${b.label} ${pt.alt.toFixed(1)}°`, pt.x + b.r + 10, pt.y + 4);
         });

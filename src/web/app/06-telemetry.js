@@ -6,6 +6,9 @@
 // ------------------------------------------------------------------
 function drawHistogram(histData) {
     if (!histData || !histData.r) return;
+    // Collapsed accordion (phone): keep the latest data and draw it when the card is opened (app/08d-live-ui.js)
+    const histAcc = document.getElementById("histogram-card");
+    if (histAcc && !histAcc.open) { window.zenHistPending = histData; return; }
 
     const w = histCanvas.width;
     const h = histCanvas.height;

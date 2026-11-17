@@ -203,18 +203,6 @@
     position: absolute; right: 12px; bottom: 60px; z-index: 2; font-size: 12px; color: rgba(226, 232, 240, 0.55);
     font-family: var(--font-mono); pointer-events: none; text-shadow: 0 1px 2px #000;
 }
-.vp-chips { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 8px; z-index: 2; max-width: calc(100% - 200px); }
-.vp-chip {
-    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: var(--radius-sm, 6px);
-    background: rgba(2, 6, 23, 0.72); border: 1px solid rgba(255, 255, 255, 0.14); color: #cbd5e1;
-    font-size: 12px; font-weight: 600; cursor: pointer; user-select: none; backdrop-filter: blur(4px);
-}
-.vp-chip input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
-.vp-chip .vp-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); display: inline-block; }
-.vp-chip:has(input:checked) { border-color: var(--accent); color: var(--text-primary); background: var(--accent-bg); }
-.vp-chip:has(input:checked) .vp-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
-.vp-chip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
-.vp-actions { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 8px; z-index: 2; }
 .vp-btn {
     height: 36px; padding: 0 14px; border-radius: var(--radius-sm, 6px); cursor: pointer;
     background: rgba(2, 6, 23, 0.72); border: 1px solid rgba(255, 255, 255, 0.2); color: #f1f5f9;
@@ -226,24 +214,17 @@
 .viewport-card .viewport-wrapper { border-radius: 0; }
 [data-theme="red"] .vp-live { background: var(--danger); border-color: var(--danger); color: #1a0000; }
 [data-theme="red"] .vp-live .vp-dot { background: #1a0000; }
-[data-theme="red"] .vp-pill, [data-theme="red"] .vp-chip, [data-theme="red"] .vp-btn, [data-theme="red"] .zoom-controls {
+[data-theme="red"] .vp-pill, [data-theme="red"] .vp-btn, [data-theme="red"] .zoom-controls {
     background: rgba(20, 4, 4, 0.8); border-color: var(--border-color); color: var(--text-primary);
 }
-[data-theme="red"] .vp-chip:has(input:checked) { background: var(--accent-bg); border-color: var(--accent); }
 @media (max-width: 600px) {
-    /* Phone: keep the picture clear, the chips and buttons sit in a strip under it */
-    .viewport-card .viewport-wrapper { overflow: visible; margin-bottom: 156px; }
-    .viewport-card .viewport-wrapper::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 156px; background: var(--bg-card); z-index: 1; }
-    .vp-actions { right: 12px; left: 12px; bottom: -50px; }
-    .vp-actions .vp-btn { flex: 1; }
-    .vp-chips { left: 12px; right: 12px; bottom: -148px; max-width: none; }
+    /* Phone: the controls sit on the picture (vp-bar, see redesign.css), the capture info is two thin lines */
     .vp-meta { display: none; }
     /* the capture info shrinks to two thin lines in the corner and the LIVE pill moves to the other corner; the picture stays clear */
     .viewport-wrapper > .frame-info { top: 8px; left: 8px; font-size: 10px; line-height: 1.35; padding: 2px 6px; }
     .viewport-wrapper > .frame-info div:nth-child(3) { display: none; }
     .vp-status { left: auto; right: 8px; top: 8px; }
     .vp-status .vp-pill { height: 20px; padding: 0 8px; font-size: 10px; }
-    .zoom-controls { top: auto; bottom: 8px; right: 8px; transform: scale(0.85); transform-origin: bottom right; }
 }
 
 /* ===== Live right rail: telemetry tiles, exposure presets, cloud/histogram pair ===== */

@@ -49,7 +49,7 @@
     will-change: transform;
 }
 
-.viewport-wrapper.zoomable { cursor: zoom-in; touch-action: none; }
+.viewport-wrapper.zoomable { cursor: pointer; touch-action: none; }
 .viewport-wrapper.zoomed { cursor: grab; }
 .viewport-wrapper.panning { cursor: grabbing; }
 
