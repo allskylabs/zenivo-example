@@ -2,25 +2,17 @@
  * Classic script: top-level declarations are shared with the other src/web/app/*.js files; load order is fixed in index.html. */
 
 // ------------------------------------------------------------------
-// The one #exposure-card: under the picture on Live (collapsed to one row, open/closed remembered), moved into
-// Settings > Image output when /settings is shown (always open there). Each page is its own URL, so placing it once at load is enough.
+// The #exposure-card lives on Live only, under the picture: collapsed to one row, open/closed remembered.
 // Admin changes it; a guest sees the live values with every control disabled and a sign-in line (the server refuses guests anyway).
 // ------------------------------------------------------------------
 const expCard = document.getElementById("exposure-card");
-(function placeExposureCard() {
-    if (!expCard) return;
+if (expCard) {
     const EXP_OPEN_KEY = "zenivo.expOpen";
-    if (currentPage === "tab-settings") {
-        const slot = document.getElementById("exp-settings-slot");
-        if (slot) slot.appendChild(expCard);
-        expCard.open = true;
-    } else {
-        try { expCard.open = localStorage.getItem(EXP_OPEN_KEY) === "1"; } catch (e) { /* storage blocked */ }
-        expCard.addEventListener("toggle", () => {
-            try { localStorage.setItem(EXP_OPEN_KEY, expCard.open ? "1" : "0"); } catch (e) { /* storage blocked */ }
-        });
-    }
-})();
+    try { expCard.open = localStorage.getItem(EXP_OPEN_KEY) === "1"; } catch (e) { /* storage blocked */ }
+    expCard.addEventListener("toggle", () => {
+        try { localStorage.setItem(EXP_OPEN_KEY, expCard.open ? "1" : "0"); } catch (e) { /* storage blocked */ }
+    });
+}
 function applyExposureAccess() {
     if (!expCard) return;
     const admin = !!(window.zenivoAuth && window.zenivoAuth.admin);

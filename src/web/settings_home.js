@@ -20,7 +20,7 @@
         ["Camera", [
             ["/focus", "search", "violet", "Focus", "lens sharpness assistant hfr", true, () => { const t = text("settings-focus-history"); return /no focus saved/i.test(t) ? "" : t.split("\n")[0].slice(0, 60); }],
             ["/calibration", "clock", "violet", "Master dark", "calibration dark frames hot pixels", true, () => ""],
-            ["/settings#image", "camera", "violet", "Image output", "camera resolution orientation flip mirror exposure gain", true, () => [...new Set([text("camera-current-badge").replace(/^--$/, ""), text("output-res-badge")].filter(Boolean))].join(" · ")],
+            ["/settings#image", "camera", "violet", "Image output", "camera resolution orientation flip mirror", true, () => [...new Set([text("camera-current-badge").replace(/^--$/, ""), text("output-res-badge")].filter(Boolean))].join(" · ")],
             ["/settings#detection", "bolt", "violet", "Detection", "events meteors aircraft flashes sensitivity", true, () => { const n = document.querySelectorAll("input[data-event]:checked").length; return n ? `${n} event type${n > 1 ? "s" : ""} on` : ""; }],
         ]],
         ["Station", [

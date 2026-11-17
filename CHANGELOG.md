@@ -8,7 +8,7 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Changed
 
-- Live: the Exposure card is back under the picture as one row (shutter, gain and Auto/Locked, open or closed remembered); the admin changes exposure there, a guest sees the live values with the controls disabled and a sign-in link. Settings > Image output still shows the same card.
+- Live: the Exposure card is back under the picture as one row (shutter, gain and Auto/Locked, open or closed remembered); the admin changes exposure there, a guest sees the live values with the controls disabled and a sign-in link. It is no longer shown in Settings > Image output.
 
 ## [1.3.0-beta.2] - 2026-11-17
 

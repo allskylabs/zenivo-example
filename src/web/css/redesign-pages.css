@@ -239,21 +239,12 @@ body:has(#tab-logs.active) .navbar { display: none; }
 #tab-live .live-events-card .live-events-status, .live-events-card .live-events-status { margin: 0; font-size: 0; line-height: 0; color: transparent; }
 .live-events-card .live-events-status .dot { width: 8px; height: 8px; margin: 0; }
 
-/* ================= Settings > Image output: Exposure card + JPEG slider ================= */
-#tab-settings #exposure-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-card); padding: 16px; margin-bottom: 14px; }
-#tab-settings #exposure-card > summary.card-header { min-height: 44px; }
-#tab-settings #exposure-card > summary.card-header h2::before { content: none; }
-#tab-settings #exposure-card .exp-summary { display: none; }
-#tab-settings #exposure-card #active-profile-badge { margin-left: auto; background: none; border: 0; padding: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--violet); }
+/* ================= Settings > Image output: JPEG slider ================= */
 #tab-settings .field:has(#perf-stream-quality) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; }
 #tab-settings .field:has(#perf-stream-quality) > label { grid-column: 1; margin: 0; }
 #tab-settings .field:has(#perf-stream-quality) > .range-value { grid-column: 2; grid-row: 1; font-family: var(--font-num); font-size: 17px; font-weight: 700; color: var(--text-primary); }
 #tab-settings .field:has(#perf-stream-quality) > input[type="range"] { grid-column: 1 / -1; width: 100%; min-height: 44px; margin: 0; }
 #tab-settings .field-sub { font-weight: 400; color: var(--text-secondary); }
-@media (max-width: 768px) {
-    #tab-settings #exposure-card .range-presets { display: none; }
-    #tab-settings #exposure-card > .field-note { display: none; }
-}
 
 /* ================= Sky (/sky) and the 3D pages: shared top bar, cards, chips ================= */
 .m-3d-bar { display: none; }
