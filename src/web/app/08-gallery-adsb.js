@@ -54,6 +54,7 @@ function setGalleryMode(mode) {
     if (!galleryContainer || !galleryTabs) return;
     galleryContainer.classList.remove("gal-mode-products", "gal-mode-day", "gal-mode-events");
     galleryContainer.classList.add(`gal-mode-${mode}`);
+    if (typeof placeEventsFilter === "function") placeEventsFilter();
     galleryTabs.querySelectorAll(".gal-tab").forEach((b) => {
         b.classList.toggle("active", b.dataset.gmode === mode);
         b.setAttribute("aria-selected", b.dataset.gmode === mode ? "true" : "false");
@@ -240,6 +241,8 @@ function renderDayStrip(days) {
 
 function renderDays() {
     if (!dayList) return;
+    const evf = document.getElementById("events-filter"), evHead = document.querySelector(".gal-pane-day .section-heading");
+    if (evf && evHead && dayList.contains(evf)) evHead.appendChild(evf);   // keep the chips alive across the re-render
     const todayKey = dayKeyOf(new Date());
     const byDay = new Map();
     const ensure = (key) => {
@@ -264,7 +267,19 @@ function renderDays() {
     dayList.innerHTML = (notice ? `<p class="text-muted day-notice">${notice}</p>` : "")
         + days.map((day) => dayBlockHtml(day, todayKey, day.date === gallerySelDay)).join("");
     renderDayStrip(days);
+    placeEventsFilter();
     dayList.querySelectorAll("video[data-info]").forEach((v) => attachVideoInfo(v, v.dataset.info));
+}
+
+const EVENT_NAMES = { meteor: "Meteor", plane: "Aircraft", satellite: "Satellite", clouds: "Clouds", flash: "Flash" };
+
+// By day shows the filter chips inside the Events card; Events mode keeps them at the top of the pane
+function placeEventsFilter() {
+    const f = document.getElementById("events-filter");
+    if (!f) return;
+    const slot = galleryContainer && galleryContainer.classList.contains("gal-mode-day") ? dayList.querySelector(".day-block.sel .day-evhead") : null;
+    if (slot) slot.after(f);
+    else { const head = document.querySelector(".gal-pane-day .section-heading"); if (head && f.parentNode !== head) head.appendChild(f); }
 }
 
 function dayBlockHtml(day, todayKey, first) {
@@ -272,37 +287,33 @@ function dayBlockHtml(day, todayKey, first) {
     const p = day.product || {};
     const evs = day.events;
     const tl = p.timelapse;
+    const utc = new Date(`${day.date}T00:00:00Z`);
+    const longDate = utc.toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" });
+    const weekDate = utc.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 
-    let products = "";
+    const tiles = [];
     if (!isToday) {
-        const tiles = [];
-        if (tl) tiles.push(`<video controls loop muted playsinline preload="metadata" src="${escapeHtml(tl.url)}#t=0.5" data-info="${escapeHtml(tl.url.replace(/\.mp4$/, ".json"))}"></video>`);
+        if (tl) tiles.push(`<div class="day-tl"><video controls loop muted playsinline preload="metadata" src="${escapeHtml(tl.url)}#t=0.5" data-info="${escapeHtml(tl.url.replace(/\.mp4$/, ".json"))}"></video><span class="dt-label">Timelapse</span>${tl.size_kb ? `<span class="dt-cap">${formatSize(tl.size_kb)}</span>` : ""}</div>`);
         [["keogram", "Keogram"], ["startrails", "Startrails"]].forEach(([k, label]) => {
-            if (p[k]) tiles.push(`<a class="day-tile" href="${escapeHtml(p[k].url)}" data-viewer="${label} — ${escapeHtml(day.date)}" title="View ${label}"><img src="${escapeHtml(p[k].url)}" alt="${label} ${escapeHtml(day.date)}" loading="lazy" /><span>${label}</span></a>`);
+            if (p[k]) tiles.push(`<a class="day-tile" href="${escapeHtml(p[k].url)}" data-viewer="${label} \u2014 ${escapeHtml(day.date)}" title="View ${label}"><img src="${escapeHtml(p[k].url)}" alt="${label} ${escapeHtml(day.date)}" loading="lazy" /><span class="dt-label">${label}</span></a>`);
         });
-        if (tiles.length) {
-            products = `<div class="day-products">${tiles.join("")}</div>`;
-            if (tl) products = `<div class="day-actions"><a href="${escapeHtml(tl.url)}" download class="btn btn-sm btn-outline">⬇️ Video · ${formatSize(tl.size_kb)}</a></div>` + products;
-        }
     }
+    const night = `<section class="card day-night"><div class="day-cardhead"><h3>Night of ${escapeHtml(longDate)}</h3><span>${tiles.length} ${tiles.length === 1 ? "product" : "products"}</span></div>
+        ${tiles.length ? `<div class="day-products">${tiles.join("")}</div>` : `<p class="text-muted day-empty">${isToday ? "Tonight's products are on the Products tab." : "No products for this night."}</p>`}
+        ${tl ? `<a href="${escapeHtml(tl.url)}" download class="day-dl">Download timelapse</a>` : ""}</section>`;
 
-    const eventsHtml = evs.length
-        ? `<div class="events-table-wrapper"><table class="events-table">
-                <thead><tr><th>Image</th><th>Type</th><th>Time</th><th>Details</th><th>Whole sky</th></tr></thead>
-                <tbody>${evs.map((i) => eventRowHtml(tableEvents[i], i)).join("")}</tbody>
-            </table></div>`
-        : `<p class="text-muted day-empty">No sky events.</p>`;
+    const cards = evs.map((i) => {
+        const ev = tableEvents[i], dur = eventDuration(ev);
+        const thumb = ev.thumbnail_url ? `<img src="${escapeHtml(ev.thumbnail_url)}" alt="" loading="lazy" />` : "";
+        return `<button type="button" class="evc" data-event-idx="${i}" style="--pill:${EVENT_COLORS[ev.type] || "var(--accent)"}" title="${escapeHtml(ev.timestamp)}">
+            <span class="evc-th">${thumb}<i class="evc-dot" aria-hidden="true"></i></span>
+            <b>${escapeHtml(EVENT_NAMES[ev.type] || ev.type)}</b>
+            <small>${escapeHtml(fmtLocalIso(ev.timestamp, true).slice(0, 5))}${dur ? " \u00b7 " + fmtSeconds(dur) : ""}</small></button>`;
+    }).join("");
+    const events = `<section class="card day-events"><div class="day-evhead"><h3><span class="t-day">Events</span><span class="t-ev">${escapeHtml(weekDate)}${isToday ? " \u00b7 Today" : ""}</span></h3><span>${evs.length} detected</span></div>
+        ${evs.length ? `<div class="evc-grid">${cards}</div>` : `<p class="text-muted day-empty">No sky events.</p>`}</section>`;
 
-    return `
-        <details class="day-block${first ? " sel" : ""}" ${first ? "open" : ""}>
-            <summary class="day-summary">
-                <span class="day-date">${escapeHtml(day.date)}</span>
-                ${isToday ? `<span class="badge badge-accent">Today</span>` : ""}
-                <span class="badge">${evs.length} ${evs.length === 1 ? "event" : "events"}</span>
-                ${tl ? `<span class="text-muted day-meta">${tl.size_kb ? formatSize(tl.size_kb) + " video" : ""}</span>` : ""}
-            </summary>
-            <div class="day-body">${products}${eventsHtml}</div>
-        </details>`;
+    return `<div class="day-block${first ? " sel" : ""}">${night}${events}</div>`;
 }
 
 // In-page image viewer for keograms / startrails (Esc, click or ✕ to close)

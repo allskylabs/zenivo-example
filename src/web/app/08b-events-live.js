@@ -133,7 +133,7 @@ function renderEvents(evData) {
 
 dayList.addEventListener("click", (e) => {
     if (e.target.closest("a")) return; // flight link
-    const tr = e.target.closest("tr[data-event-idx]");
+    const tr = e.target.closest("[data-event-idx]");
     if (tr) openEventViewer(tableEvents, Number(tr.dataset.eventIdx));
 });
 
