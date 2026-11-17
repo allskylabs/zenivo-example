@@ -29,7 +29,9 @@ function overlayLayersWanted() {
 function sendOverlaySubscription() {
     const layers = overlayLayersWanted();
     overlayPush.want = layers;
-    if (state.ws && state.ws.readyState === 1 && currentPage === "tab-live") state.ws.send(JSON.stringify({ action: "subscribe", layers }));
+    // Overlay off but the Flights card still lists aircraft: ask for them at the card's pace (10 s), not the overlay's (3 s)
+    const slow = layers.includes("aircraft") && !(chkAircraft && chkAircraft.checked) ? ["aircraft"] : [];
+    if (state.ws && state.ws.readyState === 1 && currentPage === "tab-live") state.ws.send(JSON.stringify({ action: "subscribe", layers, slow }));
 }
 // A hidden tab asks the server to stop pushing (pictures slow to a 30 s heartbeat, layers pause) and resumes when shown again
 function sendIdle() {

@@ -645,6 +645,7 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
         subs: set = set()
         subs_hold: set = set()     # what the page asked for while its tab is hidden
         last_push: Dict[str, float] = {}
+        slow: set = set()
         packed: Dict[str, Any] = {}     # layer -> rows this page already has (cleared on subscribe: next push is a snapshot)
         # Aircraft and balloons carry their on-frame velocity (frame_v), so the page moves them between pushes
         OVERLAY_EVERY_S = {"aircraft": 3.0, "satellites": 1.5, "sondes": 6.0, "events": 2.0, "logs": 2.0}
@@ -682,7 +683,8 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                 await asyncio.sleep(0.5)
                 now = time.time()
                 for layer in list(subs):
-                    if now - last.get(layer, 0.0) < OVERLAY_EVERY_S[layer]:
+                    # a layer the page only lists in a card (overlay switched off) is asked for as "slow": every 10 s
+                    if now - last.get(layer, 0.0) < (10.0 if layer in slow else OVERLAY_EVERY_S[layer]):
                         continue
                     last[layer] = now
                     try:
@@ -752,6 +754,8 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                         want = {l for l in (cmd.get("layers") or []) if l in OVERLAY_EVERY_S}
                         (subs_hold if idle["on"] else subs).clear()
                         (subs_hold if idle["on"] else subs).update(want)
+                        slow.clear()
+                        slow.update(l for l in (cmd.get("slow") or []) if l in want)
                         last_push.clear()
                         packed.clear()
                         await websocket.send_json({"type": "subscribed", "layers": sorted(want)})
