@@ -5,6 +5,8 @@
 :root { --font-num: "Space Grotesk", var(--font-mono); }
 .now-tile b, .cloud-big b, .fl-dist, .oc-stats b, .m-head-clock, .vp-bar .zoom-level, .ov-n { font-variant-numeric: tabular-nums; }
 .now-tile b { font-size: 20px; letter-spacing: -0.01em; }
+@media (max-width: 420px) { .now-tile { padding-left: 10px; padding-right: 6px; } .now-tile b { font-size: 17px; letter-spacing: -0.02em; text-overflow: clip; } }
+.live-events-count { font-family: var(--font-num); }
 
 /* ---------- Overhead now rows (Live card, all widths) ---------- */
 #overhead-card .ov-panel .flights-list { max-height: none; overflow: visible; gap: 0; }
