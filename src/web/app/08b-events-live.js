@@ -7,6 +7,7 @@ eventViewer.setAttribute("role", "dialog");
 eventViewer.setAttribute("aria-modal", "true");
 eventViewer.innerHTML = `
     <div class="ev-panel">
+        <div class="ev-topbar"><button type="button" class="ev-back" aria-label="Back">&larr;</button><b>Event detail</b></div>
         <header class="ev-head">
             <span class="ev-pill"></span>
             <div class="ev-when"><strong></strong><span></span></div>
@@ -23,9 +24,10 @@ eventViewer.innerHTML = `
         </div>
         <p class="ev-summary"></p>
         <dl class="ev-facts"></dl>
+        <section class="ev-match" hidden><h3>Matched aircraft</h3><div class="ev-match-card"></div></section>
         <div class="ev-actions">
-            <a class="btn btn-sm btn-outline ev-open-crop" target="_blank" rel="noopener">Open close-up ↗</a>
-            <a class="btn btn-sm btn-outline ev-open-sky" target="_blank" rel="noopener">Open whole sky ↗</a>
+            <a class="btn btn-sm btn-outline ev-open-crop" download rel="noopener">Download close-up</a>
+            <a class="btn btn-sm btn-outline ev-open-sky" download rel="noopener">Download whole sky</a>
         </div>
     </div>`;
 document.body.appendChild(eventViewer);
@@ -56,6 +58,13 @@ function showEvent(i) {
     evQ(".ev-images").classList.toggle("single", !crop || !ev.sky_url);
     evQ(".ev-summary").textContent = eventSummary(ev);
     evQ(".ev-facts").innerHTML = eventFacts(ev).map(([k, v, isHtml]) => `<div><dt>${escapeHtml(k)}</dt><dd>${isHtml ? v : escapeHtml(v)}</dd></div>`).join("");
+    const matchEl = evQ(".ev-match");
+    matchEl.hidden = !ev.flight;
+    if (ev.flight) {
+        const fl = ev.flight;
+        evQ(".ev-match-card").innerHTML = `<div class="evm-head">${flightHtml(ev)}</div>`
+            + `<dl class="evm-rows">${flightFacts(ev).map(([k, v]) => `<div><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd></div>`).join("")}</dl>`;
+    }
     const oc = evQ(".ev-open-crop"), os = evQ(".ev-open-sky");
     oc.hidden = !crop; os.hidden = !ev.sky_url;
     if (crop) oc.href = crop;
@@ -78,7 +87,7 @@ function closeEventViewer() {
 }
 
 eventViewer.addEventListener("click", (e) => {
-    if (e.target === eventViewer || e.target.closest(".ev-close")) closeEventViewer();
+    if (e.target === eventViewer || e.target.closest(".ev-close") || e.target.closest(".ev-back")) closeEventViewer();
     else if (e.target.closest(".ev-prev")) showEvent(evIndex - 1);
     else if (e.target.closest(".ev-next")) showEvent(evIndex + 1);
 });

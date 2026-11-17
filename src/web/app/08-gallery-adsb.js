@@ -428,15 +428,19 @@ function eventFacts(ev) {
         const d = (p) => `${COMPASS[Math.round(((p.az_deg % 360) + 360) % 360 / 45) % 8]} ${Math.round(p.alt_deg)}° up`;
         facts.push(["Where in the sky", ev.frames > 1 ? `${d(ev.sky_from)} → ${d(ev.sky_to)}` : d(ev.sky_from)]);
     }
-    const fl = ev.flight;
-    if (fl) {
-        facts.push(["Flight", flightHtml(ev), true]); // true = already-escaped HTML
-        facts.push(["Altitude", `${Number(fl.altitude_m).toLocaleString()} m`]);
-        if (fl.speed_kmh != null) facts.push(["Ground speed", `${fl.speed_kmh} km/h`]);
-        if (fl.heading_deg != null) facts.push(["Heading", `${fl.heading_deg}° (${COMPASS[Math.round(fl.heading_deg / 45) % 8]})`]);
-        if (fl.climb_m_min != null && Math.abs(fl.climb_m_min) > 60) facts.push([fl.climb_m_min > 0 ? "Climbing" : "Descending", `${Math.abs(fl.climb_m_min)} m/min`]);
-        facts.push(["Distance", `${fl.distance_km} km`]);
-        facts.push(["Direction", `az ${fl.az_deg}°, ${fl.alt_deg}° above horizon`]);
-    }
     return facts;
+}
+
+// Matched aircraft (ADS-B) rows for the event detail card
+function flightFacts(ev) {
+    const fl = ev.flight;
+    const rows = [];
+    if (!fl) return rows;
+    rows.push(["Altitude", `${Number(fl.altitude_m).toLocaleString()} m`]);
+    if (fl.speed_kmh != null) rows.push(["Ground speed", `${fl.speed_kmh} km/h`]);
+    if (fl.heading_deg != null) rows.push(["Heading", `${fl.heading_deg}° (${COMPASS[Math.round(fl.heading_deg / 45) % 8]})`]);
+    if (fl.climb_m_min != null && Math.abs(fl.climb_m_min) > 60) rows.push([fl.climb_m_min > 0 ? "Climbing" : "Descending", `${Math.abs(fl.climb_m_min)} m/min`]);
+    rows.push(["Distance", `${fl.distance_km} km`]);
+    rows.push(["Direction", `az ${fl.az_deg}°, ${fl.alt_deg}° above horizon`]);
+    return rows;
 }
