@@ -104,7 +104,7 @@ MENU = [
     ("Station", True, [("/settings#station", "home", "Station &amp; optics", "ok", True, False),
                        ("/settings#skymask", "shield", "Sky mask", "ok", True, False),
                        ("/settings#integrations", "plus", "Integrations", "ok", True, False),
-                       ("/settings#community", "users", "Community sharing", "ok", True, False),
+                       ("/settings#community", "users", "Sharing", "ok", True, False),
                        ("/settings#admin", "lock", "Admin", "ok", True, False)]),
     ("Streaming", False, [("/obs/dock", "play", "OBS dock", "warn", True, False),
                           ("/obs", "play", "OBS preview", "warn", False, True)]),

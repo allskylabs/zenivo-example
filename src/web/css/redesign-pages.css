@@ -150,3 +150,60 @@ body:has(#tab-logs.active) .navbar { display: none; }
 @media (min-width: 769px) { .evc-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); } .day-night .day-products { grid-template-columns: repeat(3, minmax(0, 1fr)); } .day-tl { grid-column: auto; grid-row: span 1; aspect-ratio: 4 / 3; } }
 .day-evhead + .events-filter .zchip { min-height: 36px; padding: 0 14px; font-size: 14px; }
 .day-evhead + .events-filter { gap: 8px; }
+
+/* ================= Event viewer (phone): media card, one details card, matched card, actions (mockup r-p15) ================= */
+.ev-phone-only { display: none; }
+.ev-actions[hidden] { display: none; }
+@media (max-width: 760px) {
+    .ev-topbar b { font-size: 17px; font-weight: 700; }
+    .ev-images { padding: 12px; border-radius: var(--radius-card); background: var(--bg-card); border: 1px solid var(--border-color); }
+    .ev-images:not(.single) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .ev-fig { border-radius: var(--radius-tile); }
+    .ev-fig img { max-height: 34vh; object-fit: cover; }
+    .ev-actions .btn { text-decoration: none; }
+    .ev-head { margin-top: 14px; padding: 16px 16px 4px; align-items: center; }
+    .ev-pill, .ev-head .ev-pill { padding: 5px 14px; font-size: 14px; font-weight: 700; }
+    .ev-emo { display: none; }
+    .ev-when { justify-content: center; }
+    .ev-when span { display: none; }
+    .ev-when strong { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+    .ev-when .evw-d, .ev-when .evw-z { display: none; }
+    .ev-summary { display: none; }
+    .ev-facts { padding: 0 16px 6px; }
+    .ev-phone-only { display: flex; }
+    .ev-facts div:first-child { border-top: 0; }
+    .ev-facts dt { color: var(--text-muted); text-transform: uppercase; }
+    .ev-facts dd { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+    .ev-match h3 { margin-bottom: 12px; font-size: 18px; font-weight: 700; }
+    .ev-match-card { padding: 14px; border-radius: var(--radius-tile); background: var(--bg-card-sub); border: 1px solid var(--border-color); }
+    .ev-actions { gap: 10px; }
+    .ev-actions .btn:not(.ev-open-crop) { border-color: var(--border-color); background: var(--bg-card-sub); color: var(--text-primary); }
+}
+
+/* ================= Menu sheet (phone): fit labels on one line, red-vision tile tinted like the mockup ================= */
+@media (max-width: 768px) {
+    .m-tile { gap: 10px; padding: 0 12px; font-size: 14px; }
+    .m-st-name { font-size: 19px; }
+    .m-quick .m-sheet-rv { background: color-mix(in srgb, var(--danger) 14%, var(--bg-card-sub)); border-color: color-mix(in srgb, var(--danger) 45%, var(--border-color)); }
+    .m-quick .m-sheet-rv b { color: color-mix(in srgb, var(--danger) 60%, #fff); }
+    .m-quick .m-sheet-rv span { color: color-mix(in srgb, var(--danger) 55%, var(--text-secondary)); }
+    .m-quick .m-sheet-rv[aria-checked="true"] { background: color-mix(in srgb, var(--danger) 28%, var(--bg-card-sub)); border-color: var(--danger); }
+}
+
+/* ================= Layers sheet: 44 x 26 switches, 48 px rows (mockup p3) ================= */
+.zsheet .lay-row { min-height: 48px; }
+.zsheet .lay-txt b { font-weight: 500; }
+.zsheet .sw { width: 44px; height: 26px; border-radius: 13px; }
+.zsheet .sw i { top: 3px; left: 3px; width: 20px; height: 20px; }
+.zsheet .sw[aria-checked="true"] i { transform: translateX(18px); }
+
+/* ================= Tap object card (mockup p4): accent frame whatever the kind, 4 stat columns ================= */
+.obj-card { padding: 16px 18px; border-color: color-mix(in srgb, var(--accent) 70%, var(--border-color)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent), 0 0 22px color-mix(in srgb, var(--accent) 10%, transparent); }
+.oc-title { margin-top: 12px; font-size: 26px; }
+.oc-sub { margin-top: 4px; }
+.oc-stats { grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 12px 6px; margin: 16px 0 18px; padding-top: 16px; }
+.oc-stats span { font-size: 10.5px; letter-spacing: 0.1em; }
+.oc-stats b { margin-top: 4px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; overflow-wrap: break-word; }
+.oc-btn { min-height: 44px; padding: 0 10px; font-size: 14px; white-space: nowrap; }
+.oc-btn.oc-primary { flex: 1.15; }
+.oc-close { color: var(--text-muted); font-weight: 300; font-size: 30px; }
