@@ -168,9 +168,7 @@ class ProductsMixin:
         return True
 
     def _startrails_sun_elev(self, dt: Optional[datetime] = None) -> float:
-        from src.calibration.auto_exposure import calculate_solar_elevation
-
-        return float(calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon, dt))
+        return self.effective_solar_elevation(dt)
 
     def _save_startrails_stats(self, today_str: str) -> None:
         import json

@@ -120,6 +120,9 @@ class DayNightAutoExposure:
         self.current_profile = DayNightProfile.NIGHT
         self.solar_elevation = -20.0
         self.damping_factor = 0.25
+        # When True the loop behaves as at night whatever the Sun does (set while the camera is the simulator,
+        # whose picture is always a night sky)
+        self.force_night = False
         # Shortest exposure the live camera accepts (e.g. 26 us on a Pi IMX708); only ever lowers the 50 us floor
         self.hw_min_exposure_s: Optional[float] = None
         # Optional user lock on one knob: the loop then puts the whole brightness step on the other one
@@ -223,7 +226,7 @@ class DayNightAutoExposure:
         locked = self.lock_exposure_s is not None or self.lock_gain_db is not None
 
         # 1. Ephemeris feedforward loop
-        solar_elev = calculate_solar_elevation(self.lat, self.lon, dt)
+        solar_elev = -30.0 if self.force_night else calculate_solar_elevation(self.lat, self.lon, dt)
         profile = self.update_profile(solar_elev)
         bounds = self.get_profile_bounds(profile)
 

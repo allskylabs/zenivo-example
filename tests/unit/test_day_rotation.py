@@ -103,14 +103,15 @@ def test_sky_analysis_throttled_and_recorded_day_and_night(monkeypatch):
         return {"star_count": 7 if sun < 0 else 0, "cloud_cover_pct": 12.0, "status": "clear", "method": "night" if sun < 0 else "day", "confidence": 0.8}
 
     monkeypatch.setattr(svc_mod, "analyze_cloud_cover", fake)
+    monkeypatch.setattr(svc, "camera_is_simulator", lambda: False)  # a real camera follows the Sun; the simulator is always night
     frame = np.zeros((100, 100, 3), np.uint8)
 
-    monkeypatch.setattr(ae_mod, "calculate_solar_elevation", lambda lat, lon: 20.0)
+    monkeypatch.setattr(ae_mod, "calculate_solar_elevation", lambda lat, lon, dt=None: 20.0)
     assert svc._sky_stats(frame, is_pytest=False)["status"] == "clear" and calls == [20.0]
     svc._sky_stats(frame, is_pytest=False)  # within analysis_interval_s: cached
     assert len(calls) == 1
 
-    monkeypatch.setattr(ae_mod, "calculate_solar_elevation", lambda lat, lon: -30.0)
+    monkeypatch.setattr(ae_mod, "calculate_solar_elevation", lambda lat, lon, dt=None: -30.0)
     svc._sky_stats_cache["_ts"] = 0.0
     assert svc._sky_stats(frame, is_pytest=False)["star_count"] == 7
     hist = svc.get_cloud_history(hours=1)

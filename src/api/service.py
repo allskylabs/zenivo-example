@@ -84,6 +84,29 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
     _instance: Optional["AllSkyService"] = None
     _lock = threading.Lock()
 
+    @property
+    def camera(self):
+        return self._camera
+
+    @camera.setter
+    def camera(self, cam) -> None:
+        """Every camera swap (startup, select, watchdog, failure fallback) re-applies the simulator-night rule."""
+        self._camera = cam
+        ae = self.__dict__.get("auto_exposure")
+        if ae is not None:
+            ae.force_night = self.camera_is_simulator()
+
+    def camera_is_simulator(self) -> bool:
+        return "Simulated" in type(self._camera).__name__
+
+    def effective_solar_elevation(self, dt: Optional[datetime] = None) -> float:
+        """Sun elevation as the PICTURE sees it: the simulator always shows a night sky (-30 deg). Anything that only
+        reports astronomy (Sky tile, rise/set, satellite passes) keeps calling calculate_solar_elevation directly."""
+        if self.camera_is_simulator():
+            return -30.0
+        from src.calibration.auto_exposure import calculate_solar_elevation
+        return float(calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon, dt))
+
     STANDARD_DARK_PROFILES: List[Dict[str, Any]] = [
         {"id": "twilight_0.5s_12dB", "label": "Twilight Short", "exposure_s": 0.5, "gain_db": 12.0, "num_frames": 5},
         {"id": "nautical_1.0s_24dB", "label": "Nautical Twilight", "exposure_s": 1.0, "gain_db": 24.0, "num_frames": 5},
@@ -189,6 +212,7 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
             initial_exposure_s=getattr(self.camera, "current_exposure_s", 0.5),
             initial_gain_db=getattr(self.camera, "current_gain_db", 12.0),
         )
+        self.auto_exposure.force_night = self.camera_is_simulator()
 
         # Caches
         self.last_frame: Optional[np.ndarray] = None
@@ -423,9 +447,7 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
             return cached
         sun_elev = -30.0
         if not is_pytest:
-            from src.calibration.auto_exposure import calculate_solar_elevation
-
-            sun_elev = float(calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon))
+            sun_elev = self.effective_solar_elevation()
         meta = meta or {}
         exposure_s = float(meta.get("actual_exposure_s", getattr(self.camera, "current_exposure_s", 1.0)))
         gain_db = float(meta.get("gain_db", getattr(self.camera, "current_gain_db", 0.0)))
