@@ -185,21 +185,38 @@
         g.fillStyle = main; g.beginPath(); g.arc(cx, cy, 2.5, 0, Math.PI * 2); g.fill();
         dots = [];
         const layer = state.seg, objs = objectsOf(layer).filter((o) => typeof o.az_deg === "number" && typeof o.alt_deg === "number" && o.alt_deg >= 0);
-        const label = objs.length <= 12;
         g.textBaseline = "middle";
+        const placed = [];   // [{o, x, y, sel}] in draw order; every object gets a dot, only some get a label
         objs.forEach((o) => {
             const r = R * (90 - Math.min(90, o.alt_deg)) / 90, th = o.az_deg * Math.PI / 180;
             const x = cx + r * Math.sin(th), y = cy - r * Math.cos(th), id = idOf[layer](o);
-            const sel = state.sel && state.sel.layer === layer && String(state.sel.id) === String(id);
+            const sel = !!state.sel && state.sel.layer === layer && String(state.sel.id) === String(id);
             dots.push({ id, x, y });
+            placed.push({ o, x, y, sel });
             if (sel) { g.strokeStyle = warn; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 9, 0, Math.PI * 2); g.stroke(); }
             g.fillStyle = sel ? warn : o.in_view ? main : accent;
             g.beginPath(); g.arc(x, y, sel ? 5.5 : 4.5, 0, Math.PI * 2); g.fill();
-            if (sel || label) {
-                const t = String(labelOf[layer](o)); g.font = (sel ? "700 " : "") + "11px " + col("--font-sans", "sans-serif");
-                g.fillStyle = sel ? warn : main; const right = x < cx + R * 0.45;
-                g.textAlign = right ? "left" : "right"; g.fillText(t, x + (right ? 9 : -9), y - (sel ? 10 : 0));
-            }
+        });
+        // Labels: the selected object always, then at most 5 others that find free space (greedy, boxes must not touch a dot or another label)
+        const MAX_LABELS = 6, taken = [];
+        const hit = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+        const fam = col("--font-sans", "sans-serif");
+        const order = placed.filter((p) => p.sel).concat(placed.filter((p) => !p.sel));
+        let drawn = 0;
+        order.forEach((p) => {
+            if (drawn >= MAX_LABELS) return;
+            const t = String(labelOf[layer](p.o));
+            g.font = (p.sel ? "700 " : "") + "11px " + fam;
+            const w = g.measureText(t).width, h = 13, dy = p.sel ? -10 : 0, preferRight = p.x < cx + R * 0.45;
+            const boxFor = (right) => { const x0 = right ? p.x + 9 : p.x - 9 - w, y0 = p.y + dy - h / 2; return { x0, y0, x1: x0 + w, y1: y0 + h, right }; };
+            const free = (bx) => bx.x0 >= 0 && bx.x1 <= size && bx.y0 >= 0 && bx.y1 <= size && !taken.some((t2) => hit(bx, t2)) &&
+                !placed.some((q) => hit(bx, { x0: q.x - 6, y0: q.y - 6, x1: q.x + 6, y1: q.y + 6 }) && q !== p);
+            let box = boxFor(preferRight);
+            if (!free(box)) { const alt = boxFor(!preferRight); box = free(alt) ? alt : (p.sel ? box : null); }
+            if (!box) return;
+            taken.push(box); drawn += 1;
+            g.fillStyle = p.sel ? warn : main; g.textAlign = box.right ? "left" : "right";
+            g.fillText(t, box.right ? box.x0 : box.x1, p.y + dy);
         });
         cv.setAttribute("aria-label", `Sky radar: ${objs.length} ${layer} above the horizon. N up, zenith in the centre, horizon at the edge`);
     }

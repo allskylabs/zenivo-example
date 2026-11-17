@@ -659,6 +659,7 @@ select.seg-src { position: absolute; width: 1px; height: 1px; opacity: 0; pointe
     #tab-focus .focus-actions-row { display: flex; gap: 10px; }
     #tab-focus .focus-actions-row .btn { flex: 1 1 0; min-height: 48px; border-radius: var(--radius-pill); }
     #tab-focus .btn-sm, #tab-calibration .btn { min-height: 44px; border-radius: var(--radius-pill); }
+    #tab-focus button { min-height: 40px; }
     #tab-focus .focus-meter, #tab-calibration .progress-track { height: 12px; border-radius: 6px; }
     #tab-focus .focus-actions { flex-wrap: wrap; gap: 6px 14px; }
     #tab-calibration #btn-trigger-dark { width: 100%; white-space: normal; line-height: 1.3; padding-top: 10px; padding-bottom: 10px; }
