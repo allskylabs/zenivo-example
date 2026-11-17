@@ -49,12 +49,6 @@ presetChips.forEach((chip) => {
     });
 });
 [rangeExposure, rangeGain].forEach((el) => el.addEventListener("pointerdown", () => markPreset("custom")));
-// Collapsed exposure card on phones: the summary line (shutter and gain) stays visible
-try {
-    const expCard = document.getElementById("exposure-card");
-    if (expCard && window.matchMedia("(max-width: 768px)").matches) expCard.removeAttribute("open");
-} catch (e) { /* matchMedia unavailable */ }
-
 // Exposure / gain locks replace the Auto/Manual switch: nothing locked = Auto computes both,
 // one locked = Auto adjusts only the other, both locked = fixed (manual) exposure and gain
 const isLocked = (knob) => state.aeLock === knob || state.aeLock === "both";

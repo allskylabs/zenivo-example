@@ -25,7 +25,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
-    <link rel="stylesheet" href="/style.css?v=20261122a">
+    <link rel="stylesheet" href="/style.css?v=20261124a">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -236,8 +236,8 @@
                     <div class="cloud-chart-wrap" id="cloud-chart-wrap">
                         <svg id="cloud-chart" role="img" aria-label="Cloud cover percentage over time"></svg>
                         <div class="cloud-tooltip hidden" id="cloud-tooltip"></div>
-                        <div class="cloud-empty hidden" id="cloud-empty">No cloud samples in this range yet. One is taken every analysis interval (Settings → Performance).</div>
                     </div>
+                    <div class="cloud-empty hidden" id="cloud-empty">No cloud samples in this range yet. One is taken every analysis interval (Settings → Performance).</div>
                     <div class="cloud-bars" id="cloud-bars" role="img" aria-label="Cloud cover per time bin"></div>
                     <div class="cloud-bars-cap" id="cloud-bars-cap"><span id="cloud-cap-l"></span><span id="cloud-cap-r">now</span></div>
                     <div class="card-foot cloud-caption" id="cloud-caption">Now <strong id="cloud-now">--</strong> / Avg <span id="cloud-avg-label">24h</span> <strong id="cloud-avg">--</strong></div>
@@ -325,9 +325,9 @@
                         <div class="card-header">
                             <h2>Recent events</h2>
                             <span class="badge" id="live-events-count">0 tonight</span>
+                            <span class="live-events-status" id="live-events-status" role="status">Loading…</span>
                             <a class="live-events-more" href="/gallery">All &rsaquo;</a>
                         </div>
-                        <div class="live-events-status" id="live-events-status">Loading…</div>
                         <ul class="live-events-list" id="live-events-list"></ul>
                                     </div>
 
@@ -394,72 +394,6 @@
                         </details>
                     </div>
 
-                        <!-- Exposure (collapsible) -->
-                        <details class="card control-card collapsible-card" id="exposure-card" open>
-                        <summary class="card-header"><h2>Exposure</h2><span class="exp-summary mono" id="exp-summary"><span id="telem-exp">--</span> &middot; <span id="telem-gain">--</span></span><span class="badge badge-accent" id="active-profile-badge">AUTO EPHEMERIS</span></summary>
-
-                        <div class="exp-preset-chips" data-admin role="group" aria-label="Exposure presets">
-                            <button type="button" class="chip-preset" data-preset="moonless" data-exp="15" data-gain="36" title="15 s, 36 dB">Moonless</button>
-                            <button type="button" class="chip-preset" data-preset="twilight" data-exp="2" data-gain="18" title="2 s, 18 dB">Twilight</button>
-                            <button type="button" class="chip-preset" data-preset="fullmoon" data-exp="0.5" data-gain="0" title="0.5 s, 0 dB">Full moon</button>
-                            <button type="button" class="chip-preset active" data-preset="custom" title="Keep the sliders as they are">Custom</button>
-                        </div>
-
-                        <!-- Shutter Slider -->
-                        <div class="control-group">
-                            <div class="control-label-row">
-                                <span class="ctl-tx"><label for="range-exposure">Shutter</label><span class="ctl-state" data-range="0.15 ms to 60 s"></span></span>
-                                <span class="range-value-row">
-                                    <span class="range-value" id="val-exposure">2.000 s</span>
-                                    <button id="lock-exposure" data-admin class="btn-lock" type="button" aria-pressed="false" title="Lock shutter: Auto then adjusts only gain">Auto</button>
-                                </span>
-                            </div>
-                            <input type="range" data-admin id="range-exposure" min="0.00015" max="60.0" step="0.00015" value="2.0" />
-                            <div class="range-presets" data-admin>
-                                <button class="btn-preset" data-exp="0.0006">0.6ms (Day)</button>
-                                <button class="btn-preset" data-exp="0.5">0.5s</button>
-                                <button class="btn-preset" data-exp="2.0">2.0s</button>
-                                <button class="btn-preset" data-exp="8.0">8.0s</button>
-                                <button class="btn-preset" data-exp="15.0">15s</button>
-                                <button class="btn-preset" data-exp="60.0">60s</button>
-                            </div>
-                        </div>
-
-                        <!-- Gain Slider -->
-                        <div class="control-group">
-                            <div class="control-label-row">
-                                <span class="ctl-tx"><label for="range-gain">Gain</label><span class="ctl-state" data-range="0 to 72 dB"></span></span>
-                                <span class="range-value-row">
-                                    <span class="range-value" id="val-gain">24.0 dB</span>
-                                    <button id="lock-gain" data-admin class="btn-lock" type="button" aria-pressed="false" title="Lock gain: Auto then adjusts only shutter">Auto</button>
-                                </span>
-                            </div>
-                            <input type="range" data-admin id="range-gain" min="0" max="72" step="0.5" value="24" />
-                            <div class="range-presets" data-admin>
-                                <button class="btn-preset-gain" data-gain="0">0 dB</button>
-                                <button class="btn-preset-gain" data-gain="18">18 dB</button>
-                                <button class="btn-preset-gain" data-gain="36">36 dB</button>
-                                <button class="btn-preset-gain" data-gain="54">54 dB</button>
-                            </div>
-                        </div>
-
-                        <!-- Target brightness -->
-                        <div class="control-group">
-                            <div class="control-label-row">
-                                <span class="ctl-tx"><label for="range-target">Target brightness</label><span class="ctl-state" data-range="5 to 250"></span></span>
-                                <span class="range-value-row">
-                                    <span class="range-value" id="val-target">--</span>
-                                    <button id="lock-target" data-admin class="btn-lock" type="button" aria-pressed="false" title="Lock the brightness Auto aims for">Auto</button>
-                                </span>
-                            </div>
-                            <input type="range" data-admin id="range-target" min="5" max="250" step="1" value="85" />
-                        </div>
-
-                        <p class="field-note">Touching a slider locks it at the chosen value; press Locked to hand it back to Auto. Nothing locked: the system computes both shutter and gain from the sky.
-                            Lock one and it computes only the other.
-                            Shutter goes up to 60 s. Both locked holds the values fixed.</p>
-                        <div id="control-alert" class="alert-box hidden"></div>
-                    </details>
                     </details>
                 </div>
             </div>
@@ -590,6 +524,73 @@
                 <small class="field-note" id="camera-scan-note"></small>
             </div>
 
+            <!-- Exposure: lives in Settings > Image output (moved from Live) -->
+            <details class="card control-card collapsible-card" id="exposure-card" data-sgroup="image" open>
+            <summary class="card-header"><h2>Exposure</h2><span class="exp-summary mono" id="exp-summary"><span id="telem-exp">--</span> &middot; <span id="telem-gain">--</span></span><span class="badge badge-accent" id="active-profile-badge">AUTO EPHEMERIS</span></summary>
+
+            <div class="exp-preset-chips" data-admin role="group" aria-label="Exposure presets">
+                <button type="button" class="chip-preset" data-preset="moonless" data-exp="15" data-gain="36" title="15 s, 36 dB">Moonless</button>
+                <button type="button" class="chip-preset" data-preset="twilight" data-exp="2" data-gain="18" title="2 s, 18 dB">Twilight</button>
+                <button type="button" class="chip-preset" data-preset="fullmoon" data-exp="0.5" data-gain="0" title="0.5 s, 0 dB">Full moon</button>
+                <button type="button" class="chip-preset active" data-preset="custom" title="Keep the sliders as they are">Custom</button>
+            </div>
+
+            <!-- Shutter Slider -->
+            <div class="control-group">
+                <div class="control-label-row">
+                    <span class="ctl-tx"><label for="range-exposure">Shutter</label><span class="ctl-state" data-range="0.15 ms to 60 s"></span></span>
+                    <span class="range-value-row">
+                        <span class="range-value" id="val-exposure">2.000 s</span>
+                        <button id="lock-exposure" data-admin class="btn-lock" type="button" aria-pressed="false" title="Lock shutter: Auto then adjusts only gain">Auto</button>
+                    </span>
+                </div>
+                <input type="range" data-admin id="range-exposure" min="0.00015" max="60.0" step="0.00015" value="2.0" />
+                <div class="range-presets" data-admin>
+                    <button class="btn-preset" data-exp="0.0006">0.6ms (Day)</button>
+                    <button class="btn-preset" data-exp="0.5">0.5s</button>
+                    <button class="btn-preset" data-exp="2.0">2.0s</button>
+                    <button class="btn-preset" data-exp="8.0">8.0s</button>
+                    <button class="btn-preset" data-exp="15.0">15s</button>
+                    <button class="btn-preset" data-exp="60.0">60s</button>
+                </div>
+            </div>
+
+            <!-- Gain Slider -->
+            <div class="control-group">
+                <div class="control-label-row">
+                    <span class="ctl-tx"><label for="range-gain">Gain</label><span class="ctl-state" data-range="0 to 72 dB"></span></span>
+                    <span class="range-value-row">
+                        <span class="range-value" id="val-gain">24.0 dB</span>
+                        <button id="lock-gain" data-admin class="btn-lock" type="button" aria-pressed="false" title="Lock gain: Auto then adjusts only shutter">Auto</button>
+                    </span>
+                </div>
+                <input type="range" data-admin id="range-gain" min="0" max="72" step="0.5" value="24" />
+                <div class="range-presets" data-admin>
+                    <button class="btn-preset-gain" data-gain="0">0 dB</button>
+                    <button class="btn-preset-gain" data-gain="18">18 dB</button>
+                    <button class="btn-preset-gain" data-gain="36">36 dB</button>
+                    <button class="btn-preset-gain" data-gain="54">54 dB</button>
+                </div>
+            </div>
+
+            <!-- Target brightness -->
+            <div class="control-group">
+                <div class="control-label-row">
+                    <span class="ctl-tx"><label for="range-target">Target brightness</label><span class="ctl-state" data-range="5 to 250"></span></span>
+                    <span class="range-value-row">
+                        <span class="range-value" id="val-target">--</span>
+                        <button id="lock-target" data-admin class="btn-lock" type="button" aria-pressed="false" title="Lock the brightness Auto aims for">Auto</button>
+                    </span>
+                </div>
+                <input type="range" data-admin id="range-target" min="5" max="250" step="1" value="85" />
+            </div>
+
+            <p class="field-note">Touching a slider locks it at the chosen value; press Locked to hand it back to Auto. Nothing locked: the system computes both shutter and gain from the sky.
+                Lock one and it computes only the other.
+                Shutter goes up to 60 s. Both locked holds the values fixed.</p>
+            <div id="control-alert" class="alert-box hidden"></div>
+                    </details>
+
             <!-- Image Output Card: resolution + orientation -->
             <div class="card settings-card" data-sgroup="image">
                 <div class="card-header">
@@ -630,8 +631,9 @@
                                 <select id="perf-stream-width" data-size-select></select>
                             </div>
                             <div class="field">
-                                <label for="perf-stream-quality">JPEG quality</label>
-                                <input type="number" id="perf-stream-quality" min="40" max="95" step="1" value="75" />
+                                <label for="perf-stream-quality">JPEG quality <span class="field-sub">(live view)</span></label>
+                                <span class="range-value" id="perf-stream-quality-val">75</span>
+                                <input type="range" id="perf-stream-quality" name="perf-stream-quality" min="40" max="95" step="1" value="75" />
                             </div>
                             <label class="toggle-row field-wide" for="star-boost-enabled">
                                 <span class="toggle-text"><span class="toggle-title">Night star boost</span><span class="toggle-hint">Brighten stars by binning</span></span>
@@ -1770,8 +1772,8 @@
     <script src="/static/focus/lens.js?v=20261115a"></script>
     <script src="/static/overlay_decode.js?v=1"></script>
     <script defer src="/static/app/01-core.js?v=20261118a"></script>
-    <script defer src="/static/app/02-controls-calibration.js?v=20261114a"></script>
-    <script defer src="/static/app/03-station-settings.js?v=20261117a"></script>
+    <script defer src="/static/app/02-controls-calibration.js?v=20261124a"></script>
+    <script defer src="/static/app/03-station-settings.js?v=20261124a"></script>
     <script defer src="/static/app/04-live-view.js?v=20261123g"></script>
     <script defer src="/static/app/05-sky-overlay.js?v=20261115a"></script>
     <script defer src="/static/app/05b-sky-reticle.js?v=20261118a"></script>
@@ -1779,7 +1781,7 @@
     <script defer src="/static/app/06-telemetry.js?v=20261118a"></script>
     <script defer src="/static/app/07-cloud.js?v=20261121a"></script>
     <script defer src="/static/app/08-gallery-adsb.js?v=20261122b"></script>
-    <script defer src="/static/app/08b-events-live.js?v=20261123i"></script>
+    <script defer src="/static/app/08b-events-live.js?v=20261124a"></script>
     <script defer src="/static/app/08c-adsb-settings.js?v=20261117a"></script>
     <script defer src="/static/app/08d-live-ui.js?v=20261123h"></script>
     <script defer src="/static/app/09-community.js?v=20261114b"></script>

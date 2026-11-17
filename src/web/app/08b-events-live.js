@@ -191,6 +191,8 @@ function renderLiveEvents(evData) {
     liveEventsStatus.innerHTML = on.length
         ? `<span class="dot ${night ? "on" : ""}"></span>${night ? "Watching" : "Paused until dark"} · ${on.map((l) => l.split(" ")[0]).join(" ")}`
         : `<span class="dot"></span>Detection off (Settings → Event detection)`;
+    liveEventsStatus.title = liveEventsStatus.textContent;   // the card shows only the status dot; the words are the tooltip
+    liveEventsStatus.setAttribute("aria-label", liveEventsStatus.textContent);
 
     if (!events.length) {
         liveEventsList.innerHTML = `<li class="live-events-empty">No events yet.<br>Meteors and aircraft show up here as soon as they are detected.</li>`;

@@ -418,6 +418,13 @@ const perfFields = {
 };
 const perfBinNote = document.getElementById("perf-bin-note");
 
+// JPEG quality is a slider: the number beside it follows the thumb live
+function paintStreamQuality() {
+    const q = perfFields.stream_jpeg_quality, out = document.getElementById("perf-stream-quality-val");
+    if (q && out) out.textContent = q.value;
+}
+if (perfFields.stream_jpeg_quality) perfFields.stream_jpeg_quality.addEventListener("input", paintStreamQuality);
+
 function syncPerformanceUI(data) {
     if (!data || !data.current) return;
     sizeState.perf = data;
@@ -438,6 +445,7 @@ function syncPerformanceUI(data) {
         }
         el.value = val;
     });
+    paintStreamQuality();
     renderSizePipeline();
     if (perfBinNote) {
         perfBinNote.textContent = data.raw10_bin > 1 ? `RAW10 binning in use: ${data.raw10_bin}×${data.raw10_bin}.` : "";
