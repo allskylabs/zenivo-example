@@ -96,8 +96,7 @@ class CaptureMixin:
             if not is_pytest and hasattr(self.camera, "set_night_mode") and now - self._night_check_ts >= 60.0:
                 self._night_check_ts = now
                 try:
-                    from src.calibration.auto_exposure import calculate_solar_elevation
-                    elev = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon)
+                    elev = self.effective_solar_elevation()
                     self.camera.set_night_mode(elev < -6.0)
                 except Exception:
                     pass
@@ -179,8 +178,7 @@ class CaptureMixin:
                 try:
                     cur_exp_val = float(getattr(self.camera, "current_exposure_s", 0.1))
                     if cur_exp_val >= 0.08 and frame is not None and frame.shape[0] >= 200:
-                        from src.calibration.auto_exposure import calculate_solar_elevation
-                        solar_elev = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon)
+                        solar_elev = self.effective_solar_elevation()
                         p90_sample = float(np.percentile(frame[::16, ::16], 90))
                         if (solar_elev >= -2.0 and p90_sample >= 245.0) or (solar_elev >= 2.0 and cur_exp_val >= 0.25):
                             if exposure_locked_auto:

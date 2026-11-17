@@ -23,8 +23,7 @@ class FocusMixin:
         if 0.0 < exp < 0.05:
             return False
         try:
-            from src.calibration.auto_exposure import calculate_solar_elevation
-            return bool(calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon) < -6.0)
+            return bool(self.effective_solar_elevation() < -6.0)
         except Exception:
             return None
 
@@ -379,8 +378,7 @@ class FocusMixin:
             return False
         if now < float(getattr(self, "_auto_sweep_retry_ts", 0.0)):
             return False
-        from src.calibration.auto_exposure import calculate_solar_elevation
-        sun = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon)
+        sun = self.effective_solar_elevation()
         self._auto_sweep_retry_ts = now + self.AUTO_SWEEP_RETRY_S
         if -12.0 <= sun <= 3.0:
             return False  # twilight: stars too faint, daylight too low and changing
@@ -428,8 +426,7 @@ class FocusMixin:
                 # Temperature moved the focus: follow it now; the next frames show the corrected lens
                 self.camera.set_lens_position(tgt)
                 return
-        from src.calibration.auto_exposure import calculate_solar_elevation
-        sun = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon)
+        sun = self.effective_solar_elevation()
         is_night = sun < -12.0
         day_metric = None
         if sun > 3.0:

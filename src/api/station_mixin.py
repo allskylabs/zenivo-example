@@ -378,8 +378,7 @@ class StationMixin:
         if not cfg.get("enabled") or frame is None or frame.ndim != 3:
             return frame
         try:
-            from src.calibration.auto_exposure import calculate_solar_elevation
-            if calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon) >= -6.0:
+            if self.effective_solar_elevation() >= -6.0:
                 return frame
             user_mask = self.station_config.get("sky_mask")
             key = (frame.shape[:2], repr(user_mask))

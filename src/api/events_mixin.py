@@ -44,9 +44,8 @@ class EventsMixin:
         Returns the types of the events found (their frame is archived)."""
         enabled = {k for k, v in self.get_event_config()["enabled"].items() if v and k != "clouds"}
         if now - self._events_sun_ts >= 60.0:
-            from src.calibration.auto_exposure import calculate_solar_elevation
             self._events_sun_ts = now
-            night = calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon) < self.EVENT_NIGHT_SUN_ELEV
+            night = self.effective_solar_elevation() < self.EVENT_NIGHT_SUN_ELEV
             if self._events_night != night:
                 if getattr(self, "day_objects", None) is not None:
                     self.day_objects.reset()

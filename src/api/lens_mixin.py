@@ -466,8 +466,7 @@ class LensMixin:
                 method = measure_focus(frame[y0:y0 + rh, x0:x0 + rw], "auto", is_night=is_night)["method"]
                 if not is_pytest and method == "contrast":
                     try:
-                        from src.calibration.auto_exposure import calculate_solar_elevation
-                        if calculate_solar_elevation(self.auto_exposure.lat, self.auto_exposure.lon) < -6.0:
+                        if self.effective_solar_elevation() < -6.0:
                             pt_n = find_focus_point(frame, sky_mask=self._focus_sky_mask(frame), is_night=True)
                             if pt_n is not None and pt_n.get("method") in ("stars", "lights"):
                                 method = pt_n["method"]

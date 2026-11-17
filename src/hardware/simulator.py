@@ -120,10 +120,8 @@ class SimulatedIMX335Controller(CameraDriverInterface):
         inside = rr2 < radius * radius
         # Sky glow: a little brighter towards the horizon, grows with exposure x gain, black outside the circle
         glow = 0.25 * exposure_s * gain_factor * (0.6 + 0.4 * rr2 / (radius * radius))
-        if 6 <= time.localtime().tm_hour < 18:
-            # Daylight: a bright smooth sky (stars drown in it). The auto exposure uses short exposures by day,
-            # so the glow must be strong enough to give a normal picture at those settings.
-            glow = glow + 11000.0 * exposure_s * gain_factor * (1.0 - 0.35 * rr2 / (radius * radius))
+        # Always a night sky, at any wall-clock time; the service runs the auto exposure in night mode while
+        # the simulator is the camera (DayNightAutoExposure.force_night), so no daylight glow is needed.
         plane += np.where(inside, glow, 0.0).astype(np.float32)
         ang = time.time() * 7.292e-5  # sidereal rate, rad/s
         c, s = np.cos(ang), np.sin(ang)
