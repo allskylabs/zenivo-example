@@ -191,7 +191,7 @@ body:has(#tab-logs.active) .navbar { display: none; }
 }
 
 /* ================= Layers sheet: 44 x 26 switches, 48 px rows (mockup p3) ================= */
-.zsheet .lay-row { min-height: 48px; }
+.zsheet .lay-row { min-height: 48px; padding: 7px 0; }
 .zsheet .lay-txt b { font-weight: 500; }
 .zsheet .sw { width: 44px; height: 26px; border-radius: 13px; }
 .zsheet .sw i { top: 3px; left: 3px; width: 20px; height: 20px; }
@@ -203,7 +203,12 @@ body:has(#tab-logs.active) .navbar { display: none; }
 .oc-sub { margin-top: 4px; }
 .oc-stats { grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 12px 6px; margin: 16px 0 18px; padding-top: 16px; }
 .oc-stats span { font-size: 10.5px; letter-spacing: 0.1em; }
-.oc-stats b { margin-top: 4px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; overflow-wrap: break-word; }
+.oc-stats b { margin-top: 4px; font-size: 15px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
 .oc-btn { min-height: 44px; padding: 0 10px; font-size: 14px; white-space: nowrap; }
 .oc-btn.oc-primary { flex: 1.15; }
 .oc-close { color: var(--text-muted); font-weight: 300; font-size: 30px; }
+
+/* Event viewer on phones: both pictures share one 16:9 box so the captions line up */
+@media (max-width: 760px) {
+    .ev-images:not(.single) .ev-fig img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: contain; background: #05080f; }
+}

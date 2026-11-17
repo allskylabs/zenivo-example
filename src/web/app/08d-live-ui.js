@@ -333,7 +333,7 @@
                     d.climb_m_min != null && Math.abs(d.climb_m_min) > 60 ? `${d.climb_m_min > 0 ? "climbing" : "descending"} ${num(Math.abs(d.climb_m_min))} m/min` : ""].filter(Boolean).join(" · ");
                 return { title: d.callsign || String(d.icao).toUpperCase(), sub: sub || "ADS-B", link: ["3D map", "/flights3d"],
                     stats: [["Altitude", d.altitude_m != null ? `${num(d.altitude_m)} m` : "--"], ["Speed", d.speed_kmh != null ? `${num(d.speed_kmh)} km/h` : "--"],
-                        ["Distance", d.distance_km != null ? `${num(d.distance_km, 1)} km` : "--"], ["Alt / Az", `${Math.round(d.alt_deg)}° · ${fmtAz(d.az_deg)}`]] };
+                        ["Distance", d.distance_km != null ? `${num(d.distance_km, 1)} km` : "--"], ["Alt / Az", `${Math.round(d.alt_deg)}° / ${Math.round(d.az_deg)}°`]] };
             }
             case "satellite":
                 return { title: d.name, sub: `NORAD ${d.norad} · ${d.visible ? "sunlit, visible" : "above the camera, not visible now"}`, link: ["3D map", "/satellites3d"],
