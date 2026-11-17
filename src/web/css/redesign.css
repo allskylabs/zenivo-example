@@ -530,7 +530,7 @@ select.seg-src { position: absolute; width: 1px; height: 1px; opacity: 0; pointe
 /* Shared row bits (all widths) */
 .kv-row, .link-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 52px; padding: 6px 0; border-bottom: 1px solid var(--divider); color: var(--text-primary); text-decoration: none; }
 .kv-row > span:first-child { font-size: 15px; }
-.kv-row .field-note { margin: 0; text-align: right; font-family: var(--font-num); }
+.kv-row .field-note { margin: 0; text-align: right; }
 .link-row { min-height: 56px; }
 .link-tx { display: flex; flex-direction: column; gap: 2px; }
 .link-tx b { font-size: 16px; font-weight: 600; }
@@ -598,7 +598,8 @@ select.seg-src { position: absolute; width: 1px; height: 1px; opacity: 0; pointe
     #tab-settings .settings-card > .settings-actions { padding: 16px; margin: 0 0 14px; border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--bg-card); }
     #tab-settings .settings-card > .settings-actions { border: 0; background: none; padding: 0; }
     #tab-settings #data-sources-card { padding: 16px; }
-    #tab-settings .settings-grid > .settings-group > legend { float: none; display: block; width: 100%; padding: 0 0 8px; font-size: 18px; font-weight: 700; }
+    #tab-settings .settings-grid > .settings-group > legend { float: left; width: 100%; padding: 0 0 8px; font-size: 18px; font-weight: 700; }
+    #tab-settings .settings-grid > .settings-group > legend ~ * { clear: both; }
     #tab-settings fieldset { min-width: 0; }
     #tab-settings .hs-fieldset { margin-top: 0; position: relative; }
     /* Image output is one card of rows: its fieldsets are sections */
@@ -621,13 +622,16 @@ select.seg-src { position: absolute; width: 1px; height: 1px; opacity: 0; pointe
     #tab-settings .field:has(> input:is([type="text"], [type="url"], [type="email"], [type="password"]), > textarea, > .fr24-token-row, > .sat-groups, > .dayobj-classes, > .adsb-grid, > .seg), #tab-settings .field.field-wide { flex-direction: column; align-items: stretch; justify-content: flex-start; }
     #tab-settings .field > input[type="text"], #tab-settings .field > input[type="url"], #tab-settings .field > input[type="email"], #tab-settings .field > input[type="password"], #tab-settings .field > textarea { width: 100%; }
     #tab-settings .field > label:first-child:has(+ input:is([type="text"], [type="url"], [type="email"], [type="password"]), + textarea), #tab-settings .field > label:first-child:has(+ .seg), #tab-settings .field > label:first-child:has(+ select.seg-src + .seg), #tab-settings .field > label:first-child:has(+ .sat-groups), #tab-settings .field > label:first-child:has(+ .dayobj-classes) { flex: none; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
-    #tab-settings .cols2 > .field, #tab-settings .stack-grid > .field { flex-direction: column; align-items: stretch; justify-content: flex-start; min-height: 0; padding: 0; gap: 6px; border: 0; }
+    #tab-settings .cols2 > .field, #tab-settings .stack-grid > .field { flex-wrap: nowrap; height: auto; min-width: 0; flex-direction: column; align-items: stretch; justify-content: flex-start; min-height: 0; padding: 0; gap: 6px; border: 0; }
     #tab-settings .cols2 > .field > label:first-child, #tab-settings .cols2 > .field > .seg, #tab-settings .stack-grid > .field > label:first-child { flex: none; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
     #tab-settings .cols2 > .field > input, #tab-settings .stack-grid > .field > input { width: 100%; min-width: 0; text-align: left; }
     #tab-settings .stack-grid > .field { margin-bottom: 12px; }
     /* read-only facts as key / value rows */
-    #tab-settings .kv-grid > .field { flex-wrap: nowrap; }
-    #tab-settings .field > input[readonly] { flex: 1 1 auto; width: auto; min-height: 36px; border: 0; background: none; padding: 0; text-align: right; color: var(--text-secondary); }
+    #tab-settings .kv-grid > .field:has(> input[readonly]) { flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: space-between; }
+    #tab-settings .kv-grid > .field:has(> input[readonly]) > label:first-child { flex: 0 0 auto; width: auto; font-size: 15px; font-weight: 500; color: var(--text-primary); }
+    #tab-settings .cols2 > .field.field-end { grid-column: 1 / -1; }
+    #tab-settings .cols2 > .field.field-end > .btn { width: 100%; }
+    #tab-settings .field > input[readonly] { text-overflow: ellipsis; min-width: 0; flex: 1 1 auto; width: auto; min-height: 40px; border: 0; background: none; padding: 0; text-align: right; color: var(--text-secondary); }
     #tab-settings .toggle-row { padding: 6px 0; border: 0; background: none; }
     #tab-settings .toggle-row:hover { border-color: transparent; }
     #tab-settings .toggle-row .switch { appearance: none; -webkit-appearance: none; }

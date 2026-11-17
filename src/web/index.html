@@ -1049,10 +1049,6 @@
                 </div>
                 <details class="params-summary" id="sky-mask-editor" open>
                     <summary>Plate-solve sky mask (outline the open sky)</summary>
-                    <p class="field-note">Press Auto-detect to propose the mask from the current frame (best at night),
-                        or click on the frame to outline open sky (green) and lit buildings, trees or
-                        poles to ignore (red). Nothing is stored until you press Apply, so you can fix the proposal first. The plate solver only uses stars inside the sky and outside obstructions,
-                        on top of its own automatic sky detection.</p>
                     <div class="mask-canvas-wrap">
                         <img id="mask-img" alt="Live frame for drawing the sky mask">
                         <canvas id="mask-canvas"></canvas>
@@ -1067,13 +1063,14 @@
                     <div class="settings-actions apply-row">
                         <button id="mask-save" class="btn btn-primary btn-block" type="button">✔ Apply mask</button>
                     </div>
+                    <p class="field-note">Press Auto-detect to propose the mask from the current frame (best at night),
+                        or click on the frame to outline open sky (green) and lit buildings, trees or
+                        poles to ignore (red). Nothing is stored until you press Apply, so you can fix the proposal first. The plate solver only uses stars inside the sky and outside obstructions,
+                        on top of its own automatic sky detection.</p>
                     <div id="mask-alert" class="alert-box hidden mt-3"></div>
                 </details>
                 <details class="params-summary" id="star-align" open>
                     <summary>Align by stars (when the automatic solve is wrong)</summary>
-                    <p class="field-note">Click 4 or more stars you can really see on the open sky (inside the green
-                        outline), spread over the frame, brightest first. The solver identifies them from their mutual
-                        angles, shows the result, and only stores it when you press Apply.</p>
                     <div class="mask-canvas-wrap">
                         <img id="align-img" alt="Live frame for picking stars">
                         <canvas id="align-canvas"></canvas>
@@ -1087,6 +1084,9 @@
                     <div class="settings-actions apply-row">
                         <button id="align-apply" class="btn btn-primary btn-block" type="button" disabled>✔ Apply</button>
                     </div>
+                    <p class="field-note">Click 4 or more stars you can really see on the open sky (inside the green
+                        outline), spread over the frame, brightest first. The solver identifies them from their mutual
+                        angles, shows the result, and only stores it when you press Apply.</p>
                     <div id="align-alert" class="alert-box hidden mt-3"></div>
                 </details>
             </div>
