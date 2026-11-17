@@ -271,7 +271,8 @@
         listEl.textContent = "";
         const accent = cssVar("--accent"), other = cssVar("--success");
         const valid = cards.filter((c) => c && finite(c.lat) && finite(c.lon) && Math.abs(c.lat) <= 90 && Math.abs(c.lon) <= 180);
-        valid.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+        const rank = { online: 0, idle: 1, offline: 2 }, seenOf = (c) => { const t = Number(seenMap[c.id]) || Number(c.updated) || 0; return t > 1e12 ? t / 1000 : t; };
+        valid.sort((a, b) => (a.id === ownId ? -1 : b.id === ownId ? 1 : 0) || rank[stationState(a, false)] - rank[stationState(b, false)] || seenOf(b) - seenOf(a) || String(a.name).localeCompare(String(b.name)));
         const pts = [];
         const counts = { online: 0, idle: 0, offline: 0 };
         for (const card of valid) {
@@ -289,9 +290,10 @@
             btn.type = "button";
             const nm = el("span", isOwn ? "nm you" : "nm");
             nm.appendChild(el("i", `cm-led ${st}`));
-            nm.appendChild(document.createTextNode(`${String(card.name || "Unnamed station")}${isOwn ? " (this station)" : ""}`));
+            nm.appendChild(document.createTextNode(String(card.name || "Unnamed station")));
+            if (isOwn) nm.appendChild(el("em", "you-pill", "You"));
             btn.appendChild(nm);
-            btn.appendChild(el("span", "sub", [card.camera, seenText(card, isOwn)].filter(Boolean).join(" · ")));
+            btn.appendChild(el("span", "sub", card.camera || seenText(card, isOwn)));
             const rt = el("span", "st-r");
             rt.appendChild(el("b", `cm-state-lbl ${st}`, st === "online" ? "Online" : st === "idle" ? "Idle" : "Offline"));
             rt.appendChild(el("small", "", isOwn ? "now" : agoOnly(card)));

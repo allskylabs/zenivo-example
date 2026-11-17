@@ -58,3 +58,26 @@
     .login-card .field { margin-bottom: 12px; }
     .login-card .btn-primary { min-height: 48px; margin-top: 4px; }
 }
+
+/* ================= Page top bar (Community; same as Sign in) ================= */
+.page-top { display: none; }
+body #cstations .you-pill { display: inline-block; margin-left: 10px; padding: 2px 10px; border-radius: 999px; font-style: normal; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: var(--accent); background: var(--accent-bg); vertical-align: 2px; }
+#cstations .nm.you { color: inherit; }
+#cstations .cm-led.offline, #clegend .cm-led.offline { background: var(--text-muted); border: 0; }
+@media (max-width: 768px) {
+    .page-top { display: flex; align-items: center; gap: 14px; height: 56px; padding: 0 20px; background: var(--bg-primary, transparent); }
+    .page-back { display: inline-grid; place-items: center; width: 32px; height: 32px; margin-left: -6px; color: var(--text-primary); }
+    .page-top-title { font-size: 17px; font-weight: 600; }
+    body:has(.page-top) .navbar { display: none; }
+    /* Community: map card with the legend row inside its bottom */
+    body #cmap-wrap { display: flex; flex-direction: column; height: auto; min-height: 0; overflow: hidden; margin: 4px 16px 0; background: var(--bg-card); }
+    body #cmap .leaflet-control-zoom { display: none; }
+    body #cmap { position: relative; inset: auto; flex: none; height: 210px; }
+    body #clegend { position: static; flex: none; gap: 16px; padding: 12px 16px 14px; border: 0; border-radius: 0; background: none; font-size: 13px; color: var(--text-secondary); }
+    body #clist { width: calc(100% - 32px); margin: 14px 16px; }
+    body #cstations .nm { display: flex; align-items: center; font-size: 17px; font-weight: 700; }
+    body #cstations .nm .cm-led { margin-right: 12px; flex: none; }
+    body #cstations .sub { margin-left: 21px; margin-top: 2px; }
+    body #cstations .st-r b { font-size: 15px; }
+    body #cstations .st-r small { font-size: 13px; }
+}
