@@ -244,7 +244,7 @@ details.acc[hidden] { display: none; }
     .m-sheet:not([hidden]), .zsheet:not([hidden]) { animation: none; }
     .sw, .sw i, details.acc > summary::after { transition: none; }
 }
-@media (max-width: 340px) { .vp-hint { display: none; } .now-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .now-tile b { font-size: 19px; } }
+@media (max-width: 340px) { .now-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .now-tile b { font-size: 19px; } }
 @media (min-width: 769px) {
     .m-head { display: none; }
     .zsheet { border-radius: var(--radius-card); bottom: 24px; border-bottom: 1px solid var(--border-color); }
@@ -255,3 +255,7 @@ details.acc[hidden] { display: none; }
 .card { border-radius: 16px; }
 
 #tab-live details.histogram-card { display: block; }
+/* on-image bar: the count never wraps; the tap hint only shows where there is room for it */
+#layers-count { white-space: nowrap; }
+.vp-layers { flex: 0 0 auto; }
+@media (max-width: 520px) { .vp-hint { visibility: hidden; } }
