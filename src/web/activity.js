@@ -118,10 +118,11 @@
         const c = data.counts_24h || {};
         if (summaryEl) {
             summaryEl.replaceChildren();
+            summaryEl.dataset.worst = c.error ? "error" : c.warning ? "warning" : "info";
             [["success", "success", "success"], ["info", "info", "info"], ["warning", "warning", "warnings"], ["error", "error", "errors"]].forEach(([k, cls, label]) => {
                 const n = c[k] || 0;
                 if (!n && k !== "error") return;
-                const sp = el("span", `ls-item ls-${cls}`, `${n} ${n === 1 && k !== "info" && k !== "success" ? label.replace(/s$/, "") : label}`);
+                const sp = el("span", `ls-item ls-${cls}${n ? "" : " ls-zero"}`, `${n} ${n === 1 && k !== "info" && k !== "success" ? label.replace(/s$/, "") : label}`);
                 summaryEl.appendChild(sp);
             });
             summaryEl.appendChild(el("span", "ls-when", "last 24 h"));
