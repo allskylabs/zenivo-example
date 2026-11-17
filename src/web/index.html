@@ -25,7 +25,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
-    <link rel="stylesheet" href="/style.css?v=20261119c">
+    <link rel="stylesheet" href="/style.css?v=20261119e">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -1696,6 +1696,12 @@
                         <a class="btn btn-sm btn-outline" href="/api/logs/download">Download log</a>
                     </div>
                 </div>
+                <div class="zchips" id="log-level-chips" role="group" aria-label="Level">
+                    <button type="button" class="zchip active" data-level="" aria-pressed="true">All</button>
+                    <button type="button" class="zchip" data-level="success" aria-pressed="false">Success</button>
+                    <button type="button" class="zchip" data-level="warning" aria-pressed="false">Warnings</button>
+                    <button type="button" class="zchip" data-level="error" aria-pressed="false">Errors</button>
+                </div>
                 <div class="log-summary" id="log-summary">Loading…</div>
                 <div class="log-storage" id="log-storage"></div>
                 <ul class="log-list" id="log-list"></ul>
@@ -1735,7 +1741,7 @@
     </div>
 
     <script src="/static/sky_catalog.js"></script>
-    <script src="/static/activity.js?v=20261117a"></script>
+    <script src="/static/activity.js?v=20261119d"></script>
     <script src="/static/focus/core.js?v=20261115a"></script>
     <script src="/static/focus/state.js?v=20261115a"></script>
     <script src="/static/focus/curve.js?v=20261115a"></script>

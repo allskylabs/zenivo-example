@@ -54,9 +54,24 @@
             list.appendChild(el("li", "log-summary", "No entries match this filter."));
             return;
         }
+        const today = new Date().toDateString();
+        const yest = new Date(Date.now() - 86400000).toDateString();
+        let lastDay = "";
         for (const e of entries) {
+            const dt = new Date(e.ts);
+            const dayKey = isNaN(dt) ? "" : dt.toDateString();
+            if (dayKey && dayKey !== lastDay) {
+                lastDay = dayKey;
+                const label = dayKey === today ? "Today" : dayKey === yest ? "Yesterday"
+                    : dt.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+                list.appendChild(el("li", "log-day", label));
+            }
             const li = el("li", `log-item lvl-${e.level}`);
-            li.appendChild(el("span", "log-time", fmtTime(e.ts)));
+            const tm = el("span", "log-time");
+            const full = fmtTime(e.ts);
+            tm.appendChild(el("span", "lt-d", full.slice(0, 11)));
+            tm.appendChild(document.createTextNode(full.slice(11)));
+            li.appendChild(tm);
             li.appendChild(el("span", "log-level", e.level));
             li.appendChild(el("span", "log-cat", e.category));
             const msg = el("span", "log-msg", e.message);
@@ -67,6 +82,21 @@
             li.appendChild(msg);
             list.appendChild(li);
         }
+    }
+
+    // Level chips drive the (desktop-visible) level select
+    const chipBox = document.getElementById("log-level-chips");
+    if (chipBox && levelSel) {
+        chipBox.addEventListener("click", (ev) => {
+            const b = ev.target.closest(".zchip");
+            if (!b) return;
+            levelSel.value = b.dataset.level;
+            levelSel.dispatchEvent(new Event("change", { bubbles: true }));
+            chipBox.querySelectorAll(".zchip").forEach((c) => {
+                c.classList.toggle("active", c === b);
+                c.setAttribute("aria-pressed", String(c === b));
+            });
+        });
     }
 
     function updateBadge(counts) {
@@ -87,7 +117,14 @@
         renderList(data.entries || []);
         const c = data.counts_24h || {};
         if (summaryEl) {
-            summaryEl.textContent = `Last 24h: ${c.success || 0} success • ${c.info || 0} info • ${c.warning || 0} warnings • ${c.error || 0} errors`;
+            summaryEl.replaceChildren();
+            [["success", "success", "success"], ["info", "info", "info"], ["warning", "warning", "warnings"], ["error", "error", "errors"]].forEach(([k, cls, label]) => {
+                const n = c[k] || 0;
+                if (!n && k !== "error") return;
+                const sp = el("span", `ls-item ls-${cls}`, `${n} ${n === 1 && k !== "info" && k !== "success" ? label.replace(/s$/, "") : label}`);
+                summaryEl.appendChild(sp);
+            });
+            summaryEl.appendChild(el("span", "ls-when", "last 24 h"));
         }
         updateBadge(c);
     }

@@ -346,3 +346,48 @@ details.acc[hidden] { display: none; }
     .ev-actions .ev-open-crop { background: var(--accent); border-color: var(--accent); color: var(--bg-primary); }
     [data-theme="red"] .ev-actions .ev-open-crop { color: #1a0000; }
 }
+
+/* ---------- Phase 2: Activity log ---------- */
+#log-filter-level { display: none; }
+#log-level-chips { padding: 0 1rem; }
+.log-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.ls-item::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--accent); }
+.ls-success::before { background: var(--success); }
+.ls-warning::before { background: var(--warning); }
+.ls-error::before { background: var(--danger); }
+.ls-when { margin-left: auto; }
+.log-day { padding: 14px 4px 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+@media (max-width: 768px) {
+    #tab-logs > .card { background: none; border: 0; padding: 0; }
+    #tab-logs .card-header { flex-direction: column; align-items: stretch; gap: 10px; border-bottom: 0; padding: 0; margin: 0 0 10px; }
+    #tab-logs .card-header h2 { display: none; }
+    #tab-logs .header-actions { width: 100%; }
+    #tab-logs .header-actions select { flex: 1 1 100%; min-height: 48px; padding: 0 14px; border-radius: var(--radius-tile); background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); font: inherit; font-size: 15px; }
+    #tab-logs .header-actions .btn { flex: 1; min-height: 44px; justify-content: center; }
+    #log-level-chips { padding: 0; }
+    .log-summary { padding: 12px 16px; margin-bottom: 10px; border-radius: var(--radius-tile); background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); font-weight: 700; font-size: 14px; }
+    .log-summary .ls-when { color: var(--text-muted); font-weight: 400; font-size: 13px; }
+    .log-storage { padding: 0 4px 8px; }
+    .log-list { max-height: none; padding: 0 0 12px; overflow: visible; }
+    .log-item { grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 12px; padding: 12px 16px; border: 0; border-top: 1px solid var(--divider); background: var(--bg-card); border-left: 1px solid var(--border-color); border-right: 1px solid var(--border-color); font-size: 16px; }
+    .log-item.lvl-error { background: color-mix(in srgb, var(--danger) 7%, var(--bg-card)); }
+    .log-day + .log-item { border-top: 1px solid var(--border-color); border-radius: var(--radius-card) var(--radius-card) 0 0; }
+    .log-item:has(+ .log-day), .log-item:last-child { border-bottom: 1px solid var(--border-color); border-radius: 0 0 var(--radius-card) var(--radius-card); }
+    .log-day + .log-item:has(+ .log-day), .log-day + .log-item:last-child { border-radius: var(--radius-card); }
+    .log-time { font-family: var(--font-num); font-size: 13px; color: var(--text-muted); }
+    .log-time .lt-d { display: none; }
+    .log-cat { font-size: 13px; }
+    .log-level { justify-self: end; font-size: 12px; letter-spacing: 0.08em; }
+    .log-msg { grid-column: 1 / -1; font-size: 16px; }
+}
+@media (min-width: 769px) { .log-day { grid-column: 1 / -1; padding: 10px 8px 2px; } .log-time .lt-d { display: inline; } }
+
+/* ---------- Phase 2: Sign in ---------- */
+.login-card { padding: 20px; border-radius: var(--radius-card); background: var(--bg-card); border: 1px solid var(--border-color); }
+.login-card h2 { font-size: 20px; font-weight: 700; margin: 0; }
+.login-card .field-note { font-size: 14px; color: var(--text-secondary); margin: 4px 0 16px; }
+.login-card .field label { display: block; margin-bottom: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.login-card input[type="password"], .login-card input[type="text"] { min-height: 48px; padding: 0 14px; border-radius: var(--radius-tile); background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); font: inherit; font-size: 16px; }
+.login-card input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.login-card .btn-primary { min-height: 48px; border-radius: 999px; font-size: 16px; font-weight: 700; }
+@media (max-width: 480px) { .login-page { align-items: flex-start; padding-top: 24px; } }

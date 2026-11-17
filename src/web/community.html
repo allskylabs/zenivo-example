@@ -27,7 +27,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
-    <link rel="stylesheet" href="/style.css?v=20261119c">
+    <link rel="stylesheet" href="/style.css?v=20261119e">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -42,17 +42,17 @@
         .cm-pop { font: 13px/1.45 var(--font-sans); width: min(300px, 70vw); }
         .cm-mk { background: none; border: 0; }
         .cm-dot { position: relative; display: block; width: 14px; height: 14px; margin: 6px; border-radius: 50%; border: 2px solid var(--bg-primary); box-shadow: 0 0 0 1px rgba(255,255,255,.35); }
-        .cm-dot.online { background: #22c55e; }
-        .cm-dot.online::after { content: ""; position: absolute; inset: -7px; border-radius: 50%; border: 2px solid #22c55e; opacity: .6; animation: cm-pulse 2s ease-out infinite; }
-        .cm-dot.idle { background: #f59e0b; }
-        .cm-dot.offline { background: transparent; border: 2px solid #94a3b8; box-shadow: none; }
+        .cm-dot.online { background: var(--success); }
+        .cm-dot.online::after { content: ""; position: absolute; inset: -7px; border-radius: 50%; border: 2px solid var(--success); opacity: .6; animation: cm-pulse 2s ease-out infinite; }
+        .cm-dot.idle { background: var(--warning); }
+        .cm-dot.offline { background: transparent; border: 2px solid var(--text-muted); box-shadow: none; }
         .cm-dot.own { box-shadow: 0 0 0 3px var(--accent); }
         @keyframes cm-pulse { from { transform: scale(.6); opacity: .8; } to { transform: scale(1.5); opacity: 0; } }
         @media (prefers-reduced-motion: reduce) { .cm-dot.online::after { animation: none; } }
         .cm-led { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; vertical-align: baseline; }
-        .cm-led.online { background: #22c55e; } .cm-led.idle { background: #f59e0b; } .cm-led.offline { border: 2px solid #94a3b8; }
+        .cm-led.online { background: var(--success); } .cm-led.idle { background: var(--warning); } .cm-led.offline { border: 2px solid var(--text-muted); }
         .cm-state { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin: 2px 0; }
-        .cm-state.online { color: #22c55e; } .cm-state.idle { color: #f59e0b; } .cm-state.offline { color: #94a3b8; }
+        .cm-state.online { color: var(--success); } .cm-state.idle { color: var(--warning); } .cm-state.offline { color: var(--text-muted); }
         .cm-pop img { max-height: 38vh; object-fit: contain; }
         .cm-zoom { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
         .cm-light { position: fixed; inset: 0; z-index: 5000; background: rgba(0, 0, 0, 0.88); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; }
@@ -80,6 +80,13 @@
         #cempty { padding: 16px 12px; color: var(--text-secondary); font-size: 13px; }
         #cempty a { color: var(--accent); display: inline-block; padding: 6px 0; }
         #cnote { padding: 10px 12px; color: var(--text-muted); font-size: 12px; }
+        #clegend { position: absolute; left: 10px; bottom: 10px; z-index: 500; display: flex; gap: 14px; padding: 8px 12px; border-radius: 999px; background: color-mix(in srgb, var(--bg-card) 88%, transparent); border: 1px solid var(--border-color); font-size: 13px; color: var(--text-secondary); pointer-events: none; }
+        #clegend .cm-led { margin-right: 6px; }
+        #cstations button { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: baseline; }
+        #cstations .st-r { grid-column: 2; grid-row: 1 / span 2; text-align: right; display: flex; flex-direction: column; }
+        #cstations .st-r b { font-size: 13px; font-weight: 700; }
+        #cstations .st-r small { font-size: 12px; color: var(--text-secondary); }
+        #cstations .cm-state-lbl.online { color: var(--success); } #cstations .cm-state-lbl.idle { color: var(--warning); } #cstations .cm-state-lbl.offline { color: var(--text-muted); }
         @media (min-width: 769px) {
             body { overflow: hidden; }
             .app-shell { height: 100vh; min-height: 0; }
@@ -88,8 +95,13 @@
         }
         @media (max-width: 768px) {
             .community { flex-direction: column; }
-            #cmap-wrap { flex: none; height: 62vh; height: 62dvh; min-height: 300px; }
-            #clist { width: 100%; flex: none; border-left: 0; border-top: 1px solid var(--border-color); overflow: visible; }
+            .app-main { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+            #cmap-wrap { flex: none; height: 50vh; height: 50dvh; min-height: 280px; margin: 12px 12px 0; border-radius: var(--radius-card); border: 1px solid var(--border-color); overflow: hidden; }
+            #clist { width: calc(100% - 24px); flex: none; margin: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-card); overflow: hidden; }
+            #clist h2 { font-size: 17px; font-weight: 700; padding: 14px 16px; }
+            #cstations button { min-height: 60px; padding: 10px 16px; }
+            #cstations .nm { font-size: 16px; } #cstations .sub { font-size: 13px; }
+            #cstations li:last-child button { border-bottom: 0; }
         }
     </style>
 </head>
@@ -211,7 +223,7 @@
     </header>
 
     <main class="community">
-        <div id="cmap-wrap"><div id="cmap" role="application" aria-label="Map of community stations"></div></div>
+        <div id="cmap-wrap"><div id="cmap" role="application" aria-label="Map of community stations"></div><div id="clegend" hidden></div></div>
         <aside id="clist" aria-label="Community stations">
             <h2>Stations <span id="ccount"></span></h2>
             <div id="cempty" hidden></div>
@@ -224,6 +236,6 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="/static/community.js?v=5"></script>
+    <script src="/static/community.js?v=6"></script>
 </body>
 </html>

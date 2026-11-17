@@ -194,6 +194,11 @@
 
     // "Updated" is when the card was last signed (up to 6 h ago on a healthy station); "last seen" is when the station
     // itself last reached this one, so it is the better sign of life. Falls back to the card time when we never heard it.
+    function agoOnly(card) {
+        const t = Number(seenMap[card.id]);
+        return Number.isFinite(t) && t > 0 ? agoText(t) : agoText(card.updated);
+    }
+
     function seenText(card, isOwn) {
         if (isOwn) return "online now";
         const t = Number(seenMap[card.id]);
@@ -268,6 +273,7 @@
         const valid = cards.filter((c) => c && finite(c.lat) && finite(c.lon) && Math.abs(c.lat) <= 90 && Math.abs(c.lon) <= 180);
         valid.sort((a, b) => String(a.name).localeCompare(String(b.name)));
         const pts = [];
+        const counts = { online: 0, idle: 0, offline: 0 };
         for (const card of valid) {
             const isOwn = card.id === ownId;
             const st = stationState(card, isOwn);
@@ -286,6 +292,11 @@
             nm.appendChild(document.createTextNode(`${String(card.name || "Unnamed station")}${isOwn ? " (this station)" : ""}`));
             btn.appendChild(nm);
             btn.appendChild(el("span", "sub", [card.camera, seenText(card, isOwn)].filter(Boolean).join(" · ")));
+            const rt = el("span", "st-r");
+            rt.appendChild(el("b", `cm-state-lbl ${st}`, st === "online" ? "Online" : st === "idle" ? "Idle" : "Offline"));
+            rt.appendChild(el("small", "", isOwn ? "now" : agoOnly(card)));
+            btn.appendChild(rt);
+            counts[st] += 1;
             btn.addEventListener("click", () => {
                 map.flyTo([card.lat, card.lon], Math.max(map.getZoom(), 6));
                 marker.openPopup();
@@ -295,7 +306,17 @@
             listEl.appendChild(item);
             stations.push({ card, marker });
         }
-        countEl.textContent = valid.length ? String(valid.length) : "";
+        countEl.textContent = valid.length ? `${valid.length} · ${counts.online} online` : "";
+        const lg = document.getElementById("clegend");
+        if (lg) {
+            lg.hidden = !valid.length;
+            lg.replaceChildren(...["online", "idle", "offline"].map((k) => {
+                const sp = el("span", "lg-item");
+                sp.appendChild(el("i", `cm-led ${k}`));
+                sp.appendChild(document.createTextNode(`${k[0].toUpperCase()}${k.slice(1)} ${counts[k]}`));
+                return sp;
+            }));
+        }
         noteEl.hidden = !valid.length;
         if (!fitted && pts.length) {
             fitted = true;
