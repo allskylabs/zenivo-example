@@ -511,12 +511,35 @@ class TrafficMixin:
             self.aircraft_info = AircraftInfo(os.path.join(self.output_dir, "cache"))
         return self.aircraft_info
 
+    def get_aircraft_info(self, icao: str, callsign: str = "") -> Dict[str, Any]:
+        """Type, registration, airline and route of one aircraft as far as they are cached; the rest is queued for
+        lookup (a client asks again a few seconds later). Nothing here is private, so guests may ask."""
+        return self._aircraft_info().describe(icao, callsign or None)
+
     def get_airports(self) -> Dict[str, Any]:
         """Airports and runways around the station (OurAirports) for the 3D flights map."""
         if getattr(self, "airports", None) is None:
             from src.analytics.airports import Airports
             self.airports = Airports(os.path.join(self.output_dir, "cache"))
         return self.airports.get(self.auto_exposure.lat, self.auto_exposure.lon)
+
+    def get_airports_frame(self, max_km: float = 250.0, limit: int = 60) -> Dict[str, Any]:
+        """Airports that fall inside the camera picture, as frame fractions (same projection as the aircraft marks), for
+        the Airports layer on the live picture. Public data only: no station coordinates."""
+        from src.analytics.adsb import sky_position
+        data = self.get_airports()
+        sol = self._overlay_solution()
+        station = self._overlay_station()
+        rows: List[Dict[str, Any]] = []
+        for a in data.get("airports", []):
+            pos = sky_position(station, a["lat"], a["lon"], a.get("elev_m", 0.0), sol)
+            if not pos.get("frame_xy") or pos["distance_km"] > max_km:
+                continue
+            rows.append({"icao": a["ident"], "iata": a.get("iata") or "", "name": a["name"], "type": a["type"],
+                         "frame_xy": pos["frame_xy"], "az_deg": pos["az_deg"], "alt_deg": pos["alt_deg"],
+                         "distance_km": pos["distance_km"]})
+        rows.sort(key=lambda r: ({"large": 0, "medium": 1}.get(r["type"], 2), r["distance_km"]))
+        return {"ready": data.get("ready", False), "airports": rows[:limit]}
 
     def get_map_config(self) -> Dict[str, Any]:
         """Basemap settings for the 3D flights map. Only Google Maps (Map Tiles API, key in station config

@@ -15,7 +15,7 @@
     // ------------------------------------------------------------------
     // Layers sheet: switches drive the same hidden checkboxes the old chips used (their change handlers persist and subscribe)
     // ------------------------------------------------------------------
-    const CHK_IDS = ["chk-sky-overlay", "chk-sky-labels", "chk-grid-overlay", "chk-eq-grid", "chk-aircraft-overlay", "chk-satellite-overlay", "chk-sonde-overlay"];
+    const CHK_IDS = ["chk-sky-overlay", "chk-sky-labels", "chk-grid-overlay", "chk-eq-grid", "chk-aircraft-overlay", "chk-satellite-overlay", "chk-sonde-overlay", "chk-airports-overlay", "chk-overlay-text"];
     const lay = $("layers-sheet"), layBd = $("layers-backdrop"), layBtn = $("btn-layers");
     function overheadCounts() {
         const ac = typeof aircraftList !== "undefined" ? aircraftList.filter((a) => a.above_horizon !== false && (a.distance_km == null || a.distance_km <= AIRCRAFT_MAX_KM)).length : 0;
@@ -323,13 +323,75 @@
     const conName = (id) => { const k = ((window.ALLSKY_CATALOG || {}).constellations || []).find((x) => x.id === id); return k ? k.name : ""; };
     const magTxt = (m) => (m == null ? "" : `mag ${m < 0 ? "−" : ""}${Math.abs(m).toFixed(1)}`);
 
+
+    // ---- Aircraft type/route and rise/set times: fetched once per selected object, kept in small caches ----
+    const acCache = new Map();      // icao -> { d, t, tries, busy }
+    const rsCache = new Map();      // key -> { d, t, busy }
+    let apIata = null, apLoading = false;   // ICAO -> IATA airport codes (OurAirports list, loaded only when a route needs it)
+    function codeName(code) {
+        if (code.length !== 4) return code;
+        if (!apIata && !apLoading) {
+            apLoading = true;
+            fetch("/api/map/airports").then((r) => r.json()).then((d) => {
+                apIata = {};
+                ((d && d.airports) || []).forEach((a) => { if (a.iata) apIata[a.ident] = a.iata; });
+            }).catch(() => { apIata = {}; });
+        }
+        return (apIata && apIata[code]) || code;
+    }
+    const routeTxt = (r) => (r ? String(r).split("-").filter(Boolean).map(codeName).join(" \u2192 ") : "");
+    function acDetail(d) {
+        if (d.type && d.route) return d;
+        const key = String(d.icao).toLowerCase();
+        let e = acCache.get(key);
+        if (!e) {
+            e = { d: null, t: 0, tries: 0, busy: false };
+            acCache.set(key, e);
+            if (acCache.size > 80) acCache.delete(acCache.keys().next().value);
+        }
+        const done = e.d && e.d.type && e.d.route;
+        if (!done && !e.busy && e.tries < 3 && Date.now() - e.t > 4000 && /^[0-9a-f]{6}$/.test(key)) {
+            e.busy = true; e.tries++; e.t = Date.now();
+            fetch(`/api/adsb/info/${key}${d.callsign ? `?callsign=${encodeURIComponent(d.callsign)}` : ""}`)
+                .then((r) => (r.ok ? r.json() : null))
+                .then((j) => { if (j) e.d = j; })
+                .catch(() => {})
+                .finally(() => { e.busy = false; e.t = Date.now(); });
+        }
+        return Object.assign({}, e.d || {}, d.type ? { type: d.type } : {}, d.route ? { route: d.route } : {});
+    }
+    const clock = (sec) => fmtLocalIso(new Date(sec * 1000).toISOString(), true).slice(0, 5);
+    // Rise/set rows for a sun/moon/planet/star/DSO; [] until the answer is in
+    function riseSetRows(c) {
+        const d = c.d;
+        let key, url;
+        if (c.kind === "sun" || c.kind === "moon") { key = c.kind; url = `/api/sky/riseset?body=${c.kind}`; }
+        else if (c.kind === "planet") { key = String(d.name).toLowerCase(); url = `/api/sky/riseset?body=${encodeURIComponent(key)}`; }
+        else if (Number.isFinite(d.ra) && Number.isFinite(d.dec) && c.kind !== "con") { key = `${d.ra.toFixed(2)},${d.dec.toFixed(2)}`; url = `/api/sky/riseset?ra=${d.ra.toFixed(2)}&dec=${d.dec.toFixed(2)}`; }
+        else return [];
+        let e = rsCache.get(key);
+        if (!e) { e = { d: null, t: 0, busy: false }; rsCache.set(key, e); if (rsCache.size > 60) rsCache.delete(rsCache.keys().next().value); }
+        if (!e.busy && Date.now() - e.t > 300000) {
+            e.busy = true; e.t = Date.now();
+            fetch(url).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j) e.d = j; }).catch(() => {}).finally(() => { e.busy = false; });
+        }
+        const j = e.d;
+        if (!j) return [];
+        if (j.state === "always_up") return [["Visibility", "always up"]];
+        if (j.state === "never_rises") return [["Visibility", "never rises"]];
+        const today = stationDate(new Date()).getUTCDate();
+        const at = (sec) => (sec ? clock(sec) + (stationDate(new Date(sec * 1000)).getUTCDate() !== today ? " +1d" : "") : "--");
+        return [["Rises", at(j.rise)], ["Sets", at(j.set)]];
+    }
+
     // -> { title, sub, stats: [[label, value]], link: [text, href, newTab] }
     function describe(c) {
         const d = c.d;
         const aa = (alt, az) => [["Altitude", `${Math.round(alt)}°`], ["Azimuth", fmtAz(az)]];
         switch (c.kind) {
             case "aircraft": {
-                const sub = [d.callsign ? `ICAO ${String(d.icao).toUpperCase()}` : "", d.heading_deg != null ? `heading ${Math.round(d.heading_deg)}°` : "",
+                const x = acDetail(d);
+                const sub = [[x.type, routeTxt(x.route)].filter(Boolean).join(" \u00b7 "), x.airline || "", d.callsign ? `ICAO ${String(d.icao).toUpperCase()}` : "", d.heading_deg != null ? `heading ${Math.round(d.heading_deg)}°` : "",
                     d.climb_m_min != null && Math.abs(d.climb_m_min) > 60 ? `${d.climb_m_min > 0 ? "climbing" : "descending"} ${num(Math.abs(d.climb_m_min))} m/min` : ""].filter(Boolean).join(" · ");
                 return { title: d.callsign || String(d.icao).toUpperCase(), sub: sub || "ADS-B", link: ["3D map", "/flights3d"],
                     stats: [["Altitude", d.altitude_m != null ? `${num(d.altitude_m)} m` : "--"], ["Speed", d.speed_kmh != null ? `${num(d.speed_kmh)} km/h` : "--"],
@@ -343,16 +405,16 @@
                     link: ["SondeHub", `https://sondehub.org/${encodeURIComponent(d.serial)}`, true],
                     stats: [["Altitude", d.altitude_m != null ? `${num(d.altitude_m)} m` : "--"], ["Distance", d.distance_km != null ? `${num(d.distance_km, 1)} km` : "--"], ...aa(d.alt_deg, d.az_deg)] };
             case "planet":
-                return { title: d.name, sub: magTxt(d.mag), link: ["Open in Sky map", "/sky"], stats: [...aa(d.alt, d.az), ["RA", fmtRa(d.ra)], ["Dec", fmtDec(d.dec)]] };
+                return { title: d.name, sub: magTxt(d.mag), link: ["Open in Sky map", "/sky"], stats: [...aa(d.alt, d.az), ["RA", fmtRa(d.ra)], ["Dec", fmtDec(d.dec)], ...riseSetRows(c)] };
             case "star":
                 return { title: d.name, sub: [d.bayer, d.con ? `in ${conName(d.con) || d.con}` : "", magTxt(d.mag)].filter(Boolean).join(" · "), link: ["Open in Sky map", "/sky"],
-                    stats: [...aa(d.alt, d.az), ["RA", fmtRa(d.ra)], ["Dec", fmtDec(d.dec)]] };
+                    stats: [...aa(d.alt, d.az), ["RA", fmtRa(d.ra)], ["Dec", fmtDec(d.dec)], ...riseSetRows(c)] };
             case "dso":
                 return { title: `${d.id} ${d.name}`, sub: ["Messier object", magTxt(d.mag)].filter(Boolean).join(" · "), link: ["Open in Sky map", "/sky"],
-                    stats: [...aa(d.alt, d.az), ["RA", fmtRa(d.ra)], ["Dec", fmtDec(d.dec)]] };
+                    stats: [...aa(d.alt, d.az), ["RA", fmtRa(d.ra)], ["Dec", fmtDec(d.dec)], ...riseSetRows(c)] };
             case "sun":
             case "moon":
-                return { title: d.name, sub: d.illum != null ? `${Math.round(d.illum * 100)}% illuminated` : "", link: ["Open in Sky map", "/sky"], stats: aa(d.alt, d.az) };
+                return { title: d.name, sub: d.illum != null ? `${Math.round(d.illum * 100)}% illuminated` : "", link: ["Open in Sky map", "/sky"], stats: [...aa(d.alt, d.az), ...riseSetRows(c)] };
             default: {
                 const k = ((window.ALLSKY_CATALOG || {}).constellations || []).find((x) => x.id === d.id);
                 return { title: d.name, sub: d.common || "Constellation", link: ["Open in Sky map", "/sky"],
