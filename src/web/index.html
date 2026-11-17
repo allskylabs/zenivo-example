@@ -544,6 +544,13 @@
 
         <!-- PAGE: Settings (/settings) -->
         <section id="tab-settings" class="tab-content" data-sub="image">
+            <!-- Phone settings home (built by settings_home.js; shown only while /settings has no #section) -->
+            <div class="settings-home" id="settings-home" hidden>
+                <label class="sh-search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="search" id="sh-q" placeholder="Search settings" aria-label="Search settings" autocomplete="off"></label>
+                <div id="sh-groups"></div>
+                <p class="sh-none" id="sh-none" hidden>No setting matches.</p>
+            </div>
+            <a class="settings-back" href="/settings" id="settings-back">&lsaquo; Settings</a>
             <nav class="mobile-subnav" aria-label="Settings sections">
                 <a href="/settings#image" data-sub="image">Image Output</a>
                 <a href="/settings#detection" data-sub="detection">Detection</a>
@@ -1381,6 +1388,7 @@
 
         <!-- PAGE: Master Dark Calibration (/calibration) -->
         <section id="tab-calibration" class="tab-content">
+            <a class="settings-back settings-back-sub" href="/settings">&lsaquo; Settings</a>
             <div class="card">
                 <div class="card-header">
                     <h2>Master Dark Calibration Routine (AC1 / AC3)</h2>
@@ -1461,6 +1469,7 @@
         </section>
         <!-- TAB: Focus assistant (zoom, score and curve fit in one screen) -->
         <section id="tab-focus" class="tab-content">
+            <a class="settings-back settings-back-sub" href="/settings">&lsaquo; Settings</a>
             <div class="focus-layout" id="focus-layout">
                 <div class="card focus-main">
                     <div class="card-header">
@@ -1766,14 +1775,15 @@
     <script defer src="/static/app/08d-live-ui.js?v=20261118b"></script>
     <script defer src="/static/app/09-community.js?v=20261114b"></script>
     <script defer src="/static/app/10-admin.js?v=20261117a"></script>
+    <script defer src="/static/settings_home.js?v=1"></script>
     <script>
     // Settings sub-navigation: one section at a time, driven by the URL hash (/settings#detection)
     (function () {
         var sec = document.getElementById("tab-settings");
-        var subs = ["image", "detection", "station", "skymask", "integrations", "community", "admin"];
+        var subs = ["home", "image", "detection", "station", "skymask", "integrations", "community", "admin"];
         function apply() {
             var h = (location.hash || "").replace("#", "");
-            var sub = subs.indexOf(h) >= 0 ? h : "image";
+            var sub = subs.indexOf(h) > 0 ? h : (window.matchMedia("(max-width: 768px)").matches && location.pathname === "/settings" ? "home" : "image");
             sec.setAttribute("data-sub", sub);
             document.querySelectorAll("#settings-subnav .side-sub, .mobile-subnav a").forEach(function (a) {
                 a.classList.toggle("active", a.getAttribute("data-sub") === sub && location.pathname === "/settings");
@@ -1781,6 +1791,7 @@
             if (sub === "skymask") window.dispatchEvent(new Event("resize"));
         }
         window.addEventListener("hashchange", apply);
+        window.addEventListener("resize", function () { if (!location.hash) apply(); });
         apply();
     })();
     </script>

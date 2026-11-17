@@ -161,7 +161,7 @@
     let dots = [];   // hit targets of the last draw: { id, x, y }
     function drawRadar() {
         if (!cv) return;
-        const box = cv.parentElement, size = Math.max(160, Math.min(box.clientWidth, 360)), dpr = window.devicePixelRatio || 1;
+        const box = cv.parentElement, size = Math.max(160, Math.min(box.clientWidth, window.innerWidth <= 520 ? 240 : 340)), dpr = window.devicePixelRatio || 1;
         if (cv.width !== Math.round(size * dpr)) { cv.width = Math.round(size * dpr); cv.height = Math.round(size * dpr); }
         cv.style.width = size + "px"; cv.style.height = size + "px";
         const g = cv.getContext("2d");
