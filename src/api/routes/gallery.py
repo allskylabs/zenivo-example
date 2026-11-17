@@ -3,7 +3,7 @@ Gallery, timelapse, sky events and stored frame endpoints.
 """
 
 from typing import Optional
-from fastapi import HTTPException, Query, Depends
+from fastapi import HTTPException, Path, Query, Depends
 
 from src.api.schemas import (
     EventConfigRequest,
@@ -133,3 +133,23 @@ def get_event_image(day: str, name: str, service: AllSkyService = Depends(get_se
     if not path:
         raise HTTPException(status_code=404, detail="Event image not found")
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
+
+
+_EVENT_ID = r"^[a-z]+_\d{8}_\d{6}_\d{3}$"
+
+
+@router.get("/api/events/{event_id}")
+def get_event(event_id: str = Path(pattern=_EVENT_ID), service: AllSkyService = Depends(get_service)):
+    """One saved sky event (deep link: /gallery?event=<id>)."""
+    ev = service.get_event(event_id)
+    if ev is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return ev
+
+
+@router.delete("/api/events/{event_id}")
+def delete_event(event_id: str = Path(pattern=_EVENT_ID), service: AllSkyService = Depends(get_service)):
+    """Delete one event and its images. Admin only like every write (src/auth/policy.py); logged in the activity log."""
+    if not service.delete_event(event_id):
+        raise HTTPException(status_code=404, detail="Event not found")
+    return {"deleted": event_id}

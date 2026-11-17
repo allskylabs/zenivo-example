@@ -3,6 +3,7 @@
 Mixin of AllSkyService (src/api/service.py): methods only, all state lives on the service instance."""
 
 import os
+import re
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import numpy as np
@@ -160,9 +161,9 @@ class EventsMixin:
         if overview is not None and cv2.imwrite(os.path.join(day_dir, f"{eid}_sky.jpg"), overview, [cv2.IMWRITE_JPEG_QUALITY, 85]):
             rec["sky_url"] = f"/api/events/img/{day}/{eid}_sky.jpg"
             rec.setdefault("thumbnail_url", rec["sky_url"])
-        with open(os.path.join(day_dir, "events.jsonl"), "a", encoding="utf-8") as fp:
-            fp.write(json.dumps(rec) + "\n")
         with self._events_lock:
+            with open(os.path.join(day_dir, "events.jsonl"), "a", encoding="utf-8") as fp:
+                fp.write(json.dumps(rec) + "\n")
             if self._events_cache is not None:
                 self._events_cache.insert(0, rec)
                 del self._events_cache[self.EVENT_KEEP_IN_MEMORY:]
@@ -224,6 +225,72 @@ class EventsMixin:
                     "length_px": e.get("length_px"), "peak_dn": e.get("peak_dn"),
                     "flight": callsign(e)} for e in out]
         return {"events": out, "total_count": len(events), "counts": counts, **self.get_event_config()}
+
+    _EVENT_ID_RE = re.compile(r"^[a-z]+_(\d{4})(\d{2})(\d{2})_\d{6}_\d{3}$")
+
+    def _event_day(self, event_id: str) -> Optional[str]:
+        m = self._EVENT_ID_RE.match(event_id or "")
+        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else None
+
+    def get_event(self, event_id: str) -> Optional[Dict[str, Any]]:
+        """One saved event by id (deep link), from memory or its day's file; None when unknown."""
+        import json
+
+        day = self._event_day(event_id)
+        if day is None:
+            return None
+        for e in self._load_events():
+            if e.get("event_id") == event_id:
+                return e
+        try:
+            with open(os.path.join(self.events_dir, day, "events.jsonl"), encoding="utf-8") as fp:
+                for line in fp:
+                    if line.strip() and f'"{event_id}"' in line:
+                        rec = json.loads(line)
+                        if rec.get("event_id") == event_id:
+                            return rec
+        except (OSError, ValueError):
+            pass
+        return None
+
+    def delete_event(self, event_id: str) -> bool:
+        """Remove one event: its line in the day's events.jsonl and its image files. False when it does not exist."""
+        import json
+
+        day = self._event_day(event_id)
+        if day is None:
+            return False
+        day_dir = os.path.join(self.events_dir, day)
+        path = os.path.join(day_dir, "events.jsonl")
+        with self._events_lock:
+            try:
+                with open(path, encoding="utf-8") as fp:
+                    lines = [ln for ln in fp if ln.strip()]
+            except OSError:
+                return False
+            keep = []
+            for ln in lines:
+                try:
+                    if json.loads(ln).get("event_id") == event_id:
+                        continue
+                except ValueError:
+                    pass
+                keep.append(ln)
+            if len(keep) == len(lines):
+                return False
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fp:
+                fp.writelines(keep)
+            os.replace(tmp, path)
+            if self._events_cache is not None:
+                self._events_cache = [e for e in self._events_cache if e.get("event_id") != event_id]
+        for suffix in (".jpg", "_sky.jpg"):
+            try:
+                os.remove(os.path.join(day_dir, f"{event_id}{suffix}"))
+            except OSError:
+                pass
+        self.activity.info("events", f"Event {event_id} deleted by the admin", event_id=event_id)
+        return True
 
     @staticmethod
     def _event_ts(e: Dict[str, Any]) -> float:
