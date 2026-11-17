@@ -380,3 +380,8 @@ body.page-3d #btn-track { background: var(--accent); border-color: var(--accent)
     #tab-focus button, #tab-focus select, #tab-focus input[type="number"], #tab-focus input[type="text"] { min-height: 44px; }
     #tab-focus input[type="range"] { height: 44px; }
 }
+
+/* Red Vision leftovers found on the real station: event-type colours and unstyled links */
+[data-theme="red"] .evc-dot { background-color: var(--accent) !important; border-color: var(--accent) !important; }
+[data-theme="red"] .live-event { border-left-color: var(--accent) !important; }
+[data-theme="red"] a:not([class]) { color: var(--accent); }
