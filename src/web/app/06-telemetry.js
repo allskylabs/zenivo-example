@@ -89,6 +89,12 @@ function syncModeButtons(modeStr) {
     btnLockGain.textContent = isLocked("gain") ? "Locked" : "Auto";
     btnLockExposure.setAttribute("aria-pressed", isLocked("exposure") ? "true" : "false");
     btnLockGain.setAttribute("aria-pressed", isLocked("gain") ? "true" : "false");
+    // Summary row of the Exposure card: Auto, or which knob is held
+    const lockText = document.getElementById("telem-lock");
+    if (lockText) {
+        lockText.textContent = { both: "Locked", exposure: "Shutter locked", gain: "Gain locked" }[state.aeLock] || "Auto";
+        lockText.classList.toggle("locked", !!state.aeLock);
+    }
 }
 
 function showExposureWarning(info) {

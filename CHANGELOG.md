@@ -6,6 +6,10 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Live: the Exposure card is back under the picture as one row (shutter, gain and Auto/Locked, open or closed remembered); the admin changes exposure there, a guest sees the live values with the controls disabled and a sign-in link. Settings > Image output still shows the same card.
+
 ## [1.3.0-beta.2] - 2026-11-17
 
 Second public beta. Not every feature has been tested; see the notice in the README. Touch gestures on real phones (pinch, drag) have only been exercised with synthetic events.
