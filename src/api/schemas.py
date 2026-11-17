@@ -278,6 +278,7 @@ class ObsOverlayRequest(BaseModel):
     """OBS and live stream celestial overlay, transform, title, and replay settings."""
     sky_overlay: Optional[bool] = Field(None, description="Show stars & constellations stick figures")
     sky_labels: Optional[bool] = Field(None, description="Show star & constellation labels")
+    dso_overlay: Optional[bool] = Field(None, description="Show Messier deep-sky object markers & labels")
     grid_overlay: Optional[bool] = Field(None, description="Show alt/az grid rings & N/E/S/W compass")
     sun_moon: Optional[bool] = Field(None, description="Show Sun & Moon tracking markers")
     badge: Optional[bool] = Field(None, description="Show astrometry info badge (LST, FOV, PA)")

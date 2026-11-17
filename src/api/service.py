@@ -154,6 +154,7 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
     DEFAULT_OBS_OVERLAY: Dict[str, Any] = {
         "sky_overlay": False,
         "sky_labels": False,
+        "dso_overlay": False,
         "grid_overlay": False,
         "sun_moon": True,
         "badge": True,
