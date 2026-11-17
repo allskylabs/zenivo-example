@@ -264,12 +264,17 @@ def detect_bright_points(frame_bgr: np.ndarray, max_points: int = 40, border_px:
         x0, y0, bw, bh, area = stats[i]
         if area < 3 or area > 80 or max(bw, bh) > 3 * max(1, min(bw, bh)) + 2:
             continue
-        cx, cy = cent[i]
+        # Flux-weighted centroid inside the blob's box: lower noise than the geometric centre of the thresholded pixels
+        wts = np.where(lab[y0:y0 + bh, x0:x0 + bw] == i, np.maximum(diff[y0:y0 + bh, x0:x0 + bw], 0.0), 0.0)
+        flux = float(wts.sum())
+        if flux <= 0.0:
+            continue
+        cx = x0 + float((wts.sum(axis=0) * np.arange(bw)).sum()) / flux
+        cy = y0 + float((wts.sum(axis=1) * np.arange(bh)).sum()) / flux
         if cx < border_px or cy < border_px or cx > w - border_px or cy > h - border_px:
             continue
         if sky_mask is not None and not sky_mask[int(cy), int(cx)]:
             continue
-        flux = float(diff[lab == i].sum())
         pts.append((cx, cy, flux))
     pts.sort(key=lambda p: -p[2])
     return np.array(pts[:max_points], dtype=np.float64).reshape(-1, 3)
@@ -288,6 +293,13 @@ def _pix_to_cam(xy: np.ndarray, f: float, cx: float, cy: float, proj: str = "rec
             theta -= (theta + k * theta ** 3 - rn) / (1.0 + 3.0 * k * theta ** 2)
         phi = np.arctan2(dy, dx)
         return np.column_stack([np.sin(theta) * np.cos(phi), np.sin(theta) * np.sin(phi), np.cos(theta)])
+    if k != 0.0:  # rectilinear lens with radial distortion: radius = f * (t + k * t^3), t = tan(theta)
+        rd = np.hypot(dx, dy)
+        t = rd.copy()
+        for _ in range(10):  # Newton: t + k t^3 = rd
+            t -= (t + k * t ** 3 - rd) / np.maximum(1.0 + 3.0 * k * t ** 2, 1e-3)
+        scale = np.where(rd > 1e-12, t / np.maximum(rd, 1e-12), 1.0)
+        dx, dy = dx * scale, dy * scale
     v = np.column_stack([dx, dy, np.ones(len(xy))])
     return v / np.linalg.norm(v, axis=1, keepdims=True)
 
@@ -335,8 +347,14 @@ def _project(R: np.ndarray, enu: np.ndarray, f: float, cx: float, cy: float,
         xy[ok, 1] = cy + r[ok] * cam[ok, 1] / rho[ok]
         return xy, ok
     ok = cam[:, 2] > 0.05
-    xy[ok, 0] = f * cam[ok, 0] / cam[ok, 2] + cx
-    xy[ok, 1] = f * cam[ok, 1] / cam[ok, 2] + cy
+    if k == 0.0:
+        xy[ok, 0] = f * cam[ok, 0] / cam[ok, 2] + cx
+        xy[ok, 1] = f * cam[ok, 1] / cam[ok, 2] + cy
+        return xy, ok
+    xn, yn = cam[ok, 0] / cam[ok, 2], cam[ok, 1] / cam[ok, 2]
+    s = 1.0 + k * (xn ** 2 + yn ** 2)
+    xy[ok, 0] = f * xn * s + cx
+    xy[ok, 1] = f * yn * s + cy
     return xy, ok
 
 
@@ -418,11 +436,63 @@ def _refine_fisheye_model(xy: np.ndarray, enu: np.ndarray, f0: float, cx0: float
     return cx, cy, f, k, R, e
 
 
+def _refine_focal_distortion(xy: np.ndarray, enu: np.ndarray, f0: float, cx: float, cy: float, k0: float,
+                             proj: str, f_span: float = 0.05, k_max: float = 0.15
+                             ) -> Tuple[float, float, np.ndarray, float]:
+    """Levenberg-Marquardt fit of focal length and radial distortion k on matched star pairs (rotation by Kabsch).
+
+    Returns (f, k, R, rms_px). f stays within f0*(1 +- f_span) and |k| <= k_max."""
+    def resid(p):
+        cam = _pix_to_cam(xy, p[0], cx, cy, proj, p[1])
+        R = _kabsch(cam, enu)
+        pr, _ = _project(R, enu, p[0], cx, cy, proj, p[1])
+        return np.nan_to_num((pr - xy).ravel(), nan=1e3)
+
+    p = np.array([f0, k0], dtype=np.float64)
+    r = resid(p)
+    lam, steps = 1e-3, np.array([0.05, 1e-4])
+    lo, hi = np.array([f0 * (1 - f_span), -k_max]), np.array([f0 * (1 + f_span), k_max])
+    for _ in range(40):
+        J = np.column_stack([(resid(p + np.eye(2)[i] * steps[i]) - r) / steps[i] for i in range(2)])
+        A, g = J.T @ J, J.T @ r
+        try:
+            trial = np.clip(p - np.linalg.solve(A + lam * np.diag(np.diag(A) + 1e-9), g), lo, hi)
+        except np.linalg.LinAlgError:
+            break
+        r_trial = resid(trial)
+        if r_trial @ r_trial < r @ r:
+            done = r @ r - r_trial @ r_trial < 1e-8 * (r @ r)
+            p, r, lam = trial, r_trial, lam / 3.0
+            if done:
+                break
+        else:
+            lam *= 4.0
+            if lam > 1e6:
+                break
+    R = _kabsch(_pix_to_cam(xy, p[0], cx, cy, proj, p[1]), enu)
+    return float(p[0]), float(p[1]), R, float(np.sqrt(np.mean(np.sum(r.reshape(-1, 2) ** 2, axis=1))))
+
+
+def drift_consistent(v_pred: np.ndarray, v_meas: np.ndarray, sigma_v: float = 0.0, rel_tol: float = 0.35,
+                     max_outlier_frac: float = 0.25) -> Tuple[bool, float]:
+    """Robust check that measured star velocities (px/s) follow the predicted sky drift.
+
+    Per-star tolerance is max(rel_tol*|v|, 3*sigma_v, 0.01); a few stars may be off (a blend, a bad centroid) as
+    long as the median relative error is within rel_tol. Returns (ok, median error in px/s)."""
+    err = np.linalg.norm(np.asarray(v_pred) - np.asarray(v_meas), axis=1)
+    speed = np.linalg.norm(v_pred, axis=1)
+    tol = np.maximum(np.maximum(rel_tol * speed, 3.0 * sigma_v), 0.01)
+    bad = int(np.sum(err > tol))
+    ok = bad <= int(max_outlier_frac * len(err)) and float(np.median(err / tol)) <= 1.0
+    return ok, float(np.median(err))
+
+
+REF_WIDTH_PX = 1296.0  # frame width the pixel tolerances below were tuned at
 SIDEREAL_RATE_RAD_S = 7.2921159e-5
 
 
 def track_sidereal_points(frames: Sequence[np.ndarray], times: Sequence[float], focal_px: float,
-                          sky_mask: Optional[np.ndarray] = None, sigma: float = 3.0, max_points: int = 600,
+                          sky_mask: Optional[np.ndarray] = None, sigma: float = 4.5, max_points: int = 150,
                           min_drift_px: float = 1.8, link_px: float = 3.0) -> Dict[str, Any]:
     """Keep only point sources that persist across a frame series AND drift with the sky.
 
@@ -432,6 +502,8 @@ def track_sidereal_points(frames: Sequence[np.ndarray], times: Sequence[float], 
     "span_s", and counts for diagnostics. focal_px only sets the plausible speed range, so a rough value works.
     """
     n = len(frames)
+    px_scale = frames[0].shape[1] / REF_WIDTH_PX  # pixel tolerances are defined at the 1296 px reference width
+    link_px, min_drift_px = link_px * px_scale, min_drift_px * px_scale
     t = np.asarray(times, dtype=np.float64)
     t_ref = float(t.mean())
     span = float(t.max() - t.min()) if n > 1 else 0.0
@@ -478,7 +550,7 @@ def track_sidereal_points(frames: Sequence[np.ndarray], times: Sequence[float], 
         if drift < min_drift_px:
             n_static += 1
             continue
-        if math.hypot(cx[1], cy[1]) > v_max or resid > 1.5:
+        if math.hypot(cx[1], cy[1]) > v_max or resid > 1.5 * px_scale:
             continue  # aircraft, satellites, flicker
         pts.append((cx[0], cy[0], float(np.median(a[:, 3]))))
         vel.append((cx[1], cy[1]))
@@ -488,6 +560,8 @@ def track_sidereal_points(frames: Sequence[np.ndarray], times: Sequence[float], 
         "velocity": np.array([vel[i] for i in order], dtype=np.float64).reshape(-1, 2),
         "time": t_ref,
         "span_s": span,
+        # 1-sigma error of a fitted drift speed (px/s) from ~0.4 px centroid noise over n frames spanning span_s
+        "velocity_sigma": 0.4 * px_scale / max(span * math.sqrt(n / 12.0), 1.0),
         "detections_per_frame": [int(len(d)) for d in dets],
         "persistent": n_persistent,
         "static": n_static,
@@ -568,6 +642,9 @@ def solve_fixed_lens(
     min_matches: int = 3,
     max_rms_px: float = 2.5,
     min_completeness: float = 0.5,
+    velocity_sigma: float = 0.0,
+    refine_lens: bool = True,
+    min_refine_matches: int = 8,
 ) -> Dict[str, Any]:
     """Pointing for a lens whose intrinsics (focal length, optical centre, distortion) are already known.
 
@@ -584,6 +661,8 @@ def solve_fixed_lens(
     w, h = image_size
     cx, cy = center_px
     f, kd = float(focal_px), float(distortion_k)
+    px_scale = w / REF_WIDTH_PX  # tolerances in px are defined at the 1296 px reference width
+    tol_px, max_rms_px = tol_px * px_scale, max_rms_px * px_scale
     pts = np.asarray(points, dtype=np.float64).reshape(-1, 3)
     if len(pts) < 3:
         return {"success": False, "error": f"only {len(pts)} star-like points to match"}
@@ -744,10 +823,10 @@ def solve_fixed_lens(
             di = [m[1] for m in c["matches"]]
             v_pred = predicted_velocity(c["R"], c["f"], ci)
             v_meas = np.asarray(velocity)[di]
-            err = np.linalg.norm(v_pred - v_meas, axis=1)
-            if np.any(err > np.maximum(0.35 * np.linalg.norm(v_pred, axis=1), 0.01)):
+            ok_drift, med_err = drift_consistent(v_pred, v_meas, velocity_sigma)
+            if not ok_drift:
                 c["reason"] = "matched stars do not drift the way the sky moves"
-            c["drift_err_px_s"] = round(float(err.max()), 4)
+            c["drift_err_px_s"] = round(med_err, 4)
         elif len(c["matches"]) < min_matches + 1:
             c["reason"] = "3 stars without drift data are not enough to be sure"
         if c["reason"] is None:
@@ -763,9 +842,28 @@ def solve_fixed_lens(
             return {"success": False, "error": "ambiguous: two different pointings fit the stars equally well",
                     "detections": int(len(pts))}
 
+    refined = None
+    if refine_lens and len(best["matches"]) >= min_refine_matches:
+        # Enough stars to measure focal length and radial distortion: refit both, keep them only if the fit tightens
+        ci = [m[0] for m in best["matches"]]
+        di = [m[1] for m in best["matches"]]
+        f_r, k_r, R_r, _ = _refine_focal_distortion(pts[di, :2], enu[ci], best["f"], cx, cy, kd, proj)
+        xy_r, _ = _project(R_r, enu, f_r, cx, cy, proj, k_r)
+        inside_r = np.isfinite(xy_r[:, 0]) & (xy_r[:, 0] >= 0) & (xy_r[:, 0] < w) & (xy_r[:, 1] >= 0) & (xy_r[:, 1] < h)
+        m_r = _match(np.where(inside_r[:, None], xy_r, np.nan), pts[:, :2], tol_px)
+        if len(m_r) >= len(best["matches"]):
+            rms_r = float(np.sqrt(np.mean([e * e for _, _, e in m_r])))
+            if rms_r < 0.9 * best["rms"]:
+                refined = {"focal_px": f_r, "distortion_k": k_r, "rms_before_px": best["rms"], "rms_after_px": rms_r}
+                best = dict(best, R=R_r, f=f_r, matches=m_r, rms=rms_r)
+                kd = k_r
+
     out = {"success": True, "mode": "fixed_lens"}
     out.update(_pointing_result(best["R"], best["f"], cx, cy, kd, proj, w, h, latitude_deg, longitude_deg, when))
     out["focal_scale"] = round(best["f"] / f, 4)
+    out["frame_width"], out["frame_height"] = int(w), int(h)
+    if refined is not None:
+        out["refined_lens"] = {k: round(float(v), 5 if k == "distortion_k" else 2) for k, v in refined.items()}
     matched = [{"name": objs[c]["name"], "mag": float(objs[c]["mag"]), "x": round(float(pts[d, 0]), 1),
                 "y": round(float(pts[d, 1]), 1), "err_px": round(e, 1)} for c, d, e in best["matches"]]
     matched.sort(key=lambda m: m["mag"])

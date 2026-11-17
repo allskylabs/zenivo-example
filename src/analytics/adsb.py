@@ -321,7 +321,10 @@ def _project_cam_to_px(cam: np.ndarray, solution: Dict[str, Any]) -> Optional[Tu
         return float(cx + r * cam[0] / rho), float(cy + r * cam[1] / rho)
     if cam[2] <= 0.05:
         return None
-    return float(f * cam[0] / cam[2] + cx), float(f * cam[1] / cam[2] + cy)
+    xn, yn = float(cam[0] / cam[2]), float(cam[1] / cam[2])
+    k = float(solution.get("distortion_k") or 0.0)
+    s = 1.0 + k * (xn * xn + yn * yn)  # radial distortion r = f*t*(1 + k*t^2), as in bright_star_solver
+    return float(f * xn * s + cx), float(f * yn * s + cy)
 
 
 def frame_to_azalt(x_frac: float, y_frac: float, solution: Dict[str, Any]) -> Tuple[float, float]:
@@ -339,6 +342,14 @@ def frame_to_azalt(x_frac: float, y_frac: float, solution: Dict[str, Any]) -> Tu
         phi = math.atan2(dy, dx)
         v = np.array([math.sin(theta) * math.cos(phi), math.sin(theta) * math.sin(phi), math.cos(theta)])
     else:
+        k = float(solution.get("distortion_k") or 0.0)
+        if k != 0.0:
+            rd = math.hypot(dx, dy)
+            t = rd
+            for _ in range(10):
+                t -= (t + k * t ** 3 - rd) / max(1e-3, 1.0 + 3.0 * k * t ** 2)
+            if rd > 1e-12:
+                dx, dy = dx * t / rd, dy * t / rd
         v = np.array([dx, dy, 1.0])
         v = v / np.linalg.norm(v)
     e = R @ v

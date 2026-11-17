@@ -194,8 +194,10 @@ function drawReticle() {
                 sensorPy = optY + (r * cy) / rho;
             } else {
                 if (cz < 0.05) return { x: NaN, y: NaN, alt: altDeg, az: azDeg, theta, visible: false };
-                sensorPx = optX + (fPx * dot(camX)) / cz;
-                sensorPy = optY + (fPx * dot(camY)) / cz;
+                const xn = dot(camX) / cz, yn = dot(camY) / cz;
+                const sk = 1 + distK * (xn * xn + yn * yn); // radial distortion r = f t (1 + k t^2), same as bright_star_solver._project
+                sensorPx = optX + fPx * xn * sk;
+                sensorPy = optY + fPx * yn * sk;
             }
             const canvasX = offsetX + toImgX(sensorPx) * scaleX;
             const canvasY = offsetY + toImgY(sensorPy) * scaleY;

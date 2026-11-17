@@ -222,6 +222,10 @@ cloud events.
 - **Plate solving:** about 6 long exposures over 90 s or more.
   - The local `bright_star_solver` keeps only points that drift at the sidereal rate, then
     matches them against the catalog and the planets (TRIAD + Kabsch).
+  - Tracking detects at sigma 4.5 (cap 150, flux-weighted centroids); the drift gate is robust (median
+    error, up to 25 % outliers, tolerance max(0.35 v, 3 sigma_v)). Pixel tolerances scale with frame width / 1296.
+  - Radial distortion `r = f t (1 + k t^2)`, t = tan(theta), applies to rectilinear lenses; equidistant keeps `f (theta + k theta^3)`.
+    A fixed-lens solve with 8+ matches refits f and k and stores them when the RMS drops by 10 % or more.
   - If that fails, the frames go to the remote blind solver.
   - A failed solve never overwrites the optics. A sky/obstruction polygon mask limits where stars
     are searched.

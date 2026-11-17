@@ -345,3 +345,40 @@ def test_manual_star_align_identifies_clicked_stars(monkeypatch):
     with pytest.raises(ValueError):
         svc.manual_star_solve(clicks[:3])
     AllSkyService.reset_instance()
+
+
+def test_rectilinear_distortion_roundtrip_and_zero_is_identity():
+    rng = np.random.default_rng(1)
+    R = _rotation(120.0, 35.0, 5.0)
+    dirs = R @ np.array([0.0, 0.0, 1.0])
+    pts = rng.normal(size=(40, 3)) * 0.35 + dirs  # directions within ~35 deg of the axis
+    enu = pts / np.linalg.norm(pts, axis=1, keepdims=True)
+    f, cx, cy = 950.0, 648.0, 365.0
+    xy0, ok0 = bss._project(R, enu, f, cx, cy, "rectilinear", 0.0)
+    xy_plain = np.full_like(xy0, np.nan)
+    cam = enu @ R
+    xy_plain[ok0] = np.column_stack([f * cam[ok0, 0] / cam[ok0, 2] + cx, f * cam[ok0, 1] / cam[ok0, 2] + cy])
+    assert np.array_equal(xy0[ok0], xy_plain[ok0])  # k = 0 is bit-identical to the plain pinhole model
+    xy, ok = bss._project(R, enu, f, cx, cy, "rectilinear", 0.03)
+    assert np.abs(xy[ok] - xy0[ok]).max() > 1.0  # k really moves points
+    back = bss._pix_to_cam(xy[ok], f, cx, cy, "rectilinear", 0.03)
+    assert np.abs(back - cam[ok]).max() < 1e-9
+
+
+def test_drift_gate_tolerates_one_outlier_but_not_a_wrong_sky():
+    v = np.tile([0.3, -0.1], (10, 1))
+    meas = v.copy()
+    meas[2] = [-0.4, 0.3]  # one blended star
+    assert bss.drift_consistent(v, meas, 0.01)[0]
+    assert not bss.drift_consistent(v, -v, 0.01)[0]
+    jitter = v + np.array([0.04, 0.0])  # 0.04 px/s off is inside 3 sigma when sigma_v = 0.02
+    assert bss.drift_consistent(v * 0.05, v * 0.05 + 0.04, 0.02)[0]
+    assert not bss.drift_consistent(v * 0.05, v * 0.05 + 0.04, 0.0)[0]
+    assert bss.drift_consistent(v, jitter, 0.0)[0]
+
+
+def test_pixel_tolerances_scale_with_frame_width():
+    frame = np.zeros((100, 2592), np.uint8)
+    tr = bss.track_sidereal_points([frame] * 3, [0.0, 30.0, 60.0], 1000.0)
+    ref = bss.track_sidereal_points([frame[:, :1296]] * 3, [0.0, 30.0, 60.0], 1000.0)
+    assert tr["velocity_sigma"] == pytest.approx(2.0 * ref["velocity_sigma"])

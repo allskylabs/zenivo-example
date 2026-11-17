@@ -479,7 +479,8 @@ class PlateSolveMixin:
                     frame, max_points=30, sky_mask=mask, sigma=3.5)
                 res = bss.solve_fixed_lens(
                     pts, (w, h), lat, lon, when, intr["f"], (intr["cx"], intr["cy"]), intr["k"], intr["proj"],
-                    velocity=tracked["velocity"] if tracked is not None else None, sky_mask=mask)
+                    velocity=tracked["velocity"] if tracked is not None else None, sky_mask=mask,
+                    velocity_sigma=tracked["velocity_sigma"] if tracked is not None else 0.0)
                 if not res.get("success"):
                     self.activity.info("station", f"Fixed-lens solve: {res.get('error')}; trying a full lens solve")
             if not res.get("success"):
@@ -672,7 +673,7 @@ class PlateSolveMixin:
         return out
 
     def _apply_fixed_lens_solution(self, res: Dict[str, Any]) -> Dict[str, Any]:
-        """Store the pointing from a fixed-lens solve; the solved lens intrinsics stay as they are."""
+        """Store the pointing from a fixed-lens solve; the lens intrinsics stay unless the solve re-measured them."""
         names = [m["name"] for m in res["matched_stars"]]
         ra, dec, roll = res["center_ra_deg"], res["center_dec_deg"], res["roll_deg"]
         ra_h, dec_abs = ra / 15.0, abs(dec)
@@ -690,6 +691,23 @@ class PlateSolveMixin:
         })
         optics = dict(self.station_config.get("optics") or {})
         optics["pointing_model"] = True
+        if res.get("refined_lens"):
+            # Enough stars to re-measure focal length and distortion k: store them like a free-lens solve does
+            sensor = self.station_config.get("camera_sensor") or {}
+            sk = float(sensor.get("width_px") or res["frame_width"]) / float(res["frame_width"])
+            f_s = res["focal_px"] * sk
+            fisheye = res.get("projection") == "equidistant"
+            dist_k = float(res["distortion_k"])
+            optics.update({
+                "focal_length_px": round(f_s, 2),
+                "focal_length_mm": round(f_s * float(sensor.get("pixel_pitch_um") or 2.0) / 1000.0, 3),
+                "distortion_k": dist_k,
+                "pixel_scale_arcsec_px": round(3600.0 * math.degrees(1.0 / f_s), 2),
+                "fov_horizontal_deg": res["fov_horizontal_deg"],
+                "fov_vertical_deg": res["fov_vertical_deg"],
+            })
+            if fisheye:
+                optics["horizon_radius_90_px"] = round(f_s * (math.pi / 2 + dist_k * (math.pi / 2) ** 3), 1)
         self.station_config.update({
             "plate_solver_endpoint": "local bright-star pattern solver",
             "solve_source": "live_frame (bright-star pattern, fixed lens)",
