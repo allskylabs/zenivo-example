@@ -25,7 +25,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
-    <link rel="stylesheet" href="/style.css?v=20261121f">
+    <link rel="stylesheet" href="/style.css?v=20261121g">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -408,7 +408,7 @@
                         <!-- Shutter Slider -->
                         <div class="control-group">
                             <div class="control-label-row">
-                                <label for="range-exposure">Shutter</label>
+                                <span class="ctl-tx"><label for="range-exposure">Shutter</label><span class="ctl-state" data-range="0.15 ms to 60 s"></span></span>
                                 <span class="range-value-row">
                                     <span class="range-value" id="val-exposure">2.000 s</span>
                                     <button id="lock-exposure" data-admin class="btn-lock" type="button" aria-pressed="false" title="Lock shutter: Auto then adjusts only gain">Auto</button>
@@ -428,7 +428,7 @@
                         <!-- Gain Slider -->
                         <div class="control-group">
                             <div class="control-label-row">
-                                <label for="range-gain">Gain</label>
+                                <span class="ctl-tx"><label for="range-gain">Gain</label><span class="ctl-state" data-range="0 to 72 dB"></span></span>
                                 <span class="range-value-row">
                                     <span class="range-value" id="val-gain">24.0 dB</span>
                                     <button id="lock-gain" data-admin class="btn-lock" type="button" aria-pressed="false" title="Lock gain: Auto then adjusts only shutter">Auto</button>
@@ -446,7 +446,7 @@
                         <!-- Target brightness -->
                         <div class="control-group">
                             <div class="control-label-row">
-                                <label for="range-target">Target brightness (0-255)</label>
+                                <span class="ctl-tx"><label for="range-target">Target brightness</label><span class="ctl-state" data-range="5 to 250"></span></span>
                                 <span class="range-value-row">
                                     <span class="range-value" id="val-target">--</span>
                                     <button id="lock-target" data-admin class="btn-lock" type="button" aria-pressed="false" title="Lock the brightness Auto aims for">Auto</button>
@@ -633,10 +633,10 @@
                                 <label for="perf-stream-quality">JPEG quality</label>
                                 <input type="number" id="perf-stream-quality" min="40" max="95" step="1" value="75" />
                             </div>
-                            <div class="field">
-                                <label for="star-boost-enabled">Night star boost</label>
-                                <label class="checkbox-label"><input type="checkbox" id="star-boost-enabled" /> Brighten stars by binning</label>
-                            </div>
+                            <label class="toggle-row field-wide" for="star-boost-enabled">
+                                <span class="toggle-text"><span class="toggle-title">Night star boost</span><span class="toggle-hint">Brighten stars by binning</span></span>
+                                <input type="checkbox" id="star-boost-enabled" class="switch" />
+                            </label>
                             <div class="field">
                                 <label for="star-boost-bin">Bin window</label>
                                 <select id="star-boost-bin">
@@ -652,10 +652,10 @@
                     <fieldset class="settings-group">
                         <legend>Star count &amp; cloud cover</legend>
                         <div class="field-grid">
-                            <div class="field">
-                                <label for="perf-sky-enabled">Sampling</label>
-                                <label class="checkbox-label"><input type="checkbox" id="perf-sky-enabled" checked /> Sample day and night</label>
-                            </div>
+                            <label class="toggle-row field-wide" for="perf-sky-enabled">
+                                <span class="toggle-text"><span class="toggle-title">Sampling</span><span class="toggle-hint">Sample day and night</span></span>
+                                <input type="checkbox" id="perf-sky-enabled" class="switch" checked />
+                            </label>
                             <div class="field">
                                 <label for="perf-sky-interval">Interval (min)</label>
                                 <input type="number" id="perf-sky-interval" data-scale="60" min="0.5" max="60" step="0.5" value="5" />
@@ -685,7 +685,7 @@
                     <!-- White balance (RAW10 night mode) -->
                     <fieldset class="settings-group">
                         <legend>White Balance</legend>
-                        <div class="field-grid">
+                        <div class="field-grid cols2">
                             <div class="field field-wide">
                                 <label for="wb-mode">Mode</label>
                                 <select id="wb-mode">
@@ -786,7 +786,7 @@
                     </fieldset>
                     <fieldset class="settings-group">
                         <legend>Cloud Cover</legend>
-                        <div class="field-grid">
+                        <div class="field-grid cols2">
                             <div class="field">
                                 <label for="roi-left">Sky region left (%)</label>
                                 <input type="number" id="roi-left" data-roi="0" min="0" max="95" step="1" value="0" />
@@ -845,7 +845,7 @@
                         </div>
                         <details class="params-summary">
                             <summary>Advanced</summary>
-                            <div class="field-grid">
+                            <div class="field-grid cols2">
                                 <div class="field">
                                     <label for="dayobj-min-area">Smallest object (px)</label>
                                     <input type="number" id="dayobj-min-area" min="1" max="100" step="1" value="2" />
@@ -890,7 +890,7 @@
                     <!-- Station coordinates -->
                     <fieldset class="settings-group">
                         <legend>Station Coordinates</legend>
-                        <div class="field-grid">
+                        <div class="field-grid cols2">
                             <div class="field field-wide">
                                 <label for="station-name">Station name</label>
                                 <input type="text" id="station-name" value="My station" />
@@ -922,7 +922,7 @@
                     <!-- Sensor & lens identity (read-only, reported by the camera) -->
                     <fieldset class="settings-group">
                         <legend>Sensor &amp; Lens</legend>
-                        <div class="field-grid">
+                        <div class="field-grid kv-grid">
                             <div class="field">
                                 <label for="st-f-tz">Station timezone</label>
                                 <select id="st-f-tz" class="mono" title="Clock, observing day and file names of this station follow it"></select>
@@ -950,7 +950,7 @@
                     <!-- Lens & optics -->
                     <fieldset class="settings-group">
                         <legend>Lens &amp; Optics</legend>
-                        <div class="field-grid">
+                        <div class="field-grid cols2">
                             <div class="field">
                                 <label for="opt-focal">Focal length (mm)</label>
                                 <input type="number" id="opt-focal" min="0.5" max="500" step="0.01" value="1.65" />
@@ -985,7 +985,7 @@
                     <!-- Mount orientation -->
                     <fieldset class="settings-group">
                         <legend>Camera Mounting</legend>
-                        <div class="field-grid">
+                        <div class="field-grid cols2">
                             <div class="field">
                                 <label for="ori-npa">North position angle (°)</label>
                                 <input type="number" id="ori-npa" min="0" max="360" step="0.1" value="0.0" />
@@ -1004,7 +1004,7 @@
                 </div>
 
                 <div class="settings-actions">
-                    <button id="btn-station-solve" class="btn btn-outline" type="button">🔭 Capture &amp; Auto Plate-Solve</button>
+                    <button id="btn-station-solve" class="btn btn-primary btn-block" type="button">🔭 Capture &amp; Auto Plate-Solve</button>
                     <label class="checkbox-label" title="Ignore the saved lens: re-read the sensor and re-measure focal length, distortion and optical centre from a 90 s star-tracking series (clear night). The old values are kept if the solve fails.">
                         <input type="checkbox" id="chk-station-deep" data-no-autosave> Deep solve (re-measure lens &amp; sensor)
                     </label>
@@ -1051,40 +1051,44 @@
                 </div>
                 <details class="params-summary" id="sky-mask-editor" open>
                     <summary>Plate-solve sky mask (outline the open sky)</summary>
-                    <p class="field-note">Press Auto-detect to propose the mask from the current frame (best at night),
-                        or click on the frame to outline open sky (green) and lit buildings, trees or
-                        poles to ignore (red). Nothing is stored until you press Apply, so you can fix the proposal first. The plate solver only uses stars inside the sky and outside obstructions,
-                        on top of its own automatic sky detection.</p>
-                    <div class="settings-actions">
+                    <div class="mask-canvas-wrap">
+                        <img id="mask-img" alt="Live frame for drawing the sky mask">
+                        <canvas id="mask-canvas"></canvas>
+                    </div>
+                    <div class="settings-actions tool-chips">
                         <button id="mask-auto" class="btn btn-sm btn-outline" type="button" title="Detect the open sky from the current frame, then edit it">✨ Auto-detect</button>
                         <button id="mask-new-sky" class="btn btn-sm btn-outline" type="button">＋ Sky polygon</button>
                         <button id="mask-new-obs" class="btn btn-sm btn-outline" type="button">＋ Obstruction</button>
                         <button id="mask-undo" class="btn btn-sm btn-outline" type="button">↶ Undo point</button>
                         <button id="mask-clear" class="btn btn-sm btn-outline" type="button">🗑 Clear all</button>
-                        <button id="mask-save" class="btn btn-sm btn-primary" type="button">✔ Apply mask</button>
                     </div>
-                    <div class="mask-canvas-wrap">
-                        <img id="mask-img" alt="Live frame for drawing the sky mask">
-                        <canvas id="mask-canvas"></canvas>
+                    <div class="settings-actions apply-row">
+                        <button id="mask-save" class="btn btn-primary btn-block" type="button">✔ Apply mask</button>
                     </div>
+                    <p class="field-note">Press Auto-detect to propose the mask from the current frame (best at night),
+                        or click on the frame to outline open sky (green) and lit buildings, trees or
+                        poles to ignore (red). Nothing is stored until you press Apply, so you can fix the proposal first. The plate solver only uses stars inside the sky and outside obstructions,
+                        on top of its own automatic sky detection.</p>
                     <div id="mask-alert" class="alert-box hidden mt-3"></div>
                 </details>
                 <details class="params-summary" id="star-align" open>
                     <summary>Align by stars (when the automatic solve is wrong)</summary>
-                    <p class="field-note">Click 4 or more stars you can really see on the open sky (inside the green
-                        outline), spread over the frame, brightest first. The solver identifies them from their mutual
-                        angles, shows the result, and only stores it when you press Apply.</p>
-                    <div class="settings-actions">
-                        <button id="align-refresh" class="btn btn-sm btn-outline" type="button">⟳ New frame</button>
-                        <button id="align-undo" class="btn btn-sm btn-outline" type="button">↶ Undo star</button>
-                        <button id="align-clear" class="btn btn-sm btn-outline" type="button">🗑 Clear</button>
-                        <button id="align-identify" class="btn btn-sm btn-outline" type="button">🔍 Identify</button>
-                        <button id="align-apply" class="btn btn-sm btn-primary" type="button" disabled>✔ Apply</button>
-                    </div>
                     <div class="mask-canvas-wrap">
                         <img id="align-img" alt="Live frame for picking stars">
                         <canvas id="align-canvas"></canvas>
                     </div>
+                    <div class="settings-actions tool-chips">
+                        <button id="align-refresh" class="btn btn-sm btn-outline" type="button">⟳ New frame</button>
+                        <button id="align-undo" class="btn btn-sm btn-outline" type="button">↶ Undo star</button>
+                        <button id="align-clear" class="btn btn-sm btn-outline" type="button">🗑 Clear</button>
+                        <button id="align-identify" class="btn btn-sm btn-outline" type="button">🔍 Identify</button>
+                    </div>
+                    <div class="settings-actions apply-row">
+                        <button id="align-apply" class="btn btn-primary btn-block" type="button" disabled>✔ Apply</button>
+                    </div>
+                    <p class="field-note">Click 4 or more stars you can really see on the open sky (inside the green
+                        outline), spread over the frame, brightest first. The solver identifies them from their mutual
+                        angles, shows the result, and only stores it when you press Apply.</p>
                     <div id="align-alert" class="alert-box hidden mt-3"></div>
                 </details>
             </div>
@@ -1099,7 +1103,7 @@
                 <div id="data-sources-list" class="data-sources" aria-live="polite"><span class="field-note">Loading…</span></div>
             </div>
 
-            <div class="card settings-card" data-sgroup="integrations">
+            <div class="card settings-card" id="integrations-card" data-sgroup="integrations">
                 <div class="card-header">
                     <h2>Integrations</h2>
                 </div>
@@ -1192,7 +1196,7 @@
                             The position sent is rounded to 0.5° (about 55 km); the exact location never leaves this station.
                         </p>
                     </fieldset>
-                    <fieldset class="settings-group" id="wx-block" data-admin>
+                    <fieldset class="settings-group hs-fieldset" id="wx-block" data-admin data-hs-title="Weather &amp; forecast" data-hs-switch="wx-enabled">
                         <legend>Weather and forecast</legend>
                         <div class="field">
                             <label class="checkbox-label"><input type="checkbox" id="wx-enabled" /> Show the weather and 48 h forecast around the station</label>
@@ -1204,10 +1208,10 @@
                                 <option value="60">every hour</option><option value="180">every 3 hours</option>
                             </select>
                         </div>
-                        <div class="field">
-                            <button type="button" class="btn btn-sm btn-outline" id="wx-refresh-now" data-no-autosave>&#8635; Update now</button>
-                        </div>
                         <div id="wx-now" class="wx-now" aria-live="polite"></div>
+                        <div class="field">
+                            <button type="button" class="btn btn-sm btn-outline btn-block" id="wx-refresh-now" data-no-autosave>&#8635; Update now</button>
+                        </div>
                         <div id="wx-hours" class="wx-hours" aria-label="Next hours"></div>
                         <p class="field-note">
                             Off by default. When on, the station asks api.open-meteo.com (free, no account) for the weather at its position, rounded to 0.1° (about 11 km);
@@ -1342,6 +1346,7 @@
                     </fieldset>
                     <fieldset class="settings-group" id="restart-box">
                         <legend>Service</legend>
+                        <a class="link-row" href="/logs"><span class="link-tx"><b>Activity log</b><small>Errors and events</small></span><span class="ds-chev" aria-hidden="true"></span></a>
                         <div class="field">
                             <button type="button" class="btn btn-sm btn-outline" id="btn-restart">Restart Zenivo</button>
                         </div>
@@ -1350,15 +1355,16 @@
                     </fieldset>
                     <fieldset class="settings-group" id="update-box">
                         <legend>Software update</legend>
-                        <p class="field-note" id="upd-line">Checking&hellip;</p>
-                        <div class="field">
-                            <label><input type="checkbox" id="upd-auto" checked /> Check for updates automatically (once a day, from GitHub; nothing about this station is sent)</label>
-                        </div>
-                        <div class="field">
+                        <div class="kv-row"><span>Version</span><span class="field-note" id="upd-line">Checking&hellip;</span></div>
+                        <label class="toggle-row" for="upd-auto">
+                            <span class="toggle-text"><span class="toggle-title">Check for updates automatically</span><span class="toggle-hint">Once a day, from GitHub; nothing about this station is sent</span></span>
+                            <input type="checkbox" id="upd-auto" class="switch" checked />
+                        </label>
+                        <div class="field btn-pair">
                             <button type="button" class="btn btn-sm btn-outline" id="upd-check">Check now</button>
                             <button type="button" class="btn btn-sm btn-primary" id="upd-apply" hidden>Update now</button>
-                            <button type="button" class="btn btn-sm btn-outline" id="upd-rollback" hidden>Go back to the previous version</button>
                         </div>
+                        <div class="field"><button type="button" class="btn btn-sm btn-outline btn-textlink" id="upd-rollback" hidden>Go back to the previous version</button></div>
                         <p class="field-note" id="upd-notes" hidden></p>
                         <p class="field-note" id="upd-status" aria-live="polite"></p>
                     </fieldset>
@@ -1366,7 +1372,7 @@
                         <legend>Password and sessions</legend>
                         <form id="admin-password-form" autocomplete="on">
                             <input type="text" name="username" value="admin" autocomplete="username" hidden readonly aria-hidden="true" tabindex="-1">
-                            <div class="field-grid">
+                            <div class="field-grid stack-grid">
                                 <div class="field">
                                     <label for="admin-current">Current password</label>
                                     <input type="password" id="admin-current" autocomplete="current-password" maxlength="256" />
@@ -1376,9 +1382,9 @@
                                     <input type="password" id="admin-new" autocomplete="new-password" maxlength="256" />
                                 </div>
                             </div>
-                            <div class="field">
-                                <button type="submit" class="btn btn-sm btn-outline" id="btn-admin-password">Change password</button>
-                                <button type="button" class="btn btn-sm btn-outline" id="btn-admin-logout-all">Sign out everywhere</button>
+                            <div class="field btn-pair">
+                                <button type="submit" class="btn btn-sm btn-primary" id="btn-admin-password">Change password</button>
+                                <button type="button" class="btn btn-sm btn-outline btn-danger-text" id="btn-admin-logout-all">Sign out everywhere</button>
                             </div>
                         </form>
                         <p class="field-note">Changing the password signs out every other browser. Forgot it? On the station run <code>python3 run_allsky.py --reset-admin</code>.</p>
@@ -1778,6 +1784,7 @@
     <script defer src="/static/app/09-community.js?v=20261114b"></script>
     <script defer src="/static/app/10-admin.js?v=20261117a"></script>
     <script defer src="/static/settings_home.js?v=1"></script>
+    <script defer src="/static/settings_layout.js?v=1"></script>
     <script>
     // Settings sub-navigation: one section at a time, driven by the URL hash (/settings#detection)
     (function () {

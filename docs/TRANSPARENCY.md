@@ -110,7 +110,7 @@ the page's origin (`Referrer-Policy: strict-origin-when-cross-origin`) and what 
 
 | Page | Host | Purpose | SRI |
 |---|---|---|---|
-| `/` (and `/settings`, `/focus` and the other UI tabs), `/sky`, `/flights3d`, `/satellites3d`, `/community`, `/obs/dock` | `fonts.googleapis.com`, `fonts.gstatic.com` | Inter and JetBrains Mono fonts | No (Google Fonts CSS cannot carry SRI) |
+| `/` (and `/settings`, `/focus` and the other UI tabs), `/sky`, `/flights3d`, `/satellites3d`, `/community`, `/obs/dock` | `fonts.googleapis.com`, `fonts.gstatic.com` | Inter and JetBrains Mono fonts | No (Google Fonts (JetBrains Mono only; Inter and Space Grotesk are bundled in src/web/fonts) CSS cannot carry SRI) |
 | `/flights3d` | `cdn.jsdelivr.net` (`maplibre-gl@5.24.0` script and stylesheet) | Map engine | Yes (sha384) |
 | `/flights3d` | `cdn.jsdelivr.net` (`three@0.160.0` `three.module.js`, `BufferGeometryUtils.js`) | 3D engine, through an import map | Yes (sha384, import map `integrity`) |
 | `/satellites3d` | `cdn.jsdelivr.net` (`three@0.160.0` `three.module.js`, `OrbitControls.js`) | 3D engine, through an import map | Yes (sha384, import map `integrity`) |
@@ -132,7 +132,7 @@ Details:
   `src/web/flights3d.html`, `src/web/satellites3d.html`).
 - `/login` and the full-frame live page (`/full`, `/live/full`, `/obs`) load nothing from other hosts. The
   main UI pages (`/`, `/live`, `/gallery`, `/settings`, `/calibration`, `/focus`, `/logs` are all served from
-  `index.html`) load only the Google Fonts. The community basemap is drawn from `src/web/geo/*.json` with no
+  `index.html`) load only the Google Fonts (JetBrains Mono only; Inter and Space Grotesk are bundled in src/web/fonts). The community basemap is drawn from `src/web/geo/*.json` with no
   map tiles, and the `/sky` viewer code and star data are local files under `/static`.
 - The Google Maps key: `GET /api/map/config` returns it to **any visitor** (the map needs it in the
   browser; `src/api/traffic_mixin.py`, `get_map_config`). Treat it as public: restrict it in the Google
@@ -395,7 +395,7 @@ Retention rules are in [CONFIGURATION.md](CONFIGURATION.md#retention-and-storage
 - **The radiosonde lookup sends the position rounded to 0.5 degrees** (about 55 km) to SondeHub (row 2 above),
   and the Flightradar24 box centre is accurate to about 10 km (row 6). The public precision setting does not change
   either of them.
-- **Some third-party resources have no SRI**: Google Fonts CSS, planet textures, map tiles, flags and
+- **Some third-party resources have no SRI**: Google Fonts (JetBrains Mono only; Inter and Space Grotesk are bundled in src/web/fonts) CSS, planet textures, map tiles, flags and
   logos (images and CSS that cannot or do not carry hashes). The libraries do have it ([section 2](#2-third-party-loads-by-the-browser)).
 - **The Content Security Policy is report-only** and allows inline scripts, so it is a record, not a barrier.
 - **Guest MJPEG stops after 10 minutes** and is limited to 10 fps and 1280 px; the page reconnects.
