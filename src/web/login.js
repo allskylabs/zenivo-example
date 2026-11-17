@@ -16,10 +16,11 @@
 
     function mode(isSetup) {
         setup = isSetup;
-        document.getElementById("login-title").textContent = isSetup ? "Set up the admin password" : "Sign in";
+        document.getElementById("login-title").textContent = isSetup ? "First-time setup" : "Admin sign-in";
+        const lock = document.querySelector(".login-lock"); if (lock) lock.hidden = isSetup;
         document.getElementById("login-lead").textContent = isSetup
-            ? "Nobody can change anything until a password is set. Choose one with at least 10 characters."
-            : "Enter the admin password to change settings.";
+            ? "Enter the setup code, then choose a password of at least 10 characters."
+            : "Settings and calibration need an admin session.";
         document.getElementById("field-code").hidden = !isSetup;
         document.getElementById("field-repeat").hidden = !isSetup;
         document.getElementById("login-password-label").textContent = isSetup ? "New password" : "Password";
