@@ -41,9 +41,12 @@ function showEvent(i) {
     const ev = evList[evIndex];
     const when = new Date(ev.timestamp);
     const pill = evQ(".ev-pill");
-    pill.textContent = EVENT_LABELS[ev.type] || ev.type;
+    const lab = EVENT_LABELS[ev.type] || ev.type, lm = /^(\S+)\s+(.+)$/.exec(lab);
+    // the leading emoji is wrapped so the phone layout (mockup: plain chip) can hide it
+    pill.innerHTML = lm && !/^[A-Za-z]/.test(lm[1]) ? `<span class="ev-emo">${escapeHtml(lm[1])}</span> ${escapeHtml(lm[2])}` : escapeHtml(lab);
     pill.style.setProperty("--pill", EVENT_COLORS[ev.type] || "var(--accent)");
-    evQ(".ev-when strong").textContent = `${fmtLocalIso(ev.timestamp)} ${tzLabel}`;
+    const [evDate = "", evTime = ""] = fmtLocalIso(ev.timestamp).split(" ");
+    evQ(".ev-when strong").innerHTML = `<span class="evw-d">${escapeHtml(evDate)} </span>${escapeHtml(evTime)}<span class="evw-z"> ${escapeHtml(tzLabel)}</span>`;
     evQ(".ev-when span").textContent = timeAgo(when);
     evQ(".ev-pos").textContent = `${evIndex + 1} / ${evList.length}`;
     evQ(".ev-prev").disabled = evIndex === 0;
@@ -57,7 +60,10 @@ function showEvent(i) {
     figSky.querySelector("figcaption").textContent = ev.moving_dot ? "Whole sky, path marked" : (crop ? "Whole sky, event boxed" : "Whole sky");
     evQ(".ev-images").classList.toggle("single", !crop || !ev.sky_url);
     evQ(".ev-summary").textContent = eventSummary(ev);
-    evQ(".ev-facts").innerHTML = eventFacts(ev).map(([k, v, isHtml]) => `<div><dt>${escapeHtml(k)}</dt><dd>${isHtml ? v : escapeHtml(v)}</dd></div>`).join("");
+    // phone card shows the date under TIME (the head carries only the clock time)
+    const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], dp = evDate.split("-");
+    const dateTxt = dp.length === 3 ? `${Number(dp[2])} ${MON[Number(dp[1]) - 1] || ""} ${dp[0]}` : evDate;
+    evQ(".ev-facts").innerHTML = `<div class="ev-phone-only"><dt>Time</dt><dd>${escapeHtml(`${dateTxt} · ${tzLabel}`)}</dd></div>` + eventFacts(ev).map(([k, v, isHtml]) => `<div><dt>${escapeHtml(k)}</dt><dd>${isHtml ? v : escapeHtml(v)}</dd></div>`).join("");
     const matchEl = evQ(".ev-match");
     matchEl.hidden = !ev.flight;
     if (ev.flight) {
@@ -69,6 +75,7 @@ function showEvent(i) {
     oc.hidden = !crop; os.hidden = !ev.sky_url;
     if (crop) oc.href = crop;
     if (ev.sky_url) os.href = ev.sky_url;
+    evQ(".ev-actions").hidden = oc.hidden && os.hidden;
 }
 
 function openEventViewer(list, i) {
