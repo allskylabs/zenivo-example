@@ -21,108 +21,121 @@
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
         body {
             background: var(--bg); color: var(--text);
-            font-family: var(--font-sans); font-size: 14px; line-height: 1.35;
+            font-family: var(--font-sans); font-size: 12px; line-height: 1.3;
             padding: 8px; overflow-y: auto; overflow-x: hidden;
         }
-        .dock { width: 100%; max-width: 420px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px;
-            background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-card, 20px); padding: 16px; }
+        .dock { width: 100%; display: flex; flex-direction: column; gap: 8px; }
         .mono, .val { font-family: var(--font-mono); }
-        .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-        .head-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
-        .title { font-weight: 700; font-size: 16px; color: var(--text); white-space: nowrap; }
+        .head { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+        .head-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
+        .title { font-weight: 700; font-size: 13px; color: var(--text); white-space: nowrap; }
         .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); flex-shrink: 0; }
         .dot.online { background: var(--green); }
         .dot.offline { background: var(--red); }
-        .pill { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px;
-            border: 1px solid var(--accent); color: var(--accent); font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .pill { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px;
+            border: 1px solid var(--accent); color: var(--accent); font-size: 11px; font-weight: 600; white-space: nowrap; }
         .pill.off { border-color: var(--muted); color: var(--muted); }
-        a.link { color: var(--muted); font-size: 12px; text-decoration: none; }
-        a.link:hover { color: var(--accent); }
-        .preview { position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: var(--radius-tile, 14px); overflow: hidden;
+        .preview { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 220px; border-radius: 8px; overflow: hidden;
             border: 1px solid var(--border); background: #000; }
-        .preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .preview .chips { position: absolute; top: 8px; left: 8px; display: flex; gap: 6px; align-items: center; }
-        .telem-mini { font-family: var(--font-mono); font-size: 12px; color: var(--text); background: rgba(0,0,0,.55);
-            border-radius: 999px; padding: 3px 8px; white-space: nowrap; }
-        .section { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-tile, 14px); padding: 14px;
-            display: flex; flex-direction: column; gap: 10px; }
-        .sec-head { display: flex; align-items: center; justify-content: space-between; gap: 8px;
-            font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
-        .row { display: flex; align-items: center; gap: 6px; }
-        .lbl { font-size: 12px; font-weight: 600; color: var(--muted); min-width: 52px; flex-shrink: 0; }
-        .val { font-size: 12px; font-weight: 600; color: var(--accent); min-width: 44px; text-align: right; flex-shrink: 0; }
-        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
-        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
+        .preview .chips { position: absolute; top: 6px; left: 6px; display: flex; gap: 6px; align-items: center; }
+        .telem-mini { font-family: var(--font-mono); font-size: 11px; color: var(--text); background: rgba(0,0,0,.6);
+            border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+
+        .section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px;
+            display: flex; flex-direction: column; gap: 6px; }
+        .sec-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap;
+            font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+        .row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+        .lbl { font-size: 11px; font-weight: 600; color: var(--muted); min-width: 52px; flex-shrink: 0; }
+        .val { font-size: 11px; font-weight: 600; color: var(--accent); min-width: 40px; text-align: right; flex-shrink: 0; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 4px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+        .seg { display: flex; width: 100%; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+        .seg > button { flex: 1; border: 0; border-radius: 0; border-right: 1px solid var(--border); height: 28px; min-width: 0; }
+        .seg > button:last-child { border-right: 0; }
 
         button {
-            background: var(--input); border: 1px solid var(--border); color: var(--text); border-radius: 12px;
-            height: 40px; padding: 0 12px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+            background: var(--input); border: 1px solid var(--border); color: var(--text); border-radius: 6px;
+            height: 28px; padding: 0 8px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer;
             transition: background .1s, border-color .1s; display: inline-flex; align-items: center;
-            justify-content: center; gap: 4px; white-space: nowrap;
+            justify-content: center; gap: 4px; white-space: nowrap; min-width: 0;
         }
         button:hover { background: var(--hover); border-color: var(--accent); }
         button:active { transform: translateY(1px); }
         button.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
-        button.btn-sm { padding: 0 10px; }
+        button.btn-sm { padding: 0 8px; }
+        button.btn-wide { flex: 1; }
         button.btn-live { border-color: var(--red); color: var(--red); background: transparent; }
         button.btn-live.active { background: var(--red); color: #fff; }
-        button.btn-danger { background: transparent; border-color: var(--red); color: var(--red); }
-        button.btn-danger:hover { background: rgba(239,68,68,.15); }
-        button.btn-danger.stopped { border-color: var(--green); color: var(--green); }
-        button.btn-wide { flex: 1; }
+        /* Overlay toggles: outline when off, filled + dot when on */
+        button.tg { background: transparent; color: var(--muted); justify-content: flex-start; }
+        button.tg::before { content: ""; width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--muted); flex-shrink: 0; }
+        button.tg.active { background: var(--accent); color: var(--bg); }
+        button.tg.active::before { background: var(--bg); border-color: var(--bg); }
 
-        .sw-row { display: flex; align-items: center; justify-content: space-between; min-height: 44px; border-top: 1px solid var(--divider, var(--border)); }
+        .sw-row { display: flex; align-items: center; justify-content: space-between; min-height: 28px; border-top: 1px solid var(--divider, var(--border)); }
         .sw-row:first-of-type { border-top: 0; }
-        .sw-row span { font-size: 14px; }
-        button.sw { width: 50px; height: 30px; padding: 0; border-radius: 15px; position: relative;
+        .sw-row span { font-size: 12px; }
+        button.sw { width: 36px; height: 20px; padding: 0; border-radius: 10px; position: relative;
             background: var(--input); border: 1px solid var(--border); }
-        button.sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px;
+        button.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
             border-radius: 50%; background: var(--muted); transition: left .12s; }
         button.sw.active { background: var(--accent); border-color: var(--accent); }
-        button.sw.active::after { left: 23px; background: #fff; }
+        button.sw.active::after { left: 18px; background: #fff; }
 
-        .stat { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-tile, 14px); padding: 10px 12px;
-            display: flex; flex-direction: column; gap: 2px; }
-        .stat .k { font-size: 12px; color: var(--muted); }
-        .stat .v { font-family: var(--font-mono); font-size: 20px; font-weight: 600; color: var(--text); }
-        .stat .v small { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 2px; }
+        .stats { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+        .stat { display: inline-flex; align-items: baseline; gap: 5px; }
+        .stat .k { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+        .stat .v { font-family: var(--font-mono); font-size: 15px; font-weight: 600; color: var(--text); }
+        .stat .v small { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 2px; }
 
-        input[type="range"] { flex: 1; height: 8px; accent-color: var(--accent); cursor: pointer; min-width: 45px; }
+        input[type="range"] { flex: 1; height: 6px; accent-color: var(--accent); cursor: pointer; min-width: 60px; }
         input[type="text"], input[type="number"], select {
-            background: var(--input); border: 1px solid var(--border); color: var(--text); border-radius: 8px;
-            height: 36px; padding: 0 8px; font-size: 14px; font-family: inherit; outline: none;
+            background: var(--input); border: 1px solid var(--border); color: var(--text); border-radius: 6px;
+            height: 28px; padding: 0 6px; font-size: 12px; font-family: inherit; outline: none;
             user-select: text; -webkit-user-select: text;
         }
         input[type="number"] { font-family: var(--font-mono); }
         input[type="text"]:focus, input[type="number"]:focus, select:focus { border-color: var(--accent); }
 
-        details.adv > summary { cursor: pointer; list-style: none; height: 36px; display: flex; align-items: center;
-            justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--muted);
-            text-transform: uppercase; letter-spacing: .4px; }
+        details.adv > summary { cursor: pointer; list-style: none; height: 24px; display: flex; align-items: center;
+            justify-content: space-between; font-size: 10px; font-weight: 700; color: var(--muted);
+            text-transform: uppercase; letter-spacing: .08em; }
         details.adv > summary::-webkit-details-marker { display: none; }
-        details.adv > summary::after { content: "+"; font-size: 16px; }
+        details.adv > summary::after { content: "+"; font-size: 14px; }
         details.adv[open] > summary::after { content: "\2212"; }
-        details.adv .adv-body { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+        details.adv .adv-body { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
 
-        .ev-list { max-height: 230px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
-        .ev-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--border);
-            cursor: pointer; font-size: 14px; }
+        .ev-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+        .ev-item { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-bottom: 1px solid var(--border);
+            cursor: pointer; font-size: 12px; }
         .ev-item:last-child { border-bottom: none; }
         .ev-item:hover { background: var(--hover); }
         .ev-item.active { background: var(--accent-bg); border-left: 3px solid var(--accent); }
-        .ev-thumb { width: 46px; height: 34px; object-fit: cover; border-radius: 4px; background: #000; flex-shrink: 0; }
+        .ev-thumb { width: 40px; height: 30px; object-fit: cover; border-radius: 4px; background: #000; flex-shrink: 0; }
         .ev-info { flex: 1; min-width: 0; }
         .ev-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-weight: 600;
-            font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .ev-sub { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap;
+            font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ev-sub { font-family: var(--font-mono); font-size: 11px; color: var(--muted); white-space: nowrap;
             overflow: hidden; text-overflow: ellipsis; }
-        .ev-empty { padding: 16px; text-align: center; color: var(--muted); font-size: 12px; }
+        .ev-empty { padding: 12px; text-align: center; color: var(--muted); font-size: 11px; }
 
-        .toast { position: fixed; bottom: 10px; right: 10px; background: var(--green); color: #041f14; font-size: 12px;
-            font-weight: 600; padding: 8px 12px; border-radius: 8px; opacity: 0; pointer-events: none;
+        /* Danger zone: Stop stream needs a ~1 s press-and-hold */
+        .danger-zone { border: 1px dashed rgba(239,68,68,.45); border-radius: 8px; padding: 8px; display: flex;
+            flex-direction: column; gap: 4px; margin-top: 4px; }
+        button.btn-danger { position: relative; overflow: hidden; background: transparent; border-color: var(--red); color: var(--red); height: 30px; }
+        button.btn-danger:hover { background: rgba(239,68,68,.12); }
+        button.btn-danger::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+            background: rgba(239,68,68,.35); transition: width 0s; pointer-events: none; }
+        button.btn-danger.holding::before { width: 100%; transition: width 1s linear; }
+        button.btn-danger.stopped { border-color: var(--green); color: var(--green); }
+        .hint { font-size: 10px; color: var(--muted); }
+
+        .toast { position: fixed; bottom: 8px; right: 8px; background: var(--green); color: #041f14; font-size: 11px;
+            font-weight: 600; padding: 6px 10px; border-radius: 6px; opacity: 0; pointer-events: none;
             transition: opacity .15s; z-index: 99; }
         .toast.show { opacity: 1; }
-        @media (max-width: 480px) { button, select { min-height: 44px; } }
     </style>
 </head>
 <body>
@@ -144,8 +157,51 @@
         <div class="preview">
             <img id="pv-img" alt="Live preview" src="/api/live/snapshot.jpg">
             <div class="chips">
-                <button id="btn-go-live" class="btn-live active btn-sm" style="height:24px;border-radius:999px" title="Back to live camera feed">LIVE</button>
+                <button id="btn-go-live" class="btn-live active btn-sm" style="height:20px;border-radius:999px;font-size:11px" title="Back to live camera feed">LIVE</button>
                 <span id="telem-summary" class="telem-mini">-- ms · -- dB</span>
+            </div>
+        </div>
+
+        <!-- Stream stats -->
+        <div class="section">
+            <div class="stats">
+                <div class="stat"><span class="k">Uptime</span><span class="v" id="st-uptime">00:00:00</span></div>
+                <div class="stat"><span class="k">Bitrate</span><span class="v" id="st-bitrate">&mdash;</span></div>
+                <div class="stat"><span class="k">Dropped</span><span class="v" id="st-dropped">&mdash;</span></div>
+            </div>
+        </div>
+
+        <!-- View mode -->
+        <div class="section">
+            <div class="sec-head"><span>View</span></div>
+            <div class="seg">
+                <button type="button" class="mode-btn active" data-mode="live">Live</button>
+                <button type="button" class="mode-btn" data-mode="timelapse">Timelapse</button>
+                <button type="button" class="mode-btn" data-mode="startrails">Startrails</button>
+                <button type="button" class="mode-btn" data-mode="keogram">Keogram</button>
+            </div>
+        </div>
+
+        <!-- Overlays -->
+        <div class="section">
+            <div class="sec-head"><span>Overlays</span><span id="lbl-lst" class="mono" style="text-transform:none">LST --:--:--</span></div>
+            <div class="seg">
+                <button type="button" id="pre-full" title="All overlays on">Full</button>
+                <button type="button" id="pre-clean" title="Stargazing: constellations + sun/moon only">Clean</button>
+                <button type="button" id="pre-raw" title="Raw video, no overlays">Raw</button>
+            </div>
+            <div class="grid">
+                <button type="button" id="tg-sky" class="tg" title="Constellations & bright stars">Constellations</button>
+                <button type="button" id="tg-labels" class="tg" title="Constellation & star names">Star names</button>
+                <button type="button" id="tg-grid" class="tg" title="Coordinate grid & compass">Grid / Compass</button>
+                <button type="button" id="tg-adsb" class="tg" title="Live ADS-B aircraft radar">ADS-B Radar</button>
+                <button type="button" id="tg-night" class="tg" title="Red tint to protect night vision">Red light</button>
+            </div>
+            <div>
+                <div class="sw-row"><span>Clock</span><button type="button" id="tg-badge" class="sw" title="Info badge with LST clock"></button></div>
+                <div class="sw-row"><span>Meteor counter</span><button type="button" id="tg-events" class="sw" title="Recent meteor &amp; aircraft trails"></button></div>
+                <div class="sw-row"><span>Moon &amp; sky quality</span><button type="button" id="tg-sunmoon" class="sw" title="Sun &amp; Moon position"></button></div>
+                <div class="sw-row"><span>Station caption</span><button type="button" id="tg-caption" class="sw" title="Show station caption title"></button></div>
             </div>
         </div>
 
@@ -155,7 +211,7 @@
                 <span>Zoom</span>
                 <button type="button" id="btn-reset-view" class="btn-sm">Reset view</button>
             </div>
-            <div class="row">
+            <div class="row" style="flex-wrap:nowrap">
                 <button type="button" id="btn-zoom-out" class="btn-sm" title="Zoom out">&minus;</button>
                 <input type="range" id="rng-zoom" min="1.0" max="6.0" step="0.1" value="1.0">
                 <button type="button" id="btn-zoom-in" class="btn-sm" title="Zoom in">+</button>
@@ -168,61 +224,16 @@
             </div>
         </div>
 
-        <!-- Overlays -->
-        <div class="section">
-            <div class="sec-head"><span>Overlays</span><span id="lbl-lst" class="mono">LST --:--:--</span></div>
-            <div class="sw-row"><span>Clock</span><button type="button" id="tg-badge" class="sw" title="Info badge with LST clock"></button></div>
-            <div class="sw-row"><span>Meteor counter</span><button type="button" id="tg-events" class="sw" title="Recent meteor &amp; aircraft trails"></button></div>
-            <div class="sw-row"><span>Moon &amp; sky quality</span><button type="button" id="tg-sunmoon" class="sw" title="Sun &amp; Moon position"></button></div>
-            <div class="sw-row"><span>Station caption</span><button type="button" id="tg-caption" class="sw" title="Show station caption title"></button></div>
-        </div>
-
-        <!-- Stream stats -->
-        <div class="section">
-            <div class="sec-head"><span>Stream</span></div>
-            <div class="grid-3">
-                <div class="stat"><span class="k">Uptime</span><span class="v" id="st-uptime">00:00:00</span></div>
-                <div class="stat"><span class="k">Bitrate</span><span class="v" id="st-bitrate">&mdash;</span></div>
-                <div class="stat"><span class="k">Dropped</span><span class="v" id="st-dropped">&mdash;</span></div>
-            </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="grid-2">
-            <button type="button" id="btn-stop-stream" class="btn-danger" title="Pause the dock preview and uptime">Stop stream</button>
-            <button type="button" id="btn-take-snapshot" title="Open a full-resolution snapshot">Take snapshot</button>
-        </div>
-
         <!-- Advanced -->
         <details class="adv section">
             <summary>More controls</summary>
             <div class="adv-body">
-                <div class="grid-2">
-                    <button type="button" class="mode-btn active" data-mode="live">Live</button>
-                    <button type="button" class="mode-btn" data-mode="timelapse">Timelapse</button>
-                    <button type="button" class="mode-btn" data-mode="startrails">Startrails</button>
-                    <button type="button" class="mode-btn" data-mode="keogram">Keogram</button>
+                <div class="grid">
+                    <button type="button" id="btn-fit" class="btn-sm" title="Toggle 16:9 Cover / 4:3 Original">16:9 Cover</button>
+                    <button type="button" id="btn-res" class="btn-sm" title="Picture size sent to /obs: same as /live, or the full output resolution">Size: as /live</button>
+                    <button type="button" id="btn-bg" class="btn-sm" title="Toggle Black / Transparent background">Black BG</button>
                 </div>
-
-                <div class="grid-2">
-                    <button type="button" id="tg-sky" title="Constellations & bright stars">Constellations</button>
-                    <button type="button" id="tg-labels" title="Constellation & star names">Star names</button>
-                    <button type="button" id="tg-grid" title="Coordinate grid & compass">Grid / Compass</button>
-                    <button type="button" id="tg-adsb" title="Live ADS-B aircraft radar">ADS-B Radar</button>
-                    <button type="button" id="tg-night" title="Red tint to protect night vision">Red light</button>
-                </div>
-
-                <div class="row">
-                    <button type="button" id="pre-full" class="btn-sm btn-wide">Full</button>
-                    <button type="button" id="pre-clean" class="btn-sm btn-wide">Clean</button>
-                    <button type="button" id="pre-raw" class="btn-sm btn-wide">Raw</button>
-                </div>
-                <div class="row">
-                    <button type="button" id="btn-fit" class="btn-sm btn-wide" title="Toggle 16:9 Cover / 4:3 Original">16:9 Cover</button>
-                    <button type="button" id="btn-res" class="btn-sm btn-wide" title="Picture size sent to /obs: same as /live, or the full output resolution">Size: as /live</button>
-                    <button type="button" id="btn-bg" class="btn-sm btn-wide" title="Toggle Black / Transparent background">Black BG</button>
-                </div>
-                <div class="row">
+                <div class="row" style="flex-wrap:nowrap">
                     <span class="lbl">Sharpness</span>
                     <input type="range" id="rng-opacity" min="0.1" max="1.0" step="0.05" value="1.0">
                     <span id="val-opacity" class="val">100%</span>
@@ -237,32 +248,32 @@
                     <button type="button" class="btn-sm pan-step" data-dx="8" data-dy="0" title="Right">&rarr;</button>
                     <button type="button" class="btn-sm" id="btn-pan-center" title="Center">Center</button>
                 </div>
-                <div class="row">
+                <div class="row" style="flex-wrap:nowrap">
                     <span class="lbl">Pan X</span>
                     <input type="range" id="rng-panx" min="-80" max="80" step="1" value="0" title="Pan horizontal (X)">
                 </div>
-                <div class="row">
+                <div class="row" style="flex-wrap:nowrap">
                     <span class="lbl">Pan Y</span>
                     <input type="range" id="rng-pany" min="-80" max="80" step="1" value="0" title="Pan vertical (Y)">
                 </div>
-                <div class="row">
+                <div class="row" style="flex-wrap:nowrap">
                     <span class="lbl">Rotate</span>
                     <input type="range" id="rng-rotate" min="-180" max="180" step="1" value="0">
                     <span id="val-rotate" class="val">0&deg;</span>
                 </div>
-                <div class="row">
-                    <button type="button" class="btn-sm rot-quick btn-wide" data-r="0">0&deg;</button>
-                    <button type="button" class="btn-sm rot-quick btn-wide" data-r="90">90&deg;</button>
-                    <button type="button" class="btn-sm rot-quick btn-wide" data-r="180">180&deg;</button>
-                    <button type="button" id="btn-fliph" class="btn-sm btn-wide" title="Flip horizontal">Flip H</button>
-                    <button type="button" id="btn-flipv" class="btn-sm btn-wide" title="Flip vertical">Flip V</button>
+                <div class="grid">
+                    <button type="button" class="btn-sm rot-quick" data-r="0">0&deg;</button>
+                    <button type="button" class="btn-sm rot-quick" data-r="90">90&deg;</button>
+                    <button type="button" class="btn-sm rot-quick" data-r="180">180&deg;</button>
+                    <button type="button" id="btn-fliph" class="btn-sm" title="Flip horizontal">Flip H</button>
+                    <button type="button" id="btn-flipv" class="btn-sm" title="Flip vertical">Flip V</button>
                 </div>
-                <div class="row">
+                <div class="row" style="flex-wrap:nowrap">
                     <span class="lbl">Bright</span>
                     <input type="range" id="rng-bright" min="0.5" max="2.5" step="0.05" value="1.0">
                     <span id="val-bright" class="val">1.0</span>
                 </div>
-                <div class="row">
+                <div class="row" style="flex-wrap:nowrap">
                     <span class="lbl">Contrast</span>
                     <input type="range" id="rng-contrast" min="0.5" max="2.5" step="0.05" value="1.0">
                     <span id="val-contrast" class="val">1.0</span>
@@ -277,7 +288,7 @@
                         <option value="top-center">Top center</option>
                     </select>
                 </div>
-                <div class="row">
+                <div class="row" style="flex-wrap:nowrap">
                     <input type="text" id="inp-title" placeholder="Main title..." style="flex:1.2;min-width:0;">
                     <input type="text" id="inp-sub" placeholder="Subtitle..." style="flex:1;min-width:0;">
                 </div>
@@ -294,7 +305,7 @@
                         <button type="button" id="btn-ev-reload" class="btn-sm" title="Reload list">Reload</button>
                     </div>
                 </div>
-                <div class="grid-2" id="ev-tabs">
+                <div class="grid" id="ev-tabs">
                     <button type="button" class="ev-tab active" data-tab="all">All</button>
                     <button type="button" class="ev-tab" data-tab="meteor">Meteors</button>
                     <button type="button" class="ev-tab" data-tab="plane">Aircraft</button>
@@ -306,20 +317,29 @@
                     <span>Camera &amp; exposure</span>
                     <span id="cam-sky-info" class="mono" style="text-transform:none">--</span>
                 </div>
-                <div class="row">
-                    <button type="button" id="cam-auto" class="btn-sm btn-wide">Auto AE</button>
-                    <button type="button" id="cam-manual" class="btn-sm btn-wide">Manual</button>
-                    <button type="button" id="cam-boost" class="btn-sm btn-wide">Star boost</button>
+                <div class="seg">
+                    <button type="button" id="cam-auto">Auto AE</button>
+                    <button type="button" id="cam-manual">Manual</button>
+                    <button type="button" id="cam-boost">Star boost</button>
                 </div>
                 <div class="row">
-                    <span class="lbl" style="min-width:40px">Exp (s)</span>
-                    <input type="number" id="inp-exp" step="any" min="0.0001" max="90" value="0.01" style="width:82px">
-                    <span class="lbl" style="min-width:32px">Gain</span>
-                    <input type="number" id="inp-gain" step="1" min="0" max="72" value="0" style="width:66px">
+                    <span class="lbl" style="min-width:36px">Exp (s)</span>
+                    <input type="number" id="inp-exp" step="any" min="0.0001" max="90" value="0.01" style="width:76px">
+                    <span class="lbl" style="min-width:28px">Gain</span>
+                    <input type="number" id="inp-gain" step="1" min="0" max="72" value="0" style="width:60px">
                     <button type="button" id="btn-cam-set" class="btn-sm btn-wide">Apply</button>
                 </div>
             </div>
         </details>
+
+        <!-- Snapshot (normal action) -->
+        <button type="button" id="btn-take-snapshot" title="Open a full-resolution snapshot">Take snapshot</button>
+
+        <!-- Danger zone -->
+        <div class="danger-zone">
+            <button type="button" id="btn-stop-stream" class="btn-danger" title="Pause the dock preview and uptime">Hold to stop stream</button>
+            <span class="hint">Press and hold for 1 second.</span>
+        </div>
     </div>
 
     <div id="toast" class="toast">Synced</div>
@@ -519,16 +539,33 @@
             }
             setInterval(tickUptime, 1000);
             pvTimer = setInterval(refreshPreview, 1500);
-            $("btn-stop-stream").addEventListener("click", () => {
-                streaming = !streaming;
-                const btn = $("btn-stop-stream");
-                btn.textContent = streaming ? "Stop stream" : "Resume stream";
-                btn.classList.toggle("stopped", !streaming);
+            // Stop needs a 1 s press-and-hold; resume is a single click
+            const stopBtn = $("btn-stop-stream");
+            let holdTimer = null;
+            function applyStreaming() {
+                stopBtn.textContent = streaming ? "Hold to stop stream" : "Resume stream";
+                stopBtn.classList.toggle("stopped", !streaming);
                 $("stream-pill").textContent = streaming ? "Streaming" : "Stopped";
                 $("stream-pill").classList.toggle("off", !streaming);
                 if (streaming) { streamStart = Date.now(); refreshPreview(); }
                 notify(streaming ? "Stream resumed" : "Stream stopped");
+            }
+            function cancelHold() {
+                clearTimeout(holdTimer); holdTimer = null;
+                stopBtn.classList.remove("holding");
+            }
+            stopBtn.addEventListener("pointerdown", (e) => {
+                if (e.button !== undefined && e.button > 0) return;
+                if (!streaming) { streaming = true; applyStreaming(); return; }
+                stopBtn.classList.add("holding");
+                holdTimer = setTimeout(() => {
+                    holdTimer = null;
+                    stopBtn.classList.remove("holding");
+                    streaming = false;
+                    applyStreaming();
+                }, 1000);
             });
+            ["pointerup", "pointerleave", "pointercancel"].forEach((ev) => stopBtn.addEventListener(ev, cancelHold));
             $("btn-take-snapshot").addEventListener("click", () => {
                 window.open("/api/live/snapshot.jpg?t=" + Date.now(), "_blank");
                 notify("Snapshot opened");
