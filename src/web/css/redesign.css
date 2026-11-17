@@ -415,4 +415,3 @@ body:has(#left-col) .panel button.on { border-color: color-mix(in srgb, var(--ac
     body:has(#left-col) #layers label { min-height: 40px; }
     body:has(#left-col) #info { padding: 14px 16px; }
 }
-}

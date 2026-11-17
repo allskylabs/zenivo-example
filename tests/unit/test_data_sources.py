@@ -87,7 +87,7 @@ def test_data_sources_lists_every_feed(client_service):
     client, _ = client_service
     d = client.get("/api/data-sources").json()
     ids = [s["id"] for s in d["sources"]]
-    assert ids == ["adsb", "adsb_public", "fr24", "satellites", "radiosondes", "airports"]
+    assert ids == ["adsb", "adsb_public", "fr24", "satellites", "radiosondes", "weather", "airports"]
     by = {s["id"]: s for s in d["sources"]}
     assert by["adsb"]["state"] == "off" and by["adsb_public"]["enabled"] is False and by["fr24"]["state"] == "off"
     assert by["satellites"]["enabled"] is True
