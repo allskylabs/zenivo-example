@@ -462,12 +462,12 @@ body:has(#left-col) .panel button.on { border-color: color-mix(in srgb, var(--ac
 .sh-none { padding: 24px 4px; color: var(--text-secondary); text-align: center; }
 
 /* Cards, fieldsets, rows, inputs, switches and buttons of the settings pages (same element ids and handlers, only restyled) */
-#tab-settings .card-header h2, #tab-settings .settings-group legend { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+#tab-settings .card-header h2, #tab-settings .settings-group legend { font-size: 16px; font-weight: 700; color: var(--text-primary); text-transform: none; letter-spacing: 0; }
 #tab-settings .settings-group { border-radius: var(--radius-tile); border-color: var(--border-color); }
 #tab-settings .field label, #tab-settings .field .field-label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
 #tab-settings .field input[type="number"], #tab-settings .field input[type="text"], #tab-settings .field input[type="url"], #tab-settings .field input[type="email"],
 #tab-settings .field input[type="password"], #tab-settings .field select { min-height: 44px; border-radius: var(--radius-tile); font-size: 16px; }
-#tab-settings .btn { min-height: 44px; border-radius: var(--radius-pill); padding-left: 18px; padding-right: 18px; }
+#tab-settings .btn { min-height: 44px; font-size: 15px; border-radius: var(--radius-pill); padding-left: 18px; padding-right: 18px; }
 #tab-settings .field-note, #tab-settings .toggle-hint { font-size: 13px; color: var(--text-secondary); }
 #tab-settings .description { font-size: 14px; color: var(--text-secondary); }
 /* every plain on/off checkbox is a switch (the input stays, so ids, labels and change handlers keep working) */
