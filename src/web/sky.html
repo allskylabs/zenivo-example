@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
     <link rel="stylesheet" href="/style.css?v=20261127a">
+    <script>if(new URLSearchParams(location.search).get("embed")==="1")document.documentElement.classList.add("embed")</script>
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -41,6 +42,13 @@
             .navbar .nav-metrics { gap: 6px; }
         }
       .sv-left.sv-collapsed .sv-body{display:none!important}
+      /* embed=1 (OBS Sky View iframe): sky canvas only, no page chrome or panels */
+      html.embed, html.embed body{background:#000!important;overflow:hidden!important;cursor:none!important}
+      html.embed *{cursor:none!important}
+      html.embed .sidebar, html.embed .m-tabbar, html.embed .m-sheet, html.embed .m-sheet-backdrop,
+      html.embed .navbar, html.embed .sv-ui{display:none!important}
+      html.embed .app-shell, html.embed .app-main{display:block!important;width:100vw!important;height:100vh!important;margin:0!important;padding:0!important}
+      html.embed #stage{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important}
       @media (max-width:700px){.sv-left{max-height:55vh}}
     </style>
 </head>

@@ -179,6 +179,7 @@
                 <button type="button" class="mode-btn" data-mode="timelapse">Timelapse</button>
                 <button type="button" class="mode-btn" data-mode="startrails">Startrails</button>
                 <button type="button" class="mode-btn" data-mode="keogram">Keogram</button>
+                <button type="button" class="mode-btn" data-mode="sky">Sky View</button>
             </div>
         </div>
 
@@ -414,7 +415,8 @@
 
                 $("btn-go-live").classList.toggle("active", state.view_mode === "live");
                 document.querySelectorAll(".mode-btn").forEach((b) => {
-                    b.classList.toggle("active", b.dataset.mode === state.view_mode);
+                    const isSky = state.view_mode === "sky" || (state.view_mode === "event" && String(state.replay_url || "").startsWith("/sky"));
+                    b.classList.toggle("active", b.dataset.mode === "sky" ? isSky : (!isSky && b.dataset.mode === state.view_mode));
                 });
 
                 $("tg-sky").classList.toggle("active", !!state.sky_overlay);
@@ -586,6 +588,8 @@
                         pushPatch({ view_mode: "timelapse", replay_url: "/uploads/allsky/timelapses/latest.mp4", replay_label: "🎬 TODAY TIMELAPSE" }, "Playing Timelapse");
                     } else if (m === "startrails") {
                         pushPatch({ view_mode: "startrails", replay_url: "/uploads/allsky/startrails/latest.jpg", replay_label: "🌀 STARTRAILS" }, "Showing Startrails");
+                    } else if (m === "sky") {
+                        pushPatch({ view_mode: "event", replay_url: "/sky?embed=1", replay_crop_url: "", replay_label: "SKY VIEW" }, "Showing Sky View");
                     } else if (m === "keogram") {
                         pushPatch({ view_mode: "keogram", replay_url: "/uploads/allsky/keograms/latest.jpg", replay_label: "📊 KEOGRAM" }, "Showing Keogram");
                     }
