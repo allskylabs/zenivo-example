@@ -48,8 +48,7 @@
 
     function headerSwitch(fs) {
         const box = $(fs.dataset.hsSwitch);
-        const card = fs.closest(".card");
-        if (!box || !card || card.querySelector(".card-header-switch")) return;
+        if (!box || fs.querySelector(".card-header-switch")) return;
         const text = (box.closest("label") || box.parentElement).textContent.trim();
         const head = document.createElement("div");
         head.className = "card-header card-header-switch";
@@ -63,7 +62,8 @@
         const srcField = box.closest(".field");
         box.setAttribute("aria-label", text);
         head.append(tx, box);
-        fs.parentElement.insertBefore(head, fs.parentElement.querySelector(".settings-grid") || fs);
+        const legend = fs.querySelector(":scope > legend");
+        fs.insertBefore(head, legend ? legend.nextSibling : fs.firstChild);
         if (srcField) srcField.classList.add("ds-moved");
     }
 
@@ -74,7 +74,7 @@
     }
 
     function init() {
-        segmented("wx-refresh");
+        segmented("wx-refresh", (o) => { const t = o.textContent.replace(/^every\s+/, ""); return t === "hour" ? "1 hour" : t; });
         segmented("wb-mode");
         segmented("dayobj-sensitivity", (o) => o.textContent.replace(/\s*\(.*$/, ""));
         document.querySelectorAll("[data-hs-switch]").forEach(headerSwitch);

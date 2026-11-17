@@ -538,7 +538,8 @@ select.seg-src { position: absolute; width: 1px; height: 1px; opacity: 0; pointe
 .ds-chev { flex: none; width: 10px; height: 10px; border-right: 2px solid var(--text-muted); border-bottom: 2px solid var(--text-muted); transform: rotate(-45deg); margin: 0 4px; transition: transform 0.15s; }
 .ds-moved { display: none !important; }
 .card-header-switch { align-items: center; gap: 14px; }
-.hs-tx { min-width: 0; }
+.hs-tx { flex: 1; min-width: 0; }
+.card-header-switch { display: flex; flex-wrap: nowrap; margin-bottom: 8px; }
 .hs-tx h2 { margin: 0; }
 .hs-tx small { display: block; margin-top: 2px; font-size: 13px; color: var(--text-secondary); }
 .hs-fieldset > legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
@@ -575,8 +576,8 @@ select.seg-src { position: absolute; width: 1px; height: 1px; opacity: 0; pointe
 .wx-hours { flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding-bottom: 6px; scrollbar-width: thin; }
 .wx-h { flex: none; padding: 8px 10px; border-radius: 10px; }
 .sat-groups, .dayobj-classes { display: flex; flex-wrap: wrap; gap: 8px; }
-#tab-settings .sat-groups label, #tab-settings .dayobj-classes label { position: relative; display: inline-flex; flex-direction: row; width: auto; min-height: 40px; padding: 0 16px; align-items: center; border-radius: var(--radius-pill); background: var(--bg-card-sub); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 14px; font-weight: 600; cursor: pointer; }
-#tab-settings .sat-groups label:has(:checked), #tab-settings .dayobj-classes label:has(:checked) { background: color-mix(in srgb, var(--accent) 22%, var(--bg-card-sub)); border-color: var(--accent); color: var(--accent); }
+#tab-settings .sat-groups label:has(> input[type="checkbox"]), #tab-settings .dayobj-classes label:has(> input[type="checkbox"]) { position: relative; display: inline-flex; flex-direction: row; justify-content: center; width: auto; min-height: 40px; padding: 0 16px; align-items: center; border-radius: var(--radius-pill); background: var(--bg-card-sub); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 14px; font-weight: 600; cursor: pointer; }
+#tab-settings .sat-groups label:has(> input[type="checkbox"]:checked), #tab-settings .dayobj-classes label:has(> input[type="checkbox"]:checked) { background: color-mix(in srgb, var(--accent) 22%, var(--bg-card-sub)); border-color: var(--accent); color: var(--accent); }
 #tab-settings .sat-groups input[type="checkbox"], #tab-settings .dayobj-classes input[type="checkbox"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; margin: 0; }
 #tab-settings .sat-groups input[type="checkbox"]::after, #tab-settings .dayobj-classes input[type="checkbox"]::after { display: none; }
 #tab-settings .sat-groups label:has(:focus-visible), #tab-settings .dayobj-classes label:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -597,9 +598,9 @@ select.seg-src { position: absolute; width: 1px; height: 1px; opacity: 0; pointe
     #tab-settings .settings-card > .settings-actions { padding: 16px; margin: 0 0 14px; border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--bg-card); }
     #tab-settings .settings-card > .settings-actions { border: 0; background: none; padding: 0; }
     #tab-settings #data-sources-card { padding: 16px; }
-    #tab-settings .settings-grid > .settings-group > legend { float: left; width: 100%; padding: 0 0 8px; font-size: 18px; font-weight: 700; }
-    #tab-settings .settings-grid > .settings-group > legend + * { clear: both; }
-    #tab-settings .hs-fieldset { margin-top: 0; }
+    #tab-settings .settings-grid > .settings-group > legend { float: none; display: block; width: 100%; padding: 0 0 8px; font-size: 18px; font-weight: 700; }
+    #tab-settings fieldset { min-width: 0; }
+    #tab-settings .hs-fieldset { margin-top: 0; position: relative; }
     /* Image output is one card of rows: its fieldsets are sections */
     #tab-settings .settings-card[data-sgroup="image"]:has(#output-resolution) { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-card); padding: 16px; }
     #tab-settings .settings-card[data-sgroup="image"]:has(#output-resolution) .settings-grid > .settings-group { padding: 0; margin: 0; border: 0; border-radius: 0; background: none; border-top: 1px solid var(--divider); padding-top: 10px; margin-top: 10px; }
