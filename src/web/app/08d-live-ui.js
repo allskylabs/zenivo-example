@@ -380,7 +380,24 @@
         const s = toScreen(c.x, c.y);
         const inside = s.x >= 0 && s.y >= 0 && s.x <= box.clientWidth && s.y <= box.clientHeight;
         ring.hidden = !inside;
-        if (inside) { ring.style.left = `${s.x}px`; ring.style.top = `${s.y}px`; }
+        if (inside) { ring.style.left = `${s.x}px`; ring.style.top = `${s.y}px`; placeCard(s); }
+    }
+    // The card is a popover next to its object: beside it when the window is wide enough, else below or above it,
+    // always kept inside the window (and above the phone tab bar). An object that left the picture keeps the last spot.
+    function placeCard(s) {
+        if (!card || card.hidden) return;
+        const r = box.getBoundingClientRect(), ax = r.left + s.x, ay = r.top + s.y, gap = 30, m = 10;
+        const vw = window.innerWidth, vh = window.innerHeight, W = card.offsetWidth, H = card.offsetHeight;
+        const tabbar = document.fullscreenElement ? null : document.querySelector(".m-tabbar");
+        const floor = vh - m - (tabbar && tabbar.offsetHeight ? tabbar.offsetHeight : 0);
+        const clamp = (v, lo, hi) => Math.max(lo, Math.min(v, Math.max(lo, hi)));
+        let left, top, side;
+        if (ax + gap + W <= vw - m) { left = ax + gap; top = ay - H / 2; side = "right"; }
+        else if (ax - gap - W >= m) { left = ax - gap - W; top = ay - H / 2; side = "left"; }
+        else { left = ax - W / 2; side = ay + gap + H <= floor || ay - gap - H < m ? "below" : "above"; top = side === "below" ? ay + gap : ay - gap - H; }
+        card.style.left = `${Math.round(clamp(left, m, vw - W - m))}px`;
+        card.style.top = `${Math.round(clamp(top, m, floor - H))}px`;
+        card.dataset.side = side;
     }
     function select(c) {
         sel = { kind: c.kind, key: c.key, last: c };
@@ -417,6 +434,18 @@
                 if (!reduceMotion) box.scrollIntoView({ block: "nearest", behavior: "smooth" });
             }
         });
+        // Fullscreen shows only the picture element: the card moves into it and back (CSS keeps it floating)
+        const cardHome = document.createComment("obj-card home");
+        card.parentNode.insertBefore(cardHome, card);
+        document.addEventListener("fullscreenchange", () => {
+            const fs = document.fullscreenElement;
+            if (fs && fs.contains(box)) fs.appendChild(card);
+            else if (cardHome.parentNode) cardHome.parentNode.insertBefore(card, cardHome.nextSibling);
+        });
+        card.addEventListener("wheel", (e) => e.stopPropagation(), { passive: true });
+        const reflow = () => { if (sel && sel.last) placeRing(sel.last); };
+        window.addEventListener("scroll", reflow, { passive: true });
+        window.addEventListener("resize", reflow);
         setInterval(refreshSel, 500);
         document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sel && (!lay || lay.hidden)) closeInfo(); });
     }

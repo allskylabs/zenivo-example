@@ -227,3 +227,8 @@ body:has(#tab-logs.active) .navbar { display: none; }
     #tab-live .obj-card { left: 10px; right: 10px; width: auto; max-width: 480px; margin: 0 auto; bottom: calc(66px + env(safe-area-inset-bottom, 0px)); max-height: 60vh; }
 }
 @media (prefers-reduced-motion: reduce) { #tab-live .obj-card { animation: none; } }
+/* In fullscreen the card sits inside the picture, above the bottom control bar */
+:fullscreen .obj-card { position: fixed; z-index: 60; margin: 0; right: 16px; bottom: 76px; width: min(400px, calc(100vw - 32px)); max-height: calc(100vh - 100px); overflow-y: auto; cursor: auto; text-align: left; }
+@media (max-width: 768px) { :fullscreen .obj-card { left: 10px; right: 10px; width: auto; max-width: 480px; margin: 0 auto; } }
+/* The card is a popover placed next to its object by app/08d-live-ui.js (placeCard sets left/top) */
+#tab-live .obj-card, :fullscreen .obj-card { left: 0; top: 0; right: auto; bottom: auto; width: min(340px, calc(100vw - 20px)); max-width: none; margin: 0; max-height: calc(100vh - 20px); }

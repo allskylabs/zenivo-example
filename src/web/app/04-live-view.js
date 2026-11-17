@@ -677,7 +677,7 @@ if (viewportContainer && zoomStage) {
     // (3x at that point, or back to fit). Zoom is also on the - / + pill, the wheel and the pinch.
     let tapStart = null;
     let lastTap = null;
-    const NO_TAP = ".zoom-controls, .vp-bar, .sel-ring, button, label, input";
+    const NO_TAP = ".zoom-controls, .vp-bar, .sel-ring, .obj-card, button, label, input";
     viewportContainer.addEventListener("click", (e) => {
         if (e.target.closest(NO_TAP) || !tapStart) return;
         const moved = Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y);
