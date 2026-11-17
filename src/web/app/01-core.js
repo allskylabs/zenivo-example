@@ -388,6 +388,7 @@ if (chkSatellite) {
     chkSatellite.checked = !!prefs.satelliteOverlay;
     chkSatellite.addEventListener("change", () => {
         savePrefs({ satelliteOverlay: chkSatellite.checked });
+        if (typeof sendOverlaySubscription === "function") sendOverlaySubscription();
         if (chkSatellite.checked) refreshSatellites(); else drawAircraft();
     });
 }
@@ -396,6 +397,7 @@ if (chkSonde) {
     chkSonde.checked = !!prefs.sondeOverlay;
     chkSonde.addEventListener("change", () => {
         savePrefs({ sondeOverlay: chkSonde.checked });
+        if (typeof sendOverlaySubscription === "function") sendOverlaySubscription();
         if (chkSonde.checked) refreshSondes(); else drawAircraft();
     });
 }
@@ -404,6 +406,7 @@ if (chkAircraft) {
     chkAircraft.checked = !!prefs.aircraftOverlay;
     chkAircraft.addEventListener("change", () => {
         savePrefs({ aircraftOverlay: chkAircraft.checked });
+        if (typeof sendOverlaySubscription === "function") sendOverlaySubscription();
         if (chkAircraft.checked) refreshAircraft(); else drawAircraft();
     });
 }

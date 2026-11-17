@@ -8,6 +8,8 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Added
 
+- Live page: aircraft, satellites and balloons are pushed over the live WebSocket (`subscribe` action, `overlay` messages) instead of one REST request every 1.5 s each; the old polling stays only as a fallback when the socket does not carry them.
+
 - Weather and forecast around the station (Settings > Integrations > Weather and forecast, off by default): current conditions and the next 48 h from Open-Meteo (free, no key; the position is rounded to 0.1°; MET Norway answers when Open-Meteo refuses a shared IP address with HTTP 429), with a "clear hours in the next 12" outlook. New `GET /api/weather` (public), `POST /api/weather/{settings,refresh}` (admin); listed under Data sources.
 - A warning (pill on the live picture) when the picture is too dark or too bright while exposure, gain or the target brightness is locked.
 - The header and tab title show the station name when one is set. Community map: online / idle / offline icons, popups kept in view, the whole world fits on phones.

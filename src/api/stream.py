@@ -491,7 +491,7 @@ _stream_jpeg_cache: list = [None, -1.0, b""]
 
 # WebSocket messages that change state: only a signed-in admin (cookie from the handshake) may send them
 WS_MUTATING_ACTIONS = frozenset({"set_exposure", "set_gain", "set_mode", "trigger_master_dark"})
-WS_GUEST_ACTIONS = frozenset({"ping", "get_telemetry", "get_status"})
+WS_GUEST_ACTIONS = frozenset({"ping", "get_telemetry", "get_status", "subscribe"})
 WS_MUTATING_COMMANDS = frozenset({1, 2})  # ASC1 binary: 1 = set_mode, 2 = set_exposure + gain
 WS_AUTH_ERROR = {"type": "error", "code": "auth", "message": "Sign in as admin"}
 
@@ -613,6 +613,38 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
 
         streamer_task = asyncio.create_task(live_streamer())
 
+        # Overlay layers the page asked for ("subscribe"): pushed here instead of the page polling REST every 1.5 s
+        subs: set = set()
+        OVERLAY_EVERY_S = {"aircraft": 1.5, "satellites": 1.5, "sondes": 3.0}
+
+        def overlay_payload(layer: str):
+            if layer == "aircraft":
+                return service.get_aircraft_now(limit=60, trail_s=0.0, bounds=None, include_fr24=None, compact=False)
+            if layer == "sondes":
+                return service.get_radiosondes_now(limit=40)
+            from src.api.routes.common import _sat_cache
+            return _sat_cache.get_or_compute((0.0, False, 60, tuple(), 0.0), lambda: service.get_satellites_now(
+                track_min=0.0, below=False, limit=60, trail_s=0.0, track_ids=set()))
+
+        async def overlay_pusher():
+            last: Dict[str, float] = {}
+            while True:
+                await asyncio.sleep(0.5)
+                now = time.time()
+                for layer in list(subs):
+                    if now - last.get(layer, 0.0) < OVERLAY_EVERY_S[layer]:
+                        continue
+                    last[layer] = now
+                    try:
+                        data = await asyncio.to_thread(overlay_payload, layer)
+                        await websocket.send_json(view({"type": "overlay", "layer": layer, "data": data}))
+                    except WebSocketDisconnect:
+                        raise
+                    except Exception:  # a failing layer must not end the live socket; the page falls back to polling it
+                        last[layer] = now + 10.0
+
+        overlay_task = asyncio.create_task(overlay_pusher())
+
         try:
             while True:
                 msg = await websocket.receive()
@@ -654,6 +686,10 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
 
                     if action == "ping":
                         await websocket.send_json({"type": "pong", "timestamp": time.time()})
+                    elif action == "subscribe":
+                        subs.clear()
+                        subs.update(l for l in (cmd.get("layers") or []) if l in OVERLAY_EVERY_S)
+                        await websocket.send_json({"type": "subscribed", "layers": sorted(subs)})
                     elif action == "get_telemetry":
                         telem = await asyncio.to_thread(service.get_telemetry)
                         await websocket.send_json(view({"type": "telemetry", "data": telem}))
@@ -699,6 +735,7 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                         await websocket.send_text("pong")
         finally:
             streamer_task.cancel()
+            overlay_task.cancel()
     except WebSocketDisconnect:
         pass
     finally:

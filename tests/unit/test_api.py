@@ -251,6 +251,19 @@ class TestStreamingAndWebSockets:
             assert b"--frame" in chunk
             assert b"Content-Type: image/jpeg" in chunk
 
+    def test_websocket_pushes_subscribed_overlay_layers(self, api_client):
+        with api_client.websocket_connect("/ws/live") as websocket:
+            assert websocket.receive_json()["type"] == "welcome"
+            websocket.send_text('{"action": "subscribe", "layers": ["aircraft", "bogus"]}')
+            seen = {}
+            for _ in range(40):
+                msg = websocket.receive_json()
+                seen[msg["type"]] = msg
+                if "overlay" in seen and "subscribed" in seen:
+                    break
+            assert seen["subscribed"]["layers"] == ["aircraft"]
+            assert seen["overlay"]["layer"] == "aircraft" and "aircraft" in seen["overlay"]["data"]
+
     def test_websocket_live_connection(self, api_client):
         with api_client.websocket_connect("/ws/live") as websocket:
             # First message should be welcome payload

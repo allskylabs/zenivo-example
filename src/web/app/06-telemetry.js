@@ -473,6 +473,7 @@ function initWebSocket(isRetry) {
         ws.onopen = () => {
             wsHealth.openedAt = Date.now();
             state.wsConnected = true;
+            if (typeof sendOverlaySubscription === "function") sendOverlaySubscription();
         };
 
         ws.onmessage = (event) => {
@@ -490,7 +491,9 @@ function initWebSocket(isRetry) {
                 // Lock state / brightness, pushed by the server only when it changes
                 try {
                     const msg = JSON.parse(event.data);
-                    if (msg.type === "ae_lock" && !state.dragging && !state.lockPending) {
+                    if (msg.type === "overlay") {
+                        if (typeof applyOverlayPush === "function") applyOverlayPush(msg.layer, msg.data);
+                    } else if (msg.type === "ae_lock" && !state.dragging && !state.lockPending) {
                         syncModeButtons(msg.mode);
                         syncAeLock(msg.ae_lock);
                     } else if (msg.type === "error" && msg.code === "auth") {

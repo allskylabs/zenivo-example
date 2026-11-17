@@ -13,8 +13,27 @@ function scheduleAircraftDraw() {
     aircraftDrawQueued = true;
     requestAnimationFrame(() => { aircraftDrawQueued = false; drawAircraft(); });
 }
+// Layers pushed over the live WebSocket ({type:"overlay"}); REST polling below only runs while no push arrives
+const overlayPush = { at: {}, want: [] };
+function overlayPushLive(layer) { return Date.now() - (overlayPush.at[layer] || 0) < 8000; }
+function overlayLayersWanted() {
+    return [chkAircraft && chkAircraft.checked ? "aircraft" : null, chkSatellite && chkSatellite.checked ? "satellites" : null,
+        chkSonde && chkSonde.checked ? "sondes" : null].filter(Boolean);
+}
+function sendOverlaySubscription() {
+    const layers = overlayLayersWanted();
+    overlayPush.want = layers;
+    if (state.ws && state.ws.readyState === 1 && currentPage === "tab-live") state.ws.send(JSON.stringify({ action: "subscribe", layers }));
+}
+function applyOverlayPush(layer, d) {
+    overlayPush.at[layer] = Date.now();
+    if (layer === "aircraft") { aircraftList = (d && d.aircraft) || []; aircraftFetchedAt = Date.now(); aircraftT = (d && d.t) || 0; }
+    else if (layer === "sondes") { sondeList = (d && d.sondes) || []; sondeT = (d && d.t) || 0; sondeFetchedAt = Date.now(); }
+    else if (layer === "satellites") satelliteList = (d && d.satellites) || [];
+    drawAircraft();
+}
 function refreshAircraft() {
-    if (!chkAircraft || !chkAircraft.checked || document.hidden) return;
+    if (!chkAircraft || !chkAircraft.checked || document.hidden || overlayPushLive("aircraft")) return;
     fetch("/api/adsb/aircraft?limit=60")
         .then((r) => r.json())
         .then((d) => {
@@ -31,7 +50,7 @@ let sondeList = [];
 let sondeT = 0;
 let sondeFetchedAt = 0;
 function refreshSondes() {
-    if (!chkSonde || !chkSonde.checked || document.hidden) return;
+    if (!chkSonde || !chkSonde.checked || document.hidden || overlayPushLive("sondes")) return;
     fetch("/api/radiosondes")
         .then((r) => r.json())
         .then((d) => {
@@ -50,7 +69,7 @@ if (chkSonde && currentPage === "tab-live") {
 // Large satellites (space stations, bright satellites): only those lit by the sun under a dark sky are drawn
 let satelliteList = [];
 function refreshSatellites() {
-    if (!chkSatellite || !chkSatellite.checked || document.hidden) return;
+    if (!chkSatellite || !chkSatellite.checked || document.hidden || overlayPushLive("satellites")) return;
     fetch("/api/satellites")
         .then((r) => r.json())
         .then((d) => {
