@@ -498,7 +498,7 @@ body:has(#left-col) .panel button.on { border-color: color-mix(in srgb, var(--ac
 .seg > button:disabled { opacity: 0.5; cursor: default; }
 select.seg-src { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .exp-preset-chips { flex-wrap: nowrap; gap: 4px; padding: 4px; border-radius: var(--radius-tile); background: var(--bg-primary); border: 1px solid var(--border-color); }
-.exp-preset-chips .chip-preset { height: auto; }
+.exp-preset-chips .chip-preset { height: auto; padding: 0 4px; font-size: 13px; }
 [data-theme="red"] .exp-preset-chips .chip-preset.active { color: var(--accent); }
 
 /* Exposure rows: title + state line left, lock and value right, slider full width */
@@ -609,7 +609,7 @@ select.seg-src { position: absolute; width: 1px; height: 1px; opacity: 0; pointe
     #tab-settings .field-grid { display: block; }
     #tab-settings .field-grid.cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     #tab-settings .field-grid.cols2 > .field-wide, #tab-settings .field-grid.cols2 > .seg { grid-column: 1 / -1; }
-    #tab-settings .field { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; padding: 8px 0; min-height: 52px; margin: 0; }
+    #tab-settings .field { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; padding: 8px 0; min-height: 52px; margin: 0; }
     #tab-settings .field-grid:not(.cols2):not(.stack-grid) > .field + .field, #tab-settings .settings-group > .field + .field, #tab-settings .settings-group > .toggle-list > * + * { border-top: 1px solid var(--divider); }
     #tab-settings .field > label:first-child:not(.checkbox-label) { flex: 1 1 0; min-width: 0; font-size: 15px; font-weight: 500; color: var(--text-primary); }
     #tab-settings .field > select, #tab-settings .field > input[type="number"] { flex: 0 1 auto; width: min(160px, 48%); min-width: 96px; text-align: right; }
@@ -617,11 +617,11 @@ select.seg-src { position: absolute; width: 1px; height: 1px; opacity: 0; pointe
     #tab-settings .field > .field-note, #tab-settings .field > small { flex: 1 1 100%; margin: 0; }
     #tab-settings .field > .btn { flex: 1 1 auto; }
     #tab-settings .field > .seg { flex: 1 1 100%; }
-    #tab-settings .field:has(> input:is([type="text"], [type="url"], [type="email"], [type="password"]), > textarea, > .fr24-token-row, > .sat-groups, > .dayobj-classes, > .adsb-grid), #tab-settings .field.field-wide:not(:has(> .seg)) { flex-direction: column; align-items: stretch; justify-content: flex-start; }
+    #tab-settings .field:has(> input:is([type="text"], [type="url"], [type="email"], [type="password"]), > textarea, > .fr24-token-row, > .sat-groups, > .dayobj-classes, > .adsb-grid, > .seg), #tab-settings .field.field-wide { flex-direction: column; align-items: stretch; justify-content: flex-start; }
     #tab-settings .field > input[type="text"], #tab-settings .field > input[type="url"], #tab-settings .field > input[type="email"], #tab-settings .field > input[type="password"], #tab-settings .field > textarea { width: 100%; }
-    #tab-settings .field > label:first-child:has(+ input:is([type="text"], [type="url"], [type="email"], [type="password"]), + textarea), #tab-settings .field > label:first-child:has(+ .sat-groups), #tab-settings .field > label:first-child:has(+ .dayobj-classes) { flex: none; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+    #tab-settings .field > label:first-child:has(+ input:is([type="text"], [type="url"], [type="email"], [type="password"]), + textarea), #tab-settings .field > label:first-child:has(+ .seg), #tab-settings .field > label:first-child:has(+ select.seg-src + .seg), #tab-settings .field > label:first-child:has(+ .sat-groups), #tab-settings .field > label:first-child:has(+ .dayobj-classes) { flex: none; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
     #tab-settings .cols2 > .field, #tab-settings .stack-grid > .field { flex-direction: column; align-items: stretch; justify-content: flex-start; min-height: 0; padding: 0; gap: 6px; border: 0; }
-    #tab-settings .cols2 > .field > label:first-child, #tab-settings .stack-grid > .field > label:first-child { flex: none; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+    #tab-settings .cols2 > .field > label:first-child, #tab-settings .cols2 > .field > .seg, #tab-settings .stack-grid > .field > label:first-child { flex: none; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
     #tab-settings .cols2 > .field > input, #tab-settings .stack-grid > .field > input { width: 100%; min-width: 0; text-align: left; }
     #tab-settings .stack-grid > .field { margin-bottom: 12px; }
     /* read-only facts as key / value rows */
