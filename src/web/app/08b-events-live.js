@@ -242,10 +242,32 @@ const flightsCount = document.getElementById("flights-count");
 const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 const compass = (az) => COMPASS[Math.round(((az % 360) + 360) % 360 / 45) % 8];
 
+let flightsLast = null;
+let flightsFilter = "all";
+const FL_FILTERS = {
+    all: () => true,
+    view: (a) => !!a.in_view,
+    up: (a) => a.climb_m_min != null && a.climb_m_min > 60,
+    down: (a) => a.climb_m_min != null && a.climb_m_min < -60,
+};
+document.getElementById("flights-chips")?.addEventListener("click", (e) => {
+    const b = e.target.closest(".zchip");
+    if (!b) return;
+    flightsFilter = b.dataset.fl;
+    document.querySelectorAll("#flights-chips .zchip").forEach((c) => {
+        const on = c === b;
+        c.classList.toggle("active", on);
+        c.setAttribute("aria-pressed", String(on));
+    });
+    if (flightsLast) renderFlights(flightsLast);
+});
+
 function renderFlights(d) {
     if (!d || !d.enabled) { flightsCard.hidden = true; return; }
+    flightsLast = d;
     flightsCard.hidden = false;
-    const list = d.aircraft || [];
+    const all = d.aircraft || [];
+    const list = all.filter(FL_FILTERS[flightsFilter] || FL_FILTERS.all);
     flightsCount.textContent = `${d.in_view || 0} in view · ${d.total || 0} heard`;
     if (d.source_in_use === "public" && d.public_provider) {
         // adsb.fi / adsb.lol terms: credit the source with a link
@@ -255,7 +277,7 @@ function renderFlights(d) {
         flightsStatus.textContent = d.connected ? "Live from the ADS-B receiver" : "Receiver not connected";
     }
     if (!list.length) {
-        flightsList.innerHTML = `<li class="live-events-empty">No aircraft heard right now.</li>`;
+        flightsList.innerHTML = `<li class="live-events-empty">${all.length ? "No aircraft match this filter." : "No aircraft heard right now."}</li>`;
         return;
     }
     flightsList.innerHTML = list.map((a) => {

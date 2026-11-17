@@ -25,7 +25,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
-    <link rel="stylesheet" href="/style.css?v=20261118d">
+    <link rel="stylesheet" href="/style.css?v=20261119a">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -294,6 +294,12 @@
                         <!-- Aircraft heard by the ADS-B receiver -->
                         <div class="ov-panel flights-card" id="flights-card" role="tabpanel" hidden>
                             <div class="ov-meta"><span class="badge" id="flights-count">--</span><span class="flights-status" id="flights-status">Loading…</span></div>
+                            <div class="zchips" id="flights-chips" role="group" aria-label="Filter aircraft">
+                                <button type="button" class="zchip active" data-fl="all" aria-pressed="true">All</button>
+                                <button type="button" class="zchip" data-fl="view" aria-pressed="false">In view</button>
+                                <button type="button" class="zchip" data-fl="up" aria-pressed="false">Climbing</button>
+                                <button type="button" class="zchip" data-fl="down" aria-pressed="false">Descending</button>
+                            </div>
                             <ul class="flights-list" id="flights-list"></ul>
                             <a class="live-events-more" href="/flights3d">3D map &rsaquo;</a>
                         </div>
@@ -1746,7 +1752,7 @@
     <script defer src="/static/app/06-telemetry.js?v=20261118a"></script>
     <script defer src="/static/app/07-cloud.js?v=20261115b"></script>
     <script defer src="/static/app/08-gallery-adsb.js?v=20261115a"></script>
-    <script defer src="/static/app/08b-events-live.js?v=20261118b"></script>
+    <script defer src="/static/app/08b-events-live.js?v=20261119a"></script>
     <script defer src="/static/app/08c-adsb-settings.js?v=20261117a"></script>
     <script defer src="/static/app/08d-live-ui.js?v=20261118b"></script>
     <script defer src="/static/app/09-community.js?v=20261114b"></script>
