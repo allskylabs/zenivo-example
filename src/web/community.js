@@ -118,7 +118,37 @@
     }
     map.on("zoomend", () => { if (map.getZoom() >= 4) load("high"); applyLevel(); });
     load("low");
-    const layer = L.layerGroup().addTo(map);
+    // Nearby stations merge into a cluster (Leaflet.markercluster); without that file the page falls back to plain markers
+    const clustered = typeof L.markerClusterGroup === "function";
+    let spiderfied = false;   // a spider is open: do not rebuild the markers under it
+    const stateTone = { online: "var(--success)", idle: "var(--warning)", offline: "var(--text-muted)" };
+    function clusterIcon(c) {
+        const kids = c.getAllChildMarkers(), n = { online: 0, idle: 0, offline: 0 };
+        let own = false;
+        for (const m of kids) { n[m.options.cmState] = (n[m.options.cmState] || 0) + 1; if (m.options.cmOwn) own = true; }
+        const total = kids.length;
+        let acc = 0;
+        const stops = [];
+        for (const k of ["online", "idle", "offline"]) {
+            if (!n[k]) continue;
+            stops.push(`${stateTone[k]} ${(acc / total * 100).toFixed(2)}% ${((acc + n[k]) / total * 100).toFixed(2)}%`);
+            acc += n[k];
+        }
+        const label = `${total} stations: ` + ["online", "idle", "offline"].filter((k) => n[k]).map((k) => `${n[k]} ${k}`).join(", ");
+        return L.divIcon({ className: "cm-mk cm-cluster", iconSize: [40, 40], iconAnchor: [20, 20],
+            html: `<span class="cm-cl${own ? " own" : ""}" role="img" title="${label}" aria-label="${label}" style="background:conic-gradient(${stops.join(",")})"><span class="cm-cl-n">${total}</span></span>` });
+    }
+    const layer = clustered ? L.markerClusterGroup({
+        maxClusterRadius: 40, showCoverageOnHover: false, zoomToBoundsOnClick: true, spiderfyOnMaxZoom: true,
+        spiderfyDistanceMultiplier: 1.3, animate: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+        spiderLegPolylineOptions: { weight: 1.5, color: tone("--text-secondary", "gray"), opacity: 0.6 },
+        iconCreateFunction: clusterIcon,
+    }) : L.layerGroup();
+    layer.addTo(map);
+    if (clustered) {
+        layer.on("spiderfied", () => { spiderfied = true; });
+        layer.on("unspiderfied", () => { spiderfied = false; });
+    }
     let stations = [];   // [{card, marker}]
     let ownId = null;
     let cards = [];
@@ -281,7 +311,7 @@
             const marker = L.marker([card.lat, card.lon], {
                 icon: L.divIcon({ className: "cm-mk", iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -12],
                     html: `<span class="cm-dot ${st}${isOwn ? " own" : ""}"></span>` }),
-                title: `${String(card.name || "Station")} (${st})`, keyboard: true,
+                title: `${String(card.name || "Station")} (${st})`, keyboard: true, cmState: st, cmOwn: isOwn,
             }).addTo(layer);
             marker.bindPopup(() => popupFor(card, isOwn), { maxWidth: 340, keepInView: true, autoPanPaddingTopLeft: [16, 76], maxHeight: Math.max(220, Math.min(460, window.innerHeight - 200)), autoPanPaddingBottomRight: [16, 24] });
             pts.push([card.lat, card.lon]);
@@ -300,8 +330,14 @@
             btn.appendChild(rt);
             counts[st] += 1;
             btn.addEventListener("click", () => {
-                map.flyTo([card.lat, card.lon], Math.max(map.getZoom(), 6));
-                marker.openPopup();
+                if (clustered) {
+                    // the marker may sit inside a cluster: zoom or spiderfy until it shows, then open its popup
+                    map.setView([card.lat, card.lon], Math.max(map.getZoom(), 6), { animate: false });
+                    layer.zoomToShowLayer(marker, () => marker.openPopup());
+                } else {
+                    map.flyTo([card.lat, card.lon], Math.max(map.getZoom(), 6));
+                    marker.openPopup();
+                }
                 if (window.matchMedia("(max-width: 768px)").matches) document.getElementById("cmap-wrap").scrollIntoView({ block: "start", behavior: "smooth" });
             });
             item.appendChild(btn);
@@ -356,7 +392,7 @@
             cards = Array.isArray(data.cards) ? data.cards : [];
             relayed = data.relayed && typeof data.relayed === "object" ? data.relayed : {};
             seenMap = data.seen && typeof data.seen === "object" ? data.seen : {};
-            if (!popupOpen) drawMarkers();
+            if (!popupOpen && !spiderfied) drawMarkers();
         } catch (err) {
             showEmpty("unavailable", "Could not load the stations. Retrying.");
         }
