@@ -340,7 +340,7 @@ data/
 | `sky_roi`, `sky_mask` | Sky region and polygons |
 | `star_boost` | Star boost on/off and bin size |
 | `event_detection` | Per-type switches |
-| `remote_solver_url` | Optional remote blind plate solver and Zenivo network origin (empty = nothing is sent) |
+| `remote_solver_url` | Optional remote blind plate solver and Zenivo network origin (default `https://virtuallab3d.com`; empty = nothing is sent) |
 | `performance` | `min_capture_interval_s` 2, `analysis_max_width` 960, `sky_analysis_enabled` 1, `analysis_interval_s` 300, `stream_max_width` 960, `stream_jpeg_quality` 75 |
 | `storage` | Retention policy |
 | `focus_record`, `focus_history`, `lens_focus` | Focus results, history and lens state |

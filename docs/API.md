@@ -107,7 +107,7 @@ object of `/api/adsb/aircraft` and `/api/satellites`; the ADS-B receiver address
 |--------|------|---------|
 | GET | `/api/station/config` | Station coordinates, optics, orientation, solve result, `timezone` (setting) and `timezone_info` (`name`, `offset_min`, what the clock and observing day follow) |
 | POST | `/api/station/timezone` | `{"timezone": ""}` for the operating system zone (default), `"coords"` for a whole-hour offset from the longitude, or an IANA name such as `"America/Chicago"` (admin) |
-| POST | `/api/station/location`, `/api/station/settings` | Save coordinates and manual optics/pointing overrides (`latitude_deg`, `longitude_deg`, `elevation_m`, `location_name`, lens fields, `azimuth_deg`, `altitude_deg`, `remote_solver_url` (opt-in remote plate solver; empty = never upload), ...) |
+| POST | `/api/station/location`, `/api/station/settings` | Save coordinates and manual optics/pointing overrides (`latitude_deg`, `longitude_deg`, `elevation_m`, `location_name`, lens fields, `azimuth_deg`, `altitude_deg`, `remote_solver_url` (remote plate solver, default `https://virtuallab3d.com`; empty = never upload), ...) |
 | POST | `/api/station/auto-locate` | Locate the station by IP geolocation. Query `auto_plate_solve` |
 | POST | `/api/station/plate-solve` | Run a plate solve in the request. Query `fov_hint` |
 | POST | `/api/station/plate-solve/start` | Start a background plate solve. Query `fov_hint`, `mode` (`auto` or `deep`) |

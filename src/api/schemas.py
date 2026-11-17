@@ -216,7 +216,7 @@ class StationLocationRequest(BaseModel):
     altitude_deg: Optional[float] = None
     zenith_tilt_deg: Optional[float] = None
     north_position_angle_deg: Optional[float] = None
-    remote_solver_url: Optional[str] = Field(default=None, max_length=300, description="Opt-in remote plate solver base URL (empty = never upload)")
+    remote_solver_url: Optional[str] = Field(default=None, max_length=300, description="Opt-in remote plate solver base URL (default https://virtuallab3d.com; empty = never upload)")
 
 
 class HistogramStats(BaseModel):

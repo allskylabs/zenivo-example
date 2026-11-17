@@ -48,7 +48,7 @@ class StationMixin:
             "location_name": DEFAULT_STATION_NAME,
             "geo_source": "default",
             "plate_solver_endpoint": "",
-            "remote_solver_url": "",
+            "remote_solver_url": "https://virtuallab3d.com",
             "solve_source": "not_solved_yet",
             "solved_at": None,
             "camera_sensor": IMX335_SPEC,
