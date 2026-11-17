@@ -449,6 +449,10 @@ class V4L2MmapCaptureSession:
         for cid, val in (
             (0x00980900, 0),   # brightness default = 0
             (0x00980901, 34),  # contrast default = 34
+            # ISP gain default = 64 (1x). Left at 0 (e.g. by the generic UVC driver probing this device, which maps
+            # 0 dB to gain=0) the MJPG output is halved and clips at 128: a saturated daytime frame then reads 127,
+            # inside the auto exposure's daytime band, and the exposure never comes down (seen 2026-11-18)
+            (0x00980913, 64),
             (V4L2_CID_EXPOSURE_AUTO, V4L2_EXPOSURE_MANUAL),  # auto_exposure = 1 (Manual)
             *(
                 # ALLSKY_ISP_WB_K=<kelvin>: lock the camera's own AWB (auto-WB drifts magenta under foliage)
