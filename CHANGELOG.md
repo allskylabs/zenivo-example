@@ -6,6 +6,26 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.3.0-beta.2] - 2026-11-17
+
+Second public beta. Not every feature has been tested; see the notice in the README. Touch gestures on real phones (pinch, drag) have only been exercised with synthetic events.
+
+### Added (web UI redesign)
+
+- Mobile-first redesign of the whole web UI: phone header, a five-tab bottom bar (Live / Sky / Overhead / Archive / Menu), Menu and Layers sheets, self-hosted Inter and Space Grotesk fonts. Live, Overhead (`/overhead`, with a sky radar), Archive, the event viewer, Settings (grouped home list with search), Focus, Activity log, Community, Sign in, Sky and the 3D pages follow one design; desktop keeps the sidebar.
+- Live: a tap or click on the picture shows an info card next to the object under it (star, planet, deep-sky object, constellation, aircraft, satellite, balloon) with rise and set times, aircraft type and route; a double tap, the wheel, a pinch or the − / + pill zoom. The Layers sheet gains **Overlay text** and **Airports**.
+- Zoom and pan (wheel, pinch, drag, double tap, keys `+ - 0`, a − / + pill; 1x to 8x) in the Archive frame viewer (kept while a day plays), the gallery lightbox, the event viewer and timelapse videos. A click on the lightbox picture no longer closes it (backdrop, ✕ or Esc do); inline videos zoom with Ctrl + wheel.
+- Sky page: rise/set times and lists for the Sun, Moon and planets (`GET /api/sky/riseset`, `GET /api/sky/bodies`, public).
+- Events: **Copy link** (`/gallery?event=<id>`) and, for the admin, **Delete** (`GET`/`DELETE /api/events/{id}`).
+- Settings > Admin: CPU, memory, disk and temperature tiles (`GET /api/system/resources`, admin). Settings > Image output now holds the Exposure card and a JPEG quality slider.
+- `GET /api/adsb/info/{icao}` (type and route of an aircraft heard now) and `GET /api/map/airports/frame`.
+
+### Changed
+
+- Focus page: one primary button (**Start focus mode**, then **Finish & save**); **Stop without saving** and **Run autofocus sweep** are secondary, and the sweep button only shows for a motorised lens in Autofocus mode.
+- The simulator (`--simulator`) always shows a night sky with stars, at any time of day, with night-mode auto exposure and picture analysis; astronomy read-outs (Sun altitude, rise/set, satellite visibility) stay real.
+- Red Vision covers the new pages and controls; touch targets are at least 44 px on phones.
+
 ### Added
 
 - Live page: aircraft, satellites and balloons are pushed over the live WebSocket (`subscribe` action, `overlay` messages) instead of one REST request every 1.5 s each; the old polling stays only as a fallback when the socket does not carry them.

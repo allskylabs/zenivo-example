@@ -12,8 +12,8 @@ estimates cloud cover, detects sky events, assists focusing and plate-solves the
 It runs on a Raspberry Pi 4 (1.8 GB RAM) as well as on a laptop or mini-PC. Low CPU and memory use
 is the main design constraint: heavy analysis is sampled, never done per frame.
 
-> **Beta software, use at your own risk.** This is a public beta (1.3.0-beta.1). Not every feature has been tested, and some
-> paths (colour ZWO/QHY sensors, QHY cooling, mobile layout, long unattended runs) have never run on real hardware. It is provided
+> **Beta software, use at your own risk.** This is a public beta (1.3.0-beta.2). Not every feature has been tested, and some
+> paths (colour ZWO/QHY sensors, QHY cooling, touch gestures on real phones, long unattended runs) have never run on real hardware. It is provided
 > as is, without warranty (see [LICENSE](LICENSE)); whoever installs it accepts all the risks. Live demo: <https://sky.hoan.uk>.
 
 ## Privacy in short
