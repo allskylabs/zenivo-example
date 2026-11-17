@@ -25,7 +25,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
-    <link rel="stylesheet" href="/style.css?v=20261121g">
+    <link rel="stylesheet" href="/style.css?v=20261122a">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -157,20 +157,22 @@
             <section class="card oh-radar" aria-label="Sky radar">
                 <div class="card-header"><h2 id="oh-radar-title">Aircraft now</h2><span class="ov-live off" id="oh-live">connecting</span></div>
                 <div class="oh-plot"><canvas id="oh-canvas" role="img" aria-label="Sky radar: N up, zenith in the centre, horizon at the edge"></canvas></div>
-                <p class="oh-hint" id="oh-hint">Rings at 30&deg; and 60&deg; elevation &middot; tap a dot or a row to select</p>
+                <p class="oh-hint" id="oh-hint">Rings at 30&deg; &middot; 60&deg; &middot; tap a row to select</p>
                 <div class="oh-links"><a class="live-events-more" href="/flights3d">Flights 3D map &rsaquo;</a><a class="live-events-more" href="/satellites3d">Satellites 3D &rsaquo;</a></div>
             </section>
-            <section class="card oh-list ov-panel" aria-label="Objects overhead">
-                <div class="ov-meta"><span class="badge" id="oh-count">--</span><span class="flights-status" id="oh-status">Loading&hellip;</span></div>
+            <div class="oh-side">
                 <div class="zchips" id="oh-chips" role="group" aria-label="Filter"></div>
-                <ul class="flights-list oh-rows" id="oh-rows"></ul>
-            </section>
+                <section class="card oh-list ov-panel" aria-label="Objects overhead">
+                    <ul class="flights-list oh-rows" id="oh-rows"></ul>
+                    <div class="ov-meta"><span class="badge" id="oh-count">--</span><span class="flights-status" id="oh-status">Loading&hellip;</span></div>
+                </section>
+            </div>
         </div>
     </main>
     </div><!-- .app-main -->
     </div><!-- .app-shell -->
 
     <script src="/static/overlay_decode.js?v=1"></script>
-    <script src="/static/overhead.js?v=2"></script>
+    <script src="/static/overhead.js?v=3"></script>
 </body>
 </html>

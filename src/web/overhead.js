@@ -59,31 +59,32 @@
     const state = { seg: "aircraft", filter: { aircraft: "all", satellites: "all", sondes: "all" }, data: {}, sel: null, wsLive: false, restAt: 0 };
 
     // ---- rows (same markup and classes as the Live "Overhead now" card, see app/08b-events-live.js) ----
-    const whereOf = (a) => a.in_view ? `<span class="fl-inview">● in view</span>`
-        : a.above_horizon !== false && a.alt_deg >= 0 ? `${compass(a.az_deg)} ${Math.round(a.alt_deg)}° up` : "below horizon";
+    const SVG = (d) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+    const ICON = {
+        aircraft: SVG('<polygon points="3 11 22 2 13 21 11 13 3 11"/>'),
+        satellites: SVG('<rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 12H4M20 12h-5M12 9V4M12 20v-5"/><path d="M2 9h4M2 15h4M18 9h4M18 15h4"/>'),
+        sondes: SVG('<path d="M12 2a6.5 6.5 0 0 1 6.5 6.5c0 3.6-3 6.5-6.5 8.5-3.5-2-6.5-4.9-6.5-8.5A6.5 6.5 0 0 1 12 2z"/><path d="M12 17v2M10 22h4M12 19v3"/>'),
+    };
+    const elOf = (a) => a.in_view || (a.above_horizon !== false && a.alt_deg >= 0) ? `El ${Math.round(a.alt_deg)}° · ${compass(a.az_deg)}` : "Below horizon";
     function rowHtml(layer, a) {
         const id = esc(idOf[layer](a));
-        const cls = `flight${a.in_view ? " in-view" : ""}${state.sel && state.sel.layer === layer && String(state.sel.id) === String(idOf[layer](a)) ? " sel" : ""}`;
-        const open = `<li class="${cls}" data-id="${id}" tabindex="0" role="button" aria-label="${esc(labelOf[layer](a))}">`;
+        const cls = `flight oh-row${a.in_view ? " in-view" : ""}${state.sel && state.sel.layer === layer && String(state.sel.id) === String(idOf[layer](a)) ? " sel" : ""}`;
+        const open = `<li class="${cls}" data-id="${id}" tabindex="0" role="button" aria-label="${esc(labelOf[layer](a))}"><span class="oh-ic">${ICON[layer]}</span>`;
+        const tail = (val, a2) => `<div class="oh-val"><b>${val}</b><span>${a2.in_view ? '<i class="oh-dot" aria-hidden="true"></i>' : ""}${esc(elOf(a2))}</span></div></li>`;
+        const num = (v) => esc(Number(v).toLocaleString());
         if (layer === "aircraft") {
             const climb = a.climb_m_min == null ? "" : a.climb_m_min > 60 ? " ↗" : a.climb_m_min < -60 ? " ↘" : "";
             const url = `https://globe.adsbexchange.com/?icao=${encodeURIComponent(String(a.icao).toLowerCase())}`;
-            return `${open}<div class="fl-top"><a href="${url}" target="_blank" rel="noopener" class="flight-tag">✈ ${esc(labelOf[layer](a))}</a><span class="fl-where">${whereOf(a)}</span></div>
-                <div class="fl-meta"><span title="Altitude">${esc(Number(a.altitude_m).toLocaleString())} m${climb}</span>
-                <span title="Ground speed">${a.speed_kmh != null ? `${esc(a.speed_kmh)} km/h` : "-- km/h"}</span>
-                <span title="Distance from the camera">${esc(a.distance_km)} km</span></div></li>`;
+            return `${open}<div class="oh-main"><a href="${url}" target="_blank" rel="noopener" class="flight-tag">${esc(labelOf[layer](a))}</a>
+                <span class="oh-sub" title="Altitude, ground speed">${num(a.altitude_m)} m${climb} · ${a.speed_kmh != null ? `${esc(a.speed_kmh)} km/h` : "-- km/h"}</span></div>${tail(`${esc(a.distance_km)} km`, a)}`;
         }
         if (layer === "sondes") {
             const dir = a.climb_m_s > 1 ? " ↗" : a.climb_m_s < -1 ? " ↘" : "";
-            return `${open}<div class="fl-top"><a href="https://sondehub.org/${encodeURIComponent(a.serial)}" target="_blank" rel="noopener" class="flight-tag">🎈 ${esc(a.serial)}</a><span class="fl-where">${whereOf(a)}</span></div>
-                <div class="fl-meta"><span title="Altitude">${esc(Number(a.altitude_m).toLocaleString())} m${dir}</span>
-                <span title="${esc(a.type || "")}">${a.freq_mhz ? esc(a.freq_mhz) + " MHz" : esc(a.type || "")}</span>
-                <span title="Distance from the camera">${esc(a.distance_km)} km</span></div></li>`;
+            return `${open}<div class="oh-main"><a href="https://sondehub.org/${encodeURIComponent(a.serial)}" target="_blank" rel="noopener" class="flight-tag">${esc(a.serial)}</a>
+                <span class="oh-sub" title="${esc(a.type || "")}">${num(a.altitude_m)} m${dir}${a.freq_mhz ? " · " + esc(a.freq_mhz) + " MHz" : a.type ? " · " + esc(a.type) : ""}</span></div>${tail(`${esc(a.distance_km)} km`, a)}`;
         }
-        const where = a.in_view ? `<span class="fl-inview">● in view</span>` : `${compass(a.az_deg)} ${Math.round(a.alt_deg)}° up`;
-        return `${open}<div class="fl-top"><a href="https://www.n2yo.com/satellite/?s=${encodeURIComponent(a.norad)}" target="_blank" rel="noopener" class="flight-tag">🛰 ${esc(a.name)}</a><span class="fl-where">${where}</span></div>
-            <div class="fl-meta"><span title="Height above the ground">${esc(Number(a.height_km).toLocaleString())} km</span>
-            <span>${compass(a.az_deg)} ${Math.round(a.alt_deg)}°</span><span>${a.visible ? "visible" : "not visible"}</span></div></li>`;
+        return `${open}<div class="oh-main"><a href="https://www.n2yo.com/satellite/?s=${encodeURIComponent(a.norad)}" target="_blank" rel="noopener" class="flight-tag">${esc(a.name)}</a>
+            <span class="oh-sub">${a.visible ? "Visible" : "Not visible"}</span></div>${tail(`${num(a.height_km)} km`, a)}`;
     }
 
     // Objects of a segment: satellites only while above the horizon, sorted like the Live card
@@ -134,13 +135,17 @@
         $("oh-count").textContent = count;
         $("oh-status").textContent = status;
         const live = $("oh-live");
-        live.textContent = state.wsLive ? "live" : "updating"; live.classList.toggle("off", !state.wsLive);
+        live.textContent = d && !(d.enabled === false || d.disabled) ? `${objectsOf(layer).length} in range` : "";
+        live.title = state.wsLive ? "Live" : "Updating"; live.classList.toggle("off", !state.wsLive);
         // chips
         const chips = $("oh-chips");
         if (chips.dataset.layer !== layer) {
             chips.dataset.layer = layer;
             chips.innerHTML = FILTERS[layer].map(([k, t]) => `<button type="button" class="zchip" data-f="${k}" aria-pressed="false">${esc(t)}</button>`).join("");
+            chips.dataset.n = "";
         }
+        const allBtn = chips.querySelector('[data-f="all"]'), nAll = String(objectsOf(layer).length);
+        if (allBtn && chips.dataset.n !== nAll) { allBtn.textContent = `All ${nAll}`; chips.dataset.n = nAll; }
         chips.querySelectorAll(".zchip").forEach((c) => { const on = c.dataset.f === state.filter[layer]; c.classList.toggle("active", on); c.setAttribute("aria-pressed", String(on)); });
         // rows
         const ul = $("oh-rows");
@@ -161,7 +166,7 @@
     let dots = [];   // hit targets of the last draw: { id, x, y }
     function drawRadar() {
         if (!cv) return;
-        const box = cv.parentElement, size = Math.max(160, Math.min(box.clientWidth, window.innerWidth <= 520 ? 240 : 340)), dpr = window.devicePixelRatio || 1;
+        const box = cv.parentElement, size = Math.max(160, Math.min(box.clientWidth, window.innerWidth <= 520 ? 208 : 340)), dpr = window.devicePixelRatio || 1;
         if (cv.width !== Math.round(size * dpr)) { cv.width = Math.round(size * dpr); cv.height = Math.round(size * dpr); }
         cv.style.width = size + "px"; cv.style.height = size + "px";
         const g = cv.getContext("2d");
