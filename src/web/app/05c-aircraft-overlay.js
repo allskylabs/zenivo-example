@@ -15,7 +15,8 @@ function scheduleAircraftDraw() {
 }
 // Layers pushed over the live WebSocket ({type:"overlay"}); REST polling below only runs while no push arrives
 const overlayPush = { at: {}, want: [] };
-function overlayPushLive(layer) { return Date.now() - (overlayPush.at[layer] || 0) < 8000; }
+// The server skips pushes whose content did not change, so "live" means subscribed and acknowledged, not "recently heard"
+function overlayPushLive(layer) { return window.overlayPushOn(layer); }
 window.overlayPushOn = function overlayPushOn(layer) { return !!((!layer || overlayPush.want.includes(layer)) && state.ws && state.ws.readyState === 1 && overlayPush.acked && Date.now() - overlayPush.acked < 3600000); };
 function overlayLayersWanted() {
     const extra = [];

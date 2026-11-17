@@ -644,7 +644,8 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
         subs: set = set()
         subs_hold: set = set()     # what the page asked for while its tab is hidden
         last_push: Dict[str, float] = {}
-        OVERLAY_EVERY_S = {"aircraft": 1.5, "satellites": 1.5, "sondes": 3.0, "events": 2.0, "logs": 2.0}
+        # Aircraft and balloons carry their on-frame velocity (frame_v), so the page moves them between pushes
+        OVERLAY_EVERY_S = {"aircraft": 3.0, "satellites": 1.5, "sondes": 6.0, "events": 2.0, "logs": 2.0}
         admin_ws = is_admin(websocket)
 
         def overlay_payload(layer: str):
@@ -663,7 +664,8 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                 # Only what the overlay and the flights card draw: no per-aircraft source/provider/age, no FR24 account block
                 keep = ("icao", "callsign", "altitude_m", "speed_kmh", "heading_deg", "climb_m_min", "az_deg", "alt_deg",
                         "distance_km", "frame_xy", "frame_v", "in_view", "above_horizon")
-                return {**{k: d.get(k) for k in ("enabled", "connected", "source_in_use", "public_provider", "t", "total", "in_view")},
+                return {**{k: d[k] for k in ("enabled", "connected", "source_in_use", "public_provider", "total", "in_view")
+                           if d.get(k) is not None}, "t": round(float(d.get("t") or 0), 2),
                         "aircraft": [{k: a[k] for k in keep if k in a} for a in d.get("aircraft") or []]}
             if layer == "sondes":
                 return service.get_radiosondes_now(limit=40)
@@ -676,9 +678,11 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
             from src.api.routes.common import _sat_cache
             d = _sat_cache.get_or_compute((0.0, False, 60, tuple(), 0.0), lambda: service.get_satellites_now(
                 track_min=0.0, below=False, limit=60, trail_s=0.0, track_ids=set()))
-            keep = ("name", "norad", "az_deg", "alt_deg", "height_km", "above_horizon", "sunlit", "visible", "frame_xy", "in_view")
-            return {"sun_alt_deg": d.get("sun_alt_deg"), "camera": d.get("camera"),
-                    "satellites": [{k: s[k] for k in keep if k in s} for s in d.get("satellites") or []]}
+            # The overlay draws only satellites that are in the frame AND visible (sunlit under a dark sky): by day that is
+            # none, so the list is empty and the unchanged-payload check sends it once
+            return {"satellites": [{"name": s.get("name"), "height_km": s.get("height_km"), "frame_xy": s["frame_xy"],
+                                    "in_view": True, "visible": True}
+                                   for s in d.get("satellites") or [] if s.get("in_view") and s.get("visible") and s.get("frame_xy")]}
 
         async def overlay_pusher():
             last = last_push
