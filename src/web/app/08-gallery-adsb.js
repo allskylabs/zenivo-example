@@ -92,13 +92,15 @@ if (tlBuild) {
         tlBuild.disabled = true;
         tlBuild.textContent = "Building...";
         tlResult.classList.remove("hidden");
+        destroyZooms(tlZooms);
         tlResult.textContent = "Encoding frames, this can take a minute.";
         try {
             const res = await fetch(`/api/timelapse/build?${q}`, { method: "POST" });
             const d = await res.json();
             if (res.ok) {
                 const url = `${d.timelapse_url}?t=${Date.now()}`;
-                tlResult.innerHTML = `${d.video_frames_count} frames, ${d.duration_s}s @ ${d.fps} fps, ${formatSize(d.size_kb)} · <a href="${escapeHtml(url)}" download>Download</a><video controls loop muted playsinline src="${escapeHtml(url)}"></video>`;
+                tlResult.innerHTML = `${d.video_frames_count} frames, ${d.duration_s}s @ ${d.fps} fps, ${formatSize(d.size_kb)} · <a href="${escapeHtml(url)}" download>Download</a><div class="tl-zoom"><video controls loop muted playsinline src="${escapeHtml(url)}"></video></div>`;
+                zoomVideo(tlResult.querySelector("video"), tlZooms);
             } else {
                 tlResult.textContent = `Build failed: ${d.detail || "unknown error"}`;
             }
@@ -127,6 +129,7 @@ async function loadGalleryAndEvents() {
 
 function renderGallery(data) {
     productsGrid.innerHTML = "";
+    destroyZooms(cardZooms);
     if (galleryDateEl && data && data.date) {
         galleryDateEl.textContent = `Archive: ${data.date} (${tzLabel})`;
     }
@@ -182,10 +185,19 @@ function renderGallery(data) {
             </div>
         `;
         productsGrid.appendChild(card);
-        if (item.type === "timelapse") attachVideoInfo(card.querySelector("video"), item.info_url);
+        if (item.type === "timelapse") { attachVideoInfo(card.querySelector("video"), item.info_url); zoomVideo(card.querySelector("video"), cardZooms); }
     });
     galleryHistory = data.history || [];
     renderDays();
+}
+
+// Zoom + pan for timelapse videos (zoom_pan.js); the wheel needs Ctrl/Cmd here so the page still scrolls over the tiles
+const cardZooms = [], dayZooms = [], tlZooms = [];
+function destroyZooms(list) { list.splice(0).forEach((z) => z.destroy()); }
+function zoomVideo(video, list) {
+    if (!video || !video.parentElement || !window.ZenivoZoomPan) return;
+    const zp = ZenivoZoomPan.attach(video.parentElement, video, { pill: "hover", wheel: "ctrl" });
+    if (zp) list.push(zp);
 }
 
 function formatSize(kb) {
@@ -264,11 +276,12 @@ function renderDays() {
         notice = `Showing the newest ${tableEvents.length} of ${eventsMeta.total_count} events.`;
     }
     if (!days.some((d) => d.date === gallerySelDay)) gallerySelDay = days[0].date;
+    destroyZooms(dayZooms);
     dayList.innerHTML = (notice ? `<p class="text-muted day-notice">${notice}</p>` : "")
         + days.map((day) => dayBlockHtml(day, todayKey, day.date === gallerySelDay)).join("");
     renderDayStrip(days);
     placeEventsFilter();
-    dayList.querySelectorAll("video[data-info]").forEach((v) => attachVideoInfo(v, v.dataset.info));
+    dayList.querySelectorAll("video[data-info]").forEach((v) => { attachVideoInfo(v, v.dataset.info); zoomVideo(v, dayZooms); });
 }
 
 const EVENT_NAMES = { meteor: "Meteor", plane: "Aircraft", satellite: "Satellite", clouds: "Clouds", flash: "Flash" };
@@ -321,14 +334,17 @@ const viewer = document.createElement("div");
 viewer.className = "image-viewer hidden";
 viewer.innerHTML = `
     <button class="image-viewer-close" title="Close (Esc)">✕</button>
-    <img alt="" />
+    <div class="iv-zoom"><img alt="" draggable="false" /></div>
     <div class="image-viewer-caption"></div>
 `;
 document.body.appendChild(viewer);
 const viewerImg = viewer.querySelector("img");
+// Zoom + pan the picture (zoom_pan.js); a click on the picture no longer closes the viewer, the backdrop, the X and Esc do
+const viewerZoom = window.ZenivoZoomPan ? ZenivoZoomPan.attach(viewer.querySelector(".iv-zoom"), viewerImg, { active: () => !viewer.classList.contains("hidden") }) : null;
 const viewerCaption = viewer.querySelector(".image-viewer-caption");
 
 function closeViewer() {
+    if (viewerZoom) viewerZoom.reset();
     viewer.classList.add("hidden");
     viewerImg.removeAttribute("src");
 }
@@ -338,10 +354,11 @@ document.addEventListener("click", (e) => {
     if (link) {
         if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return; // keep open-in-new-tab
         e.preventDefault();
+        if (viewerZoom) viewerZoom.reset();
         viewerImg.src = link.getAttribute("href");
         viewerCaption.textContent = link.dataset.viewer;
         viewer.classList.remove("hidden");
-    } else if (!viewer.classList.contains("hidden") && viewer.contains(e.target)) {
+    } else if (!viewer.classList.contains("hidden") && viewer.contains(e.target) && !e.target.closest(".iv-zoom")) {
         closeViewer();
     }
 });

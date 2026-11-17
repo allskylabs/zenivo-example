@@ -279,6 +279,8 @@ if (cloudChart && currentPage === "tab-live") {
     const fv = document.getElementById("frame-viewer");
     const fvImg = document.getElementById("fv-img");
     const fvMsg = document.getElementById("fv-msg");
+    // Zoom + pan the picture together with its event boxes (the stage holds both); kept while frames play, reset otherwise (zoom_pan.js)
+    const fvZoom = window.ZenivoZoomPan ? ZenivoZoomPan.attach(document.getElementById("fv-zoom"), document.getElementById("fv-stage"), { active: () => !fv.classList.contains("hidden") }) : null;
     const fvChart = document.getElementById("fv-chart");
     const fvPlay = document.getElementById("fv-play");
     const fvSpeed = document.getElementById("fv-speed");
@@ -314,6 +316,7 @@ if (cloudChart && currentPage === "tab-live") {
         const f = fvFrames[fvIdx];
         if (!f) return;
         viewTs = f.ts;
+        if (fvZoom && !fvTimer) fvZoom.reset();   // a new item starts at 1x; during playback the zoom and pan stay
         fvImg.src = f.url;
         fvImg.classList.remove("hidden");
         fvMsg.classList.add("hidden");
@@ -405,11 +408,12 @@ if (cloudChart && currentPage === "tab-live") {
         const f = fvFrames[fvIdx], i = fvIdx;
         fvBoxes.innerHTML = "";
         if (!f || f.baked || !fvImg.naturalWidth) return;   // baked: the event's own image already has the box drawn in
-        const wrap = fvImg.parentElement.getBoundingClientRect(), im = fvImg.getBoundingClientRect();
+        // layout offsets inside the stage (not getBoundingClientRect), so the zoom transform does not skew the boxes
+        const iw = fvImg.offsetWidth, ih = fvImg.offsetHeight;
         const W = fvImg.naturalWidth, H = fvImg.naturalHeight;
-        const k = Math.min(im.width / W, im.height / H);
+        const k = Math.min(iw / W, ih / H);
         const w = W * k, h = H * k;   // object-fit: contain
-        Object.assign(fvBoxes.style, { left: `${im.left - wrap.left + (im.width - w) / 2}px`, top: `${im.top - wrap.top + (im.height - h) / 2}px`, width: `${w}px`, height: `${h}px` });
+        Object.assign(fvBoxes.style, { left: `${fvImg.offsetLeft + (iw - w) / 2}px`, top: `${fvImg.offsetTop + (ih - h) / 2}px`, width: `${w}px`, height: `${h}px` });
         fvBoxes.setAttribute("viewBox", `0 0 ${W} ${H}`);
         const active = cloudEvents.filter((e) => e.line && f.ts >= e.start_ts - 30 && f.ts <= Math.max(e.end_ts || 0, e.start_ts) + 30);
         const found = await Promise.all(active.map((e) => (e.moving_dot ? locateDot(e, i) : null)));
@@ -498,6 +502,7 @@ if (cloudChart && currentPage === "tab-live") {
         }
         if (!fvFrames.length) {
             fvImg.classList.add("hidden");
+            if (fvZoom) fvZoom.reset();
             fvMsg.textContent = fvLoadFailed ? "Could not load the archived frames (the server did not answer). Tap the event again."
                 : "No archived frame near that time (frames are kept for a limited number of days).";
             fvMsg.classList.remove("hidden");
@@ -563,6 +568,7 @@ if (cloudChart && currentPage === "tab-live") {
     function closeFrameViewer() {
         fvReq++;
         stopPlay();
+        if (fvZoom) fvZoom.reset();
         fv.classList.add("hidden");
         viewTs = null;
         fvEvent = null;

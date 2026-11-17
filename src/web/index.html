@@ -25,7 +25,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
-    <link rel="stylesheet" href="/style.css?v=20261125a">
+    <link rel="stylesheet" href="/style.css?v=20261126a">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -248,7 +248,7 @@
                                 <button type="button" class="fv-close" id="fv-close" aria-label="Close">&times;</button>
                             </div>
                             <div class="fv-body"><div class="fv-main">
-                            <div class="fv-img-wrap"><img id="fv-img" alt="Archived frame"><svg id="fv-boxes" class="fv-boxes"></svg><div class="fv-msg hidden" id="fv-msg"></div></div>
+                            <div class="fv-img-wrap" id="fv-zoom"><div class="fv-stage" id="fv-stage"><img id="fv-img" alt="Archived frame" draggable="false"><svg id="fv-boxes" class="fv-boxes"></svg></div><div class="fv-msg hidden" id="fv-msg"></div></div>
                             <div class="fv-meta" id="fv-meta"></div>
                             <div class="fv-chart-wrap"><svg id="fv-chart" class="fv-chart" preserveAspectRatio="none"></svg><div class="cloud-tooltip hidden" id="fv-tooltip"></div></div>
                             <div class="fv-nav">
@@ -1793,6 +1793,7 @@
     <script src="/static/focus/controls.js?v=20261125a"></script>
     <script src="/static/focus/lens.js?v=20261125a"></script>
     <script src="/static/overlay_decode.js?v=1"></script>
+    <script defer src="/static/zoom_pan.js?v=20261126a"></script>
     <script defer src="/static/app/01-core.js?v=20261124c"></script>
     <script defer src="/static/app/02-controls-calibration.js?v=20261124c"></script>
     <script defer src="/static/app/03-station-settings.js?v=20261124c"></script>
@@ -1801,9 +1802,9 @@
     <script defer src="/static/app/05b-sky-reticle.js?v=20261124b"></script>
     <script defer src="/static/app/05c-aircraft-overlay.js?v=20261124b"></script>
     <script defer src="/static/app/06-telemetry.js?v=20261118a"></script>
-    <script defer src="/static/app/07-cloud.js?v=20261124a"></script>
-    <script defer src="/static/app/08-gallery-adsb.js?v=20261122b"></script>
-    <script defer src="/static/app/08b-events-live.js?v=20261124c"></script>
+    <script defer src="/static/app/07-cloud.js?v=20261126a"></script>
+    <script defer src="/static/app/08-gallery-adsb.js?v=20261126a"></script>
+    <script defer src="/static/app/08b-events-live.js?v=20261126a"></script>
     <script defer src="/static/app/08c-adsb-settings.js?v=20261117a"></script>
     <script defer src="/static/app/08d-live-ui.js?v=20261124c"></script>
     <script defer src="/static/app/09-community.js?v=20261114b"></script>
