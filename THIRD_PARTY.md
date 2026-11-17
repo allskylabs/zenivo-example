@@ -76,6 +76,7 @@ The pages load these from the hosts below; the pinned versions and the SRI hashe
 | three.js r160 example textures (Earth and Moon images) | `/satellites3d` | **Licence not verified** for the individual images (the three.js repository is MIT; the example textures carry their own notes) | https://github.com/mrdoob/three.js/tree/r160/examples/textures/planets |
 | MapLibre GL JS 5.24.0 | `/flights3d` | BSD-3-Clause | https://github.com/maplibre/maplibre-gl-js |
 | Leaflet 1.9.4 | `/community` | BSD-2-Clause | https://github.com/Leaflet/Leaflet, loaded from `unpkg.com` |
+| Leaflet.markercluster 1.5.3 | `/community` | MIT | https://github.com/Leaflet/Leaflet.markercluster, loaded from `unpkg.com` (script and `MarkerCluster.css`, SRI-pinned) |
 
 ## 5. Fonts (Google Fonts)
 

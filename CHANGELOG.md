@@ -6,6 +6,10 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Community: stations that sit close together on the map merge into one numbered badge with a ring showing how many are online, idle or offline; a tap zooms in, and stations at the same spot fan out so each can be opened.
+
 ### Changed
 
 - Live: the Exposure card is back under the picture as one row (shutter, gain and Auto/Locked, open or closed remembered); the admin changes exposure there, a guest sees the live values with the controls disabled and a sign-in link. It is no longer shown in Settings > Image output.

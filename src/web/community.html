@@ -23,6 +23,8 @@
     <!-- head-brand:end -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
+          integrity="sha384-pmjIAcz2bAn0xukfxADbZIb3t8oRT9Sv0rvO+BR5Csr6Dhqq+nZs59P0pPKQJkEV" crossorigin="">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -47,6 +49,11 @@
         .cm-dot.idle { background: var(--warning); }
         .cm-dot.offline { background: transparent; border: 2px solid var(--text-muted); box-shadow: none; }
         .cm-dot.own { box-shadow: 0 0 0 3px var(--accent); }
+        .cm-cluster { cursor: pointer; }
+        .cm-cl { position: relative; display: block; width: 40px; height: 40px; border-radius: 50%; box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-primary) 25%, transparent); }
+        .cm-cl.own { box-shadow: 0 0 0 3px var(--accent); }
+        .cm-cl-n { position: absolute; inset: 5px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); font: 700 13px/1 var(--font-num); }
+        .cm-cluster:focus-visible .cm-cl { outline: 2px solid var(--accent); outline-offset: 3px; }
         @keyframes cm-pulse { from { transform: scale(.6); opacity: .8; } to { transform: scale(1.5); opacity: 0; } }
         @media (prefers-reduced-motion: reduce) { .cm-dot.online::after { animation: none; } }
         .cm-led { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; vertical-align: baseline; }
@@ -239,6 +246,8 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="/static/community.js?v=7"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"
+            integrity="sha384-eXVCORTRlv4FUUgS/xmOyr66XBVraen8ATNLMESp92FKXLAMiKkerixTiBvXriZr" crossorigin=""></script>
+    <script src="/static/community.js?v=20261128b"></script>
 </body>
 </html>
