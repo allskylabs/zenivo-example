@@ -593,9 +593,10 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
         async def push_lock_state():
             nonlocal last_lock
             payload = {"type": "ae_lock", "mode": service.mode, "ae_lock": service.get_ae_lock()}
-            if payload != last_lock:
-                last_lock = payload
-                await websocket.send_text(json.dumps(payload))
+            key = {**payload, "ae_lock": {**payload["ae_lock"], "brightness": round(float(payload["ae_lock"].get("brightness") or 0) / 4)}}
+            if key != last_lock:
+                last_lock = key
+                await websocket.send_text(json.dumps(payload, separators=(",", ":")))
 
         if binary_mode:
             await push_lock_state()
@@ -643,11 +644,11 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
         subs: set = set()
         subs_hold: set = set()     # what the page asked for while its tab is hidden
         last_push: Dict[str, float] = {}
-        OVERLAY_EVERY_S = {"aircraft": 1.5, "satellites": 1.5, "sondes": 3.0, "flights": 5.0, "events": 2.0, "logs": 2.0}
+        OVERLAY_EVERY_S = {"aircraft": 1.5, "satellites": 1.5, "sondes": 3.0, "events": 2.0, "logs": 2.0}
         admin_ws = is_admin(websocket)
 
         def overlay_payload(layer: str):
-            if layer in ("aircraft", "sondes", "flights"):
+            if layer in ("aircraft", "sondes"):
                 hit = _overlay_cache.get(layer)
                 if hit and time.monotonic() - hit[0] < 1.0:
                     return hit[1]
@@ -658,11 +659,14 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
 
         def _overlay_compute(layer: str):
             if layer == "aircraft":
-                return service.get_aircraft_now(limit=60, trail_s=0.0, bounds=None, include_fr24=None, compact=False)
+                d = service.get_aircraft_now(limit=60, trail_s=0.0, bounds=None, include_fr24=None, compact=False)
+                # Only what the overlay and the flights card draw: no per-aircraft source/provider/age, no FR24 account block
+                keep = ("icao", "callsign", "altitude_m", "speed_kmh", "heading_deg", "climb_m_min", "az_deg", "alt_deg",
+                        "distance_km", "frame_xy", "frame_v", "in_view", "above_horizon")
+                return {**{k: d.get(k) for k in ("enabled", "connected", "source_in_use", "public_provider", "t", "total", "in_view")},
+                        "aircraft": [{k: a[k] for k in keep if k in a} for a in d.get("aircraft") or []]}
             if layer == "sondes":
                 return service.get_radiosondes_now(limit=40)
-            if layer == "flights":
-                return service.get_aircraft_now(limit=12, trail_s=0.0, bounds=None, include_fr24=None, compact=False)
             if layer == "events":   # only a version: the page fetches the list when it changes
                 ev = service._load_events()
                 return {"v": [len(ev), ev[0].get("id") or ev[0].get("ts") or ev[0].get("time") if ev else None]}
@@ -670,8 +674,11 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                 from src.activity import get_activity_log
                 return {"v": get_activity_log()._next_id}
             from src.api.routes.common import _sat_cache
-            return _sat_cache.get_or_compute((0.0, False, 60, tuple(), 0.0), lambda: service.get_satellites_now(
+            d = _sat_cache.get_or_compute((0.0, False, 60, tuple(), 0.0), lambda: service.get_satellites_now(
                 track_min=0.0, below=False, limit=60, trail_s=0.0, track_ids=set()))
+            keep = ("name", "norad", "az_deg", "alt_deg", "height_km", "above_horizon", "sunlit", "visible", "frame_xy", "in_view")
+            return {"sun_alt_deg": d.get("sun_alt_deg"), "camera": d.get("camera"),
+                    "satellites": [{k: s[k] for k in keep if k in s} for s in d.get("satellites") or []]}
 
         async def overlay_pusher():
             last = last_push

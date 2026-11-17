@@ -334,7 +334,7 @@ if (currentPage === "tab-live" && sondesCard) {
 
 if (currentPage === "tab-live" && flightsCard) {
     loadFlights();
-    setInterval(() => { if (!document.hidden && !overlayPushOn("flights")) loadFlights(); }, 10000);
+    setInterval(() => { if (!document.hidden && !overlayPushOn("aircraft")) loadFlights(); }, 10000);
 }
 
 if (currentPage === "tab-live" && liveEventsList) {

@@ -19,7 +19,8 @@ function overlayPushLive(layer) { return Date.now() - (overlayPush.at[layer] || 
 window.overlayPushOn = function overlayPushOn(layer) { return !!((!layer || overlayPush.want.includes(layer)) && state.ws && state.ws.readyState === 1 && overlayPush.acked && Date.now() - overlayPush.acked < 3600000); };
 function overlayLayersWanted() {
     const extra = [];
-    if (currentPage === "tab-live") extra.push("events", "flights");
+    if (currentPage === "tab-live") extra.push("events");
+    if (currentPage === "tab-live" && document.getElementById("flights-card") && !(chkAircraft && chkAircraft.checked)) extra.push("aircraft");
     if (currentPage === "tab-live" && window.zenivoAuth && window.zenivoAuth.admin) extra.push("logs");
     return extra.concat([chkAircraft && chkAircraft.checked ? "aircraft" : null, chkSatellite && chkSatellite.checked ? "satellites" : null,
         chkSonde && chkSonde.checked ? "sondes" : null].filter(Boolean));
@@ -38,8 +39,13 @@ function applyOverlayPush(layer, d) {
     overlayPush.at[layer] = Date.now();
     if (layer === "events") { if (typeof loadLiveEvents === "function") loadLiveEvents(); return; }
     if (layer === "logs") { if (window.zenivoPollLogs) window.zenivoPollLogs(); return; }
-    if (layer === "flights") { if (typeof renderFlights === "function") renderFlights(d); return; }
-    if (layer === "aircraft") { aircraftList = (d && d.aircraft) || []; aircraftFetchedAt = Date.now(); aircraftT = (d && d.t) || 0; }
+
+    if (layer === "aircraft") {
+        // One push serves both the overlay and the flights card (the 12 nearest, as the card's own request asked for)
+        if (typeof renderFlights === "function" && document.getElementById("flights-card")) renderFlights({ ...d, aircraft: ((d && d.aircraft) || []).slice(0, 12) });
+        if (!(chkAircraft && chkAircraft.checked)) return;
+        aircraftList = (d && d.aircraft) || []; aircraftFetchedAt = Date.now(); aircraftT = (d && d.t) || 0;
+    }
     else if (layer === "sondes") { sondeList = (d && d.sondes) || []; sondeT = (d && d.t) || 0; sondeFetchedAt = Date.now(); }
     else if (layer === "satellites") satelliteList = (d && d.satellites) || [];
     drawAircraft();
