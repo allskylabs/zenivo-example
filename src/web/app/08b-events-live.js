@@ -19,8 +19,8 @@ eventViewer.innerHTML = `
             </div>
         </header>
         <div class="ev-images">
-            <figure class="ev-fig ev-fig-crop"><img alt="Close-up" /><figcaption>Close-up</figcaption></figure>
-            <figure class="ev-fig ev-fig-sky"><img alt="Whole sky" /><figcaption>Whole sky, event boxed</figcaption></figure>
+            <figure class="ev-fig ev-fig-crop"><div class="ev-zoom"><img alt="Close-up" draggable="false" /></div><figcaption>Close-up</figcaption></figure>
+            <figure class="ev-fig ev-fig-sky"><div class="ev-zoom"><img alt="Whole sky" draggable="false" /></div><figcaption>Whole sky, event boxed</figcaption></figure>
         </div>
         <p class="ev-summary"></p>
         <dl class="ev-facts"></dl>
@@ -37,11 +37,17 @@ document.body.appendChild(eventViewer);
 const evQ = (sel) => eventViewer.querySelector(sel);
 let evList = [];
 let evIndex = 0;
+// Zoom + pan on each event picture (zoom_pan.js; the pill shows on hover or once zoomed, the tiles are small on phones); keys + - 0 go to the picture under the pointer, else to the whole-sky one
+const evZoomOpen = () => !eventViewer.classList.contains("hidden");
+const evZoomCrop = window.ZenivoZoomPan ? ZenivoZoomPan.attach(evQ(".ev-fig-crop .ev-zoom"), evQ(".ev-fig-crop img"), { pill: "hover", active: () => evZoomOpen() && evQ(".ev-fig-sky").hidden && !evQ(".ev-fig-sky .ev-zoom").matches(":hover") }) : null;
+const evZoomSky = window.ZenivoZoomPan ? ZenivoZoomPan.attach(evQ(".ev-fig-sky .ev-zoom"), evQ(".ev-fig-sky img"), { pill: "hover", active: () => evZoomOpen() && !evQ(".ev-fig-crop .ev-zoom").matches(":hover") }) : null;
+const evZoomReset = () => { if (evZoomCrop) evZoomCrop.reset(); if (evZoomSky) evZoomSky.reset(); };
 
 function showEvent(i) {
     if (!evList.length) return;
     evIndex = Math.max(0, Math.min(evList.length - 1, i));
     const ev = evList[evIndex];
+    evZoomReset();
     const when = new Date(ev.timestamp);
     const pill = evQ(".ev-pill");
     const lab = EVENT_LABELS[ev.type] || ev.type, lm = /^(\S+)\s+(.+)$/.exec(lab);
@@ -142,6 +148,7 @@ function openEventViewer(list, i) {
 function closeEventViewer() {
     const u = new URL(location.href);
     if (u.searchParams.has("event")) { u.searchParams.delete("event"); history.replaceState(null, "", u.pathname + u.search + u.hash); }
+    evZoomReset();
     eventViewer.classList.add("hidden");
     document.body.classList.remove("no-scroll");
     eventViewer.querySelectorAll("img").forEach((im) => im.removeAttribute("src"));
@@ -162,9 +169,10 @@ document.addEventListener("keydown", (e) => {
 });
 // Swipe left/right on phones
 let evTouchX = null;
-eventViewer.addEventListener("touchstart", (e) => { evTouchX = e.touches[0].clientX; }, { passive: true });
+eventViewer.addEventListener("touchstart", (e) => { evTouchX = e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });   // a pinch is not a swipe
 eventViewer.addEventListener("touchend", (e) => {
     if (evTouchX === null) return;
+    if ((evZoomCrop && evZoomCrop.zoomed()) || (evZoomSky && evZoomSky.zoomed())) { evTouchX = null; return; }   // zoomed: a drag pans, it does not change event
     const dx = e.changedTouches[0].clientX - evTouchX;
     evTouchX = null;
     if (Math.abs(dx) > 60) showEvent(evIndex + (dx < 0 ? 1 : -1));

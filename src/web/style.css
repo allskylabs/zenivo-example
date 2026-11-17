@@ -2,8 +2,9 @@
 @import url("/static/css/fonts.css?v=20261121a");
 @import url("/static/css/base.css?v=20261124a");
 @import url("/static/css/viewport.css?v=20261124a");
+@import url("/static/css/zoom-pan.css?v=20261126a");
 @import url("/static/css/telemetry.css?v=20261124a");
-@import url("/static/css/gallery.css?v=20261115a");
+@import url("/static/css/gallery.css?v=20261126a");
 @import url("/static/css/settings.css?v=20261115b");
 @import url("/static/css/activity-cloud.css?v=20261124a");
 @import url("/static/css/focus.css?v=20261115a");

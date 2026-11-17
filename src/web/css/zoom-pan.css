@@ -1,0 +1,23 @@
+/* Zoom + pan for stored pictures/videos (zoom_pan.js). The pill reuses .zoom-controls / .zoom-btn from viewport.css (Red Vision rules in sky-shell.css and redesign-pages.css apply). */
+.zp-clip { position: relative; overflow: hidden; touch-action: pan-y; user-select: none; -webkit-user-select: none; outline-offset: -2px; }
+.zp-clip.zp-zoomed { cursor: grab; }
+.zp-clip.zp-zoomed.zp-panning { cursor: grabbing; }
+.zp-clip img, .zp-clip video { -webkit-user-drag: none; }
+.zp-pill { top: 8px; right: 8px; z-index: 3; }
+.zp-pill .zoom-btn { color: var(--text-primary); }
+.zp-pill .zoom-level { min-width: 48px; }
+.zp-pill[hidden], .zp-pill .zoom-btn[hidden] { display: none; }
+/* inline tiles: the pill shows on hover / keyboard focus / while zoomed (touch: pinch or double tap, pill only once zoomed) */
+.zp-pill-hover { opacity: 0; transition: opacity 0.15s; }
+.zp-clip:hover .zp-pill-hover, .zp-clip:focus-within .zp-pill-hover, .zp-clip.zp-zoomed .zp-pill-hover { opacity: 1; }
+@media (hover: none) { .zp-clip:not(.zp-zoomed) .zp-pill-hover { display: none; } }
+@media (pointer: coarse), (max-width: 600px) {
+    .zp-pill .zoom-btn { min-width: 44px; height: 44px; font-size: 1.15rem; }
+    .zp-pill .zoom-level { min-width: 56px; font-size: 0.8rem; }
+}
+/* wrappers added around the pictures */
+.iv-zoom { display: block; max-width: 100%; }
+.ev-zoom { display: block; }
+.fv-stage { position: relative; width: 100%; min-height: 160px; display: flex; align-items: center; justify-content: center; }
+.tl-zoom { margin-top: var(--space-2); border-radius: var(--radius-md); }
+.tl-result .tl-zoom video { margin-top: 0; }
