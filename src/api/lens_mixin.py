@@ -385,9 +385,13 @@ class LensMixin:
         # (when the camera reports one), then drop `settle` more exposed while the lens was moving
         last_rep = None
         arrived_frame = None
+        arrived_meta: Dict[str, Any] = {}
+        used_meta: Dict[str, Any] = {}
+        t_cmd = time.time()
         max_attempts = 2 if not is_pytest else 8
         for attempt in range(max_attempts):
             f, meta, since = self._focus_new_frame(since, timeout_s=wait)
+            arrived_meta = meta or {}
             reported = meta.get("lens_position")
             if reported is None:
                 arrived_frame = f
@@ -412,8 +416,10 @@ class LensMixin:
         for k in range(frames):
             if k == 0 and settle == 0 and arrived_frame is not None and not is_pytest:
                 frame = arrived_frame
+                used_meta = arrived_meta
             else:
-                frame, _, since = self._focus_new_frame(since, timeout_s=wait)
+                frame, used_meta, since = self._focus_new_frame(since, timeout_s=wait)
+                used_meta = used_meta or {}
             self.focus.last_poll = time.time()
             fh, fw = frame.shape[:2]
             rects = [self.focus.roi_rect(fw, fh)]
@@ -429,6 +435,26 @@ class LensMixin:
                     if i == 0 and not is_pytest:
                         with self._focus_lock:
                             self.focus.last_result = self.focus.record(res, time.time())
+        sw = self.focus.sweep
+        if isinstance(sw, dict) and sw.get("state") == "running" and not is_pytest:
+            # Diagnostics per measured point (why did a refine pass score lower than the sweep at the same position?):
+            # what the frame itself reports, how bright the ROI was, and how long after the lens command it was taken
+            try:
+                x0, y0, rw, rh = rects[0]
+                roi = frame[y0:y0 + rh, x0:x0 + rw]
+                sw.setdefault("diag", []).append({
+                    "cmd": round(float(pos), 4), "reported": used_meta.get("lens_position"),
+                    "reused_arrival_frame": bool(frames == 1 and settle == 0 and arrived_frame is not None),
+                    "attempts": attempt + 1, "dt_ms": round((time.time() - t_cmd) * 1000.0),
+                    "roi": [int(x0), int(y0), int(rw), int(rh)], "frame": [int(fw), int(fh)],
+                    "roi_mean": round(float(roi.mean()), 2), "roi_max": int(roi.max()),
+                    "exposure_s": used_meta.get("actual_exposure_s"), "sensor_exposure_s": used_meta.get("sensor_exposure_s"),
+                    "gain_db": used_meta.get("gain_db"), "isp_brightness": used_meta.get("isp_brightness"),
+                    "isp_contrast": used_meta.get("isp_contrast"), "af_state": used_meta.get("af_state"),
+                    "score": None if not per[0] else round(float(np.median(per[0])), 3),
+                })
+            except Exception:
+                pass
         return [float(np.median(v)) if v else None for v in per], since
 
     @staticmethod
