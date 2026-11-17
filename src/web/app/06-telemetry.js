@@ -493,7 +493,9 @@ function initWebSocket(isRetry) {
                 // Lock state / brightness, pushed by the server only when it changes
                 try {
                     const msg = JSON.parse(event.data);
-                    if (msg.type === "overlay") {
+                    if (msg.type === "ov") {
+                        if (typeof applyPackedOverlay === "function") applyPackedOverlay(msg);
+                    } else if (msg.type === "overlay") {
                         if (typeof applyOverlayPush === "function") applyOverlayPush(msg.layer, msg.data);
                     } else if (msg.type === "subscribed") {
                         overlayPush.acked = Date.now();

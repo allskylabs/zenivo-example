@@ -269,3 +269,7 @@ worker sends:
 | POST | `/api/allsky/ingest/telemetry` | Telemetry JSON |
 
 The client identifies itself with the header `X-Device-Id: zenivo-<hostname>` (override with `ZENIVO_DEVICE_ID`).
+
+### Live WebSocket: packed overlays
+
+`/ws/live` text actions (guests may send them): `{"action":"subscribe","layers":["aircraft","satellites","sondes","events","logs"]}` and `{"action":"idle","on":true|false}` (hidden tab: pictures slow to a 30 s heartbeat, layers pause). Aircraft, satellites and radiosondes arrive packed: `{"type":"ov","l":<layer>,"t":<time>,"f":1 (snapshot),"m":{changed meta},"u":[[row],...],"x":[ids gone]}`. A row is an array in the field order of `src/api/overlay_pack.py` (`fx`,`fy` = frame position x 10000, `vx`,`vy` = frame velocity x 10000 per second, `fl` bits: 1 in view, 2 above horizon, 4 visible); only rows that changed are sent. `events` and `logs` (admin) push `{"type":"overlay","layer":...,"data":{"v":...}}` when there is something new to fetch. A picture is sent once; without a new one a telemetry-only ASB1 packet goes out every 5 s.

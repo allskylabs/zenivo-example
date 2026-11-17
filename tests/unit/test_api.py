@@ -258,12 +258,11 @@ class TestStreamingAndWebSockets:
             seen = {}
             for _ in range(40):
                 msg = websocket.receive_json()
-                seen[msg["type"] + ":" + msg.get("layer", "")] = msg
-                if "overlay:aircraft" in seen and "overlay:events" in seen and "subscribed:" in seen:
+                seen[msg["type"] + ":" + (msg.get("layer") or msg.get("l") or "")] = msg
+                if "ov:aircraft" in seen and "overlay:events" in seen and "subscribed:" in seen:
                     break
             assert seen["subscribed:"]["layers"] == ["aircraft", "events"]
-            air = seen["overlay:aircraft"]["data"]
-            assert "aircraft" in air and "fr24" not in air      # slim payload: no account block
+            assert seen["ov:aircraft"]["f"] == 1 and "u" in seen["ov:aircraft"]   # packed snapshot (src/api/overlay_pack.py)
             assert "v" in seen["overlay:events"]["data"]         # events: only a version, the page fetches on change
 
     def test_websocket_live_connection(self, api_client):

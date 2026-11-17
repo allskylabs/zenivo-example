@@ -18,6 +18,7 @@ from src.api.service import AllSkyService
 from src.auth.middleware import can_mutate, is_admin
 from src.auth.rounding import view_for
 from src.api.guest_view import guest_view
+from src.api import overlay_pack
 
 # 92-byte Little-Endian Binary Header ("ASB1") + 4096-byte uint32[4][256] Histogram + Raw JPEG
 ASB1_HEADER_STRUCT = struct.Struct("<4sBBBBdffffIfffIIIIfffffHHI")
@@ -644,6 +645,7 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
         subs: set = set()
         subs_hold: set = set()     # what the page asked for while its tab is hidden
         last_push: Dict[str, float] = {}
+        packed: Dict[str, Any] = {}     # layer -> rows this page already has (cleared on subscribe: next push is a snapshot)
         # Aircraft and balloons carry their on-frame velocity (frame_v), so the page moves them between pushes
         OVERLAY_EVERY_S = {"aircraft": 3.0, "satellites": 1.5, "sondes": 6.0, "events": 2.0, "logs": 2.0}
         admin_ws = is_admin(websocket)
@@ -660,13 +662,7 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
 
         def _overlay_compute(layer: str):
             if layer == "aircraft":
-                d = service.get_aircraft_now(limit=60, trail_s=0.0, bounds=None, include_fr24=None, compact=False)
-                # Only what the overlay and the flights card draw: no per-aircraft source/provider/age, no FR24 account block
-                keep = ("icao", "callsign", "altitude_m", "speed_kmh", "heading_deg", "climb_m_min", "az_deg", "alt_deg",
-                        "distance_km", "frame_xy", "frame_v", "in_view", "above_horizon")
-                return {**{k: d[k] for k in ("enabled", "connected", "source_in_use", "public_provider", "total", "in_view")
-                           if d.get(k) is not None}, "t": round(float(d.get("t") or 0), 2),
-                        "aircraft": [{k: a[k] for k in keep if k in a} for a in d.get("aircraft") or []]}
+                return service.get_aircraft_now(limit=60, trail_s=0.0, bounds=None, include_fr24=None, compact=False)
             if layer == "sondes":
                 return service.get_radiosondes_now(limit=40)
             if layer == "events":   # only a version: the page fetches the list when it changes
@@ -676,18 +672,12 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                 from src.activity import get_activity_log
                 return {"v": get_activity_log()._next_id}
             from src.api.routes.common import _sat_cache
-            d = _sat_cache.get_or_compute((0.0, False, 60, tuple(), 0.0), lambda: service.get_satellites_now(
+            return _sat_cache.get_or_compute((0.0, False, 60, tuple(), 0.0), lambda: service.get_satellites_now(
                 track_min=0.0, below=False, limit=60, trail_s=0.0, track_ids=set()))
-            # The overlay draws only satellites that are in the frame AND visible (sunlit under a dark sky): by day that is
-            # none, so the list is empty and the unchanged-payload check sends it once
-            return {"satellites": [{"name": s.get("name"), "height_km": s.get("height_km"), "frame_xy": s["frame_xy"],
-                                    "in_view": True, "visible": True}
-                                   for s in d.get("satellites") or [] if s.get("in_view") and s.get("visible") and s.get("frame_xy")]}
 
         async def overlay_pusher():
             last = last_push
             sent_v: Dict[str, Any] = {}
-            sent_h: Dict[str, int] = {}
             while True:
                 await asyncio.sleep(0.5)
                 now = time.time()
@@ -703,14 +693,13 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                             if sent_v.get(layer) == data["v"]:
                                 continue
                             sent_v[layer] = data["v"]
-                        out = view({"type": "overlay", "layer": layer, "data": data})
-                        # Skip a push whose content equals the last one (timestamps aside): nothing moved, nothing to draw
-                        body = json.dumps(out["data"], separators=(",", ":"), sort_keys=True, default=str)
-                        h = hash(body.replace(str(data.get("t", "")), "") if isinstance(data, dict) else body)
-                        if sent_h.get(layer) == h:
+                        if layer in overlay_pack.FIELDS:
+                            # Packed rows, only what changed since the last push to this page (src/api/overlay_pack.py)
+                            msg, packed[layer] = overlay_pack.delta(layer, view(data), packed.get(layer))
+                            if msg is not None:
+                                await websocket.send_text(json.dumps(msg, separators=(",", ":"), default=str))
                             continue
-                        sent_h[layer] = h
-                        await websocket.send_text(json.dumps(out, separators=(",", ":"), default=str))
+                        await websocket.send_text(json.dumps({"type": "overlay", "layer": layer, "data": data}, separators=(",", ":")))
                     except WebSocketDisconnect:
                         raise
                     except Exception:  # a failing layer must not end the live socket; the page falls back to polling it
@@ -764,6 +753,7 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                         (subs_hold if idle["on"] else subs).clear()
                         (subs_hold if idle["on"] else subs).update(want)
                         last_push.clear()
+                        packed.clear()
                         await websocket.send_json({"type": "subscribed", "layers": sorted(want)})
                     elif action == "idle":   # the tab was hidden / shown again
                         idle["on"] = bool(cmd.get("on"))

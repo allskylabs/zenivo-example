@@ -36,6 +36,33 @@ function sendIdle() {
     if (state.ws && state.ws.readyState === 1) state.ws.send(JSON.stringify({ action: "idle", on: document.hidden }));
 }
 document.addEventListener("visibilitychange", sendIdle);
+// Packed pushes ({type:"ov"}, src/api/overlay_pack.py): rows as arrays in this field order, only the rows that changed.
+// Rebuilt here into the same objects the REST endpoints return, so the drawing code has one shape to deal with.
+const OVERLAY_FIELDS = {
+    aircraft: ["icao", "callsign", "altitude_m", "speed_kmh", "heading_deg", "climb_m_min", "az_deg", "alt_deg", "distance_km", "fx", "fy", "vx", "vy", "fl"],
+    satellites: ["norad", "name", "height_km", "az_deg", "alt_deg", "fx", "fy", "fl"],
+    sondes: ["serial", "type", "altitude_m", "climb_m_s", "az_deg", "alt_deg", "distance_km", "fx", "fy", "vx", "vy", "fl"],
+};
+const overlayStore = {};   // layer -> { rows: Map(id -> object), meta: {} }
+function applyPackedOverlay(msg) {
+    const fields = OVERLAY_FIELDS[msg.l];
+    if (!fields) return;
+    let st = overlayStore[msg.l];
+    if (msg.f || !st) st = overlayStore[msg.l] = { rows: new Map(), meta: {} };
+    Object.entries(msg.m || {}).forEach(([k, v]) => { if (v === null) delete st.meta[k]; else st.meta[k] = v; });
+    (msg.x || []).forEach((id) => st.rows.delete(id));
+    (msg.u || []).forEach((r) => {
+        const o = {};
+        fields.forEach((f, i) => { o[f] = r[i]; });
+        if (o.fx != null && o.fy != null) o.frame_xy = [o.fx / 10000, o.fy / 10000];
+        if (o.vx != null && o.vy != null) o.frame_v = [o.vx / 10000, o.vy / 10000];
+        o.in_view = !!(o.fl & 1); o.above_horizon = !!(o.fl & 2); o.visible = !!(o.fl & 4);
+        st.rows.set(r[0], o);
+    });
+    const list = [...st.rows.values()];
+    if (msg.l === "aircraft") list.sort((a, b) => (a.distance_km ?? 1e9) - (b.distance_km ?? 1e9));
+    applyOverlayPush(msg.l, { ...st.meta, t: msg.t, [msg.l]: list });
+}
 function applyOverlayPush(layer, d) {
     overlayPush.at[layer] = Date.now();
     if (layer === "events") { if (typeof loadLiveEvents === "function") loadLiveEvents(); return; }
@@ -145,14 +172,15 @@ function drawAircraft() {
     const lag = Math.max(-5, Math.min(20, shift));
     if (showSat) {
         satelliteList.forEach((sat) => {
-            if (!sat.frame_xy || !sat.in_view || !sat.visible) return;
+            if (!sat.frame_xy || !sat.in_view) return;
+            const dim = !sat.visible;   // above the camera but not visible to the eye now (daylight or in the Earth's shadow)
             let fx = sat.frame_xy[0], fy = sat.frame_xy[1];
             if (mirrorX) fx = 1 - fx;
             if (mirrorY) fy = 1 - fy;
             const x = offsetX + fx * renderW;
             const y = offsetY + fy * renderH;
-            ctx.strokeStyle = "rgba(34, 211, 238, 0.95)";
-            ctx.fillStyle = "rgba(34, 211, 238, 0.95)";
+            ctx.strokeStyle = dim ? "rgba(34, 211, 238, 0.45)" : "rgba(34, 211, 238, 0.95)";
+            ctx.fillStyle = dim ? "rgba(34, 211, 238, 0.6)" : "rgba(34, 211, 238, 0.95)";
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(x, y - 12); ctx.lineTo(x + 12, y); ctx.lineTo(x, y + 12); ctx.lineTo(x - 12, y); ctx.closePath();
