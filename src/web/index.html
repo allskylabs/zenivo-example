@@ -25,7 +25,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
-    <link rel="stylesheet" href="/style.css?v=20261119a">
+    <link rel="stylesheet" href="/style.css?v=20261119b">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -524,13 +524,13 @@
                         <h2 id="gallery-day-title">By Day</h2>
                         <span class="badge" id="day-count-badge">0 Days</span>
                     </div>
-                    <div class="events-filter" id="events-filter" style="margin-top: 0;">
-                        <button type="button" class="btn btn-sm btn-outline active" data-type="">All</button>
-                        <button type="button" class="btn btn-sm btn-outline" data-type="meteor">☄️ Meteors</button>
-                        <button type="button" class="btn btn-sm btn-outline" data-type="plane">✈️ Aircraft</button>
-                        <button type="button" class="btn btn-sm btn-outline" data-type="satellite">🛰️ Satellites</button>
-                        <button type="button" class="btn btn-sm btn-outline" data-type="clouds">☁️ Clouds</button>
-                        <button type="button" class="btn btn-sm btn-outline" data-type="flash">⚡ Flashes</button>
+                    <div class="events-filter zchips" id="events-filter" role="group" aria-label="Event type">
+                        <button type="button" class="zchip active" data-type="">All</button>
+                        <button type="button" class="zchip" data-type="meteor">☄️ Meteors</button>
+                        <button type="button" class="zchip" data-type="plane">✈️ Aircraft</button>
+                        <button type="button" class="zchip" data-type="satellite">🛰️ Satellites</button>
+                        <button type="button" class="zchip" data-type="clouds">☁️ Clouds</button>
+                        <button type="button" class="zchip" data-type="flash">⚡ Flashes</button>
                     </div>
                 </div>
                 <div id="day-list" class="day-list">
@@ -1751,7 +1751,7 @@
     <script defer src="/static/app/05c-aircraft-overlay.js?v=20261117h"></script>
     <script defer src="/static/app/06-telemetry.js?v=20261118a"></script>
     <script defer src="/static/app/07-cloud.js?v=20261115b"></script>
-    <script defer src="/static/app/08-gallery-adsb.js?v=20261115a"></script>
+    <script defer src="/static/app/08-gallery-adsb.js?v=20261119b"></script>
     <script defer src="/static/app/08b-events-live.js?v=20261119a"></script>
     <script defer src="/static/app/08c-adsb-settings.js?v=20261117a"></script>
     <script defer src="/static/app/08d-live-ui.js?v=20261118b"></script>

@@ -202,6 +202,42 @@ function dayKeyOf(date) {
     return `${sd.getUTCFullYear()}-${p(sd.getUTCMonth() + 1)}-${p(sd.getUTCDate())}`;
 }
 
+let gallerySelDay = "";
+// Date strip for the By day view: one chip per day (oldest to newest), the selected day's block is the only one shown
+function renderDayStrip(days) {
+    let strip = document.getElementById("day-strip");
+    if (!strip) {
+        strip = document.createElement("div");
+        strip.id = "day-strip";
+        strip.className = "day-strip";
+        dayList.parentNode.insertBefore(strip, dayList);
+        strip.addEventListener("click", (e) => {
+            const nav = e.target.closest("[data-ds-step]");
+            if (nav) {
+                const sc = strip.querySelector(".ds-scroll");
+                sc.scrollBy({ left: Number(nav.dataset.dsStep) * sc.clientWidth * 0.8, behavior: "smooth" });
+                return;
+            }
+            const b = e.target.closest("[data-day]");
+            if (!b) return;
+            gallerySelDay = b.dataset.day;
+            renderDays();
+        });
+    }
+    const asc = [...days].reverse();
+    const utc = (k) => new Date(`${k}T00:00:00Z`);
+    const month = utc(gallerySelDay).toLocaleDateString(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
+    strip.innerHTML = `<div class="ds-head"><b>${escapeHtml(month)}</b>
+        <span><button type="button" class="ds-nav" data-ds-step="-1" aria-label="Earlier days">&larr;</button><button type="button" class="ds-nav" data-ds-step="1" aria-label="Later days">&rarr;</button></span></div>
+        <div class="ds-scroll">${asc.map((d) => {
+            const n = d.events.length + (d.product && d.product.timelapse ? 1 : 0);
+            return `<button type="button" class="ds-d${d.date === gallerySelDay ? " active" : ""}${n ? "" : " empty"}" data-day="${escapeHtml(d.date)}" aria-pressed="${d.date === gallerySelDay}">
+                <span>${escapeHtml(utc(d.date).toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" }))}</span><b>${Number(d.date.slice(8))}</b></button>`;
+        }).join("")}</div>`;
+    const act = strip.querySelector(".ds-d.active");
+    if (act) { const sc = strip.querySelector(".ds-scroll"); sc.scrollLeft = act.offsetLeft - sc.clientWidth / 2 + act.offsetWidth / 2; }
+}
+
 function renderDays() {
     if (!dayList) return;
     const todayKey = dayKeyOf(new Date());
@@ -224,8 +260,10 @@ function renderDays() {
     } else if (eventsMeta.total_count > tableEvents.length) {
         notice = `Showing the newest ${tableEvents.length} of ${eventsMeta.total_count} events.`;
     }
+    if (!days.some((d) => d.date === gallerySelDay)) gallerySelDay = days[0].date;
     dayList.innerHTML = (notice ? `<p class="text-muted day-notice">${notice}</p>` : "")
-        + days.map((day, n) => dayBlockHtml(day, todayKey, n === 0)).join("");
+        + days.map((day) => dayBlockHtml(day, todayKey, day.date === gallerySelDay)).join("");
+    renderDayStrip(days);
     dayList.querySelectorAll("video[data-info]").forEach((v) => attachVideoInfo(v, v.dataset.info));
 }
 
@@ -256,7 +294,7 @@ function dayBlockHtml(day, todayKey, first) {
         : `<p class="text-muted day-empty">No sky events.</p>`;
 
     return `
-        <details class="day-block" ${first ? "open" : ""}>
+        <details class="day-block${first ? " sel" : ""}" ${first ? "open" : ""}>
             <summary class="day-summary">
                 <span class="day-date">${escapeHtml(day.date)}</span>
                 ${isToday ? `<span class="badge badge-accent">Today</span>` : ""}
