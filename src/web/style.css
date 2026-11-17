@@ -1,4 +1,5 @@
 /* Zenivo stylesheet: split into css/*.css parts, imported in the original cascade order (design tokens live in /static/tokens.css) */
+@import url("/static/css/fonts.css?v=20261121a");
 @import url("/static/css/base.css?v=20261115a");
 @import url("/static/css/viewport.css?v=20261118a");
 @import url("/static/css/telemetry.css?v=20261115a");
@@ -11,3 +12,4 @@
 @import url("/static/css/phone.css?v=20261115a");
 @import url("/static/css/pages.css?v=20261115a");
 @import url("/static/css/redesign.css?v=20261120c");
+@import url("/static/css/redesign-live.css?v=20261121a");

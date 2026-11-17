@@ -1,0 +1,62 @@
+/* Live page fidelity pass (phone mockup): number font, cloud bar card, overhead rows, one-row accordions.
+ * Loaded last (style.css). Own file so it merges cleanly beside redesign.css. */
+
+/* ---------- Fonts: Space Grotesk for numbers (self-hosted, css/fonts.css), the old mono face as fallback ---------- */
+:root { --font-num: "Space Grotesk", var(--font-mono); }
+.now-tile b, .cloud-big b, .fl-dist, .oc-stats b, .m-head-clock, .vp-bar .zoom-level, .ov-n { font-variant-numeric: tabular-nums; }
+.now-tile b { font-size: 20px; letter-spacing: -0.01em; }
+
+/* ---------- Overhead now rows (Live card, all widths) ---------- */
+#overhead-card .ov-panel .flights-list { max-height: none; overflow: visible; gap: 0; }
+#overhead-card .ov-panel .flight { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 12px; row-gap: 2px; align-items: baseline; padding: 12px 0; border: 0; border-bottom: 1px solid var(--divider); border-radius: 0; background: none; }
+#overhead-card .ov-panel .flight:last-child { border-bottom: 0; }
+#overhead-card .ov-panel .fl-main { grid-column: 1; grid-row: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+#overhead-card .ov-panel .flight-tag { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 700; color: var(--text-primary); text-decoration: none; }
+#overhead-card .ov-panel .fl-inview { flex: none; padding: 3px 8px; font-size: 10px; letter-spacing: 0.08em; }
+#overhead-card .ov-panel .fl-sub { grid-column: 1; grid-row: 2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text-secondary); }
+#overhead-card .ov-panel .fl-dist { grid-column: 2; grid-row: 1; justify-self: end; min-width: 64px; text-align: right; white-space: nowrap; font-family: var(--font-num); font-size: 16px; font-weight: 700; color: var(--text-primary); }
+#overhead-card .ov-panel .flight .fl-where { grid-column: 2; grid-row: 2; justify-self: end; min-width: 64px; margin: 0; text-align: right; white-space: nowrap; overflow: visible; font-size: 13px; color: var(--text-secondary); }
+#overhead-card .ov-panel .live-events-more { display: block; margin-top: 4px; text-align: right; }
+
+/* ---------- Cloud cover card ---------- */
+.cloud-big, .cloud-bars, .cloud-bars-cap { display: none; }
+.cloud-big b { font-family: var(--font-num); font-size: 28px; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; color: var(--text-primary); }
+.cloud-big span { font-size: 14px; color: var(--text-secondary); }
+.cloud-bars { align-items: flex-end; gap: 4px; height: 70px; }
+.cb-slot { flex: 1 1 0; min-width: 0; height: 100%; display: flex; align-items: flex-end; cursor: pointer; }
+.cb-slot i { display: block; width: 100%; border-radius: 3px; background: var(--accent); }
+.cb-slot i.cb-last { background: color-mix(in srgb, var(--accent) 60%, #fff); }
+.cloud-bars-cap { justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--text-muted); }
+
+/* ---------- Phone (<= 768 px) ---------- */
+@media (max-width: 768px) {
+    /* 16 px side margins, 14 px between cards */
+    #tab-live .dashboard-grid { gap: 14px; padding-bottom: 14px; }
+    #tab-live .dashboard-grid > *, #tab-live .main-viewport-col > *, #tab-live .controls-col > *, #tab-live .live-pair > * { margin: 0 16px; max-width: calc(100% - 32px); }
+    #tab-live .live-pair > .card { margin: 0 16px; }
+    #tab-live .viewport-card { margin: 0; max-width: 100%; }
+    #tab-live .now-strip { gap: 8px; }
+    #tab-live .overhead-card .card-header h2, #tab-live .live-events-card .card-header h2, #tab-live .cloud-card .card-header h2 { font-size: 16px; font-weight: 700; }
+
+    /* Overhead: no chips, no data-source line */
+    #overhead-card .zchips, #overhead-card .ov-meta { display: none; }
+
+    /* Cloud cover = bars */
+    .cloud-card .cr-toggle { min-height: 36px; padding: 0 14px; font-size: 14px; }
+    .cloud-card .cloud-summary, .cloud-card .cloud-chart-wrap, .cloud-card .cloud-caption { display: none; }
+    .cloud-big { display: flex; align-items: baseline; gap: 12px; margin: 4px 0 14px; }
+    .cloud-bars { display: flex; }
+    .cloud-bars-cap { display: flex; }
+
+    /* Accordions: one 52 px row, title left, chevron right */
+    #tab-live #weather-acc, #tab-live #histogram-card, #tab-live #telemetry-acc { padding: 0 16px; border-radius: var(--radius-card); }
+    #tab-live details.acc[open] { padding-bottom: 16px; }
+    #tab-live details.acc > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 50px; min-height: 50px; margin: 0; padding: 0; border: 0; }
+    #tab-live details.acc[open] > summary { margin: 0 0 12px; padding: 0; border: 0; }
+    #tab-live details.acc > summary h2 { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 15px; font-weight: 600; line-height: 1.2; }
+    #tab-live details.acc > summary .acc-sub, #tab-live details.acc > summary .badge, #tab-live details.acc > summary .text-muted { display: none; }
+    #tab-live details.acc > summary::after { width: 8px; height: 8px; margin-left: 0; }
+    #tab-live #telemetry-acc > .card { margin: 0 0 12px; }
+    #tab-live #telemetry-acc > .card:last-child { margin-bottom: 0; }
+    #tab-live #hist-calc-badge { margin-right: 10px; }
+}

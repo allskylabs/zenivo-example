@@ -252,6 +252,12 @@ const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 const compass = (az) => COMPASS[Math.round(((az % 360) + 360) % 360 / 45) % 8];
 
 let flightsLast = null;
+// Live "Overhead now" rows: title (+ IN VIEW badge), sub line, and a right column with the distance and "NE · 42° up"
+const OV_ROWS = 4;
+const ovWhere = (up, az, alt) => (up !== false && alt != null && alt >= 0 ? `${compass(az)} · ${Math.round(alt)}° up` : "below horizon");
+const ovRow = (inView, tag, sub, dist, where) => `<li class="flight${inView ? " in-view" : ""}"><div class="fl-main">${tag}${inView ? `<span class="fl-inview">IN VIEW</span>` : ""}</div>` +
+    `<div class="fl-sub">${sub}</div><div class="fl-dist" title="Distance from the camera">${dist}</div><div class="fl-where">${where}</div></li>`;
+
 let flightsFilter = "all";
 const FL_FILTERS = {
     all: () => true,
@@ -289,20 +295,13 @@ function renderFlights(d) {
         flightsList.innerHTML = `<li class="live-events-empty">${all.length ? "No aircraft match this filter." : "No aircraft heard right now."}</li>`;
         return;
     }
-    flightsList.innerHTML = list.map((a) => {
+    flightsList.innerHTML = list.slice(0, OV_ROWS).map((a) => {
         const name = escapeHtml(a.callsign || a.icao);
         const url = `https://globe.adsbexchange.com/?icao=${encodeURIComponent(String(a.icao).toLowerCase())}`;
         const climb = a.climb_m_min == null ? "" : a.climb_m_min > 60 ? " ↗" : a.climb_m_min < -60 ? " ↘" : "";
-        const where = a.in_view ? `<span class="fl-inview">● in view</span>`
-            : a.above_horizon ? `${compass(a.az_deg)} ${Math.round(a.alt_deg)}° up` : "below horizon";
-        const hdg = a.heading_deg == null ? "" : `<span class="fl-hdg" style="transform:rotate(${a.heading_deg}deg)" title="Heading ${a.heading_deg}°">↑</span>`;
-        return `<li class="flight${a.in_view ? " in-view" : ""}">
-            <div class="fl-top"><a href="${url}" target="_blank" rel="noopener" class="flight-tag">✈ ${name}</a>${hdg}<span class="fl-where">${where}</span></div>
-            <div class="fl-meta">
-                <span title="Altitude">${escapeHtml(Number(a.altitude_m).toLocaleString())} m${climb}</span>
-                <span title="Ground speed">${a.speed_kmh != null ? `${escapeHtml(a.speed_kmh)} km/h` : "-- km/h"}</span>
-                <span title="Distance from the camera">${escapeHtml(a.distance_km)} km</span>
-            </div></li>`;
+        const speed = a.speed_kmh != null ? `${escapeHtml(a.speed_kmh)} km/h` : "-- km/h";
+        return ovRow(a.in_view, `<a href="${url}" target="_blank" rel="noopener" class="flight-tag">${name}</a>`,
+            `${escapeHtml(Number(a.altitude_m).toLocaleString())} m${climb} · ${speed}`, `${escapeHtml(a.distance_km)} km`, ovWhere(a.above_horizon, a.az_deg, a.alt_deg));
     }).join("");
 }
 
@@ -334,17 +333,11 @@ function renderSondes(d) {
     document.getElementById("sondes-status").textContent = "Live from SondeHub (within 350 km)";
     const ul = document.getElementById("sondes-list");
     if (!list.length) { ul.innerHTML = `<li class="live-events-empty">No radiosonde flying nearby right now.</li>`; return; }
-    ul.innerHTML = list.map((a) => {
-        const where = a.in_view ? `<span class="fl-inview">● in view</span>`
-            : a.above_horizon ? `${compass(a.az_deg)} ${Math.round(a.alt_deg)}° up` : "below horizon";
+    ul.innerHTML = list.slice(0, OV_ROWS).map((a) => {
         const dir = a.climb_m_s > 1 ? " ↗" : a.climb_m_s < -1 ? " ↘" : "";
-        return `<li class="flight${a.in_view ? " in-view" : ""}">
-            <div class="fl-top"><a href="https://sondehub.org/${encodeURIComponent(a.serial)}" target="_blank" rel="noopener" class="flight-tag">🎈 ${escapeHtml(a.serial)}</a><span class="fl-where">${where}</span></div>
-            <div class="fl-meta">
-                <span title="Altitude">${escapeHtml(Number(a.altitude_m).toLocaleString())} m${dir}</span>
-                <span title="${escapeHtml(a.type || "")}">${a.freq_mhz ? escapeHtml(a.freq_mhz) + " MHz" : escapeHtml(a.type || "")}</span>
-                <span title="Distance from the camera">${escapeHtml(a.distance_km)} km</span>
-            </div></li>`;
+        const climb = a.climb_m_s == null ? "" : ` · ${a.climb_m_s > 0 ? "+" : ""}${Number(a.climb_m_s).toFixed(1)} m/s`;
+        return ovRow(a.in_view, `<a href="https://sondehub.org/${encodeURIComponent(a.serial)}" target="_blank" rel="noopener" class="flight-tag">${escapeHtml(a.serial)}</a>`,
+            `${escapeHtml(Number(a.altitude_m).toLocaleString())} m${dir}${climb}`, `${escapeHtml(a.distance_km)} km`, ovWhere(a.above_horizon, a.az_deg, a.alt_deg));
     }).join("");
 }
 // Live page: satellites above the horizon, those inside the camera frame first (fed by the same push as the overlay)
@@ -362,17 +355,9 @@ function renderSats(d) {
         : sun > -6 ? "Daylight: positions only, not visible to the eye" : "Bright = sunlit under a dark sky";
     const ul = document.getElementById("sats-list");
     if (!all.length) { ul.innerHTML = `<li class="live-events-empty">No large satellite above the horizon right now.</li>`; return; }
-    const list = all.slice().sort((a, b) => (b.in_view - a.in_view) || (b.visible - a.visible) || (b.alt_deg - a.alt_deg)).slice(0, 12);
-    ul.innerHTML = list.map((s) => {
-        const where = s.in_view ? `<span class="fl-inview">● in view</span>` : `${compass(s.az_deg)} ${Math.round(s.alt_deg)}° up`;
-        return `<li class="flight${s.in_view ? " in-view" : ""}">
-            <div class="fl-top"><a href="https://www.n2yo.com/satellite/?s=${encodeURIComponent(s.norad)}" target="_blank" rel="noopener" class="flight-tag">🛰 ${escapeHtml(s.name)}</a><span class="fl-where">${where}</span></div>
-            <div class="fl-meta">
-                <span title="Height above the ground">${escapeHtml(Number(s.height_km).toLocaleString())} km</span>
-                <span title="Direction and elevation">${compass(s.az_deg)} ${Math.round(s.alt_deg)}°</span>
-                <span>${s.visible ? "visible" : "not visible"}</span>
-            </div></li>`;
-    }).join("");
+    const list = all.slice().sort((a, b) => (b.in_view - a.in_view) || (b.visible - a.visible) || (b.alt_deg - a.alt_deg)).slice(0, OV_ROWS);
+    ul.innerHTML = list.map((s) => ovRow(s.in_view, `<a href="https://www.n2yo.com/satellite/?s=${encodeURIComponent(s.norad)}" target="_blank" rel="noopener" class="flight-tag">${escapeHtml(s.name)}</a>`,
+        `${escapeHtml(Number(s.height_km).toLocaleString())} km high`, s.range_km != null ? `${escapeHtml(Number(s.range_km).toLocaleString())} km` : `${Math.round(s.alt_deg)}°`, ovWhere(true, s.az_deg, s.alt_deg))).join("");
 }
 async function loadSatsCard() {
     try {

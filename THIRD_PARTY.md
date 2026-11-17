@@ -79,11 +79,12 @@ The pages load these from the hosts below; the pinned versions and the SRI hashe
 
 ## 5. Fonts (Google Fonts)
 
-Loaded from `fonts.googleapis.com` and `fonts.gstatic.com`; not bundled.
+Inter and JetBrains Mono load from `fonts.googleapis.com` and `fonts.gstatic.com`. Inter (400/600/700) and Space Grotesk (500/700) are also self-hosted in `src/web/fonts/` (woff2 from Fontsource via jsDelivr, licence texts `OFL-*.txt` beside them, `src/web/css/fonts.css`).
 
 | Family | Weights | Licence | Source |
 |---|---|---|---|
 | Inter | 400, 500, 600, 700 | SIL Open Font License 1.1 (Google Fonts metadata, `license: "OFL"`) | https://github.com/rsms/inter, https://fonts.google.com/specimen/Inter |
+| Space Grotesk | 500, 700 (self-hosted) | SIL Open Font License 1.1 (`src/web/fonts/OFL-space-grotesk.txt`) | https://github.com/floriankarsten/space-grotesk |
 | JetBrains Mono | 400, 600 | SIL Open Font License 1.1 (Google Fonts metadata, `license: "OFL"`) | https://github.com/JetBrains/JetBrainsMono, https://fonts.google.com/specimen/JetBrains+Mono |
 
 ## 6. Data and imagery fetched at run time

@@ -2,6 +2,40 @@
  * Classic script: top-level declarations are shared with the other src/web/app/*.js files; load order is fixed in index.html. */
 
 // ------------------------------------------------------------------
+// Bar view of the cloud series (phone card): pure helpers, no DOM
+// ------------------------------------------------------------------
+// Seconds per bar for a range in hours: 6h -> 15 min, 24h -> 1 h, 72h -> 3 h, 7d -> 6 h, 30d -> 1 day
+function cloudBinSeconds(hours) {
+    return hours <= 6 ? 900 : hours <= 24 ? 3600 : hours <= 72 ? 10800 : hours <= 168 ? 21600 : 86400;
+}
+// Bins counted back from `end` so the last bar is "now". Bar value = mean cc of the samples inside; bins with no sample get v = null (a gap).
+function cloudBins(points, start, end, hours) {
+    const bs = cloudBinSeconds(hours);
+    const n = Math.max(1, Math.ceil((end - start) / bs));
+    const bins = [];
+    for (let k = 0; k < n; k++) bins.push({ t0: Math.max(start, end - (n - k) * bs), t1: end - (n - k - 1) * bs, sum: 0, n: 0, v: null });
+    (points || []).forEach((p) => {
+        if (p.cc === null || p.cc === undefined || p.t < start || p.t > end) return;
+        const k = Math.min(n - 1, Math.max(0, Math.floor((p.t - (end - n * bs)) / bs)));
+        bins[k].sum += p.cc;
+        bins[k].n += 1;
+    });
+    bins.forEach((b) => { if (b.n) b.v = b.sum / b.n; });
+    return bins;
+}
+// "today 08:00" / "yesterday 08:00" / "12 Nov" for the left caption; dateOf(ts) -> a Date whose UTC fields are station-local
+function cloudStartLabel(startTs, nowTs, dateOf) {
+    const p = (x) => String(x).padStart(2, "0");
+    const d = dateOf(startTs), n = dateOf(nowTs);
+    const day = (x) => Math.floor(Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate()) / 86400000);
+    const diff = day(n) - day(d);
+    const hm = `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+    if (diff <= 0) return `today ${hm}`;
+    if (diff === 1) return `yesterday ${hm}`;
+    return `${d.getUTCDate()} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()]}`;
+}
+
+// ------------------------------------------------------------------
 // Cloud Cover History chart (inline SVG, refreshed every 5 min)
 // ------------------------------------------------------------------
 const cloudChart = document.getElementById("cloud-chart");
@@ -127,7 +161,47 @@ if (cloudChart && currentPage === "tab-live") {
         if (!g || viewTs === null || viewTs < g.start || viewTs > g.end) return;
         svgEl("line", { class: "cc-mark", x1: g.x(viewTs), x2: g.x(viewTs), y1: g.m.t, y2: g.laneY + g.LANE - 3 }, svg);
     }
+    // Phone card: one rounded bar per time bin (the line chart above stays for the wide screen)
+    const barsEl = document.getElementById("cloud-bars");
+    const capL = document.getElementById("cloud-cap-l");
+    const capR = document.getElementById("cloud-cap-r");
+    let capTimer = null;
+    function renderCloudBars() {
+        if (!barsEl || !cloudData) return;
+        const bins = cloudBins(cloudData.points, cloudData.start, cloudData.end, cloudHours);
+        let last = -1;
+        bins.forEach((b, i) => { if (b.v !== null) last = i; });
+        barsEl.replaceChildren();
+        bins.forEach((b, i) => {
+            const slot = document.createElement("b");
+            slot.className = "cb-slot";
+            const lbl = `${fmtTime(b.t0, cloudHours > 24)}–${fmtTime(b.t1, false)}`;
+            if (b.v !== null) {
+                slot.title = `${lbl} · ${Math.round(b.v)}% cloud`;
+                const bar = document.createElement("i");
+                bar.style.height = `${Math.max(3, b.v)}%`;
+                if (i === last) bar.className = "cb-last";
+                slot.appendChild(bar);
+            } else {
+                slot.title = `${lbl} · no data`;
+            }
+            slot.dataset.lbl = lbl;
+            slot.dataset.val = b.v === null ? "no data" : `${Math.round(b.v)}%`;
+            barsEl.appendChild(slot);
+        });
+        const base = cloudStartLabel(cloudData.start, cloudData.end, (t) => stationDate(new Date(t * 1000)));
+        capL.textContent = base; capR.textContent = "now";
+        capL.dataset.base = base;
+    }
+    if (barsEl) barsEl.addEventListener("click", (e) => {
+        const slot = e.target.closest(".cb-slot");
+        if (!slot) return;
+        capL.textContent = slot.dataset.lbl; capR.textContent = slot.dataset.val;
+        clearTimeout(capTimer);
+        capTimer = setTimeout(() => { capL.textContent = capL.dataset.base || ""; capR.textContent = "now"; }, 3500);
+    });
     function renderCloudChart() {
+        renderCloudBars();
         renderChart(cloudChart, mainStore);
         if (fv && !fv.classList.contains("hidden")) renderChart(fvChart, fvStore);
     }
@@ -523,6 +597,9 @@ if (cloudChart && currentPage === "tab-live") {
             document.getElementById("cloud-clear").textContent = pct(sm.clear_pct);
             document.getElementById("cloud-range").textContent = sm.min === null || sm.min === undefined ? "--" : `${pct(sm.min)} – ${pct(sm.max)}`;
             document.getElementById("cloud-samples").textContent = sm.samples ?? "--";
+            const bigN = document.getElementById("cloud-big-n"), bigT = document.getElementById("cloud-big-t");
+            if (bigN) bigN.textContent = pct(sm.mean);
+            if (bigT) bigT.textContent = `mean · clear ${pct(sm.clear_pct)} of the time`;
             const avgEl = document.getElementById("cloud-avg");
             if (avgEl) avgEl.textContent = pct(sm.mean);
             const avgLbl = document.getElementById("cloud-avg-label");
