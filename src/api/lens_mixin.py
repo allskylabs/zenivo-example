@@ -690,6 +690,22 @@ class LensMixin:
                 refine.append((pos, scores[0]))
                 sw["points"].append({"pos": pos, "score": scores[0], "phase": "refine"})
                 sw["progress"] = 0.95 + 0.05 * (k + 1) / len(back)
+            if not is_pytest:
+                # A refine pass that disagrees with the sweep at the same lens positions (seen once: 7.3 against 12.6
+                # with an unchanged scene) is kept in the journal with its per-point diagnostics, since the next
+                # sweep overwrites the state
+                try:
+                    import json
+                    import logging
+                    rv = [quality(v) for _, v in refine if v is not None]
+                    cv = [quality(v) for p0, v in zip(done_pos, curves[win["roi"]]) if v is not None and bottom - 1e-6 <= p0 <= top + 1e-6]
+                    if rv and cv and abs(float(np.median(rv)) - float(np.median(cv))) > 0.15 * abs(float(np.median(cv))):
+                        logging.getLogger("allsky.focus").warning(
+                            "Sweep refine disagrees with coarse pass (refine median %.3f, coarse %.3f): %s",
+                            float(np.median(rv)), float(np.median(cv)), json.dumps(sw.get("diag", [])[-(len(back) + 6):]))
+                        sw["refine_mismatch"] = True
+                except Exception:
+                    pass
             fx = np.array([p for p, v in refine if v is not None])
             fy = np.array([quality(v) for p, v in refine if v is not None])
             if len(fx) >= 5:
