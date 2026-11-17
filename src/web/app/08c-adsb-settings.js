@@ -243,6 +243,19 @@ if (satBlock) {
 
 const dataSourcesList = document.getElementById("data-sources-list");
 const STATE_LABEL = { ok: "Working", waiting: "Waiting", error: "Problem", off: "Off" };
+// Per source: the switch that already exists (it is moved into the row, so ids, handlers and autosave stay) and the settings block shown when the row is opened.
+const DS_CONTROLS = {
+    adsb: ["adsb-enabled", "adsb-host"], adsb_public: ["adsb-public-fallback", "adsb-public-fallback"], fr24: ["fr24-enabled", "fr24-enabled"],
+    radiosondes: ["sondes-enabled", "sondes-enabled"], satellites: ["sat-enabled", null],
+};
+const dsParts = {};
+Object.entries(DS_CONTROLS).forEach(([sid, [boxId, detailId]]) => {
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    const detail = detailId ? document.getElementById(detailId) : null;
+    box.setAttribute("aria-label", (box.closest("label") || box.parentElement).textContent.trim());
+    dsParts[sid] = { box, field: box.closest(".field"), detail: detail ? detail.closest("fieldset") : null };
+});
 
 async function loadDataSources() {
     if (!dataSourcesList) return;
@@ -250,8 +263,13 @@ async function loadDataSources() {
         const res = await fetch("/api/data-sources");
         if (!res.ok) throw new Error(res.status === 401 ? "sign in as admin" : `HTTP ${res.status}`);
         const d = await res.json();
-        dataSourcesList.innerHTML = "";
+        const open = new Set([...dataSourcesList.querySelectorAll(".ds-item.open")].map((e) => e.dataset.sid));
+        dataSourcesList.replaceChildren();
         d.sources.forEach((s) => {
+            const part = dsParts[s.id];
+            const item = document.createElement("div");
+            item.className = "ds-item" + (open.has(s.id) ? " open" : "");
+            item.dataset.sid = s.id;
             const row = document.createElement("div");
             row.className = "ds-row";
             const dot = document.createElement("span");
@@ -262,13 +280,44 @@ async function loadDataSources() {
             const name = document.createElement("strong");
             name.textContent = s.name;
             const detail = document.createElement("small");
-            detail.textContent = [STATE_LABEL[s.state], s.detail, s.host].filter(Boolean).join(" · ");
+            detail.textContent = [s.detail, s.host].filter(Boolean).join(" · ") || STATE_LABEL[s.state] || "";
             main.append(name, detail);
             row.append(dot, main);
-            dataSourcesList.appendChild(row);
+            if (part && part.box) {
+                const sw = document.createElement("span");
+                sw.className = "ds-sw";
+                sw.append(part.box);
+                if (part.field) part.field.classList.add("ds-moved");
+                row.append(sw);
+            }
+            item.append(row);
+            if (part && part.detail) {
+                row.classList.add("ds-expand");
+                row.tabIndex = 0;
+                row.setAttribute("role", "button");
+                row.setAttribute("aria-expanded", item.classList.contains("open") ? "true" : "false");
+                const chev = document.createElement("span");
+                chev.className = "ds-chev";
+                chev.setAttribute("aria-hidden", "true");
+                row.append(chev);
+                const body = document.createElement("div");
+                body.className = "ds-detail";
+                body.append(part.detail);
+                item.append(body);
+                const toggle = (ev) => {
+                    if (ev.target.closest(".ds-sw")) return;
+                    const on = item.classList.toggle("open");
+                    row.setAttribute("aria-expanded", on ? "true" : "false");
+                };
+                row.addEventListener("click", toggle);
+                row.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(ev); } });
+            }
+            dataSourcesList.appendChild(item);
         });
     } catch (err) {
         dataSourcesList.textContent = `Could not load the data sources: ${err.message}`;
+        // the switches and settings blocks stay reachable without the status list
+        Object.values(dsParts).forEach((p) => { if (p.field && p.box) p.field.append(p.box); if (p.detail) dataSourcesList.append(p.detail); });
     }
 }
 const dsRefresh = document.getElementById("data-sources-refresh");
@@ -367,9 +416,17 @@ if (wxBlock) {
         if (!d.enabled) return;
         if (!d.available) { wxNow.textContent = d.error ? `Could not load: ${d.error}` : (d.fetching ? "Loading…" : "Waiting for the first answer…"); return; }
         const c = d.current;
-        wxNow.textContent = `${c.summary || "Now"} · ${fmt(c.temp_c, "°C", 1)} · cloud ${fmt(c.cloud_pct, "%")} · humidity ${fmt(c.humidity_pct, "%")} · ` +
-            `wind ${fmt(c.wind_ms, " m/s", 1)} ${compass(c.wind_dir_deg)} · ${fmt(c.pressure_hpa, " hPa")} · visibility ${fmt(c.visibility_m == null ? null : c.visibility_m / 1000, " km", 0)}` +
-            ` — next 12 h: ${d.outlook.clear_hours_next_12} clear hours${d.outlook.rain_expected_next_12 ? ", rain likely" : ""} (updated ${Math.round(d.age_s / 60)} min ago)`;
+        const kv = (k, v) => { const r = document.createElement("div"); const kk = document.createElement("span"); kk.textContent = k; const vv = document.createElement("b"); vv.textContent = v; r.append(kk, vv); return r; };
+        const big = document.createElement("div"); big.className = "wx-big";
+        const temp = document.createElement("b"); temp.textContent = fmt(c.temp_c, "°C", 0);
+        const sum = document.createElement("small"); sum.textContent = `Now · ${c.summary || "no summary"}`;
+        big.append(temp, sum);
+        const facts = document.createElement("div"); facts.className = "wx-facts";
+        facts.append(kv("Cloud", fmt(c.cloud_pct, "%")), kv("Humidity", fmt(c.humidity_pct, "%")), kv("Wind", `${fmt(c.wind_ms, " m/s", 1)} ${compass(c.wind_dir_deg)}`),
+            kv("Pressure", fmt(c.pressure_hpa, " hPa")), kv("Visibility", fmt(c.visibility_m == null ? null : c.visibility_m / 1000, " km", 0)));
+        const outlook = document.createElement("p"); outlook.className = "wx-outlook";
+        outlook.textContent = `Next 12 h: ${d.outlook.clear_hours_next_12} clear hours${d.outlook.rain_expected_next_12 ? ", rain likely" : ""} (updated ${Math.round(d.age_s / 60)} min ago)`;
+        wxNow.append(big, facts, outlook);
         (d.hourly || []).slice(0, 24).forEach((h) => {
             const cell = document.createElement("div");
             cell.className = "wx-h";
