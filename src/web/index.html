@@ -25,7 +25,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
-    <link rel="stylesheet" href="/style.css?v=20261124c">
+    <link rel="stylesheet" href="/style.css?v=20261125a">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -1502,7 +1502,7 @@
                     <div class="focus-view-row">
                         <div class="focus-zoom-wrap" id="focus-zoom-wrap">
                             <canvas id="focus-zoom-canvas"></canvas>
-                            <div class="focus-zoom-empty" id="focus-zoom-empty"><span>Press <strong>Start focus mode</strong> to stream a native-resolution crop.</span></div>
+                            <div class="focus-zoom-empty" id="focus-zoom-empty"><span>Press <strong>Start focus mode</strong> (Live focus card) to stream a native-resolution crop.</span></div>
                         </div>
                         <aside class="focus-aside">
                             <div class="focus-aside-title">Overview <span class="text-muted">click to move · arrow keys nudge</span></div>
@@ -1525,7 +1525,7 @@
                                     <button data-chart-metric="sharpness" title="Sharpness: edge contrast, higher is sharper">Sharpness</button>
                                 </div>
                                 <div class="header-actions focus-chart-actions">
-                                    <button class="btn btn-sm btn-success" id="focus-go-best" hidden title="Return to the sharpest lens position found on the chart">★ Best (<span id="focus-best-pos-val">—</span>)</button>
+                                    <button class="btn btn-sm btn-outline" id="focus-go-best" hidden title="Return to the sharpest lens position found on the chart">★ Best (<span id="focus-best-pos-val">—</span>)</button>
                                     <button class="btn btn-sm btn-outline" id="focus-record-point" title="Record a measurement at the current lens position">Record point</button>
                                     <button class="btn btn-sm btn-outline" id="focus-reset" title="Clear the chart data and start over (R)">Reset (R)</button>
                                 </div>
@@ -1565,9 +1565,10 @@
                             <span class="focus-badge" id="focus-badge">OFF</span>
                         </div>
                         <div class="focus-actions-row">
-                            <button class="btn btn-primary" id="focus-toggle">Start focus mode</button>
-                            <button class="btn btn-success" id="focus-finish" hidden title="Save the lens position and this result to Settings, then leave focus mode">Finish &amp; save</button>
+                            <button class="btn btn-primary" id="focus-toggle" title="Start focus mode">Start focus mode</button>
+                            <button class="btn btn-outline" id="focus-finish" hidden title="Leave focus mode without saving the lens position or result">Stop without saving</button>
                         </div>
+                        <p class="focus-hint text-muted focus-cta-hint" id="focus-toggle-hint">Streams fast native-resolution frames with a live sharpness score. Auto-exposure and archiving pause until you finish.</p>
                         <button class="btn btn-sm btn-outline btn-block focus-keep" id="focus-keep" hidden>Still focusing — keep focus mode on</button>
                         <div class="focus-score">
                             <div class="focus-score-label" id="focus-score-label">Score</div>
@@ -1628,7 +1629,7 @@
                         <div class="btn-group focus-btns">
                             <button class="btn btn-sm btn-outline" id="focus-pick-star" title="Find and lock onto the best unsaturated bright star">Find star</button>
                             <button class="btn btn-sm btn-outline" id="focus-pick-light" title="Find and lock onto the clearest light spot">Find light</button>
-                            <button class="btn btn-sm btn-primary" id="focus-auto-point" title="Automatically place the focus region on a star (night) or detail (day)">Auto point</button>
+                            <button class="btn btn-sm btn-outline" id="focus-auto-point" title="Automatically place the focus region on a star (night) or detail (day)">Auto point</button>
                         </div>
                         </details>
                     </div>
@@ -1643,9 +1644,10 @@
                         <div class="focus-lens-pos"><b id="focus-lens-pos">—</b> <span class="text-muted" id="focus-lens-dist"></span></div>
                         <div class="focus-lens-step">Lens step <b id="focus-lens-step">—</b> <span class="text-muted">/ <span id="focus-lens-step-max">1023</span></span></div>
                         <div class="btn-group focus-btns focus-lens-run">
-                            <button class="btn btn-primary" id="focus-run-af" title="Run an autofocus sweep now">Run autofocus</button>
+                            <button class="btn btn-outline" id="focus-run-af" title="Start focus mode (if it is off) and sweep the lens to find focus">Run autofocus sweep</button>
                             <button class="btn btn-outline" id="focus-lens-cancel" hidden>Abort</button>
                         </div>
+                        <div class="focus-hint text-muted focus-af-hint" id="focus-run-af-hint">Starts focus mode by itself, then sweeps the lens to find the sharpest position.</div>
                         <div class="focus-meter" id="focus-lens-progress-wrap" hidden><div class="focus-meter-fill good" id="focus-lens-progress"></div></div>
                         <div class="focus-hint focus-lens-status"><span id="focus-lens-msg">&nbsp;</span></div>
                         <input type="range" id="focus-lens-slider" min="0" max="3" step="0.005" value="0" aria-label="Lens position (dioptres)">
@@ -1667,7 +1669,7 @@
                                 <option value="6">6 h</option>
                                 <option value="12">12 h</option>
                             </select>
-                            <button class="btn btn-sm btn-primary" id="focus-refocus-now" title="Find focus now (enters focus mode for the sweep)">Refocus now</button>
+                            <button class="btn btn-sm btn-outline" id="focus-refocus-now" title="Find focus now (enters focus mode for the sweep)">Refocus now</button>
                         </div>
                         <div class="focus-hint text-muted" id="focus-lens-saved">&nbsp;</div>
                         <div class="focus-hint text-muted" id="focus-lens-comp"></div>
@@ -1679,7 +1681,7 @@
                         <summary>Exposure while focusing <span class="text-muted" id="focus-exp-summary"></span></summary>
                         <p class="text-muted focus-hint">Auto-exposure pauses in focus mode so the score stays comparable. If the light changed, meter once. Short exposures refresh faster and blur less.</p>
                         <div class="btn-group focus-btns">
-                            <button class="btn btn-sm btn-primary" id="focus-auto-exp" title="Meter the zoom region (brightest parts to ~80 %), then hold that exposure">Auto expose</button>
+                            <button class="btn btn-sm btn-outline" id="focus-auto-exp" title="Meter the zoom region (brightest parts to ~80 %), then hold that exposure">Auto expose</button>
                             <button class="btn btn-sm btn-outline focus-exp-preset" data-exp="1.0" data-gain="36">Stars 1 s · 36 dB</button>
                             <button class="btn btn-sm btn-outline focus-exp-preset" data-exp="0.1" data-gain="24">Lights 0.1 s · 24 dB</button>
                             <button class="btn btn-sm btn-outline focus-exp-preset" data-exp="0.005" data-gain="0">Day 5 ms</button>
@@ -1687,9 +1689,17 @@
                         <div class="focus-exp-row">
                             <label>Exposure (s) <input type="number" id="focus-exp" min="0.00015" max="30" step="any"></label>
                             <label>Gain (dB) <input type="number" id="focus-gain" min="0" max="72" step="0.5"></label>
-                            <button class="btn btn-sm btn-primary" id="focus-exp-apply">Apply</button>
+                            <button class="btn btn-sm btn-outline" id="focus-exp-apply">Apply</button>
                         </div>
                     </details>
+                    <div class="card focus-howto" id="focus-howto">
+                        <h2>How to focus</h2>
+                        <ul class="focus-hint">
+                            <li>Aim at a bright star near the centre (or a distant light by day), then press Start focus mode.</li>
+                            <li>Move the lens until the star size drops or the sharpness score rises; the Best marker shows the sharpest position.</li>
+                            <li>Press Finish &amp; save to keep the lens position and leave focus mode.</li>
+                        </ul>
+                    </div>
                     <details class="card focus-details" id="focus-history-details">
                         <summary>Saved focus history <span class="text-muted" id="focus-history-count"></span></summary>
                         <div class="focus-history" id="focus-history"></div>
@@ -1777,11 +1787,11 @@
     <script src="/static/sky_catalog.js"></script>
     <script src="/static/activity.js?v=20261122b"></script>
     <script src="/static/focus/core.js?v=20261115a"></script>
-    <script src="/static/focus/state.js?v=20261115a"></script>
+    <script src="/static/focus/state.js?v=20261125a"></script>
     <script src="/static/focus/curve.js?v=20261115a"></script>
     <script src="/static/focus/charts.js?v=20261115a"></script>
-    <script src="/static/focus/controls.js?v=20261115a"></script>
-    <script src="/static/focus/lens.js?v=20261115a"></script>
+    <script src="/static/focus/controls.js?v=20261125a"></script>
+    <script src="/static/focus/lens.js?v=20261125a"></script>
     <script src="/static/overlay_decode.js?v=1"></script>
     <script defer src="/static/app/01-core.js?v=20261124c"></script>
     <script defer src="/static/app/02-controls-calibration.js?v=20261124c"></script>

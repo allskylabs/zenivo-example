@@ -74,6 +74,9 @@
         const mf = L.mode !== "auto" || !motorized;
         lensCard.classList.toggle("lens-af", !mf);
         $("focus-af-row").hidden = mf || !motorized;
+        // The sweep button only exists for a motorised lens in Autofocus mode; Manual shows position and step controls only
+        $("focus-run-af").closest(".focus-lens-run").hidden = mf;
+        $("focus-run-af-hint").hidden = mf;
         const every = $("focus-refocus-every");
         if (document.activeElement !== every && L.refocus_every_h !== undefined) every.value = String(L.refocus_every_h);
         lensSlider.title = mf ? "Drag to focus" : "AF moves the lens; drag to switch to MF";

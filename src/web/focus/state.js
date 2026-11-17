@@ -158,10 +158,13 @@
         if (s.smooth) document.querySelectorAll("#focus-smooth button").forEach((b) => b.classList.toggle("active", +b.dataset.smooth === s.smooth));
         if (s.exposure_s !== undefined && document.activeElement !== $("focus-exp")) $("focus-exp").value = +s.exposure_s.toPrecision(4);
         if (s.gain_db !== undefined && document.activeElement !== $("focus-gain")) $("focus-gain").value = +s.gain_db.toFixed(1);
-        toggleBtn.textContent = st.active ? "Stop" : "Start focus mode";
+        // One filled button: Start focus mode while off, Finish & save while on (Stop without saving is a plain pill)
+        toggleBtn.textContent = st.active ? "Finish & save" : "Start focus mode";
+        toggleBtn.title = st.active ? "Save the lens position and this result to Settings, then leave focus mode" : "Start focus mode";
         $("focus-finish").hidden = !st.active;
+        $("focus-toggle-hint").hidden = st.active;
+        $("focus-howto").classList.toggle("is-on", st.active);
         renderSaved(s);
-        toggleBtn.classList.toggle("btn-danger", st.active);
         badge.textContent = st.active ? "LIVE" : "OFF";
         badge.classList.toggle("on", st.active);
         showExpiry(s.expires_in_s);

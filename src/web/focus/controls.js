@@ -55,8 +55,9 @@
         drawChart();
     }
 
-    $("focus-finish").addEventListener("click", async () => {
-        const b = $("focus-finish");
+    // "Finish & save" is the primary button (#focus-toggle while focus mode is on); #focus-finish is the secondary "Stop without saving"
+    async function finishAndSave() {
+        const b = toggleBtn;
         b.disabled = true;
         try {
             const r = await api("/api/focus/finish", { method: "POST" });
@@ -68,14 +69,26 @@
         } finally {
             b.disabled = false;
         }
+    }
+
+    $("focus-finish").addEventListener("click", async () => {
+        const b = $("focus-finish");
+        b.disabled = true;
+        try {
+            applyState(await api("/api/focus/stop", { method: "POST" }));
+            startOverviewTimer();
+        } catch (e) {
+            alert(`Focus mode: ${e.message}`);
+        } finally {
+            b.disabled = false;
+        }
     });
 
     toggleBtn.addEventListener("click", async () => {
+        if (st.active) { finishAndSave(); return; }
         toggleBtn.disabled = true;
         try {
-            if (st.active) {
-                applyState(await api("/api/focus/stop", { method: "POST" }));
-            } else {
+            {
                 st.history = [];
                 st.userPickedChartMetric = false;
                 st.showSweep = false;  // time curve, unless AF starts a sweep (then the sweep view returns)

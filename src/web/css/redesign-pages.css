@@ -385,3 +385,17 @@ body.page-3d #btn-track { background: var(--accent); border-color: var(--accent)
 [data-theme="red"] .evc-dot { background-color: var(--accent) !important; border-color: var(--accent) !important; }
 [data-theme="red"] .live-event { border-left-color: var(--accent) !important; }
 [data-theme="red"] a:not([class]) { color: var(--accent); }
+
+/* Focus page: one filled button (Start focus mode / Finish & save); everything else is a dark pill */
+#tab-focus [hidden] { display: none !important; }
+#tab-focus .focus-cta-hint, #tab-focus .focus-af-hint { margin: 0.5rem 0 0; line-height: 1.4; }
+#tab-focus .focus-actions-row #focus-toggle { flex: 2 1 0; }
+#tab-focus .focus-actions-row #focus-finish { flex: 1 1 0; }
+#tab-focus .focus-howto h2 { margin: 0 0 0.4rem; font-size: 1rem; }
+#tab-focus .focus-howto ul { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.4rem; color: var(--text-secondary); line-height: 1.4; }
+#tab-focus .focus-lens-run { margin-top: 0.5rem; }
+@media (max-width: 768px) {
+    #tab-focus .focus-actions-row { flex-wrap: wrap; }
+    #tab-focus .focus-actions-row #focus-toggle { flex: 1 1 100%; }
+    #tab-focus .focus-actions-row #focus-finish { flex: 1 1 100%; background: var(--bg-card-sub); }
+}
