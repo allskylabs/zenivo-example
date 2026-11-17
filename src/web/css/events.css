@@ -89,7 +89,7 @@ body.no-scroll { overflow: hidden; }
 
 .ev-when { display: flex; flex-direction: column; line-height: 1.25; }
 .ev-when strong { font-size: 0.95rem; }
-.ev-when span { font-size: 0.78rem; color: var(--text-secondary); }
+.ev-when > span { font-size: 0.78rem; color: var(--text-secondary); }
 
 .ev-nav {
     margin-left: auto;

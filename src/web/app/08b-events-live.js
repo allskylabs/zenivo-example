@@ -47,7 +47,7 @@ function showEvent(i) {
     pill.style.setProperty("--pill", EVENT_COLORS[ev.type] || "var(--accent)");
     const [evDate = "", evTime = ""] = fmtLocalIso(ev.timestamp).split(" ");
     evQ(".ev-when strong").innerHTML = `<span class="evw-d">${escapeHtml(evDate)} </span>${escapeHtml(evTime)}<span class="evw-z"> ${escapeHtml(tzLabel)}</span>`;
-    evQ(".ev-when span").textContent = timeAgo(when);
+    evQ(".ev-when > span").textContent = timeAgo(when);
     evQ(".ev-pos").textContent = `${evIndex + 1} / ${evList.length}`;
     evQ(".ev-prev").disabled = evIndex === 0;
     evQ(".ev-next").disabled = evIndex === evList.length - 1;
