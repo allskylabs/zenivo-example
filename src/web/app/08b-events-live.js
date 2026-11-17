@@ -326,6 +326,7 @@ function renderSats(d) {
     const inView = all.filter((s) => s.in_view).length;
     document.getElementById("sats-count").textContent = `${inView} in view · ${all.length} up`;
     const sun = d && d.sun_alt_deg;
+    if (typeof sun === "number") window.ALLSKY_SUN_ALT = { v: sun, t: Date.now() };
     document.getElementById("sats-status").textContent = sun == null ? "Large satellites above the horizon"
         : sun > -6 ? "Daylight: positions only, not visible to the eye" : "Bright = sunlit under a dark sky";
     const ul = document.getElementById("sats-list");

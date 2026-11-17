@@ -141,10 +141,17 @@
         const set = (id, t) => { const el = $(id); if (el && el.textContent !== t) el.textContent = t; };
         const cm = /(-?[\d.]+)/.exec(($("telem-clouds") || {}).textContent || "");
         set("now-cloud", cm ? `${Math.round(parseFloat(cm[1]))}%` : "--");
-        const sa = parseFloat((($("telem-sun-alt") || {}).textContent || "").replace("−", "-").replace("+", ""));
+        // Sun altitude: the server's value (satellite push, < 5 min old); else the local tile once the station position is known; else "--"
+        const srv = window.ALLSKY_SUN_ALT;
+        let sa = srv && Date.now() - srv.t < 300000 ? srv.v : NaN;
+        if (!Number.isFinite(sa)) {
+            const la = $("station-lat"), lo = $("station-lon");
+            const known = la && lo && la.value !== "" && lo.value !== "" && (parseFloat(la.value) !== 0 || parseFloat(lo.value) !== 0);
+            if (known) sa = parseFloat((($("telem-sun-alt") || {}).textContent || "").replace("\u2212", "-").replace("+", ""));
+        }
         set("now-sky", Number.isFinite(sa) ? (sa > -0.83 ? "Day" : sa > -18 ? "Twilight" : "Night") : "--");
         if (wxTemp != null) { set("now-temp-l", "Temp"); set("now-temp", `${Math.round(wxTemp)}°C`); }
-        else { set("now-temp-l", "Exposure"); set("now-temp", (($("telem-exp") || {}).textContent || "--").trim() || "--"); }
+        else { set("now-temp-l", "Exposure"); set("now-temp", (($("telem-exp") || {}).textContent || "--").replace(/\s+/g, "") || "--"); }
         const em = /^\s*(\d+)/.exec(($("live-events-count") || {}).textContent || "");
         set("now-events", em ? em[1] : "--");
     }
