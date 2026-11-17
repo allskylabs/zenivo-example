@@ -229,6 +229,7 @@
             const ASB1_HEADER_TOTAL = 4188;
 
             const overlayState = {
+                dso_overlay: false,
                 sky_overlay: false,
                 sky_labels: false,
                 grid_overlay: false,
@@ -350,6 +351,7 @@
                 if (params.get("bg")) overlayState.bg = params.get("bg");
                 if (params.get("stars") !== null) overlayState.sky_overlay = params.get("stars") === "1" || params.get("stars") === "true";
                 if (params.get("labels") !== null) overlayState.sky_labels = params.get("labels") === "1" || params.get("labels") === "true";
+                if (params.get("dso") !== null) overlayState.dso_overlay = params.get("dso") === "1" || params.get("dso") === "true";
                 if (params.get("grid") !== null) overlayState.grid_overlay = params.get("grid") === "1" || params.get("grid") === "true";
                 if (params.get("badge") !== null) overlayState.badge = params.get("badge") === "1" || params.get("badge") === "true";
                 if (params.get("sun_moon") !== null) overlayState.sun_moon = params.get("sun_moon") === "1" || params.get("sun_moon") === "true";
@@ -504,6 +506,20 @@
                 };
             }
 
+            // Planets for the Solar System toggle: server alt/az, refreshed every 60 s (not per frame)
+            let skyBodies = [];
+            async function pollSkyBodies() {
+                try {
+                    const r = await fetch("/api/sky/bodies");
+                    if (!r.ok) return;
+                    const d = await r.json();
+                    skyBodies = (d.bodies || []).filter((b) => b && b.name && b.name !== "Sun" && b.name !== "Moon" && typeof b.alt === "number" && typeof b.az === "number");
+                    drawReticle();
+                } catch (e) { /* keep last data */ }
+            }
+            pollSkyBodies();
+            setInterval(pollSkyBodies, 60000);
+
             function drawReticle() {
                 if (!canvas || !stage) return;
                 const w = stage.clientWidth;
@@ -524,7 +540,8 @@
                 const showBadge = overlayState.badge !== false;
                 const showAdsb = !!overlayState.adsb_overlay;
                 const showEvents = !!overlayState.events_overlay;
-                if (!showSky && !showLabels && !showGrid && !showSunMoon && !showBadge && !showAdsb && !showEvents) return;
+                const showDso = !!overlayState.dso_overlay;
+                if (!showSky && !showDso && !showLabels && !showGrid && !showSunMoon && !showBadge && !showAdsb && !showEvents) return;
 
                 const st = stationConfig || {};
                 const sensor = st.camera_sensor || {};
@@ -887,48 +904,72 @@
                     ctx.restore();
                 }
 
-                // 3. Labels (small, light, no boxes; sizes divided by viewport zoom so they stay small on screen)
-                if (showLabels && catalog.constellations) {
-                    // Tune label look here. Sizes are in canvas px at zoom 1.
-                    const LABEL_STYLE = {
-                        conFont: 7.5, conWeight: 500, conSpacing: "0.4px", conFill: "rgba(186, 230, 253, 0.55)",
-                        starFont: 6.5, starWeight: 400, starFill: "rgba(186, 230, 253, 0.6)",
-                        starDx: 4, starDy: -2,
-                        shadow: "rgba(0, 0, 0, 0.8)", shadowBlur: 2,
-                    };
-                    const zk = Math.max(0.5, Number(overlayState.zoom) || 1.0);
-                    ctx.save();
-                    ctx.font = `${LABEL_STYLE.conWeight} ${LABEL_STYLE.conFont / zk}px Inter, system-ui, sans-serif`;
-                    if ("letterSpacing" in ctx) ctx.letterSpacing = LABEL_STYLE.conSpacing;
-                    ctx.textAlign = "center";
+                // 3. Labels (no boxes). LABEL_STYLE sizes are in OUTPUT pixels of the OBS source; they are divided by
+                // the effective on-screen scale kd (viewport CSS zoom) so they stay the same size at any zoom.
+                const LABEL_STYLE = {
+                    conPx: 17, conWeight: 600, conFill: "rgba(240, 248, 255, 0.85)", conSpacing: 0.5,
+                    starPx: 13.5, starWeight: 500, starFill: "rgba(255, 244, 220, 0.85)", starDx: 7, starDy: -3,
+                    planetPx: 13.5, planetWeight: 600, planetFill: "rgba(255, 236, 190, 0.92)", planetDot: 3.5,
+                    dsoPx: 13.5, dsoWeight: 500, dsoFill: "rgba(196, 230, 255, 0.9)", dsoR: 5,
+                    outlinePx: 1.5, outline: "rgba(0, 0, 0, 0.8)", shadow: "rgba(0, 0, 0, 0.45)", shadowPx: 3,
+                };
+                let kd = 1;
+                try {
+                    const m = new DOMMatrix(getComputedStyle(viewport).transform);
+                    kd = Math.hypot(m.a, m.b) || 1;
+                } catch (e) { kd = Number(overlayState.zoom) || 1; }
+                kd = Math.max(0.2, kd);
+                const lp = (outPx) => outPx / kd; // output px -> canvas units
+                const nightLabel = (c) => (isNight ? colors.labelText : c);
+                function drawLabel(txt, x, y, px, weight, fill, align, spacing) {
+                    ctx.font = `${weight} ${lp(px)}px Inter, system-ui, sans-serif`;
+                    if ("letterSpacing" in ctx) ctx.letterSpacing = spacing ? `${lp(spacing)}px` : "0px";
+                    ctx.textAlign = align;
                     ctx.textBaseline = "middle";
+                    ctx.lineJoin = "round";
+                    ctx.lineWidth = lp(LABEL_STYLE.outlinePx * 2);
+                    ctx.strokeStyle = LABEL_STYLE.outline;
                     ctx.shadowColor = LABEL_STYLE.shadow;
-                    ctx.shadowBlur = LABEL_STYLE.shadowBlur / zk;
+                    ctx.shadowBlur = lp(LABEL_STYLE.shadowPx);
+                    ctx.strokeText(txt, x, y);
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = nightLabel(fill);
+                    ctx.fillText(txt, x, y);
+                }
 
+                if (showLabels && catalog.constellations) {
+                    ctx.save();
                     catalog.constellations.forEach((c) => {
                         if (c.ra !== undefined && c.dec !== undefined) {
                             const p = projectRaDecToCanvas(c.ra, c.dec);
-                            if (p.visible) {
-                                ctx.fillStyle = LABEL_STYLE.conFill;
-                                ctx.fillText(c.name || c.id, p.x, p.y);
-                            }
+                            if (p.visible) drawLabel(c.name || c.id, p.x, p.y, LABEL_STYLE.conPx, LABEL_STYLE.conWeight, LABEL_STYLE.conFill, "center", LABEL_STYLE.conSpacing);
                         }
                     });
-
                     if (catalog.bright_stars) {
-                        ctx.font = `${LABEL_STYLE.starWeight} ${LABEL_STYLE.starFont / zk}px Inter, system-ui, sans-serif`;
-                        if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
-                        ctx.textAlign = "left";
-                        ctx.fillStyle = LABEL_STYLE.starFill;
                         catalog.bright_stars.forEach((s) => {
                             if (s.name && Number(s.mag || 3.0) <= 2.2) {
                                 const p = projectRaDecToCanvas(s.ra, s.dec);
-                                if (p.visible) {
-                                    ctx.fillText(s.name, p.x + LABEL_STYLE.starDx / zk, p.y + LABEL_STYLE.starDy / zk);
-                                }
+                                if (p.visible) drawLabel(s.name, p.x + lp(LABEL_STYLE.starDx), p.y + lp(LABEL_STYLE.starDy), LABEL_STYLE.starPx, LABEL_STYLE.starWeight, LABEL_STYLE.starFill, "left", 0);
                             }
                         });
                     }
+                    ctx.restore();
+                }
+
+                // 3b. Deep-sky objects (Messier), independent of sky_labels
+                if (showDso && catalog.messier) {
+                    ctx.save();
+                    catalog.messier.forEach((o) => {
+                        const p = projectRaDecToCanvas(o.ra, o.dec);
+                        if (!p.visible) return;
+                        const r = lp(LABEL_STYLE.dsoR);
+                        ctx.lineWidth = lp(1.5);
+                        ctx.strokeStyle = nightLabel(LABEL_STYLE.dsoFill);
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
+                        ctx.stroke();
+                        drawLabel(o.id, p.x + r + lp(4), p.y, LABEL_STYLE.dsoPx, LABEL_STYLE.dsoWeight, LABEL_STYLE.dsoFill, "left", 0);
+                    });
                     ctx.restore();
                 }
 
@@ -955,6 +996,24 @@
                         ctx.shadowBlur = 4;
                         ctx.fillText(`${b.label} (${pt.alt.toFixed(0)}°)`, pt.x + b.r + 8, pt.y + 5);
                         ctx.shadowBlur = 0;
+                    });
+                    ctx.restore();
+
+                    // Naked-eye planets (server alt/az, refreshed every 60 s)
+                    ctx.save();
+                    skyBodies.forEach((b) => {
+                        if (b.alt <= 0) return;
+                        const pt = projectAltAzToCanvas(b.alt, b.az);
+                        if (!pt.visible) return;
+                        const r = lp(LABEL_STYLE.planetDot);
+                        ctx.fillStyle = nightLabel(LABEL_STYLE.planetFill);
+                        ctx.strokeStyle = LABEL_STYLE.outline;
+                        ctx.lineWidth = lp(LABEL_STYLE.outlinePx);
+                        ctx.beginPath();
+                        ctx.arc(pt.x, pt.y, r, 0, 2 * Math.PI);
+                        ctx.stroke();
+                        ctx.fill();
+                        drawLabel(b.name, pt.x + r + lp(5), pt.y, LABEL_STYLE.planetPx, LABEL_STYLE.planetWeight, LABEL_STYLE.planetFill, "left", 0);
                     });
                     ctx.restore();
                 }
