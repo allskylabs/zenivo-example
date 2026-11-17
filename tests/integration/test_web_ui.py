@@ -81,6 +81,12 @@ class TestWebUIStaticAssets:
         assert 'href="/community"' in res.text and 'aria-current="page"' in res.text
         assert web_client.get("/static/community.js").status_code == 200
 
+    def test_overhead_page_is_public_and_has_nav(self, web_client):
+        res = web_client.get("/overhead")
+        assert res.status_code == 200
+        assert 'href="/overhead"' in res.text and 'aria-current="page"' in res.text
+        assert web_client.get("/static/overlay_decode.js").status_code == 200
+
     def test_serve_index_html_direct(self, web_client):
         res = web_client.get("/index.html")
         assert res.status_code == 200

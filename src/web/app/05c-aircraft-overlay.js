@@ -44,32 +44,10 @@ function sendIdle() {
     if (state.ws && state.ws.readyState === 1) state.ws.send(JSON.stringify({ action: "idle", on: document.hidden }));
 }
 document.addEventListener("visibilitychange", sendIdle);
-// Packed pushes ({type:"ov"}, src/api/overlay_pack.py): rows as arrays in this field order, only the rows that changed.
-// Rebuilt here into the same objects the REST endpoints return, so the drawing code has one shape to deal with.
-const OVERLAY_FIELDS = {
-    aircraft: ["icao", "callsign", "altitude_m", "speed_kmh", "heading_deg", "climb_m_min", "az_deg", "alt_deg", "distance_km", "fx", "fy", "vx", "vy", "fl"],
-    satellites: ["norad", "name", "height_km", "az_deg", "alt_deg", "fx", "fy", "fl"],
-    sondes: ["serial", "type", "altitude_m", "climb_m_s", "az_deg", "alt_deg", "distance_km", "fx", "fy", "vx", "vy", "fl"],
-};
-const overlayStore = {};   // layer -> { rows: Map(id -> object), meta: {} }
+// Packed pushes ({type:"ov"}, src/api/overlay_pack.py): decoded by the shared /static/overlay_decode.js (also used by the Overhead page)
 function applyPackedOverlay(msg) {
-    const fields = OVERLAY_FIELDS[msg.l];
-    if (!fields) return;
-    let st = overlayStore[msg.l];
-    if (msg.f || !st) st = overlayStore[msg.l] = { rows: new Map(), meta: {} };
-    Object.entries(msg.m || {}).forEach(([k, v]) => { if (v === null) delete st.meta[k]; else st.meta[k] = v; });
-    (msg.x || []).forEach((id) => st.rows.delete(id));
-    (msg.u || []).forEach((r) => {
-        const o = {};
-        fields.forEach((f, i) => { o[f] = r[i]; });
-        if (o.fx != null && o.fy != null) o.frame_xy = [o.fx / 10000, o.fy / 10000];
-        if (o.vx != null && o.vy != null) o.frame_v = [o.vx / 10000, o.vy / 10000];
-        o.in_view = !!(o.fl & 1); o.above_horizon = !!(o.fl & 2); o.visible = !!(o.fl & 4);
-        st.rows.set(r[0], o);
-    });
-    const list = [...st.rows.values()];
-    if (msg.l === "aircraft") list.sort((a, b) => (a.distance_km ?? 1e9) - (b.distance_km ?? 1e9));
-    applyOverlayPush(msg.l, { ...st.meta, t: msg.t, [msg.l]: list });
+    const d = window.ZenivoOverlay && window.ZenivoOverlay.apply(msg);
+    if (d) applyOverlayPush(msg.l, d);
 }
 function applyOverlayPush(layer, d) {
     overlayPush.at[layer] = Date.now();

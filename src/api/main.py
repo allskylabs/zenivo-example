@@ -197,6 +197,11 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
         def serve_section_page():
             return page_shell()
 
+        # Overhead lists (aircraft, satellites, radiosondes) with a small sky radar; public like the Live page
+        @app.get("/overhead")
+        def serve_overhead():
+            return read_page("overhead.html")
+
         # 3D map of the aircraft the ADS-B receiver hears (standalone page; loads MapLibre + three.js)
         @app.get("/flights3d")
         def serve_flights3d():

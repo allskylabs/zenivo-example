@@ -13,7 +13,7 @@ import re
 import sys
 
 WEB = os.path.join(os.path.dirname(__file__), "..", "src", "web")
-PAGES = {"index.html": None, "sky.html": "/sky", "flights3d.html": "/flights3d", "satellites3d.html": "/satellites3d",
+PAGES = {"index.html": None, "sky.html": "/sky", "overhead.html": "/overhead", "flights3d.html": "/flights3d", "satellites3d.html": "/satellites3d",
          "community.html": "/community", "login.html": "/login"}
 NO_NAV = {"login.html"}  # standalone page without sidebar: only head and brand are generated
 
@@ -32,6 +32,7 @@ TAGLINE = "All-sky observatory software"
 HEAD = {
     "index.html": ("Zenivo — All-sky observatory", "Zenivo: live view, calibration, sky overlay and event detection for your all-sky camera."),
     "sky.html": ("Sky view — Zenivo", "Interactive planetarium of the sky above your Zenivo all-sky station."),
+    "overhead.html": ("Overhead — Zenivo", "Aircraft, satellites and weather balloons above your all-sky station, as lists and a sky radar."),
     "flights3d.html": ("Flights 3D — Zenivo", "3D map of the aircraft your all-sky station hears over ADS-B."),
     "satellites3d.html": ("Satellites 3D — Zenivo", "3D map of the satellites above your all-sky station."),
     "login.html": ("Sign in — Zenivo", "Sign in to the admin controls of your Zenivo all-sky station."),
@@ -43,6 +44,7 @@ HEAD = {
 NAV = [
     ("Sky", [("/live", "&#9673;", "Live", "tab", "tab-live"),
              ("/sky", "&#10024;", "Sky view", "link", ""),
+             ("/overhead", "&#9737;", "Overhead", "link", ""),
              ("/flights3d", "&#9992;", "Flights 3D", "link", ""),
              ("/satellites3d", "&#128752;", "Satellites 3D", "link", ""),
              ("/community", "&#127760;", "Community", "link", "")]),
@@ -85,13 +87,14 @@ def icon(name, cls="m-svg", size=22):
             f'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{ICONS[name]}</svg>')
 
 
-# phone tab bar: Live / Sky / Overhead (= the Flights page) / Archive / Menu (the rest lives in the Menu sheet)
+# phone tab bar: Live / Sky / Overhead (= the lists page, /overhead) / Archive / Menu (the rest lives in the Menu sheet)
 MOBILE = [("/live", "camera", "Live", "/live,/,/index.html"), ("/sky", "star", "Sky", "/sky"),
-          ("/flights3d", "nav", "Overhead", "/flights3d"), ("/gallery", "calendar", "Archive", "/gallery,/logs")]
-MORE_PATHS = "/satellites3d,/community,/focus,/calibration,/settings,/obs"
+          ("/overhead", "nav", "Overhead", "/overhead"), ("/gallery", "calendar", "Archive", "/gallery,/logs")]
+MORE_PATHS = "/flights3d,/satellites3d,/community,/focus,/calibration,/settings,/obs"
 # Menu sheet groups: (title, admin-only group, [(href, icon, label, tone, admin item, new tab)])
 MENU = [
-    ("Explore", False, [("/satellites3d", "globe", "Satellites 3D", "accent", False, False),
+    ("Explore", False, [("/flights3d", "nav", "Flights 3D", "accent", False, False),
+                        ("/satellites3d", "globe", "Satellites 3D", "accent", False, False),
                         ("/community", "pin", "Community", "accent", False, False),
                         ("/logs", "clock", "Activity log", "accent", True, False)]),
     ("Camera", True, [("/focus", "search", "Focus", "violet", True, False),
