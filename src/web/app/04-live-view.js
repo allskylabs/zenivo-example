@@ -109,7 +109,11 @@ function readManualStationPayload(sourceLabel, autoPlateSolve = false) {
         azimuth_deg: oriAzInput && !isNaN(parseFloat(oriAzInput.value)) ? parseFloat(oriAzInput.value) : undefined,
         zenith_tilt_deg: oriTiltInput && !isNaN(parseFloat(oriTiltInput.value)) ? parseFloat(oriTiltInput.value) : undefined,
         north_position_angle_deg: oriNpaInput && !isNaN(parseFloat(oriNpaInput.value)) ? parseFloat(oriNpaInput.value) : undefined,
-        remote_solver_url: (document.getElementById("station-remote-solver") || { value: undefined }).value,
+        // A custom (legacy) value is not sent back: the API only accepts the listed servers, and omitting it keeps the saved one
+        remote_solver_url: (() => {
+            const el = document.getElementById("station-remote-solver");
+            return el && el.selectedOptions[0] && !el.selectedOptions[0].dataset.custom ? el.value : undefined;
+        })(),
     };
 }
 

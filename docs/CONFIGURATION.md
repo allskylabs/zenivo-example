@@ -91,7 +91,7 @@ Factory defaults (neutral station "My station" at 0, 0, IMX335 sensor, 1.65 mm f
 |-----|----------|
 | `latitude_deg`, `longitude_deg`, `elevation_m` | Station position. Defaults 0.0, 0.0, 0.0 (set your own in Settings, Station & Optics) |
 | `location_name`, `geo_source` | Display name and where the coordinates came from (`default`, `manual`, `browser_gps`, `ip_geolocation`) |
-| `remote_solver_url` | Remote blind plate solver base URL (default `https://virtuallab3d.com`; clear it to never upload). While set, a frame, the station coordinates and the time are sent to it if the local solve is not confident. Settable in Settings, Station & Optics, or `POST /api/station/settings` |
+| `remote_solver_url` | Remote blind plate solver, chosen from a list in Settings (Zenivo network `https://virtuallab3d.com`, the default, or Off = empty, never upload; no free text). While set, a frame, the station coordinates and the time are sent to it if the local solve is not confident. Settable in Settings, Station & Optics, or `POST /api/station/settings` |
 | `plate_solver_endpoint` | Informational: which solver produced the last solution |
 | `solve_source`, `solved_at`, `matched_stars_count`, `constellations_in_fov` | Result bookkeeping of the last plate solve |
 | `camera_sensor` | Sensor specification (size in pixels, pixel pitch) |

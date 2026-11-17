@@ -918,9 +918,12 @@
                                 <small class="field-note">Without GPS, your public IP address is sent to a geolocation service.</small>
                             </div>
                             <div class="field field-wide">
-                                <label for="station-remote-solver">Remote plate solver URL (optional)</label>
-                                <input type="url" id="station-remote-solver" placeholder="empty = never upload" maxlength="300" autocomplete="off" />
-                                <small class="field-note">When set, a frame, the station coordinates and the time are sent to this address to solve the plate.</small>
+                                <label for="station-remote-solver">Remote plate solver</label>
+                                <select id="station-remote-solver">
+                                    <option value="https://virtuallab3d.com" selected>Zenivo network — virtuallab3d.com</option>
+                                    <option value="">Off (never upload)</option>
+                                </select>
+                                <small class="field-note">When on, a frame, the station coordinates and the time are sent to this server to solve the plate. Choose Off to send nothing.</small>
                             </div>
                         </div>
                     </fieldset>

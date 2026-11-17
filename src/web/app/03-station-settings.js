@@ -77,7 +77,18 @@ function updateStationUI(st) {
         }
         const remoteSolverInput = document.getElementById("station-remote-solver");
         if (remoteSolverInput && document.activeElement !== remoteSolverInput && st.remote_solver_url !== undefined) {
-            remoteSolverInput.value = st.remote_solver_url || "";
+            const ru = st.remote_solver_url || "";
+            let custom = remoteSolverInput.querySelector("option[data-custom]");
+            if (custom) custom.remove();
+            if (ru !== "" && ru !== "https://virtuallab3d.com") {
+                // A value saved earlier that is not in the list: show it read-only so it is not silently lost
+                custom = document.createElement("option");
+                custom.dataset.custom = "1";
+                custom.value = ru;
+                custom.textContent = "Custom: " + ru;
+                remoteSolverInput.appendChild(custom);
+            }
+            remoteSolverInput.value = ru;
         }
         if (oriNpaInput && document.activeElement !== oriNpaInput && ori.north_position_angle_deg !== undefined) {
             oriNpaInput.value = Number(ori.north_position_angle_deg).toFixed(2);
