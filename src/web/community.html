@@ -18,7 +18,7 @@
     <meta property="og:image" content="/static/brand/og-image.png">
     <meta name="twitter:card" content="summary_large_image">
     <script src="/static/auth.js?v=1"></script>
-    <script src="/static/brand/version.js?v=2" defer></script>
+    <script src="/static/brand/version.js?v=3" defer></script>
     <!-- head-brand:end -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
@@ -33,7 +33,7 @@
         body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-sans); }
         .app-shell { min-height: 100vh; }
         .community { flex: 1; min-height: 0; display: flex; }
-        #cmap-wrap { position: relative; flex: 1; min-width: 0; isolation: isolate; }
+        #cmap-wrap { scroll-margin-top: 64px; position: relative; flex: 1; min-width: 0; isolation: isolate; }
         #cmap { position: absolute; inset: 0; background: var(--bg-primary); }
         #cmap .leaflet-popup-content-wrapper, #cmap .leaflet-popup-tip { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); }
         #cmap .leaflet-container a { color: var(--accent); }
@@ -198,6 +198,6 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="/static/community.js?v=3"></script>
+    <script src="/static/community.js?v=5"></script>
 </body>
 </html>

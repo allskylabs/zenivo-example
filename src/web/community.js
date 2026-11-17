@@ -57,7 +57,7 @@
     }).setView([20, 10], 2);
     // The whole world must fit the box, also on a phone: the lowest zoom is the one that shows it all (not a fixed 2)
     function fitMinZoom() {
-        const z = Math.max(0.5, map.getBoundsZoom(L.latLngBounds([-60, -180], [80, 180]), true));
+        const z = Math.max(0.5, map.getBoundsZoom(L.latLngBounds([-58, -180], [83, 180]), false));
         map.setMinZoom(z);
         if (map.getZoom() < z) map.setZoom(z);
     }
@@ -276,7 +276,7 @@
                     html: `<span class="cm-dot ${st}${isOwn ? " own" : ""}"></span>` }),
                 title: `${String(card.name || "Station")} (${st})`, keyboard: true,
             }).addTo(layer);
-            marker.bindPopup(() => popupFor(card, isOwn), { maxWidth: 340, keepInView: true, autoPanPaddingTopLeft: [16, 24], autoPanPaddingBottomRight: [16, 24] });
+            marker.bindPopup(() => popupFor(card, isOwn), { maxWidth: 340, keepInView: true, autoPanPaddingTopLeft: [16, 76], maxHeight: Math.max(220, Math.min(460, window.innerHeight - 200)), autoPanPaddingBottomRight: [16, 24] });
             pts.push([card.lat, card.lon]);
             const item = el("li");
             const btn = el("button");

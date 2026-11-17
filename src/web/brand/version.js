@@ -24,7 +24,10 @@
                 var n = c && typeof c.location_name === "string" ? c.location_name.trim().slice(0, 60) : "";
                 if (!n || n === "My station" || n === "GPS Station" || n === "Auto-Detected Station") return;
                 document.querySelectorAll(".brand-name").forEach(function (el) { el.textContent = n; el.title = "Zenivo station: " + n; });
-                if (!/ · Zenivo$/.test(document.title)) document.title = document.title.replace(/\s*[—-]\s*Zenivo.*$/, "") + " · " + n + " · Zenivo";
+                if (!/ · Zenivo$/.test(document.title)) {
+                    var page = /^Zenivo\b/.test(document.title) ? "" : document.title.replace(/\s*[—-]\s*Zenivo.*$/, "");
+                    document.title = (page ? page + " · " : "") + n + " · Zenivo";
+                }
             })
             .catch(function () { });
     }
