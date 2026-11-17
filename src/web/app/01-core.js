@@ -215,7 +215,7 @@ function setStationTz(info) {
     STATION_UTC_OFFSET_MIN = info.offset_min;
     tzLabel = makeTzLabel();
 }
-fetch("/api/station/config").then((r) => (r.ok ? r.json() : null)).then((st) => { if (st) setStationTz(st.timezone_info); }).catch(() => {});
+(window.zenivoStationConfig ? window.zenivoStationConfig() : fetch("/api/station/config").then((r) => (r.ok ? r.json() : null))).then((st) => { if (st) setStationTz(st.timezone_info); }).catch(() => {});
 function fmtLocalIso(iso, timeOnly) {
     const d = new Date(iso);
     if (isNaN(d)) return iso || "";

@@ -14,12 +14,17 @@
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fill); else fill();
 })();
 
+/* One shared /api/station/config request per page load (the name here, the time zone in 01-core.js). */
+window.zenivoStationConfig = function () {
+    if (!window.__zsc) window.__zsc = fetch("/api/station/config", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+    return window.__zsc;
+};
+
 /* A station that has a name of its own shows it in the header and the tab title ("Hanoi" / "Live — Hanoi · Zenivo"). */
 (function () {
     function apply() {
         if (!window.fetch) return;
-        fetch("/api/station/config", { cache: "no-store" })
-            .then(function (r) { return r.ok ? r.json() : null; })
+        window.zenivoStationConfig()
             .then(function (c) {
                 var n = c && typeof c.location_name === "string" ? c.location_name.trim().slice(0, 60) : "";
                 if (!n || n === "My station" || n === "GPS Station" || n === "Auto-Detected Station") return;
