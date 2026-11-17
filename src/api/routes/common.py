@@ -15,6 +15,8 @@ _sat_cache = TTLCache(ttl_s=5.0, max_size=64)
 _traffic_cache = TTLCache(ttl_s=15.0, max_size=64)
 _dayobj_cache = TTLCache(ttl_s=15.0, max_size=64)
 _frame_near_cache = TTLCache(ttl_s=10.0, max_size=128)
+_sky_cache = TTLCache(ttl_s=60.0, max_size=128)
+_acinfo_cache = TTLCache(ttl_s=5.0, max_size=256)
 _dark_preview_cache = TTLCache(ttl_s=30.0, max_size=16)
 
 GUEST_MAX_RANGE_S = 24 * 3600.0

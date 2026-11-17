@@ -1,0 +1,63 @@
+/* Data-backed UI from the phone mockups: layer "Overlay text", Admin system tiles, event Copy/Delete, Sky page Sun/Moon/Planets cards.
+ * Kept in its own file (imported last in style.css). Colours come from tokens.css so Red Vision works unchanged. */
+
+/* ---- Live picture: "Overlay text" off hides the capture-info box (the sidereal-time line is skipped in drawReticle) ---- */
+.viewport-wrapper.no-otext > .frame-info { display: none; }
+
+/* ---- Event viewer: Copy link / Delete ---- */
+.ev-actions .ev-del { border-color: color-mix(in srgb, var(--danger) 55%, transparent); color: var(--danger); }
+.ev-actions .ev-del[data-armed="1"] { background: var(--danger); color: #fff; }
+.ev-actions-note { margin: 2px 0 0; text-align: center; font-size: 12px; color: var(--text-secondary); }
+:root.is-admin .ev-actions-note { display: none; }
+
+/* ---- Settings -> Admin: system tiles ---- */
+.adm-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+.adm-tile { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: var(--radius-tile); background: var(--bg-card-sub); border: 1px solid var(--border-color); }
+.adm-tile span { font-size: 12px; color: var(--text-secondary); }
+.adm-tile b { font-family: var(--font-num); font-size: 24px; line-height: 1.1; color: var(--text-primary); }
+.adm-tile small { font-size: 11px; color: var(--text-muted); min-height: 1em; }
+.adm-bar { display: block; height: 4px; border-radius: 2px; background: var(--divider); overflow: hidden; }
+.adm-bar u { display: block; height: 100%; width: 0; border-radius: 2px; background: var(--success); text-decoration: none; transition: width 0.4s; }
+.adm-tile.warn .adm-bar u { background: var(--warning); }
+.adm-tile.crit .adm-bar u { background: var(--danger); }
+@media (prefers-reduced-motion: reduce) { .adm-bar u { transition: none; } }
+
+/* ---- Sky page: Sun & Moon / Planets ---- */
+.skl-btn { position: absolute; z-index: 30; right: 12px; top: 12px; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border-color); background: color-mix(in srgb, var(--bg-card) 90%, transparent); color: var(--text-primary); font: 600 13px var(--font-sans); cursor: pointer; backdrop-filter: blur(6px); }
+.skl-btn[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+.skl-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.skl-panel { position: absolute; z-index: 29; right: 12px; top: 56px; width: min(360px, calc(100% - 24px)); max-height: calc(100% - 72px); overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.skl-panel[hidden] { display: none; }
+.skl-card { padding: 16px; border-radius: var(--radius-card); background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); font-family: var(--font-sans); }
+.skl-card h2 { margin: 0 0 12px; font-size: 16px; font-weight: 700; }
+.skl-msg { padding: 14px; border-radius: var(--radius-card); background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 13px; }
+.skl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.skl-tile { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 12px; border-radius: var(--radius-tile); background: var(--bg-card-sub); border: 1px solid var(--border-color); min-width: 0; }
+.skl-k { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 4px; }
+.skl-l { font-size: 12px; color: var(--text-secondary); }
+.skl-tile b { font-family: var(--font-num); font-size: 18px; font-weight: 700; }
+.skl-row { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.skl-row b { font-size: 14px; }
+.skl-ph { font-size: 14px; }
+.skl-sub { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+.skl-moon { position: absolute; right: 10px; top: 8px; }
+.skl-moon-dark { fill: color-mix(in srgb, var(--text-muted) 40%, var(--bg-card-sub)); }
+.skl-moon-lit { fill: #f3e9c6; }
+.skl-list { list-style: none; margin: 0; padding: 0; }
+.skl-planet { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--divider); }
+.skl-planet:first-child { border-top: 0; }
+.skl-dot { flex: none; width: 36px; height: 36px; border-radius: 12px; background: var(--bg-card-sub); position: relative; }
+.skl-dot::after { content: ""; position: absolute; inset: 12px; border-radius: 50%; background: var(--c, #e2e8f0); }
+.skl-venus { --c: #fbbf24; }
+.skl-mars { --c: #ef4444; }
+.skl-jupiter { --c: #a78bfa; }
+.skl-saturn { --c: #f1f5f9; }
+.skl-pt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.skl-pt b { font-size: 15px; }
+.skl-pt small { font-size: 12px; color: var(--text-secondary); }
+.skl-tag { font-size: 13px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
+.skl-tag.ok { color: var(--success); }
+@media (max-width: 700px) {
+    .skl-btn { top: auto; bottom: 12px; right: 12px; }
+    .skl-panel { top: 12px; right: 12px; bottom: 56px; max-height: none; }
+}

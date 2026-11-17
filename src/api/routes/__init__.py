@@ -11,7 +11,7 @@ from src.api.routes.common import (
     GUEST_MAX_RANGE_S, GUEST_MAX_SAT_IDS, GUEST_MAX_TRAIL_S, _TS_MIN, _TS_MAX, _NO_STORE,
 )
 # Importing the modules registers their routes (the order is the route registration order)
-from src.api.routes import camera, calibration, station, live, focus, gallery, flights, system, community  # noqa: F401
+from src.api.routes import camera, calibration, station, live, focus, gallery, flights, system, sky, community  # noqa: F401
 
 __all__ = [
     "router", "get_service", "public_view", "_view_for_request", "_check_ts", "_check_range",

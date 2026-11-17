@@ -3,7 +3,7 @@ ADS-B, traffic, day objects, radiosondes, satellites and map endpoints.
 """
 
 from typing import Optional
-from fastapi import HTTPException, Query, Request, status, Depends
+from fastapi import HTTPException, Path, Query, Request, status, Depends
 
 from src.api.schemas import (
     AdsbConfigRequest,
@@ -12,7 +12,7 @@ from src.api.schemas import (
     WeatherSettingsRequest,
 )
 from src.api.service import AllSkyService
-from src.api.routes.common import (router, get_service, public_view, _check_range, _sat_cache, _traffic_cache, _dayobj_cache, GUEST_MAX_SAT_IDS, GUEST_MAX_TRAIL_S)
+from src.api.routes.common import (router, get_service, public_view, _check_range, _sat_cache, _traffic_cache, _dayobj_cache, _acinfo_cache, GUEST_MAX_SAT_IDS, GUEST_MAX_TRAIL_S)
 
 
 @router.get("/api/adsb")
@@ -112,6 +112,16 @@ def get_radiosondes(limit: int = Query(default=40, ge=1, le=200),
     return public_view(request, service, service.get_radiosondes_now(limit=limit))
 
 
+@router.get("/api/adsb/info/{icao}")
+def get_adsb_aircraft_info(icao: str = Path(pattern=r"^[0-9A-Fa-f]{6}$"),
+                           callsign: str = Query(default="", pattern=r"^[A-Za-z0-9]{0,8}$"),
+                           service: AllSkyService = Depends(get_service)):
+    """Type, registration, airline and route of one aircraft (tap card on the live picture). Unknown parts are
+    looked up in the background, so an empty answer is worth one retry after a few seconds."""
+    key = (icao.upper(), callsign.upper())
+    return _acinfo_cache.get_or_compute(key, lambda: service.get_aircraft_info(key[0], key[1]))
+
+
 @router.get("/api/adsb/flight/{fr24_id}")
 def get_adsb_flight_detail(fr24_id: str, service: AllSkyService = Depends(get_service)):
     """Full Flightradar24 flight detail and complete historical trail from departure airport."""
@@ -155,6 +165,12 @@ def get_map_config(service: AllSkyService = Depends(get_service)):
 def get_map_airports(service: AllSkyService = Depends(get_service)):
     """Airports and runways around the station (OurAirports, public domain) for the 3D flights map."""
     return service.get_airports()
+
+
+@router.get("/api/map/airports/frame")
+def get_map_airports_frame(service: AllSkyService = Depends(get_service)):
+    """Airports inside the camera picture (frame fractions + ICAO/IATA) for the Airports layer on the live view."""
+    return _acinfo_cache.get_or_compute(("airports-frame",), service.get_airports_frame)
 
 
 @router.post("/api/adsb")

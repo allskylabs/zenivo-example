@@ -28,6 +28,9 @@ eventViewer.innerHTML = `
         <div class="ev-actions">
             <a class="btn btn-sm btn-outline ev-open-crop" download rel="noopener">Download close-up</a>
             <a class="btn btn-sm btn-outline ev-open-sky" download rel="noopener">Download whole sky</a>
+            <button type="button" class="btn btn-sm btn-outline ev-copy">Copy link</button>
+            <button type="button" class="btn btn-sm btn-outline ev-del" data-admin>Delete</button>
+            <p class="ev-actions-note ev-phone-only">Delete is available to admins only</p>
         </div>
     </div>`;
 document.body.appendChild(eventViewer);
@@ -75,7 +78,56 @@ function showEvent(i) {
     oc.hidden = !crop; os.hidden = !ev.sky_url;
     if (crop) oc.href = crop;
     if (ev.sky_url) os.href = ev.sky_url;
-    evQ(".ev-actions").hidden = oc.hidden && os.hidden;
+    evDelDisarm();
+    evQ(".ev-copy").textContent = "Copy link";
+}
+
+// Deep link to one event: /gallery?event=<id> (the page opens it in this viewer)
+const evLink = (ev) => `${location.origin}/gallery?event=${encodeURIComponent(ev.event_id)}`;
+let evDelTimer = null;
+function evDelDisarm() {
+    clearTimeout(evDelTimer);
+    const b = evQ(".ev-del");
+    b.dataset.armed = "";
+    b.textContent = "Delete";
+}
+async function evCopyLink() {
+    const ev = evList[evIndex], b = evQ(".ev-copy");
+    if (!ev || !ev.event_id) return;
+    const url = evLink(ev);
+    try {
+        await navigator.clipboard.writeText(url);
+        b.textContent = "Link copied";
+    } catch (e) {
+        window.prompt("Copy this link", url);   // clipboard blocked (plain http): let the person copy it by hand
+    }
+    setTimeout(() => { b.textContent = "Copy link"; }, 2000);
+}
+async function evDelete() {
+    const ev = evList[evIndex], b = evQ(".ev-del");
+    if (!ev || !ev.event_id) return;
+    if (!b.dataset.armed) {   // first tap asks, second (within 4 s) deletes
+        b.dataset.armed = "1";
+        b.textContent = "Tap again to delete";
+        evDelTimer = setTimeout(evDelDisarm, 4000);
+        return;
+    }
+    evDelDisarm();
+    b.disabled = true;
+    try {
+        const res = await fetch(`/api/events/${encodeURIComponent(ev.event_id)}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(res.status === 401 || res.status === 403 ? "Sign in as admin" : `HTTP ${res.status}`);
+        [evList, tableEvents, liveEventsData].forEach((arr) => {
+            const k = arr.findIndex((x) => x.event_id === ev.event_id);
+            if (k >= 0) arr.splice(k, 1);
+        });
+        if (evList.length) showEvent(Math.min(evIndex, evList.length - 1)); else closeEventViewer();
+        if (typeof loadEvents === "function" && document.getElementById("day-list")) loadEvents();
+        if (typeof loadLiveEvents === "function" && document.getElementById("live-events-list")) loadLiveEvents();
+    } catch (err) {
+        b.textContent = `Not deleted: ${err.message}`;
+        setTimeout(() => { b.textContent = "Delete"; }, 3000);
+    } finally { b.disabled = false; }
 }
 
 function openEventViewer(list, i) {
@@ -88,6 +140,8 @@ function openEventViewer(list, i) {
 }
 
 function closeEventViewer() {
+    const u = new URL(location.href);
+    if (u.searchParams.has("event")) { u.searchParams.delete("event"); history.replaceState(null, "", u.pathname + u.search + u.hash); }
     eventViewer.classList.add("hidden");
     document.body.classList.remove("no-scroll");
     eventViewer.querySelectorAll("img").forEach((im) => im.removeAttribute("src"));
@@ -95,6 +149,8 @@ function closeEventViewer() {
 
 eventViewer.addEventListener("click", (e) => {
     if (e.target === eventViewer || e.target.closest(".ev-close") || e.target.closest(".ev-back")) closeEventViewer();
+    else if (e.target.closest(".ev-copy")) evCopyLink();
+    else if (e.target.closest(".ev-del")) evDelete();
     else if (e.target.closest(".ev-prev")) showEvent(evIndex - 1);
     else if (e.target.closest(".ev-next")) showEvent(evIndex + 1);
 });
@@ -116,6 +172,13 @@ eventViewer.addEventListener("touchend", (e) => {
 
 let tableEvents = [];
 let liveEventsData = [];
+
+// ?event=<id> in the address opens that event (shared with "Copy link")
+(function openLinkedEvent() {
+    const id = new URLSearchParams(location.search).get("event");
+    if (!id || !/^[a-z]+_\d{8}_\d{6}_\d{3}$/.test(id)) return;
+    fetch(`/api/events/${id}`).then((r) => (r.ok ? r.json() : null)).then((ev) => { if (ev) openEventViewer([ev], 0); }).catch(() => {});
+})();
 
 function eventRowHtml(ev, i) {
     const when = new Date(ev.timestamp);

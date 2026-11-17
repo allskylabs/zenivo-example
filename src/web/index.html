@@ -25,7 +25,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
-    <link rel="stylesheet" href="/style.css?v=20261124a">
+    <link rel="stylesheet" href="/style.css?v=20261124c">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -1333,6 +1333,15 @@
                     <h2>Admin</h2>
                 </div>
                 <div class="settings-grid">
+                    <fieldset class="settings-group adm-sys" id="admin-system">
+                        <legend>System</legend>
+                        <div class="adm-tiles" role="group" aria-label="Host load">
+                            <div class="adm-tile" data-k="cpu"><span>CPU</span><b>--</b><i class="adm-bar"><u></u></i></div>
+                            <div class="adm-tile" data-k="ram"><span>RAM</span><b>--</b><i class="adm-bar"><u></u></i><small></small></div>
+                            <div class="adm-tile" data-k="disk"><span>Disk</span><b>--</b><i class="adm-bar"><u></u></i><small></small></div>
+                            <div class="adm-tile" data-k="temp"><span>Temp</span><b>--</b><i class="adm-bar"><u></u></i></div>
+                        </div>
+                    </fieldset>
                     <fieldset class="settings-group">
                         <legend>Public location precision</legend>
                         <p class="field-note">Visitors who are not signed in, and the community card, see the station location rounded to this grid. You always see the exact location.</p>
@@ -1755,10 +1764,13 @@
         <div class="lay-row"><div class="lay-txt"><b>Aircraft</b><small id="lay-sub-aircraft">--</small></div><button type="button" class="sw" role="switch" aria-checked="false" data-chk="chk-aircraft-overlay" aria-label="Aircraft"><i></i></button></div>
         <div class="lay-row"><div class="lay-txt"><b>Satellites</b><small id="lay-sub-satellites">--</small></div><button type="button" class="sw" role="switch" aria-checked="false" data-chk="chk-satellite-overlay" aria-label="Satellites"><i></i></button></div>
         <div class="lay-row"><div class="lay-txt"><b>Radiosondes</b><small id="lay-sub-sondes">--</small></div><button type="button" class="sw" role="switch" aria-checked="false" data-chk="chk-sonde-overlay" aria-label="Radiosondes"><i></i></button></div>
+        <div class="lay-row"><div class="lay-txt"><b>Airports</b><small>ICAO markers near the horizon</small></div><button type="button" class="sw" role="switch" aria-checked="false" data-chk="chk-airports-overlay" aria-label="Airports"><i></i></button></div>
+        <h3 class="m-sheet-title">Picture</h3>
+        <div class="lay-row"><div class="lay-txt"><b>Overlay text</b><small>time, exposure and sidereal time on the picture</small></div><button type="button" class="sw" role="switch" aria-checked="true" data-chk="chk-overlay-text" aria-label="Overlay text"><i></i></button></div>
         <p class="lay-note">The lists stay live even when a layer is hidden.</p>
         <div hidden>
             <input type="checkbox" id="chk-sky-overlay"><input type="checkbox" id="chk-sky-labels"><input type="checkbox" id="chk-grid-overlay"><input type="checkbox" id="chk-eq-grid">
-            <input type="checkbox" id="chk-aircraft-overlay"><input type="checkbox" id="chk-sonde-overlay"><input type="checkbox" id="chk-satellite-overlay">
+            <input type="checkbox" id="chk-aircraft-overlay"><input type="checkbox" id="chk-sonde-overlay"><input type="checkbox" id="chk-satellite-overlay"><input type="checkbox" id="chk-airports-overlay"><input type="checkbox" id="chk-overlay-text" checked>
         </div>
     </div>
 
@@ -1771,21 +1783,21 @@
     <script src="/static/focus/controls.js?v=20261115a"></script>
     <script src="/static/focus/lens.js?v=20261115a"></script>
     <script src="/static/overlay_decode.js?v=1"></script>
-    <script defer src="/static/app/01-core.js?v=20261118a"></script>
-    <script defer src="/static/app/02-controls-calibration.js?v=20261124a"></script>
-    <script defer src="/static/app/03-station-settings.js?v=20261124a"></script>
+    <script defer src="/static/app/01-core.js?v=20261124c"></script>
+    <script defer src="/static/app/02-controls-calibration.js?v=20261124c"></script>
+    <script defer src="/static/app/03-station-settings.js?v=20261124c"></script>
     <script defer src="/static/app/04-live-view.js?v=20261123g"></script>
     <script defer src="/static/app/05-sky-overlay.js?v=20261115a"></script>
-    <script defer src="/static/app/05b-sky-reticle.js?v=20261118a"></script>
-    <script defer src="/static/app/05c-aircraft-overlay.js?v=20261120a"></script>
+    <script defer src="/static/app/05b-sky-reticle.js?v=20261124b"></script>
+    <script defer src="/static/app/05c-aircraft-overlay.js?v=20261124b"></script>
     <script defer src="/static/app/06-telemetry.js?v=20261118a"></script>
     <script defer src="/static/app/07-cloud.js?v=20261124a"></script>
     <script defer src="/static/app/08-gallery-adsb.js?v=20261122b"></script>
-    <script defer src="/static/app/08b-events-live.js?v=20261124a"></script>
+    <script defer src="/static/app/08b-events-live.js?v=20261124c"></script>
     <script defer src="/static/app/08c-adsb-settings.js?v=20261117a"></script>
-    <script defer src="/static/app/08d-live-ui.js?v=20261123h"></script>
+    <script defer src="/static/app/08d-live-ui.js?v=20261124c"></script>
     <script defer src="/static/app/09-community.js?v=20261114b"></script>
-    <script defer src="/static/app/10-admin.js?v=20261117a"></script>
+    <script defer src="/static/app/10-admin.js?v=20261124b"></script>
     <script defer src="/static/settings_home.js?v=1"></script>
     <script defer src="/static/settings_layout.js?v=1"></script>
     <script>

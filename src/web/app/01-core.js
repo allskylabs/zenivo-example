@@ -47,6 +47,8 @@ const chkAircraft = document.getElementById("chk-aircraft-overlay");
 const chkSatellite = document.getElementById("chk-satellite-overlay");
 const aircraftCanvas = document.getElementById("aircraft-canvas");
 const chkSonde = document.getElementById("chk-sonde-overlay");
+const chkAirports = document.getElementById("chk-airports-overlay");
+const chkOverlayText = document.getElementById("chk-overlay-text");
 const btnRefreshFrame = document.getElementById("btn-refresh-frame");
 const btnFullscreen = document.getElementById("btn-fullscreen");
 const viewportContainer = document.getElementById("viewport-container");
@@ -400,6 +402,25 @@ if (chkSonde) {
         if (typeof sendOverlaySubscription === "function") sendOverlaySubscription();
         if (chkSonde.checked) refreshSondes(); else drawAircraft();
     });
+}
+
+if (chkAirports) {
+    chkAirports.checked = !!prefs.airportsOverlay;
+    chkAirports.addEventListener("change", () => {
+        savePrefs({ airportsOverlay: chkAirports.checked });
+        if (typeof refreshAirports === "function") refreshAirports(); else drawAircraft();
+    });
+}
+
+// "Overlay text": the capture-info box (time, exposure) and the sidereal-time line drawn on the live picture; on by default
+if (chkOverlayText) {
+    const applyText = () => {
+        if (viewportContainer) viewportContainer.classList.toggle("no-otext", !chkOverlayText.checked);
+        if (typeof drawReticle === "function") drawReticle();
+    };
+    chkOverlayText.checked = prefs.overlayText !== false;
+    chkOverlayText.addEventListener("change", () => { savePrefs({ overlayText: chkOverlayText.checked }); applyText(); });
+    if (viewportContainer) viewportContainer.classList.toggle("no-otext", !chkOverlayText.checked);
 }
 
 if (chkAircraft) {

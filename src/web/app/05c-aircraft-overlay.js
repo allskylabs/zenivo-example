@@ -115,6 +115,22 @@ function refreshSatellites() {
         .catch(() => {});
 }
 
+// Airports (OurAirports) that fall inside the picture: the server projects them like the aircraft marks
+let airportList = [], airportsAt = 0;
+function refreshAirports() {
+    if (!chkAirports || !chkAirports.checked) { drawAircraft(); return; }
+    if (document.hidden || Date.now() - airportsAt < 25000) { drawAircraft(); return; }
+    airportsAt = Date.now();
+    fetch("/api/map/airports/frame")
+        .then((r) => r.json())
+        .then((d) => {
+            airportList = (d && d.airports) || [];
+            if (d && d.ready === false) airportsAt = Date.now() - 20000;   // still downloading: ask again soon
+            drawAircraft();
+        })
+        .catch(() => {});
+}
+
 function drawAircraft() {
     if (!aircraftCanvas || !viewportContainer) return;
     const w = viewportContainer.clientWidth;
@@ -129,7 +145,8 @@ function drawAircraft() {
     const showAircraft = !!(chkAircraft && chkAircraft.checked);
     const showSat = !!(chkSatellite && chkSatellite.checked);
     const showSonde = !!(chkSonde && chkSonde.checked);
-    if (!showAircraft && !showSat && !showSonde) return;
+    const showAirports = !!(chkAirports && chkAirports.checked);
+    if (!showAircraft && !showSat && !showSonde && !showAirports) return;
 
     const st = state.station || {};
     const sensor = st.camera_sensor || {};
@@ -160,6 +177,30 @@ function drawAircraft() {
     const age = (Date.now() - aircraftFetchedAt) / 1000.0;
     const shift = aircraftT && liveFrameT != null ? liveFrameT - aircraftT : age;
     const lag = Math.max(-5, Math.min(20, shift));
+    if (showAirports) {
+        airportList.forEach((ap) => {
+            if (!ap.frame_xy) return;
+            let fx = ap.frame_xy[0], fy = ap.frame_xy[1];
+            if (mirrorX) fx = 1 - fx;
+            if (mirrorY) fy = 1 - fy;
+            const x = offsetX + fx * renderW;
+            const y = offsetY + fy * renderH;
+            ctx.strokeStyle = "rgba(134, 239, 172, 0.95)";
+            ctx.fillStyle = "rgba(134, 239, 172, 0.95)";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.stroke();
+            if (ap.type === "small" && view.zoom < 2) return;   // small airfields: marker only until zoomed in
+            ctx.save();
+            ctx.font = "10px monospace";
+            ctx.shadowColor = "rgba(2, 6, 23, 0.95)";
+            ctx.shadowBlur = 4;
+            ctx.textAlign = x > offsetX + renderW * 0.8 ? "right" : "left";
+            ctx.fillText(ap.icao, x + (ctx.textAlign === "left" ? 8 : -8), y);
+            ctx.restore();
+        });
+    }
     if (showSat) {
         satelliteList.forEach((sat) => {
             if (!sat.frame_xy || !sat.in_view) return;
@@ -245,6 +286,11 @@ function drawAircraft() {
         ctx.shadowBlur = 0;
     });
     ctx.restore();
+}
+
+if (chkAirports && currentPage === "tab-live") {
+    setInterval(refreshAirports, 30000);
+    setTimeout(refreshAirports, 1500);
 }
 
 if (chkAircraft && currentPage === "tab-live") {
