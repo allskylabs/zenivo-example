@@ -29,6 +29,11 @@ function sendOverlaySubscription() {
     overlayPush.want = layers;
     if (state.ws && state.ws.readyState === 1 && currentPage === "tab-live") state.ws.send(JSON.stringify({ action: "subscribe", layers }));
 }
+// A hidden tab asks the server to stop pushing (pictures slow to a 30 s heartbeat, layers pause) and resumes when shown again
+function sendIdle() {
+    if (state.ws && state.ws.readyState === 1) state.ws.send(JSON.stringify({ action: "idle", on: document.hidden }));
+}
+document.addEventListener("visibilitychange", sendIdle);
 function applyOverlayPush(layer, d) {
     overlayPush.at[layer] = Date.now();
     if (layer === "events") { if (typeof loadLiveEvents === "function") loadLiveEvents(); return; }

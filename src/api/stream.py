@@ -457,12 +457,17 @@ async def _build_full_binary_packet(
     packet_type: int = 1,
     full_res: bool = False,
     client_v2: bool = False,
-) -> bytes:
-    """Capture/fetch latest telemetry, status, and JPEG and pack into a single ASB1 binary frame."""
+    last_ts: Optional[float] = None,
+) -> tuple:
+    """Capture/fetch latest telemetry, status, and JPEG and pack into a single ASB1 binary frame.
+    Returns (packet, frame_ts). With last_ts given, a frame already sent (same timestamp) is not encoded or attached again:
+    the packet then carries telemetry only (the page keeps showing the picture it has)."""
     telem = await asyncio.to_thread(service.get_telemetry)
     status = await asyncio.to_thread(service.get_status)
     jpeg_bytes = b""
     frame, frame_ts = service.get_display_frame()
+    if frame is not None and last_ts is not None and frame_ts == last_ts and not full_res:
+        frame = None
     if frame is not None:
         if full_res:
             custom_jpeg = None if client_v2 else await asyncio.to_thread(_apply_obs_transform_fallback, frame, service)
@@ -482,8 +487,11 @@ async def _build_full_binary_packet(
                     _encode_stream_jpeg, frame, int(perf["stream_max_width"]), int(perf["stream_jpeg_quality"])
                 ) or b""
                 _stream_jpeg_cache[:] = [frame, frame_ts, jpeg_bytes]
-    return pack_asb1_binary_packet(telem, status, jpeg_bytes, packet_type=packet_type, capture_ts=frame_ts)
+    return pack_asb1_binary_packet(telem, status, jpeg_bytes, packet_type=packet_type, capture_ts=frame_ts), frame_ts
 
+
+# One computation per second shared by every connected page: layer -> (monotonic time, payload)
+_overlay_cache: Dict[str, tuple] = {}
 
 # [frame object, capture timestamp, encoded JPEG] of the last frame sent to WebSocket viewers
 _stream_jpeg_cache: list = [None, -1.0, b""]
@@ -491,7 +499,7 @@ _stream_jpeg_cache: list = [None, -1.0, b""]
 
 # WebSocket messages that change state: only a signed-in admin (cookie from the handshake) may send them
 WS_MUTATING_ACTIONS = frozenset({"set_exposure", "set_gain", "set_mode", "trigger_master_dark"})
-WS_GUEST_ACTIONS = frozenset({"ping", "get_telemetry", "get_status", "subscribe"})
+WS_GUEST_ACTIONS = frozenset({"ping", "get_telemetry", "get_status", "subscribe", "idle"})
 WS_MUTATING_COMMANDS = frozenset({1, 2})  # ASC1 binary: 1 = set_mode, 2 = set_exposure + gain
 WS_AUTH_ERROR = {"type": "error", "code": "auth", "message": "Sign in as admin"}
 
@@ -568,7 +576,7 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
     may_change = can_mutate(websocket)  # admin session from the handshake cookie + same-site Origin
     try:
         if binary_mode:
-            pkt = await _build_full_binary_packet(service, packet_type=1, full_res=full_res, client_v2=client_v2)
+            pkt, first_ts = await _build_full_binary_packet(service, packet_type=1, full_res=full_res, client_v2=client_v2)
             await websocket.send_bytes(pkt)
         else:
             status_payload = await asyncio.to_thread(service.get_status)
@@ -593,13 +601,31 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
             await push_lock_state()
 
         # Background streamer task
+        idle = {"on": False}      # the page is in a hidden tab: nothing but a slow heartbeat
         async def live_streamer():
+            sent_ts = first_ts if binary_mode else None   # capture time of the picture this client already holds
+            last_sent = time.monotonic()
             while True:
+                if idle.pop("kick", False):       # the tab is visible again: send the current picture now
+                    sent_ts, last_sent = None, 0.0
                 exp_s = float(getattr(service.camera, "current_exposure_s", 0.1))
                 sleep_s = 0.45 if (full_res and not client_v2) else max(0.35, min(2.0, exp_s * 0.95))
                 await asyncio.sleep(sleep_s)
                 if binary_mode:
-                    pkt = await _build_full_binary_packet(service, packet_type=1, full_res=full_res, client_v2=client_v2)
+                    # A picture goes out once. Without a new one, only a telemetry-only packet every 5 s (30 s while hidden)
+                    # keeps the page's clock and "online" state alive; the same JPEG is never sent twice.
+                    frame_ts = service.get_display_frame()[1]
+                    new_frame = frame_ts != sent_ts or full_res
+                    if idle["on"] and time.monotonic() - last_sent < 30.0:
+                        continue
+                    if not new_frame and time.monotonic() - last_sent < 5.0:
+                        await push_lock_state()
+                        continue
+                    pkt, sent = await _build_full_binary_packet(service, packet_type=1, full_res=full_res, client_v2=client_v2,
+                                                                last_ts=None if full_res else sent_ts)
+                    if sent is not None:
+                        sent_ts = sent
+                    last_sent = time.monotonic()
                     await websocket.send_bytes(pkt)
                     await push_lock_state()
                 else:
@@ -615,10 +641,22 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
 
         # Overlay layers the page asked for ("subscribe"): pushed here instead of the page polling REST every 1.5 s
         subs: set = set()
+        subs_hold: set = set()     # what the page asked for while its tab is hidden
+        last_push: Dict[str, float] = {}
         OVERLAY_EVERY_S = {"aircraft": 1.5, "satellites": 1.5, "sondes": 3.0, "flights": 5.0, "events": 2.0, "logs": 2.0}
         admin_ws = is_admin(websocket)
 
         def overlay_payload(layer: str):
+            if layer in ("aircraft", "sondes", "flights"):
+                hit = _overlay_cache.get(layer)
+                if hit and time.monotonic() - hit[0] < 1.0:
+                    return hit[1]
+                data = _overlay_compute(layer)
+                _overlay_cache[layer] = (time.monotonic(), data)
+                return data
+            return _overlay_compute(layer)
+
+        def _overlay_compute(layer: str):
             if layer == "aircraft":
                 return service.get_aircraft_now(limit=60, trail_s=0.0, bounds=None, include_fr24=None, compact=False)
             if layer == "sondes":
@@ -636,8 +674,9 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                 track_min=0.0, below=False, limit=60, trail_s=0.0, track_ids=set()))
 
         async def overlay_pusher():
-            last: Dict[str, float] = {}
+            last = last_push
             sent_v: Dict[str, Any] = {}
+            sent_h: Dict[str, int] = {}
             while True:
                 await asyncio.sleep(0.5)
                 now = time.time()
@@ -653,7 +692,14 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                             if sent_v.get(layer) == data["v"]:
                                 continue
                             sent_v[layer] = data["v"]
-                        await websocket.send_json(view({"type": "overlay", "layer": layer, "data": data}))
+                        out = view({"type": "overlay", "layer": layer, "data": data})
+                        # Skip a push whose content equals the last one (timestamps aside): nothing moved, nothing to draw
+                        body = json.dumps(out["data"], separators=(",", ":"), sort_keys=True, default=str)
+                        h = hash(body.replace(str(data.get("t", "")), "") if isinstance(data, dict) else body)
+                        if sent_h.get(layer) == h:
+                            continue
+                        sent_h[layer] = h
+                        await websocket.send_text(json.dumps(out, separators=(",", ":"), default=str))
                     except WebSocketDisconnect:
                         raise
                     except Exception:  # a failing layer must not end the live socket; the page falls back to polling it
@@ -682,7 +728,7 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                             await asyncio.to_thread(service.set_mode, target_mode)
                         elif cmd_id == 2:  # set_exposure + gain
                             await asyncio.to_thread(service.set_exposure, float(exp_val), float(gain_val))
-                        pkt = await _build_full_binary_packet(service, packet_type=2)
+                        pkt, _ = await _build_full_binary_packet(service, packet_type=2)
                         await websocket.send_bytes(pkt)
                     continue
 
@@ -703,9 +749,22 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                     if action == "ping":
                         await websocket.send_json({"type": "pong", "timestamp": time.time()})
                     elif action == "subscribe":
-                        subs.clear()
-                        subs.update(l for l in (cmd.get("layers") or []) if l in OVERLAY_EVERY_S)
-                        await websocket.send_json({"type": "subscribed", "layers": sorted(subs)})
+                        want = {l for l in (cmd.get("layers") or []) if l in OVERLAY_EVERY_S}
+                        (subs_hold if idle["on"] else subs).clear()
+                        (subs_hold if idle["on"] else subs).update(want)
+                        last_push.clear()
+                        await websocket.send_json({"type": "subscribed", "layers": sorted(want)})
+                    elif action == "idle":   # the tab was hidden / shown again
+                        idle["on"] = bool(cmd.get("on"))
+                        if not idle["on"]:
+                            idle["kick"] = True
+                        if idle["on"]:
+                            subs_hold.update(subs)
+                            subs.clear()
+                        else:
+                            subs.update(subs_hold)
+                            subs_hold.clear()
+                            last_push.clear()
                     elif action == "get_telemetry":
                         telem = await asyncio.to_thread(service.get_telemetry)
                         await websocket.send_json(view({"type": "telemetry", "data": telem}))
@@ -718,7 +777,7 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                         gain_val = float(gain) if gain is not None else None
                         res = await asyncio.to_thread(service.set_exposure, exp, gain_val)
                         if binary_mode:
-                            pkt = await _build_full_binary_packet(service, packet_type=2)
+                            pkt, _ = await _build_full_binary_packet(service, packet_type=2)
                             await websocket.send_bytes(pkt)
                         else:
                             await websocket.send_json({"type": "exposure_result", "data": res})
@@ -726,7 +785,7 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                         gain = float(cmd.get("gain_db", 24.0))
                         res = await asyncio.to_thread(service.set_gain, gain)
                         if binary_mode:
-                            pkt = await _build_full_binary_packet(service, packet_type=2)
+                            pkt, _ = await _build_full_binary_packet(service, packet_type=2)
                             await websocket.send_bytes(pkt)
                         else:
                             await websocket.send_json({"type": "gain_result", "data": res})
@@ -734,7 +793,7 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                         mode = str(cmd.get("mode", "manual"))
                         res = await asyncio.to_thread(service.set_mode, mode)
                         if binary_mode:
-                            pkt = await _build_full_binary_packet(service, packet_type=2)
+                            pkt, _ = await _build_full_binary_packet(service, packet_type=2)
                             await websocket.send_bytes(pkt)
                         else:
                             await websocket.send_json({"type": "mode_result", "data": res})

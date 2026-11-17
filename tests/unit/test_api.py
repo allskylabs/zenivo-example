@@ -276,3 +276,20 @@ class TestStreamingAndWebSockets:
             websocket.send_text('{"action": "ping"}')
             reply = websocket.receive_json()
             assert reply["type"] == "pong"
+
+
+def test_websocket_never_resends_the_same_picture(api_client):
+    """Telemetry-only packets (no JPEG) while the camera has no new frame; a hidden tab gets only a slow heartbeat."""
+    import struct
+    with api_client.websocket_connect("/ws/live?binary=1") as websocket:
+        first = websocket.receive_bytes()
+        assert struct.unpack_from("<I", first, 88)[0] > 0 or len(first) >= 4188
+        websocket.send_text('{"action": "idle", "on": true}')
+        websocket.send_text('{"action": "ping"}')
+        seen = []
+        for _ in range(30):
+            m = websocket.receive()
+            if m.get("text") and '"pong"' in m["text"]:
+                break
+            seen.append(m)
+        assert all(not m.get("bytes") for m in seen)   # idle: no frame packets queued before the pong

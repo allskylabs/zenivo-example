@@ -475,6 +475,7 @@ function initWebSocket(isRetry) {
             state.wsConnected = true;
             overlayPush.acked = 0;
             if (typeof sendOverlaySubscription === "function") sendOverlaySubscription();
+            if (document.hidden && typeof sendIdle === "function") sendIdle();
         };
 
         ws.onmessage = (event) => {
