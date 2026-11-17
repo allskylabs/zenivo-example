@@ -55,6 +55,42 @@
         }
     });
 
+    // System tiles: host load, refreshed every 10 s while the Admin section is on screen and the tab is visible
+    const card = document.getElementById("admin-card");
+    const tiles = {};
+    document.querySelectorAll("#admin-system .adm-tile").forEach((t) => { tiles[t.dataset.k] = t; });
+    function setTile(k, pct, text, sub, warnAt) {
+        const t = tiles[k];
+        if (!t) return;
+        t.querySelector("b").textContent = text;
+        const small = t.querySelector("small");
+        if (small) small.textContent = sub || "";
+        const v = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+        t.querySelector("u").style.width = `${v}%`;
+        t.classList.toggle("warn", pct != null && pct >= warnAt && pct < 90);
+        t.classList.toggle("crit", pct != null && pct >= 90);
+    }
+    let sysBusy = false;
+    async function pollSystem() {
+        if (sysBusy || document.hidden || !card || card.offsetParent === null) return;
+        sysBusy = true;
+        try {
+            const res = await fetch("/api/system/resources", { cache: "no-store" });
+            if (!res.ok) return;
+            const d = await res.json();
+            const p = (v) => (v == null ? "--" : `${Math.round(v)}%`);
+            setTile("cpu", d.cpu_pct, p(d.cpu_pct), "", 70);
+            setTile("ram", d.ram_pct, p(d.ram_pct), d.ram_total_mb ? `${d.ram_used_mb} / ${d.ram_total_mb} MB` : "", 75);
+            setTile("disk", d.disk_pct, p(d.disk_pct), d.disk_free_gb != null ? `${d.disk_free_gb} GB free` : "", 75);
+            // the bar runs 0-90 C; a Pi throttles from 80 C
+            setTile("temp", d.temp_c == null ? null : (d.temp_c / 90) * 100, d.temp_c == null ? "--" : `${Math.round(d.temp_c)} \u00b0C`, "", (75 / 90) * 100);
+        } catch (err) { /* offline: keep the last numbers */ } finally { sysBusy = false; }
+    }
+    pollSystem();
+    setInterval(pollSystem, 10000);
+    document.addEventListener("visibilitychange", pollSystem);
+    window.addEventListener("hashchange", () => setTimeout(pollSystem, 100));
+
     load();
 })();
 

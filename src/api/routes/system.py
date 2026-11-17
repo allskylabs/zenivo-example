@@ -14,6 +14,9 @@ from src.api.schemas import (
 )
 from src.api.service import AllSkyService
 from src.api.routes.common import (router, get_service)
+from src.api.ttl_cache import TTLCache
+
+_res_cache = TTLCache(ttl_s=4.0, max_size=2)
 
 
 # ----------------------------------------------------------------------
@@ -38,6 +41,13 @@ def run_storage_cleanup(service: AllSkyService = Depends(get_service)):
 def update_storage_policy(payload: StoragePolicyRequest, service: AllSkyService = Depends(get_service)):
     """Change retention limits (days kept, size cap, free-space floor, archive / timelapse intervals)."""
     return service.configure_storage(**payload.model_dump(exclude_none=True))
+
+
+@router.get("/api/system/resources")
+def get_system_resources(service: AllSkyService = Depends(get_service)):
+    """Host CPU / RAM / disk / temperature for the Admin page (admin only, see ADMIN_GET in src/auth/policy.py)."""
+    from src.api.sysinfo import resources
+    return _res_cache.get_or_compute("r", lambda: resources(service.output_dir))
 
 
 # ----------------------------------------------------------------------

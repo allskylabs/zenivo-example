@@ -23,7 +23,7 @@ LOCAL_INGEST: frozenset = frozenset()
 # GET routes that leak logs or settings: admin only. All other GETs are public.
 # (/docs, /redoc and /openapi.json are FastAPI's built-in pages; they sit outside /api but are matched by exact path.)
 ADMIN_GET = frozenset({"/api/logs", "/api/logs/download", "/api/community/settings", "/api/focus", "/api/focus/frame",
-                       "/api/focus/overview.jpg", "/api/storage", "/api/camera/devices", "/api/satellites/config", "/api/data-sources", "/docs", "/redoc", "/openapi.json"})
+                       "/api/focus/overview.jpg", "/api/storage", "/api/camera/devices", "/api/satellites/config", "/api/data-sources", "/api/system/resources", "/docs", "/redoc", "/openapi.json"})
 # WebSocket text actions a guest may send (they only read). Everything else needs the admin session + same-site origin.
 WS_GUEST_ACTIONS = frozenset({"ping", "get_telemetry", "get_status", "subscribe", "idle"})
 # Pages of the web UI that are only for the admin (guests are redirected to /login).
