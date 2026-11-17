@@ -473,6 +473,7 @@ function initWebSocket(isRetry) {
         ws.onopen = () => {
             wsHealth.openedAt = Date.now();
             state.wsConnected = true;
+            overlayPush.acked = 0;
             if (typeof sendOverlaySubscription === "function") sendOverlaySubscription();
         };
 
@@ -493,6 +494,8 @@ function initWebSocket(isRetry) {
                     const msg = JSON.parse(event.data);
                     if (msg.type === "overlay") {
                         if (typeof applyOverlayPush === "function") applyOverlayPush(msg.layer, msg.data);
+                    } else if (msg.type === "subscribed") {
+                        overlayPush.acked = Date.now();
                     } else if (msg.type === "ae_lock" && !state.dragging && !state.lockPending) {
                         syncModeButtons(msg.mode);
                         syncAeLock(msg.ae_lock);

@@ -254,14 +254,14 @@ class TestStreamingAndWebSockets:
     def test_websocket_pushes_subscribed_overlay_layers(self, api_client):
         with api_client.websocket_connect("/ws/live") as websocket:
             assert websocket.receive_json()["type"] == "welcome"
-            websocket.send_text('{"action": "subscribe", "layers": ["aircraft", "bogus"]}')
+            websocket.send_text('{"action": "subscribe", "layers": ["aircraft", "bogus", "events"]}')
             seen = {}
             for _ in range(40):
                 msg = websocket.receive_json()
                 seen[msg["type"]] = msg
                 if "overlay" in seen and "subscribed" in seen:
                     break
-            assert seen["subscribed"]["layers"] == ["aircraft"]
+            assert seen["subscribed"]["layers"] == ["aircraft", "events"]
             assert seen["overlay"]["layer"] == "aircraft" and "aircraft" in seen["overlay"]["data"]
 
     def test_websocket_live_connection(self, api_client):

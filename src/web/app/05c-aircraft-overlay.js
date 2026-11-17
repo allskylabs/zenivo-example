@@ -16,9 +16,13 @@ function scheduleAircraftDraw() {
 // Layers pushed over the live WebSocket ({type:"overlay"}); REST polling below only runs while no push arrives
 const overlayPush = { at: {}, want: [] };
 function overlayPushLive(layer) { return Date.now() - (overlayPush.at[layer] || 0) < 8000; }
+window.overlayPushOn = function overlayPushOn(layer) { return !!((!layer || overlayPush.want.includes(layer)) && state.ws && state.ws.readyState === 1 && overlayPush.acked && Date.now() - overlayPush.acked < 3600000); };
 function overlayLayersWanted() {
-    return [chkAircraft && chkAircraft.checked ? "aircraft" : null, chkSatellite && chkSatellite.checked ? "satellites" : null,
-        chkSonde && chkSonde.checked ? "sondes" : null].filter(Boolean);
+    const extra = [];
+    if (currentPage === "tab-live") extra.push("events", "flights");
+    if (currentPage === "tab-live" && window.zenivoAuth && window.zenivoAuth.admin) extra.push("logs");
+    return extra.concat([chkAircraft && chkAircraft.checked ? "aircraft" : null, chkSatellite && chkSatellite.checked ? "satellites" : null,
+        chkSonde && chkSonde.checked ? "sondes" : null].filter(Boolean));
 }
 function sendOverlaySubscription() {
     const layers = overlayLayersWanted();
@@ -27,6 +31,9 @@ function sendOverlaySubscription() {
 }
 function applyOverlayPush(layer, d) {
     overlayPush.at[layer] = Date.now();
+    if (layer === "events") { if (typeof loadLiveEvents === "function") loadLiveEvents(); return; }
+    if (layer === "logs") { if (window.zenivoPollLogs) window.zenivoPollLogs(); return; }
+    if (layer === "flights") { if (typeof renderFlights === "function") renderFlights(d); return; }
     if (layer === "aircraft") { aircraftList = (d && d.aircraft) || []; aircraftFetchedAt = Date.now(); aircraftT = (d && d.t) || 0; }
     else if (layer === "sondes") { sondeList = (d && d.sondes) || []; sondeT = (d && d.t) || 0; sondeFetchedAt = Date.now(); }
     else if (layer === "satellites") satelliteList = (d && d.satellites) || [];

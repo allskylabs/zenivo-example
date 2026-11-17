@@ -25,7 +25,7 @@ LOCAL_INGEST: frozenset = frozenset()
 ADMIN_GET = frozenset({"/api/logs", "/api/logs/download", "/api/community/settings", "/api/focus", "/api/focus/frame",
                        "/api/focus/overview.jpg", "/api/storage", "/api/camera/devices", "/api/satellites/config", "/api/data-sources", "/docs", "/redoc", "/openapi.json"})
 # WebSocket text actions a guest may send (they only read). Everything else needs the admin session + same-site origin.
-WS_GUEST_ACTIONS = frozenset({"ping", "get_telemetry", "get_status"})
+WS_GUEST_ACTIONS = frozenset({"ping", "get_telemetry", "get_status", "subscribe"})
 # Pages of the web UI that are only for the admin (guests are redirected to /login).
 ADMIN_PAGES = frozenset({"/settings", "/calibration", "/focus", "/logs", "/obs/dock", "/obs/control", "/dock"})
 # A request carrying any of these came through a proxy/tunnel: its peer address (127.0.0.1) says nothing about the client.

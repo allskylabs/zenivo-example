@@ -615,19 +615,29 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
 
         # Overlay layers the page asked for ("subscribe"): pushed here instead of the page polling REST every 1.5 s
         subs: set = set()
-        OVERLAY_EVERY_S = {"aircraft": 1.5, "satellites": 1.5, "sondes": 3.0}
+        OVERLAY_EVERY_S = {"aircraft": 1.5, "satellites": 1.5, "sondes": 3.0, "flights": 5.0, "events": 2.0, "logs": 2.0}
+        admin_ws = is_admin(websocket)
 
         def overlay_payload(layer: str):
             if layer == "aircraft":
                 return service.get_aircraft_now(limit=60, trail_s=0.0, bounds=None, include_fr24=None, compact=False)
             if layer == "sondes":
                 return service.get_radiosondes_now(limit=40)
+            if layer == "flights":
+                return service.get_aircraft_now(limit=12, trail_s=0.0, bounds=None, include_fr24=None, compact=False)
+            if layer == "events":   # only a version: the page fetches the list when it changes
+                ev = service._load_events()
+                return {"v": [len(ev), ev[0].get("id") or ev[0].get("ts") or ev[0].get("time") if ev else None]}
+            if layer == "logs":
+                from src.activity import get_activity_log
+                return {"v": get_activity_log()._next_id}
             from src.api.routes.common import _sat_cache
             return _sat_cache.get_or_compute((0.0, False, 60, tuple(), 0.0), lambda: service.get_satellites_now(
                 track_min=0.0, below=False, limit=60, trail_s=0.0, track_ids=set()))
 
         async def overlay_pusher():
             last: Dict[str, float] = {}
+            sent_v: Dict[str, Any] = {}
             while True:
                 await asyncio.sleep(0.5)
                 now = time.time()
@@ -636,7 +646,13 @@ async def _live_websocket_session(websocket: WebSocket, service: AllSkyService):
                         continue
                     last[layer] = now
                     try:
+                        if layer == "logs" and not admin_ws:   # the activity log is admin-only
+                            continue
                         data = await asyncio.to_thread(overlay_payload, layer)
+                        if layer in ("events", "logs"):
+                            if sent_v.get(layer) == data["v"]:
+                                continue
+                            sent_v[layer] = data["v"]
                         await websocket.send_json(view({"type": "overlay", "layer": layer, "data": data}))
                     except WebSocketDisconnect:
                         raise

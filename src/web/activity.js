@@ -161,7 +161,8 @@
         });
     }
 
+    window.zenivoPollLogs = poll;
     poll();
-    setInterval(poll, POLL_MS);
+    setInterval(() => { if (!(window.overlayPushOn && window.overlayPushOn("logs"))) poll(); }, POLL_MS);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
 })();

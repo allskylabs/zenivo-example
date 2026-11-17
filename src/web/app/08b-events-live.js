@@ -334,11 +334,11 @@ if (currentPage === "tab-live" && sondesCard) {
 
 if (currentPage === "tab-live" && flightsCard) {
     loadFlights();
-    setInterval(() => { if (!document.hidden) loadFlights(); }, 10000);
+    setInterval(() => { if (!document.hidden && !overlayPushOn("flights")) loadFlights(); }, 10000);
 }
 
 if (currentPage === "tab-live" && liveEventsList) {
     loadLiveEvents();
-    setInterval(() => { if (!document.hidden) loadLiveEvents(); }, 20000);
+    setInterval(() => { if (!document.hidden && !overlayPushOn("events")) loadLiveEvents(); }, 20000);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) loadLiveEvents(); });
 }
