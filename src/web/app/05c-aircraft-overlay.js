@@ -18,19 +18,25 @@ const overlayPush = { at: {}, want: [] };
 // The server skips pushes whose content did not change, so "live" means subscribed and acknowledged, not "recently heard"
 function overlayPushLive(layer) { return window.overlayPushOn(layer); }
 window.overlayPushOn = function overlayPushOn(layer) { return !!((!layer || overlayPush.want.includes(layer)) && state.ws && state.ws.readyState === 1 && overlayPush.acked && Date.now() - overlayPush.acked < 3600000); };
+// Every layer the Live page lists in a card is always subscribed; the overlay switch only decides whether it is drawn on the
+// picture and how often it comes (overlay on: its own pace; card only: every 10 s, see overlaySlowLayers)
+const OVERLAY_CARDS = { aircraft: "flights-card", satellites: "sats-card", sondes: "sondes-card" };
+function overlayChecked(layer) {
+    const c = layer === "aircraft" ? chkAircraft : layer === "satellites" ? chkSatellite : chkSonde;
+    return !!(c && c.checked);
+}
 function overlayLayersWanted() {
-    const extra = [];
-    if (currentPage === "tab-live") extra.push("events");
-    if (currentPage === "tab-live" && document.getElementById("flights-card") && !(chkAircraft && chkAircraft.checked)) extra.push("aircraft");
-    if (currentPage === "tab-live" && window.zenivoAuth && window.zenivoAuth.admin) extra.push("logs");
-    return extra.concat([chkAircraft && chkAircraft.checked ? "aircraft" : null, chkSatellite && chkSatellite.checked ? "satellites" : null,
-        chkSonde && chkSonde.checked ? "sondes" : null].filter(Boolean));
+    if (currentPage !== "tab-live") return [];
+    const out = ["events"];
+    if (window.zenivoAuth && window.zenivoAuth.admin) out.push("logs");
+    Object.keys(OVERLAY_CARDS).forEach((l) => { if (overlayChecked(l) || document.getElementById(OVERLAY_CARDS[l])) out.push(l); });
+    return out;
 }
 function sendOverlaySubscription() {
     const layers = overlayLayersWanted();
     overlayPush.want = layers;
-    // Overlay off but the Flights card still lists aircraft: ask for them at the card's pace (10 s), not the overlay's (3 s)
-    const slow = layers.includes("aircraft") && !(chkAircraft && chkAircraft.checked) ? ["aircraft"] : [];
+    // Overlay off: the card alone needs the layer, at the card's pace
+    const slow = layers.filter((l) => OVERLAY_CARDS[l] && !overlayChecked(l));
     if (state.ws && state.ws.readyState === 1 && currentPage === "tab-live") state.ws.send(JSON.stringify({ action: "subscribe", layers, slow }));
 }
 // A hidden tab asks the server to stop pushing (pictures slow to a 30 s heartbeat, layers pause) and resumes when shown again
@@ -70,14 +76,18 @@ function applyOverlayPush(layer, d) {
     if (layer === "events") { if (typeof loadLiveEvents === "function") loadLiveEvents(); return; }
     if (layer === "logs") { if (window.zenivoPollLogs) window.zenivoPollLogs(); return; }
 
+    // One push serves the card (always) and the overlay (when its switch is on)
     if (layer === "aircraft") {
-        // One push serves both the overlay and the flights card (the 12 nearest, as the card's own request asked for)
         if (typeof renderFlights === "function" && document.getElementById("flights-card")) renderFlights({ ...d, aircraft: ((d && d.aircraft) || []).slice(0, 12) });
-        if (!(chkAircraft && chkAircraft.checked)) return;
         aircraftList = (d && d.aircraft) || []; aircraftFetchedAt = Date.now(); aircraftT = (d && d.t) || 0;
+    } else if (layer === "sondes") {
+        const list = ((d && d.sondes) || []).slice().sort((a, b) => (a.distance_km ?? 1e9) - (b.distance_km ?? 1e9));
+        if (typeof renderSondes === "function" && document.getElementById("sondes-card")) renderSondes({ ...d, sondes: list.slice(0, 8) });
+        sondeList = list; sondeT = (d && d.t) || 0; sondeFetchedAt = Date.now();
+    } else if (layer === "satellites") {
+        if (typeof renderSats === "function") renderSats(d);
+        satelliteList = (d && d.satellites) || [];
     }
-    else if (layer === "sondes") { sondeList = (d && d.sondes) || []; sondeT = (d && d.t) || 0; sondeFetchedAt = Date.now(); }
-    else if (layer === "satellites") satelliteList = (d && d.satellites) || [];
     drawAircraft();
 }
 function refreshAircraft() {

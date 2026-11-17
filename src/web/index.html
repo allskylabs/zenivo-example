@@ -388,6 +388,17 @@
                         <ul class="flights-list" id="sondes-list"></ul>
                     </div>
 
+                    <!-- Satellites above the horizon (same data as the overlay) -->
+                    <div class="card flights-card" id="sats-card" hidden>
+                        <div class="card-header">
+                            <h2>Satellites Overhead</h2>
+                            <span class="badge" id="sats-count">--</span>
+                        </div>
+                        <div class="flights-status" id="sats-status">Loading…</div>
+                        <ul class="flights-list" id="sats-list"></ul>
+                        <a class="live-events-more" href="/satellites3d">3D map →</a>
+                    </div>
+
                     <!-- Aircraft heard by the ADS-B receiver -->
                     <div class="card flights-card" id="flights-card" hidden>
                         <div class="card-header">
@@ -1668,11 +1679,11 @@
     <script defer src="/static/app/04-live-view.js?v=20261115b"></script>
     <script defer src="/static/app/05-sky-overlay.js?v=20261115a"></script>
     <script defer src="/static/app/05b-sky-reticle.js?v=20261115a"></script>
-    <script defer src="/static/app/05c-aircraft-overlay.js?v=20261117g"></script>
+    <script defer src="/static/app/05c-aircraft-overlay.js?v=20261117h"></script>
     <script defer src="/static/app/06-telemetry.js?v=20261117e"></script>
     <script defer src="/static/app/07-cloud.js?v=20261115b"></script>
     <script defer src="/static/app/08-gallery-adsb.js?v=20261115a"></script>
-    <script defer src="/static/app/08b-events-live.js?v=20261117b"></script>
+    <script defer src="/static/app/08b-events-live.js?v=20261117c"></script>
     <script defer src="/static/app/08c-adsb-settings.js?v=20261117a"></script>
     <script defer src="/static/app/09-community.js?v=20261114b"></script>
     <script defer src="/static/app/10-admin.js?v=20261117a"></script>

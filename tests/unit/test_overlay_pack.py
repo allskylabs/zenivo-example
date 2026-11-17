@@ -31,5 +31,5 @@ def test_satellites_keep_those_in_the_frame_by_day_too():
         {"norad": 1, "name": "GEO", "height_km": 35786, "frame_xy": [0.4, 0.3], "in_view": True, "visible": False},
         {"norad": 2, "name": "LOW", "height_km": 600, "in_view": False, "visible": False}]}
     msg, _ = op.delta("satellites", payload, None)
-    assert [r[0] for r in msg["u"]] == [1] and "camera" not in msg["m"]
+    assert [r[0] for r in msg["u"]] == [1, 2] and "camera" not in msg["m"]   # the list card shows those outside the frame too
     assert dict(zip(op.FIELDS["satellites"], msg["u"][0]))["fl"] == 1    # in view, not visible to the eye

@@ -316,6 +316,43 @@ function renderSondes(d) {
             </div></li>`;
     }).join("");
 }
+// Live page: satellites above the horizon, those inside the camera frame first (fed by the same push as the overlay)
+const satsCard = document.getElementById("sats-card");
+function renderSats(d) {
+    if (!satsCard) return;
+    if (d && d.disabled) { satsCard.hidden = true; return; }
+    const all = ((d && d.satellites) || []).filter((s) => s.above_horizon !== false);
+    satsCard.hidden = false;
+    const inView = all.filter((s) => s.in_view).length;
+    document.getElementById("sats-count").textContent = `${inView} in view · ${all.length} up`;
+    const sun = d && d.sun_alt_deg;
+    document.getElementById("sats-status").textContent = sun == null ? "Large satellites above the horizon"
+        : sun > -6 ? "Daylight: positions only, not visible to the eye" : "Bright = sunlit under a dark sky";
+    const ul = document.getElementById("sats-list");
+    if (!all.length) { ul.innerHTML = `<li class="live-events-empty">No large satellite above the horizon right now.</li>`; return; }
+    const list = all.slice().sort((a, b) => (b.in_view - a.in_view) || (b.visible - a.visible) || (b.alt_deg - a.alt_deg)).slice(0, 12);
+    ul.innerHTML = list.map((s) => {
+        const where = s.in_view ? `<span class="fl-inview">● in view</span>` : `${compass(s.az_deg)} ${Math.round(s.alt_deg)}° up`;
+        return `<li class="flight${s.in_view ? " in-view" : ""}">
+            <div class="fl-top"><a href="https://www.n2yo.com/satellite/?s=${encodeURIComponent(s.norad)}" target="_blank" rel="noopener" class="flight-tag">🛰 ${escapeHtml(s.name)}</a><span class="fl-where">${where}</span></div>
+            <div class="fl-meta">
+                <span title="Height above the ground">${escapeHtml(Number(s.height_km).toLocaleString())} km</span>
+                <span title="Direction and elevation">${compass(s.az_deg)} ${Math.round(s.alt_deg)}°</span>
+                <span>${s.visible ? "visible" : "not visible"}</span>
+            </div></li>`;
+    }).join("");
+}
+async function loadSatsCard() {
+    try {
+        const res = await fetch("/api/satellites");
+        if (res.ok) renderSats(await res.json());
+    } catch (err) { /* optional feature */ }
+}
+if (currentPage === "tab-live" && satsCard) {
+    setTimeout(() => { if (!overlayPushOn("satellites")) loadSatsCard(); }, 3000);
+    setInterval(() => { if (!document.hidden && !overlayPushOn("satellites")) loadSatsCard(); }, 20000);
+}
+
 async function loadSondes() {
     try {
         const res = await fetch("/api/radiosondes?limit=8");
@@ -326,7 +363,7 @@ if (currentPage === "tab-live" && sondesCard) {
     loadSondes();
     setInterval(() => {
         // when switched off in Settings, look again only every 5 minutes
-        if (document.hidden || (sondesOff && Date.now() - sondesLast < 300000)) return;
+        if (document.hidden || overlayPushOn("sondes") || (sondesOff && Date.now() - sondesLast < 300000)) return;
         sondesLast = Date.now();
         loadSondes();
     }, 20000);

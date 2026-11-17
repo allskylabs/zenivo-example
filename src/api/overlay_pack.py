@@ -41,11 +41,9 @@ def _row(layer: str, o: Dict[str, Any]) -> List[Any]:
 
 
 def rows(layer: str, payload: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[Any, List[Any]]]:
-    """(meta, {id: row}) of a REST-shaped payload. Satellites keep only those inside the frame: the others are never drawn."""
+    """(meta, {id: row}) of a REST-shaped payload (everything above the horizon: the page lists it and draws what is in the frame)."""
     items = payload.get(LIST_KEY[layer]) or []
-    if layer == "satellites":
-        items = [s for s in items if s.get("in_view") and s.get("frame_xy")]
-    meta = {k: payload[k] for k in META[layer] if payload.get(k) not in (None, "", False)}
+    meta = {k: payload[k] for k in META[layer] if payload.get(k) not in (None, "")}
     out: Dict[Any, List[Any]] = {}
     for o in items:
         r = _row(layer, o)
