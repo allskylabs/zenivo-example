@@ -105,8 +105,8 @@
 #fv-chart .axis-label { fill: var(--text-muted); font-size: 12px; font-family: var(--font-mono); }
 #cloud-chart .night-band { fill: rgba(148, 163, 184, 0.09); }
 #fv-chart .night-band { fill: rgba(148, 163, 184, 0.09); }
-#cloud-chart .cc-area { fill: rgba(56, 189, 248, 0.12); }
-#fv-chart .cc-area { fill: rgba(56, 189, 248, 0.12); }
+#cloud-chart .cc-area { fill: color-mix(in srgb, var(--accent) 12%, transparent); }
+#fv-chart .cc-area { fill: color-mix(in srgb, var(--accent) 12%, transparent); }
 #cloud-chart .cc-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 #fv-chart .cc-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 #cloud-chart .cc-low { fill: var(--bg-card); stroke: var(--accent); stroke-width: 2; }

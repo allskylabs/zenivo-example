@@ -287,7 +287,7 @@ body.page-3d #btn-track { background: var(--accent); border-color: var(--accent)
     body.page-3d #left-col { top: 8px; left: 16px; right: 16px; max-width: none; gap: 8px; align-items: stretch; }
     body.page-3d #top { padding: 12px 16px; }
     body.page-3d #left-toggle { min-height: 40px; min-width: 40px; border-radius: 50%; }
-    body.page-3d #top .btns, body.page-3d #layers { display: flex; flex-wrap: wrap; gap: 8px; }
+    body.page-3d #top .btns, body.page-3d #layers { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; }
     body.page-3d #top .btns button, body.page-3d #layers label { min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border-color); background: var(--bg-card-sub); color: var(--text-secondary); font-size: 14px; font-weight: 600; }
     body.page-3d #layers { width: auto; background: none; border: 0; padding: 0; backdrop-filter: none; }
     body.page-3d #layers h2, body.page-3d #layers > details { display: none; }
@@ -332,5 +332,51 @@ body.page-3d #btn-track { background: var(--accent); border-color: var(--accent)
 [data-theme="red"] .tick::before, [data-theme="red"] .tick.ground::before { background: var(--text-primary); }
 [data-theme="red"] #timeline .tl .above { background: var(--border-color); }
 [data-theme="red"] #timeline .tl .vis { background: var(--accent); }
-[data-theme="red"] .legend i[style*="22d3ee"], [data-theme="red"] .legend i[style*="f59e0b"], [data-theme="red"] .legend i[style*="6b7280"] { filter: grayscale(1) sepia(1) hue-rotate(-50deg) saturate(4); }
 [data-theme="red"] #cam-badge .dot { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+/* ================= Red Vision pass: white / blue / green leftovers (night-vision rule: only red and dark tones) ================= */
+[data-theme="red"] .zoom-btn, [data-theme="red"] .frame-info, [data-theme="red"] .vp-hint, [data-theme="red"] .vp-meta { color: var(--text-primary); }
+[data-theme="red"] .frame-info { background: color-mix(in srgb, var(--bg-primary) 75%, transparent); }
+[data-theme="red"] .live-event .ev-type, [data-theme="red"] .fv-events .ev-type { color: var(--text-primary) !important; }
+[data-theme="red"] .sw i, [data-theme="red"] #tab-settings input[type="checkbox"]::after, [data-theme="red"] .switch:checked::after,
+[data-theme="red"] .rv-toggle.btn-primary .rv-knob, [data-theme="red"] .m-sheet-rv.btn-primary .rv-knob { background: var(--text-primary); }
+[data-theme="red"] #exposure-card input[type="range"]::-webkit-slider-thumb, [data-theme="red"] #tab-settings input[type="range"]::-webkit-slider-thumb { background: var(--text-primary); }
+[data-theme="red"] #exposure-card input[type="range"]::-moz-range-thumb, [data-theme="red"] #tab-settings input[type="range"]::-moz-range-thumb { background: var(--text-primary); }
+[data-theme="red"] .wx-h, [data-theme="red"] .fv-nav .btn.active, [data-theme="red"] #focus-toggle.btn-danger { color: #1a0000; }
+[data-theme="red"] .side-item.active, [data-theme="red"] .side-sub.active { color: var(--text-primary); }
+[data-theme="red"] .vp-pill { color: var(--text-primary); border-color: var(--border-color); background: color-mix(in srgb, var(--bg-primary) 80%, transparent); }
+/* WebGL / video canvases cannot take theme variables: tint them with the same monochrome-red filter the live picture uses (CSS only, the render code is untouched) */
+[data-theme="red"] body.page-3d #stage canvas, [data-theme="red"] .sv-root canvas, [data-theme="red"] .sv-root video, [data-theme="red"] #info-model { filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-50deg) brightness(0.8); }
+[data-theme="red"] #info-model { background: var(--bg-card-sub); }
+[data-theme="red"] .legend .ramp { background: linear-gradient(90deg, var(--text-muted), var(--accent)); }
+[data-theme="red"] .legend i[style*="22d3ee"] { background: var(--accent) !important; }
+[data-theme="red"] .legend i[style*="f59e0b"] { background: var(--warning) !important; }
+[data-theme="red"] .legend i[style*="6b7280"] { background: var(--text-muted) !important; }
+/* archived pictures (event viewer, frame viewer, gallery, thumbnails) and per-type event marks */
+[data-theme="red"] img:not(.keep-colour) { filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-50deg) brightness(0.8); }
+[data-theme="red"] .ev-meteor, [data-theme="red"] .ev-plane, [data-theme="red"] .ev-satellite, [data-theme="red"] .ev-flash { background: var(--accent); fill: var(--accent); }
+[data-theme="red"] .frame-info .frame-event { color: var(--warning); }
+[data-theme="red"] .size-pipeline strong, [data-theme="red"] .auth-toast { color: var(--text-primary); }
+
+/* emoji / pictograph glyphs ignore `color`: tint them with the monochrome-red filter */
+[data-theme="red"] .live-event .ev-type, [data-theme="red"] .side-ic { filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-50deg); }
+
+/* ================= Settings on a phone: 44 px touch targets, nothing wider than the screen ================= */
+@media (max-width: 768px) {
+    #tab-settings legend { max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; }
+    #tab-settings button, #tab-settings select, #tab-settings .chip-preset, #tab-settings .checkbox-label, #tab-settings .ds-sw,
+    #tab-settings input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]) { min-height: 44px; }
+    #tab-settings .checkbox-label, #tab-settings .ds-sw { display: inline-flex; align-items: center; }
+    #tab-settings summary { display: flex; align-items: center; min-height: 44px; }
+    #tab-settings input[type="range"], #exposure-card input[type="range"] { height: 44px; }
+}
+@media (max-width: 768px) {
+    #tab-settings .checkbox-label, #tab-settings .btn, #tab-settings .btn-sm, #tab-settings .card-header-switch { min-height: 44px !important; }
+    #tab-settings .card-header-switch { align-items: center; }
+    #tab-settings #legend-slot, #tab-settings fieldset > legend { max-width: calc(100% - 2px); }
+}
+/* Focus page on a phone: 44 px targets */
+@media (max-width: 768px) {
+    #tab-focus button, #tab-focus select, #tab-focus input[type="number"], #tab-focus input[type="text"] { min-height: 44px; }
+    #tab-focus input[type="range"] { height: 44px; }
+}

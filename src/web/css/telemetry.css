@@ -68,13 +68,13 @@
 }
 
 .badge-accent {
-    background: rgba(56, 189, 248, 0.15);
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
     border-color: var(--accent);
     color: var(--accent);
 }
 
 .badge-success {
-    background: rgba(16, 185, 129, 0.15);
+    background: color-mix(in srgb, var(--success) 15%, transparent);
     border-color: var(--success);
     color: var(--success);
 }
@@ -100,13 +100,13 @@
 }
 
 .alert-success {
-    background: rgba(16, 185, 129, 0.15);
+    background: color-mix(in srgb, var(--success) 15%, transparent);
     border: 1px solid var(--success);
     color: var(--success);
 }
 
 .alert-info {
-    background: rgba(56, 189, 248, 0.15);
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
     border: 1px solid var(--accent);
     color: var(--accent);
 }

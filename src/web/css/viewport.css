@@ -62,7 +62,7 @@
     display: flex;
     gap: 2px;
     background: rgba(2, 6, 23, 0.72);
-    border: 1px solid rgba(56, 189, 248, 0.35);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
     border-radius: 6px;
     padding: 2px;
     z-index: 2;
@@ -80,7 +80,7 @@
     cursor: pointer;
 }
 
-.zoom-btn:hover { background: rgba(56, 189, 248, 0.2); }
+.zoom-btn:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 .zoom-level { font-family: var(--font-mono); font-size: 0.75rem; min-width: 52px; }
 
 #reticle-canvas {

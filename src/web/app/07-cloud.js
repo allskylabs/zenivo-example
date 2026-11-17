@@ -344,6 +344,8 @@ if (cloudChart && currentPage === "tab-live") {
     }
 
     const EV_COLORS = { meteor: "#f472b6", plane: "#fbbf24", satellite: "#34d399", flash: "#f87171" };
+    // Red Vision: one red tone for every event type (night-vision rule)
+    const evColor = (type) => (document.documentElement.getAttribute("data-theme") === "red" ? "#ff6b6b" : (EV_COLORS[type] || "#fff"));
     const fvBoxes = document.getElementById("fv-boxes");
     // Where an event is at a moment: moving dots are interpolated along their path (line is the first -> last point,
     // normalised to the frame); a streak is drawn as the whole line
@@ -413,7 +415,7 @@ if (cloudChart && currentPage === "tab-live") {
         const found = await Promise.all(active.map((e) => (e.moving_dot ? locateDot(e, i) : null)));
         if (req !== boxReq) return;
         active.forEach((e, n) => {
-            const [x0, y0, x1, y1] = e.line, c = EV_COLORS[e.type] || "#fff";
+            const [x0, y0, x1, y1] = e.line, c = evColor(e.type);
             const dur = (e.end_ts || e.start_ts) - e.start_ts;
             const name = `${EV_NAMES[e.type] || e.type}${e.label ? " " + e.label : ""}`;
             const inside = f.ts >= e.start_ts - 4 && f.ts <= (e.end_ts || e.start_ts) + 4;
@@ -447,7 +449,7 @@ if (cloudChart && currentPage === "tab-live") {
         fvList.innerHTML = evs.map((e) => {
             const bits = [e.flight ? `✈ ${escapeHtml(e.flight)}` : "", e.length_px ? `${Math.round(e.length_px)} px` : "",
                 e.frames > 1 ? `${e.frames} frames` : "", e.peak_dn ? `peak +${e.peak_dn} DN` : ""].filter(Boolean).join(" · ");
-            return `<li data-ts="${e.start_ts}" data-id="${escapeHtml(e.event_id || "")}" style="--pill:${EV_COLORS[e.type] || "#fff"}"><div class="ev-type">${EV_NAMES[e.type] || e.type}</div>` +
+            return `<li data-ts="${e.start_ts}" data-id="${escapeHtml(e.event_id || "")}" style="--pill:${evColor(e.type)}"><div class="ev-type">${EV_NAMES[e.type] || e.type}</div>` +
                 `<div class="ev-time">${fmtTime(e.start_ts, true)}</div><div class="ev-detail">${bits}</div></li>`;
         }).join("");
         markEventList(false);

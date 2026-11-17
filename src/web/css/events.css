@@ -186,7 +186,7 @@ body.no-scroll { overflow: hidden; }
 
 /* Clickable event rows / items */
 .event-row { cursor: pointer; }
-.event-row:hover td { background: rgba(56, 189, 248, 0.05); }
+.event-row:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent); }
 .live-event { cursor: pointer; border-left: 3px solid var(--pill, var(--accent)); transition: border-color 0.15s, background 0.15s; }
 .live-event:hover, .live-event:focus-visible { background: color-mix(in srgb, var(--pill, var(--accent)) 8%, var(--bg-card-sub)); outline: none; }
 .live-event .ev-type { color: var(--pill, var(--text-primary)); }
