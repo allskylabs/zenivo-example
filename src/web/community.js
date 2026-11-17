@@ -63,7 +63,18 @@
     }
     L.control.attribution({ prefix: false }).addAttribution("Land, lakes, rivers: Natural Earth (public domain)").addTo(map);
     // The map box gets its final size after the shell lays out (and on rotation): tell Leaflet, or the map lands off-centre
-    if (window.ResizeObserver) new ResizeObserver(() => { map.invalidateSize(); fitMinZoom(); }).observe(document.getElementById("cmap"));
+    // Until the visitor moves the map themselves, every size change re-fits it to the stations: on phones the box gets
+    // its size late, and a fit done before that left the map zoomed on Africa with no station in view
+    let userMoved = false, lastPts = [];
+    const cmapEl = document.getElementById("cmap");
+    for (const t of ["pointerdown", "wheel", "keydown"]) cmapEl.addEventListener(t, () => { userMoved = true; }, { passive: true, capture: true });
+    function autoFit() {
+        if (userMoved) return;
+        if (lastPts.length === 1) map.setView(lastPts[0], 5, { animate: false });
+        else if (lastPts.length) map.fitBounds(lastPts, { padding: [40, 40], maxZoom: 6, animate: false });
+        else map.setView([20, 10], Math.max(map.getMinZoom(), Math.min(2, map.getZoom())), { animate: false });
+    }
+    if (window.ResizeObserver) new ResizeObserver(() => { map.invalidateSize(); fitMinZoom(); autoFit(); }).observe(cmapEl);
     fitMinZoom();
     if (map.getMinZoom() > 2) map.setView([20, 10], map.getMinZoom());
     const ink = tone("--text-muted", "#64748b"), landFill = tone("--border-color", "#1e293b");
@@ -332,6 +343,7 @@
             btn.addEventListener("click", () => {
                 if (clustered) {
                     // the marker may sit inside a cluster: zoom or spiderfy until it shows, then open its popup
+                    userMoved = true;
                     map.setView([card.lat, card.lon], Math.max(map.getZoom(), 6), { animate: false });
                     layer.zoomToShowLayer(marker, () => marker.openPopup());
                 } else {
@@ -356,9 +368,10 @@
             }));
         }
         noteEl.hidden = !valid.length;
+        lastPts = pts;
         if (!fitted && pts.length) {
             fitted = true;
-            if (pts.length === 1) map.setView(pts[0], 5); else map.fitBounds(pts, { padding: [40, 40], maxZoom: 6 });
+            autoFit();
         }
     }
 
