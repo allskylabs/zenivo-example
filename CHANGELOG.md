@@ -6,6 +6,13 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.3.0-beta.3] - 2026-11-18
+
+### Fixed
+
+- Events: on clear, crowded skies twinkling stars lined up by chance into faint "aircraft" and "satellite" dot tracks (most events in a three-day sample, none matching a flight). A weak dot track (under 60 DN) now needs six positions and must not sit on stars that are also bright in the other recent frames; strong strobes and flight-matched events are unchanged.
+- RTS5869: the bridge's ISP gain default is restored at stream start (gain 0 halved MJPG frames and froze the daytime auto exposure on a white picture).
+
 ### Added
 
 - Community: stations that sit close together on the map merge into one numbered badge with a ring showing how many are online, idle or offline; a tap zooms in, and stations at the same spot fan out so each can be opened.
