@@ -323,3 +323,24 @@ def test_smooth_streak_with_one_bright_spot_stays_a_meteor():
     cv2.line(frames[2], (300, 200), (520, 330), (150, 150, 150), 2, cv2.LINE_AA)
     cv2.circle(frames[2], (420, 271), 3, (240, 240, 240), -1)
     assert [e["type"] for e in _run(frames)] == ["meteor"]
+
+
+def _fed_detector(frames):
+    det = SkyEventDetector()
+    for i, f in enumerate(frames):
+        det.process(f, ALL, ts=1000.0 + 90 * i, exposure_s=10.0, gain_db=30.0)
+    return det
+
+
+def test_dots_on_persistent_stars_are_recognised_as_stars():
+    """_on_stars: dots sitting where a star is also bright in the other recent frames vs dots that really moved."""
+    path = [(300 + 30 * k, 300 + 10 * k) for k in range(6)]
+    # work-size positions (the detector works at 640 px wide, the frames are 1296 px)
+    s = 640 / W
+    pts = [(x * s, y * s, 1000.0 + 90 * (k + 1), 55) for k, (x, y) in enumerate(path)]
+    stars = _dots(8, path, value=100, radius=2)
+    for f in stars:
+        for x, y in path:
+            cv2.circle(f, (x, y), 2, (150, 150, 150), -1, cv2.LINE_AA)
+    assert _fed_detector(stars)._on_stars(pts)
+    assert not _fed_detector(_dots(8, path, value=100, radius=2))._on_stars(pts)

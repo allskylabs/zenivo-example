@@ -484,6 +484,13 @@ class SkyEventDetector:
     DOT_MIN_SPEED_PX_S = 0.5
     DOT_MAX_DURATION_S = 1200.0
     POINT_MAX_TRACKS = 120
+    # Star-field linking: on a clear, crowded sky twinkling stars line up by chance into "dot tracks" (measured: 49 of 51
+    # events in 3 days were such, none matched an aircraft). Without a strong strobe a dot track needs more positions, and
+    # its dots must not sit on a star that is also bright in the other recent frames.
+    WEAK_TRACK_PEAK = 60
+    WEAK_TRACK_MIN_POINTS = 6
+    STAR_PERSIST_FRAC = 0.5    # share of track dots sitting on a persistent star that makes it a star track
+    STAR_PERSIST_MIN_OTHERS = 3  # other recent frames needed to judge
 
     def _point_candidates(self, binary: np.ndarray, diff: np.ndarray, thr: float,
                           lines: List[Tuple[float, ...]]) -> Optional[List[Tuple[float, float, int, Tuple[float, int, float]]]]:
@@ -656,6 +663,31 @@ class SkyEventDetector:
         self._points = alive[:self.POINT_MAX_TRACKS]
         return events
 
+    def _on_stars(self, pts: List[Tuple[Any, ...]]) -> bool:
+        """True when most dots of a track lie on a spot that is also bright (above its surroundings) in the other
+        recent frames: a twinkling star, not something that moved there."""
+        frames = [(ts, cv2.cvtColor(f, cv2.COLOR_BGR2GRAY) if f.ndim == 3 else f) for ts, f in self._recent]
+        on = judged = 0
+        for p in pts:
+            x, y, pts_ts, pk = int(round(p[0])), int(round(p[1])), p[2], p[3]
+            others = [g for ts, g in frames if abs(ts - pts_ts) > 1e-3]
+            if len(others) < self.STAR_PERSIST_MIN_OTHERS:
+                continue
+            judged += 1
+            need = max(8.0, 0.4 * pk)
+            hits = 0
+            for g in others:
+                h, w = g.shape[:2]
+                y0, y1, x0, x1 = max(0, y - 1), min(h, y + 2), max(0, x - 1), min(w, x + 2)
+                by0, by1, bx0, bx1 = max(0, y - 8), min(h, y + 9), max(0, x - 8), min(w, x + 9)
+                if y1 <= y0 or x1 <= x0:
+                    continue
+                if float(g[y0:y1, x0:x1].max()) - float(np.median(g[by0:by1, bx0:bx1])) >= need:
+                    hits += 1
+            if hits >= 0.5 * len(others):
+                on += 1
+        return judged > 0 and on >= self.STAR_PERSIST_FRAC * judged
+
     def _finish_points(self, t: Dict[str, Any], enabled: set) -> Optional[Dict[str, Any]]:
         pts = t["pts"]
         if not pts:
@@ -753,6 +785,10 @@ class SkyEventDetector:
                 self.point_stats["tracks_rejected_cloud"] = self.point_stats.get("tracks_rejected_cloud", 0) + 1
                 return None
         peaks = [p[3] for p in pts]
+        if max(peaks) < self.WEAK_TRACK_PEAK:
+            if len(pts) < self.WEAK_TRACK_MIN_POINTS or self._on_stars(pts):
+                self.point_stats["tracks_rejected_starfield"] = self.point_stats.get("tracks_rejected_starfield", 0) + 1
+                return None
         blinking = t["blinks"] > 0 or max(peaks) > 2.5 * max(1, min(peaks))
         etype = "plane" if blinking or max(peaks) >= 60 else "satellite"
         if etype not in enabled:
