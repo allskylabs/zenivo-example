@@ -36,6 +36,7 @@
     const stretchChk = $("focus-stretch");
     const markersChk = $("focus-markers");
     const crossChk = $("focus-crosshair");
+    const peakChk = $("focus-peaking");
     const lensCard = $("focus-lens-card");
     const lensSlider = $("focus-lens-slider");
     // Flags shared by several focus files (a plain `let` cannot cross file boundaries)
@@ -328,6 +329,34 @@
     // ------------------------------------------------------------------
     // Rendering
     // ------------------------------------------------------------------
+    // Focus peaking (like Sony's red dots): native pixels whose local contrast (Laplacian of luma) stands out.
+    // Computed once per frame at native resolution (the crop is small), cached for redraws on resize.
+    const peak = { bmp: null, pts: null, cv: null };
+    function peakPoints(bmp) {
+        if (peak.bmp === bmp) return peak.pts;
+        const w = bmp.width, h = bmp.height;
+        if (!peak.cv) peak.cv = document.createElement("canvas");
+        peak.cv.width = w; peak.cv.height = h;
+        const c = peak.cv.getContext("2d", { willReadFrequently: true });
+        c.drawImage(bmp, 0, 0);
+        const d = c.getImageData(0, 0, w, h).data;
+        const y = new Float32Array(w * h);
+        for (let i = 0, j = 0; i < y.length; i++, j += 4) y[i] = 0.299 * d[j] + 0.587 * d[j + 1] + 0.114 * d[j + 2];
+        const g = new Float32Array(w * h);
+        let sum = 0, sum2 = 0, n = 0;
+        for (let yy = 1; yy < h - 1; yy++) for (let xx = 1; xx < w - 1; xx++) {
+            const i = yy * w + xx;
+            const v = Math.abs(4 * y[i] - y[i - 1] - y[i + 1] - y[i - w] - y[i + w]);
+            g[i] = v; sum += v; sum2 += v * v; n++;
+        }
+        const mean = sum / Math.max(1, n), sd = Math.sqrt(Math.max(0, sum2 / Math.max(1, n) - mean * mean));
+        const thr = Math.max(24, mean + 3 * sd);
+        const pts = [];
+        for (let i = 0; i < g.length; i++) if (g[i] >= thr) pts.push(i % w, (i / w) | 0);
+        peak.bmp = bmp; peak.pts = pts;
+        return pts;
+    }
+
     function drawZoom() {
         const bmp = st.bitmap;
         if (!bmp) return;
@@ -345,6 +374,15 @@
         ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
         const scale = canvas.width / bmp.width;
         $("focus-zoom-label").textContent = `· ${bmp.width}×${bmp.height} native px · ${(side / bmp.width).toFixed(1)}× on screen`;
+
+        if (peakChk && peakChk.checked) {
+            const pts = peakPoints(bmp);
+            const sz = Math.max(2 * dpr, scale * 0.7);
+            ctx.fillStyle = "rgba(255,32,32,0.95)";
+            for (let k = 0; k < pts.length; k += 2) {
+                ctx.fillRect((pts[k] + 0.5) * scale - sz / 2, (pts[k + 1] + 0.5) * scale - sz / 2, sz, sz);
+            }
+        }
 
         const res = st.lastResult;
         if (markersChk.checked && res && res.sources) {
@@ -433,5 +471,5 @@
         $("focus-stat-n").textContent = String(vals.length);
     }
 
-    Object.assign(F, { $, api, applyState, badge, canvas, crossChk, drawZoom, flags, fmtScore, frameLoop, keepBtn, lensCard, lensChart, lensChartCtx, lensSlider, markersChk, overviewImg, overviewWrap, roiBox, roiSizeSel, setTxt, st, stretchChk, syncRoiModeUi, timeChart, timeChartCtx, toggleBtn, updateStats, wrap });
+    Object.assign(F, { $, api, applyState, badge, canvas, crossChk, peakChk, drawZoom, flags, fmtScore, frameLoop, keepBtn, lensCard, lensChart, lensChartCtx, lensSlider, markersChk, overviewImg, overviewWrap, roiBox, roiSizeSel, setTxt, st, stretchChk, syncRoiModeUi, timeChart, timeChartCtx, toggleBtn, updateStats, wrap });
 })();

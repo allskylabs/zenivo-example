@@ -6,7 +6,7 @@
     "use strict";
     const F = window.ZenivoFocus;
     if (!F || !F.onFocusPage) return;
-    const { toggleBtn, overviewImg, overviewWrap, roiBox, roiSizeSel, stretchChk, markersChk, crossChk, st, api, syncRoiModeUi, applyState, frameLoop, drawZoom, updateStats, $, recordLensMeasurement, updateCurveSummary, drawChart } = F;
+    const { toggleBtn, overviewImg, overviewWrap, roiBox, roiSizeSel, stretchChk, markersChk, crossChk, peakChk, st, api, syncRoiModeUi, applyState, frameLoop, drawZoom, updateStats, $, recordLensMeasurement, updateCurveSummary, drawChart } = F;
     // Defined in files loaded later: call through F at run time
     const setLensPoll = (...a) => F.setLensPoll(...a);
 
@@ -163,7 +163,7 @@
             else await maybeSweepCurrentRoi();
         } catch (e) { alert(`Auto point: ${e.message}`); }
     });
-    [markersChk, crossChk].forEach((c) => c.addEventListener("change", drawZoom));
+    [markersChk, crossChk, peakChk].forEach((c) => c.addEventListener("change", drawZoom));
     stretchChk.addEventListener("change", refreshOverview);
 
     async function pickSource(lights) {
