@@ -16,6 +16,22 @@ is the main design constraint: heavy analysis is sampled, never done per frame.
 > paths (colour ZWO/QHY sensors, QHY cooling, touch gestures on real phones, long unattended runs) have never run on real hardware. It is provided
 > as is, without warranty (see [LICENSE](LICENSE)); whoever installs it accepts all the risks. Live demo: <https://sky.hoan.uk>.
 
+## Screenshots
+
+Captured from the live station at <https://sky.hoan.uk> (Sony Starvis IMX335):
+
+| Live view & overlays | WebGL observer sky view |
+| :---: | :---: |
+| ![Zenivo live view with constellation overlays, exposure controls and recent meteor event](docs/screenshots/live.webp) | ![Zenivo WebGL observer sky view with constellations, satellites and aircraft](docs/screenshots/sky.webp) |
+
+| Satellites 3D | Flights 3D |
+| :---: | :---: |
+| ![Zenivo Satellites 3D showing orbital tracks and naked-eye visible passes](docs/screenshots/satellites3d.webp) | ![Zenivo Flights 3D showing terrain, camera FOV dome and nearby aircraft](docs/screenshots/flights3d.webp) |
+
+| Daily gallery (timelapse, keogram, startrails) | Opt-in community map |
+| :---: | :---: |
+| ![Zenivo Gallery & Events with daily timelapse, keogram and startrails](docs/screenshots/gallery.webp) | ![Zenivo decentralized community map with stations in Vietnam and the USA](docs/screenshots/community.webp) |
+
 ## Privacy in short
 
 - No telemetry, no call home, no auto-update, no remote control, no licence check.
