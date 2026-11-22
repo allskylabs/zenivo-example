@@ -288,12 +288,13 @@
             box.appendChild(zoom);
             if (relayNote) box.appendChild(el("div", "meta", relayNote));
         }
+        const acts = el("div", "acts");   // "Open station" and "Message" share one row
         if (base && card.open !== false) {
             const a = el("a", "open", "Open station");
             a.href = base;
             a.target = "_blank";
             a.rel = "noopener noreferrer";
-            box.appendChild(a);
+            acts.appendChild(a);
         } else if (base) {
             box.appendChild(el("div", "meta", "The owner does not link to this station's page."));
         } else if (!(card.relays || relayed[card.id])) {
@@ -303,8 +304,9 @@
             const msg = el("button", "msg", "Message");
             msg.type = "button";
             msg.addEventListener("click", () => window.ZenivoChat.openDM(card.id));
-            box.appendChild(msg);
+            acts.appendChild(msg);
         }
+        if (acts.childNodes.length) box.appendChild(acts);
         return box;
     }
 
@@ -316,6 +318,7 @@
         layer.clearLayers();
         stations = [];
         listEl.textContent = "";
+        listEl.classList.remove("dm-col");
         const accent = cssVar("--accent"), other = cssVar("--success");
         const valid = cards.filter((c) => c && finite(c.lat) && finite(c.lon) && Math.abs(c.lat) <= 90 && Math.abs(c.lon) <= 180);
         const rank = { online: 0, idle: 1, offline: 2 }, seenOf = (c) => { const t = Number(seenMap[c.id]) || Number(c.updated) || 0; return t > 1e12 ? t / 1000 : t; };
@@ -367,7 +370,7 @@
                 dm.setAttribute("aria-label", `Message ${String(card.name || "this station")}`);
                 dm.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
                 dm.addEventListener("click", () => window.ZenivoChat.openDM(card.id));
-                item.classList.add("has-dm");
+                listEl.classList.add("dm-col");   // reserve the gutter on every row so the status column stays aligned
                 item.appendChild(dm);
             }
             listEl.appendChild(item);
