@@ -92,35 +92,45 @@ class ChatNet:
         if me is None:
             return {}
         local = m.chat_local()
-        got = {"public": 0, "dm": 0, "hubs_ok": 0, "hubs_failed": 0}
+        got = {"public": 0, "dm": 0, "fwd": 0, "hubs_ok": 0, "hubs_failed": 0}
         hubs = self.hubs()[:MAX_POLL_HUBS]
         now = time.time()
+        stats = m.chat_stats()
+        as_hub = m.chat_hub()      # a hub pulls like a hub: all direct messages (ciphertext) and hop counts
         for base, priv in hubs:
+            ckey = base + "#hub" if as_hub else base      # a separate cursor: the two modes see different messages
             try:
                 for _ in range(MAX_PAGES):
-                    cursor = float(local.cursors.get(base, 0.0))
-                    reply = self._fetch(f"{base}/api/community/chat/messages?since={cursor!r}", allow_private=priv,
-                                        headers=chatmod.sign_fetch(me), timeout=15.0)
+                    cursor = float(local.cursors.get(ckey, 0.0))
+                    reply = self._fetch(f"{base}/api/community/chat/messages?since={cursor!r}" + ("&hub=1" if as_hub else ""),
+                                        allow_private=priv, headers=chatmod.sign_fetch(me, hub=as_hub), timeout=15.0)
                     msgs = reply.get("messages") if isinstance(reply, dict) else None
                     nxt = reply.get("next") if isinstance(reply, dict) else None
                     if not isinstance(msgs, list) or isinstance(nxt, bool) or not isinstance(nxt, (int, float)):
                         raise ValueError("bad reply")
-                    for msg in msgs[:500]:
-                        kind = m.chat_ingest(msg)
-                        if kind in ("public", "dm"):
+                    hl = reply.get("hops") if as_hub else None
+                    if not isinstance(hl, list) or len(hl) != len(msgs):
+                        hl = [0] * len(msgs)
+                    for msg, h in list(zip(msgs, hl))[:500]:
+                        h = h if isinstance(h, int) and not isinstance(h, bool) and 0 <= h <= chatmod.MAX_HOPS else 0
+                        kind = m.chat_ingest(msg, hops=h, origin=base)
+                        if kind in ("public", "dm", "fwd"):
                             got[kind] += 1
                     if nxt > cursor:
-                        local.set_cursor(base, float(nxt))
+                        local.set_cursor(ckey, float(nxt))
                     if reply.get("more") is not True or not nxt > cursor:
                         break
                 got["hubs_ok"] += 1
+                stats.peer(base, "pulled", 0, ok=True)
             except Exception as exc:
                 got["hubs_failed"] += 1
+                stats.peer(base, "pull_fail")
                 logger.debug("Chat poll %s failed: %s", base, exc)
         if hubs and now - self._last_keys > KEYS_EVERY_S:
             self._refresh_keys(hubs)
         self._publish_key(hubs)
         local.save(force=False)
+        stats.save(force=False)
         self.last = got
         return got
 
@@ -187,6 +197,7 @@ class ChatNet:
                 msg = chatmod.make_dm(me, to, rec["xpub"], plain)
         except chatmod.ChatError as exc:
             raise chatmod.ChatRefused(400, str(exc))
+        stats = m.chat_stats()
         payload: Dict[str, Any] = {"msg": msg}
         own_key = m.chat_own_key_record()
         delivered = 0
@@ -207,8 +218,12 @@ class ChatNet:
                     self._published[base] = now
             except Exception as exc:
                 logger.debug("Chat post to %s failed: %s", base, exc)
+                stats.inc("send_fail")
+                stats.peer(base, "send_fail")
         if not delivered:
             raise chatmod.ChatRefused(503, "No hub could be reached (a hub is a station with chat on and a public address)")
+        stats.inc("sent_public" if to == chatmod.PUBLIC else "sent_dm")
         local.add(to, msg, plain, incoming=False)
         local.save(force=False)
+        stats.save(force=False)
         return {"ok": True, "mid": msg["mid"], "hubs": delivered}

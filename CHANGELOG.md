@@ -8,6 +8,8 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Added
 
+- Community chat forwarding: hubs pull private messages (ciphertext) from each other with a signed hub-pull request, so a message reaches the recipient through any reachable hub (hop counter outside the signature, 4 hops, global cap of 5000 private messages; messages from a sender whose card is not known yet wait in a pending queue instead of being lost). Chat statistics for the owner (`data/community_chat_stats.json`, `GET /api/community/chat/stats`, Community page and Settings). More hubs now see who talks to whom and when, never the content. See docs/COMMUNITY.md "Chat".
+
 - Community: opt-out station chat (public room and end-to-end encrypted private messages) through hub stations, effective only while Community sharing is on (`chat_enabled`, default on; untick "Chat with other stations" in Settings). Signed messages, rate limits, block list, 7-day expiry; the chat panel is on the Community page. See docs/COMMUNITY.md "Chat".
 
 ## [1.3.0-beta.3] - 2026-11-18

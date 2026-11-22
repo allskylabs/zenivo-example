@@ -136,16 +136,36 @@ Chat is owner-only in the UI (Community page, panel "Chat"); all remote text is 
   minute per client address, 20 per minute and 300 per day per station, 16 KB body, clock skew at most 300 s),
   `GET /api/community/chat/messages?since=` (public room; private messages only with the headers `X-Zenivo-Id`, `X-Zenivo-Time`,
   `X-Zenivo-Sig` = signature over `zenivo-chat-fetch-v1\n<id>\n<time>`, within 300 s; about 500 messages / 200 KB per answer),
-  `GET /api/community/chat/keys`. Hubs also pull the public room from other hubs each gossip round.
+  `GET /api/community/chat/keys`. Hubs also pull from other hubs each gossip round (see "Forwarding" below).
+- **Forwarding (store-and-forward mesh)**: a hub pulls with `GET /api/community/chat/messages?since=&hub=1` and the headers
+  signed under the domain `zenivo-chat-hubpull-v1\n<id>\n<time>` (within 300 s). The answering hub accepts it only from a
+  station whose card it knows **and** that card has a `url` (a hub itself); the answer holds the public room **and every
+  private message (ciphertext)** plus `hops` (one counter per message). A normal station fetch is unchanged (public room plus its
+  own private messages). A message carries a hop counter that is **not part of the signed content** (stored beside it, so the
+  signature still verifies the original); a hub adds 1 when it ingests from another hub, never hands on a message that has
+  reached 4 hops and drops it beyond; duplicates are dropped by `mid`. Caps are the same everywhere: 7 days, 200 private messages
+  per recipient (oldest first), 2000 public, and 5000 private messages in all so forwarding cannot fill the disk. Blocked senders
+  are neither stored nor forwarded. A pulled message whose sender card is not known yet waits in a pending queue (500 messages,
+  24 h, memory only) and is retried after the next gossip round merged more cards, instead of being lost while the cursor moves on.
+  Recipients still poll up to 3 hubs; any reachable hub that has received the message (directly or from another hub) delivers it,
+  and delivery to the local chat is idempotent by `mid`.
+- **Statistics (owner only)**: `data/community_chat_stats.json` and `GET /api/community/chat/stats` (admin) hold counters only,
+  never message content or recipients: own messages sent (public/private) and received, send failures per hub; as a hub messages
+  accepted from stations, pulled from hubs, served in answers, refused by reason (rate limit, unknown station, bad signature, too
+  old, cap), private messages held now (count and number of distinct recipients) and the pending queue; per day for 30 days,
+  totals since start, and per peer hub pulled / served / last ok. Shown in the Community page chat panel ("Chat statistics") and
+  as one line in Settings, Community. Written atomically, at most every 30 s.
 - **Clients** send to up to 3 hubs (seeds first, then stations with `chat: true`), poll them every gossip round (and every 30 s
   while the chat panel is open) and decrypt private messages locally. A message from a sender whose card the receiver does not
-  know is dropped.
+  know yet is kept in the pending queue (see "Forwarding").
 - **Block list**: the owner can block a station; its messages are hidden, not stored and not forwarded by this station.
 
 Threat model for chat: hubs see who talks to whom and when (not private contents); anyone can create identities, so spam is
 limited by the rate limits above, size caps, expiry and the block list, not prevented; public messages are readable by everyone;
-private messages are **not replicated between hubs** (a pull returns the public room plus the private messages for the polling
-station), so sender and recipient need a hub in common (seeds are tried first); a replayed fetch header within 300 s only
+private messages are **forwarded between hubs** (ciphertext only, up to 4 hops), so more hubs than the sender pushed to now see
+who talks to whom and when, never the content; a hub-pull header only works with a station that has an address, and a replayed
+header within 300 s only reveals ciphertext and metadata; a malicious hub can drop or delay messages (the recipient polls up to 3
+hubs); a replayed fetch header within 300 s only
 reveals ciphertext and metadata; there is no forward secrecy for the long-term key beyond the per-message ephemeral key on the sender side.
 
 ## Threat model

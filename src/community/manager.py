@@ -90,6 +90,8 @@ class CommunityManager:
         self._chat_day: Dict[str, Deque[float]] = {}
         self._chat_hubs: Dict[str, Dict[str, Any]] = {}   # origin -> {t, on, private}: what the last announce said
         self._chat_net: Any = None
+        self._chat_stats: Any = None
+        self._chat_pending: List[Dict[str, Any]] = []   # pulled messages whose sender card is not known yet (memory only)
         self.worker = GossipWorker(self)
 
     # -- paths / settings --------------------------------------------------
@@ -564,6 +566,13 @@ class CommunityManager:
                 self._chat_local = chatmod.LocalChat(self._path("community_chat_local.json"))
             return self._chat_local
 
+    def chat_stats(self):
+        from src.community.chatstats import ChatStats
+        with self._lock:
+            if self._chat_stats is None:
+                self._chat_stats = ChatStats(self._path("community_chat_stats.json"))
+            return self._chat_stats
+
     def chat_net(self):
         from src.community.chatnet import ChatNet
         with self._lock:
@@ -576,6 +585,8 @@ class CommunityManager:
         if self._chat_store is not None:
             self._chat_store.clear()
             self._chat_store = None
+        with self._lock:
+            self._chat_pending = []
         try:
             os.unlink(self._path("community_chat.json"))
         except OSError:
@@ -609,34 +620,91 @@ class CommunityManager:
         self._ensure()
         return self._registry.get(station_id)
 
-    def chat_ingest(self, msg: Any, now: Optional[float] = None, store: bool = True) -> str:
-        """A message that arrived from a hub: check it and file it. Returns "public", "dm", "dup" or "drop"."""
+    def chat_ingest(self, msg: Any, now: Optional[float] = None, store: bool = True, hops: Optional[int] = None,
+                    origin: Optional[str] = None) -> str:
+        """A message that arrived from a hub: check it, file it (a hub keeps public messages and direct messages for
+        others and passes them on), deliver it to the local chat when it is for us. `hops` = hop count the serving hub
+        reported (None: not a pull; stored count is hops + 1); `origin` = that hub, for the statistics. Returns
+        "public", "dm", "fwd" (kept for others), "dup", "pending" (sender card not known yet, retried) or "drop"."""
         now = time.time() if now is None else now
+        pulled = hops is not None
+        stats = self.chat_stats()
         try:
             chatmod.check_message(msg)
             if now - msg["t"] > chatmod.TTL_S or msg["t"] > now + chatmod.SKEW_S:
+                if pulled:
+                    stats.inc("refused_old", now=now)
                 return "drop"
             card = self._chat_card(msg["from"])
             if card is None:
+                if pulled:
+                    self._chat_pend(msg, hops, origin, now)
+                    return "pending"
                 return "drop"
             chatmod.verify_message(msg, card.get("pubkey"))
         except chatmod.ChatError:
+            if pulled:
+                stats.inc("refused_sig", now=now)
             return "drop"
         local = self.chat_local()
         me = self._identity.id if self._identity else None
         if local.is_blocked(msg["from"]):
             return "drop"
+        stored = False
+        if store and self.chat_hub() and msg["to"] != me:
+            st = self.chat_store()
+            before = st.evicted
+            stored = st.add(msg, now, hops=0 if hops is None else hops + 1)
+            if st.evicted > before:
+                stats.inc("refused_cap", st.evicted - before, now=now)
+            if stored and pulled:
+                stats.inc("hub_pulled", now=now)
+                if origin:
+                    stats.peer(origin, "pulled", ok=True, now=now)
         if msg["to"] == chatmod.PUBLIC:
-            if store and self.chat_hub():
-                self.chat_store().add(msg, now)
-            return "public" if local.add(chatmod.PUBLIC, msg, msg["body"], incoming=msg["from"] != me, now=now) else "dup"
+            incoming = msg["from"] != me
+            if not local.add(chatmod.PUBLIC, msg, msg["body"], incoming=incoming, now=now):
+                return "dup"
+            if incoming:
+                stats.inc("recv_public", now=now)
+            return "public"
         if msg["to"] == me:
             try:
                 text = chatmod.open_dm(msg, self.chat_key())
             except chatmod.ChatError:
                 return "drop"
-            return "dm" if local.add(msg["from"], msg, text, incoming=True, now=now) else "dup"
-        return "drop"
+            if not local.add(msg["from"], msg, text, incoming=True, now=now):
+                return "dup"
+            stats.inc("recv_dm", now=now)
+            return "dm"
+        return "fwd" if stored else "drop"
+
+    def _chat_pend(self, msg: Dict[str, Any], hops: int, origin: Optional[str], now: float) -> None:
+        with self._lock:
+            if any(e["msg"]["mid"] == msg["mid"] for e in self._chat_pending):
+                return
+            self._chat_pending.append({"msg": msg, "hops": hops, "origin": origin, "t": now})
+            del self._chat_pending[:-chatmod.PENDING_CAP]
+
+    def chat_retry_pending(self, now: Optional[float] = None) -> int:
+        """After the gossip round merged more cards: file the pending messages whose sender is known now; drop those
+        waiting for more than 24 h. Returns how many were filed."""
+        now = time.time() if now is None else now
+        with self._lock:
+            items, self._chat_pending = self._chat_pending, []
+        done = 0
+        keep: List[Dict[str, Any]] = []
+        for e in items:
+            if now - e["t"] > chatmod.PENDING_TTL_S:
+                self.chat_stats().inc("refused_unknown", now=now)
+            elif self._chat_card(e["msg"]["from"]) is None:
+                keep.append(e)
+            else:
+                done += 1
+                self.chat_ingest(e["msg"], now, hops=e["hops"], origin=e["origin"])
+        with self._lock:
+            self._chat_pending = (keep + self._chat_pending)[-chatmod.PENDING_CAP:]
+        return done
 
     def accept_chat_post(self, payload: Any, now: Optional[float] = None) -> Dict[str, Any]:
         """Hub: one message and/or the sender's chat key record, from a station whose card we know. The caller has
@@ -651,8 +719,10 @@ class CommunityManager:
             sender = msg.get("from") if isinstance(msg, dict) else None
         else:
             sender = key.get("id") if isinstance(key, dict) else None
+        stats = self.chat_stats()
         card = self._chat_card(sender)
         if card is None:
+            stats.inc("refused_unknown", now=now)
             raise chatmod.ChatRefused(403, "Unknown station")
         if self._identity is not None and sender == self._identity.id:
             raise chatmod.ChatRefused(400, "Own messages do not need a hub")
@@ -663,36 +733,73 @@ class CommunityManager:
             if key is not None:
                 chatmod.verify_key_record(key, card.get("pubkey"), now)
         except chatmod.ChatError as exc:
+            late = "time" in str(exc) or "future" in str(exc)
+            stats.inc("refused_old" if late else "refused_sig", now=now)
             raise chatmod.ChatRefused(403 if "signature" in str(exc) else 400, str(exc))
         try:
             self.chat_rate(sender, "station")    # counted only for verified items: nobody can use up another station's quota
         except RateLimited:
+            stats.inc("refused_rate", now=now)
             raise chatmod.ChatRefused(429, "Too many messages from this station")
         store = self.chat_store()
         stored = False
         if key is not None:
             store.put_key(key)
         if msg is not None and not self.chat_local().is_blocked(sender):
+            before = store.evicted
             stored = store.add(msg, now)
+            if store.evicted > before:
+                stats.inc("refused_cap", store.evicted - before, now=now)
             if stored:
+                stats.inc("hub_accepted", now=now)
                 self.chat_ingest(msg, now, store=False)    # a message for this hub's own owner lands in the local thread
         store.save(force=False)
+        stats.save(force=False)
         return {"ok": True, "stored": stored}
 
     def chat_fetch(self, since: float, station_id: Optional[str], t_header: Optional[str], sig_header: Optional[str],
-                   now: Optional[float] = None) -> Dict[str, Any]:
-        """Hub: the public room, plus the direct messages of the station that signed the request headers."""
+                   now: Optional[float] = None, hub: bool = False) -> Dict[str, Any]:
+        """Hub: the public room, plus the direct messages of the station that signed the request headers. With `hub`
+        (another hub pulling): every direct message (ciphertext) and the hop counts, only when the headers carry a
+        hub-pull signature of a station whose card we know and which has an address itself (is a hub)."""
         if not self.chat_hub():
             raise chatmod.ChatRefused(404, "This station is not a chat hub")
         dm_for = None
-        if station_id or t_header or sig_header:
+        origin = None
+        if hub or station_id or t_header or sig_header:
             card = self._chat_card(station_id)
-            if card is None or not chatmod.verify_fetch(card.get("pubkey"), station_id, t_header, sig_header, now):
+            if card is None or not chatmod.verify_fetch(card.get("pubkey"), station_id, t_header, sig_header, now, hub=hub):
                 raise chatmod.ChatRefused(403, "Bad signature")
+            if hub:
+                if not card.get("url"):
+                    raise chatmod.ChatRefused(403, "Only hubs may pull all messages")
+                origin = card["url"]
             dm_for = station_id
+        hops: Optional[List[int]] = [] if hub else None
         msgs, nxt, more = self.chat_store().fetch(since, dm_for=dm_for, limit=500, max_bytes=200 * 1024,
-                                                  hidden=self.chat_local().is_blocked)
-        return {"messages": msgs, "next": nxt, "more": more}
+                                                  hidden=self.chat_local().is_blocked, all_dm=hub, hops_out=hops)
+        stats = self.chat_stats()
+        stats.inc("hub_served", len(msgs))
+        if origin:
+            stats.peer(origin, "served", len(msgs), ok=True)
+        out: Dict[str, Any] = {"messages": msgs, "next": nxt, "more": more}
+        if hops is not None:
+            out["hops"] = hops
+        return out
+
+    def chat_count(self, name: str, n: int = 1) -> None:
+        self.chat_stats().inc(name, n)
+
+    def chat_stats_payload(self) -> Dict[str, Any]:
+        """Owner: counters (no content), what this hub holds right now (counts only) and the pending queue."""
+        snap = self.chat_stats().snapshot()
+        held = {"public": 0, "dm": 0, "recipients": 0}
+        if self.chat_hub():
+            c = self.chat_store().counts()
+            held = {"public": c["public"], "dm": c["dm"], "recipients": self.chat_store().dm_stats()[1]}
+        with self._lock:
+            pending = len(self._chat_pending)
+        return dict(snap, enabled=self.chat_on(), hub=self.chat_hub(), held=held, pending=pending)
 
     def chat_keys_payload(self) -> Dict[str, Any]:
         if not self.chat_hub():
@@ -727,7 +834,9 @@ class CommunityManager:
         """Called by the gossip worker after each round: poll the hubs, tidy and save."""
         if not self.chat_on():
             return
+        self.chat_retry_pending()      # the gossip round has just merged cards
         self.chat_net().round()
+        self.chat_stats().save(force=False)
         if self._chat_store is not None:
             self._chat_store.sweep(known=lambda i: self._registry.get(i) is not None)
             self._chat_store.save(force=False)

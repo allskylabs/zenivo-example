@@ -71,7 +71,7 @@ class TestDefaultDeny:
 
     def test_admin_only_reads(self, guest_client, fresh_auth):
         c = guest_client
-        for path in ("/api/logs", "/api/logs/download", "/api/community/settings"):
+        for path in ("/api/logs", "/api/logs/download", "/api/community/settings", "/api/community/chat/stats"):
             assert c.get(path).status_code == 401
         assert c.get("/api/status").status_code == 200
         assert c.get("/api/community/peers").status_code == 200

@@ -165,11 +165,28 @@
     }
     box.addEventListener("change", syncChat);
 
+    // One line of chat counters (owner only; counts, never content)
+    async function loadChatStats() {
+        const el = document.getElementById("community-chat-stats");
+        if (!el) return;
+        try {
+            const res = await fetch("/api/community/chat/stats");
+            const s = res.ok ? await res.json() : null;
+            if (!s || !s.enabled) { el.hidden = true; return; }
+            const t = s.totals || {};
+            let line = `Chat: sent ${(t.sent_public || 0) + (t.sent_dm || 0)}, received ${(t.recv_public || 0) + (t.recv_dm || 0)}, failed sends ${t.send_fail || 0}.`;
+            if (s.hub) line += ` As a hub: accepted ${t.hub_accepted || 0}, pulled ${t.hub_pulled || 0}, served ${t.hub_served || 0}; holding ${s.held.dm} private message(s) for ${s.held.recipients} station(s); ${s.pending} waiting for a card.`;
+            el.textContent = line;
+            el.hidden = false;
+        } catch (err) { /* optional feature */ }
+    }
+
     async function loadStatus() {
         try {
             const res = await fetch("/api/community/status");
             if (res.ok) showStatus(await res.json());
         } catch (err) { /* optional feature */ }
+        loadChatStats();
     }
 
     async function load() {

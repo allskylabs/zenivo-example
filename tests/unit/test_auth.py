@@ -133,6 +133,7 @@ class TestPolicy:
         ("GET", "/api/logs", policy.ADMIN),
         ("GET", "/api/logs/download", policy.ADMIN),
         ("GET", "/api/community/settings", policy.ADMIN),
+        ("GET", "/api/community/chat/stats", policy.ADMIN),
         ("GET", "/api/focus", policy.ADMIN),
         ("GET", "/api/focus/frame", policy.ADMIN),
         ("GET", "/api/focus/overview.jpg", policy.ADMIN),

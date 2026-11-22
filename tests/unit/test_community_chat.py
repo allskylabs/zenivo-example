@@ -104,3 +104,49 @@ class TestStore:
         assert chat.ChatStore(str(tmp_path / "c.json")).counts()["public"] == 3   # survives a restart
         store.clear()
         assert not os.path.exists(str(tmp_path / "c.json")) and store.counts()["public"] == 0
+
+
+class TestForwarding:
+    def test_hops_limit_and_signature_survives(self, alice, bob, tmp_path):
+        store = chat.ChatStore(str(tmp_path / "h.json"))
+        xp = chat._b64(bytes(range(32)))
+        ok = chat.make_public(alice, "hop")
+        assert store.add(ok, hops=3) and not store.add(chat.make_public(alice, "x"), hops=chat.MAX_HOPS + 1)
+        assert store.add(chat.make_dm(alice, bob.id, xp, "fwd"), hops=chat.MAX_HOPS)   # kept, never handed on
+        out = []
+        msgs, _, _ = store.fetch(0.0, all_dm=True, hops_out=out)
+        assert [m["mid"] for m in msgs] == [ok["mid"]] and out == [3]
+        chat.verify_message(msgs[0], pub(alice))                       # the hop counter is not signed content
+        assert "h" not in msgs[0]
+        assert len(store.fetch(0.0, dm_for=bob.id)[0]) == 2            # the recipient itself still gets it
+
+    def test_global_dm_cap_and_hub_pull_signature(self, alice, bob, tmp_path, monkeypatch):
+        monkeypatch.setattr(chat, "DM_GLOBAL_CAP", 3)
+        store = chat.ChatStore(str(tmp_path / "g.json"))
+        xp = chat._b64(bytes(range(32)))
+        for i in range(5):
+            store.add(chat.make_dm(alice, bob.id, xp, f"d{i}"))
+        assert store.dm_stats()[0] == 3
+        h = chat.sign_fetch(alice, hub=True)
+        t = h["X-Zenivo-Time"]
+        assert chat.verify_fetch(pub(alice), alice.id, t, h["X-Zenivo-Sig"], hub=True)
+        assert not chat.verify_fetch(pub(alice), alice.id, t, h["X-Zenivo-Sig"])   # the domains do not mix
+
+
+class TestStats:
+    def test_counters_days_peers_and_persistence(self, tmp_path):
+        from src.community.chatstats import ChatStats
+        p = str(tmp_path / "s.json")
+        s = ChatStats(p)
+        s.inc("sent_dm", 2, now=86400 * 100)
+        s.inc("bogus")
+        s.inc("recv_public", now=86400 * 200)
+        s.peer("https://h.example", "pulled", 3, ok=True, now=5.0)
+        snap = s.snapshot()
+        assert snap["totals"]["sent_dm"] == 2 and snap["totals"]["recv_public"] == 1
+        assert len(snap["days"]) == 2 and snap["peers"]["https://h.example"]["pulled"] == 3
+        for d in range(40):
+            s.inc("send_fail", now=86400 * (300 + d))
+        assert len(s.snapshot()["days"]) == 30
+        s.save(force=True)
+        assert ChatStats(p).snapshot()["totals"]["send_fail"] == 40

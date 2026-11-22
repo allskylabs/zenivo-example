@@ -208,6 +208,7 @@ async def post_community_chat(request: Request, service: AllSkyService = Depends
     try:
         mgr.chat_rate(key, "ip")
     except RateLimited:
+        mgr.chat_count("refused_rate")
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests")
     length = request.headers.get("content-length")
     if length is not None and length.isdigit() and int(length) > _CHAT_MAX_BODY:
@@ -233,8 +234,10 @@ async def post_community_chat(request: Request, service: AllSkyService = Depends
 
 
 @router.get("/api/community/chat/messages")
-def get_community_chat_messages(request: Request, since: float = 0.0, service: AllSkyService = Depends(get_service)):
-    """Public room; plus the direct messages of the station that signed X-Zenivo-Id/-Time/-Sig."""
+def get_community_chat_messages(request: Request, since: float = 0.0, hub: int = 0,
+                                service: AllSkyService = Depends(get_service)):
+    """Public room; plus the direct messages of the station that signed X-Zenivo-Id/-Time/-Sig. `hub=1`: another hub
+    pulling every direct message (ciphertext) with hop counts; needs a hub-pull signature of a station with an address."""
     import math
     from src.community.chat import ChatRefused
     mgr = service.community
@@ -243,7 +246,7 @@ def get_community_chat_messages(request: Request, since: float = 0.0, service: A
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bad cursor")
     h = request.headers
     try:
-        out = mgr.chat_fetch(since, h.get("x-zenivo-id"), h.get("x-zenivo-time"), h.get("x-zenivo-sig"))
+        out = mgr.chat_fetch(since, h.get("x-zenivo-id"), h.get("x-zenivo-time"), h.get("x-zenivo-sig"), hub=bool(hub))
     except ChatRefused as exc:
         raise HTTPException(status_code=exc.status, detail=exc.detail)
     return Response(content=json.dumps(out, separators=(",", ":")), media_type="application/json",
@@ -260,6 +263,12 @@ def get_community_chat_keys(service: AllSkyService = Depends(get_service)):
                         headers=_COMMUNITY_CORS)
     except ChatRefused as exc:
         raise HTTPException(status_code=exc.status, detail=exc.detail)
+
+
+@router.get("/api/community/chat/stats")
+def get_community_chat_stats(service: AllSkyService = Depends(get_service)):
+    """Owner: chat counters (no message content), see docs/COMMUNITY.md "Chat"."""
+    return service.community.chat_stats_payload()
 
 
 @router.get("/api/community/chat/local")

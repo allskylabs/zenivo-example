@@ -137,3 +137,75 @@ class TestChatAPI:
         assert client.get("/api/community/chat/local").status_code == 404
         settings(client, chat_enabled=True, enabled=False)              # sharing off: chat off whatever the box says
         assert client.get("/api/community/chat/local").status_code == 404
+
+
+def hub_station(client, path, url):
+    ident = Identity(str(path))
+    card = build_card(ident, name="H" + ident.id[:4], lat=1.0, lon=2.0, precision_deg=0.1, url=url, camera=None,
+                      software="Zenivo 1.1.0")
+    assert client.post("/api/community/announce", json=card).status_code == 200
+    return ident
+
+
+class TestForwarding:
+    def test_hub_pull_needs_signed_hub_headers_and_a_hub(self, client, tmp_path):
+        settings(client, enabled=True, public_url=HUB, seeds=[], chat_enabled=True)
+        a = station(client, tmp_path / "a.pem")
+        b = station(client, tmp_path / "b.pem")
+        other = hub_station(client, tmp_path / "o.pem", "https://other.example.org")
+        key = chat.ChatKey(str(tmp_path / "b.key"))
+        rec = chat.make_key_record(b, key)
+        assert post(client, {"msg": chat.make_dm(a, b.id, rec["xpub"], "psst")}).json()["stored"] is True
+        url = "/api/community/chat/messages?since=0&hub=1"
+        reply = client.get(url, headers=chat.sign_fetch(other, hub=True)).json()
+        assert [m["to"] for m in reply["messages"]] == [b.id] and reply["hops"] == [0]
+        assert client.get(url, headers=chat.sign_fetch(a, hub=True)).status_code == 403      # no address: not a hub
+        assert client.get(url, headers=chat.sign_fetch(other)).status_code == 403            # wrong signature domain
+        assert client.get(url).status_code == 403
+        plain = client.get("/api/community/chat/messages?since=0", headers=chat.sign_fetch(a)).json()["messages"]
+        assert not [m for m in plain if m["to"] == b.id]                                     # a normal station: own DMs only
+
+    def test_dm_reaches_a_recipient_through_another_hub(self, client, tmp_path):
+        settings(client, enabled=True, public_url=HUB, seeds=[], chat_enabled=True)
+        mgr = client.service.community
+        a = station(client, tmp_path / "a.pem")
+        b = station(client, tmp_path / "b.pem")
+        far = hub_station(client, tmp_path / "far.pem", "https://far.example.org")
+        key = chat.ChatKey(str(tmp_path / "b.key"))
+        rec = chat.make_key_record(b, key)
+        msg = chat.make_dm(a, b.id, rec["xpub"], "via two hubs")
+        assert mgr.chat_ingest(msg, hops=1, origin="https://far.example.org") == "fwd"      # as if pulled from another hub
+        assert mgr.chat_ingest(msg, hops=1, origin="https://far.example.org") == "drop"     # duplicate mid
+        mine = client.get("/api/community/chat/messages?since=0", headers=chat.sign_fetch(b)).json()["messages"]
+        assert chat.open_dm(next(m for m in mine if m["to"] == b.id), key) == "via two hubs"
+        onward = client.get("/api/community/chat/messages?since=0&hub=1", headers=chat.sign_fetch(far, hub=True)).json()
+        assert onward["hops"][[m["mid"] for m in onward["messages"]].index(msg["mid"])] == 2  # hops + 1 on ingest
+        late = chat.make_dm(a, b.id, rec["xpub"], "too far")
+        assert mgr.chat_ingest(late, hops=4, origin="https://far.example.org") == "drop"    # would exceed 4 hops
+        near_end = chat.make_dm(a, b.id, rec["xpub"], "last hop")
+        assert mgr.chat_ingest(near_end, hops=3, origin="https://far.example.org") == "fwd"
+        onward = client.get("/api/community/chat/messages?since=0&hub=1", headers=chat.sign_fetch(far, hub=True)).json()
+        assert near_end["mid"] not in [m["mid"] for m in onward["messages"]]                 # held, not handed on
+
+    def test_unknown_sender_waits_in_the_pending_queue(self, client, tmp_path):
+        settings(client, enabled=True, public_url=HUB, seeds=[], chat_enabled=True)
+        mgr = client.service.community
+        late = Identity(str(tmp_path / "late.pem"))                                          # card not announced yet
+        b = station(client, tmp_path / "b.pem")
+        key = chat.ChatKey(str(tmp_path / "b.key"))
+        msg = chat.make_dm(late, b.id, chat.make_key_record(b, key)["xpub"], "pending")
+        assert mgr.chat_ingest(msg, hops=0, origin="https://far.example.org") == "pending"
+        assert mgr.chat_stats_payload()["pending"] == 1 and mgr.chat_retry_pending() == 0
+        card = build_card(late, name="L", lat=1.0, lon=2.0, precision_deg=0.1, url=None, camera=None, software="Zenivo 1.1.0")
+        assert client.post("/api/community/announce", json=card).status_code == 200
+        assert mgr.chat_retry_pending() == 1 and mgr.chat_stats_payload()["pending"] == 0
+        mine = client.get("/api/community/chat/messages?since=0", headers=chat.sign_fetch(b)).json()["messages"]
+        assert msg["mid"] in [m["mid"] for m in mine]
+
+    def test_stats_endpoint_counts_without_content(self, client):
+        st = client.get("/api/community/chat/stats")
+        assert st.status_code == 200
+        body = st.json()
+        assert body["totals"]["hub_accepted"] >= 1 and body["totals"]["hub_pulled"] >= 1
+        assert body["held"]["dm"] >= 1 and body["held"]["recipients"] >= 1 and "hub" in body
+        assert "psst" not in st.text and "via two hubs" not in st.text

@@ -32,6 +32,7 @@ except Exception:  # missing library: idmod.availability() reports it, the chat 
 DOMAIN_MSG = b"zenivo-chat-v1\n"
 DOMAIN_KEY = b"zenivo-chat-key-v1\n"
 DOMAIN_FETCH = b"zenivo-chat-fetch-v1\n"
+DOMAIN_HUBPULL = b"zenivo-chat-hubpull-v1\n"
 DM_INFO = b"zenivo-chat-dm-v1"
 VERSION = 1
 PUBLIC = "*"
@@ -44,6 +45,10 @@ SKEW_S = 300
 TTL_S = 7 * 24 * 3600
 PUBLIC_CAP = 2000
 DM_CAP = 200                      # per recipient
+DM_GLOBAL_CAP = 5000              # all recipients together (forwarding must not fill the disk)
+MAX_HOPS = 4                      # hub-to-hub hops a message may travel (not part of the signed content)
+PENDING_CAP = 500                 # pulled messages whose sender card is not known yet
+PENDING_TTL_S = 24 * 3600
 KEYS_CAP = 500
 KEY_MAX_AGE_S = 30 * 24 * 3600
 MAX_TIME = 4_000_000_000          # unix seconds: refuses absurd values
@@ -262,18 +267,19 @@ def check_skew(msg: Dict[str, Any], now: Optional[float] = None) -> None:
 
 
 # -- signed fetch (a station asks a hub for its own direct messages) ---------------
-def fetch_message(station_id: str, t: int) -> bytes:
-    return DOMAIN_FETCH + f"{station_id}\n{int(t)}".encode("ascii")
+def fetch_message(station_id: str, t: int, hub: bool = False) -> bytes:
+    return (DOMAIN_HUBPULL if hub else DOMAIN_FETCH) + f"{station_id}\n{int(t)}".encode("ascii")
 
 
-def sign_fetch(identity, t: Optional[int] = None) -> Dict[str, str]:
+def sign_fetch(identity, t: Optional[int] = None, hub: bool = False) -> Dict[str, str]:
+    """Headers of a fetch; `hub` signs under the hub-pull domain (a hub asking another hub for ALL direct messages)."""
     t = int(time.time()) if t is None else int(t)
     return {"X-Zenivo-Id": identity.id, "X-Zenivo-Time": str(t),
-            "X-Zenivo-Sig": _b64(identity.sign(fetch_message(identity.id, t)))}
+            "X-Zenivo-Sig": _b64(identity.sign(fetch_message(identity.id, t, hub)))}
 
 
 def verify_fetch(pubkey_b64: str, station_id: str, t_header: Optional[str], sig_header: Optional[str],
-                 now: Optional[float] = None) -> bool:
+                 now: Optional[float] = None, hub: bool = False) -> bool:
     now = time.time() if now is None else now
     try:
         t = int(t_header or "")
@@ -281,7 +287,7 @@ def verify_fetch(pubkey_b64: str, station_id: str, t_header: Optional[str], sig_
         sig = _unb64(sig_header, 64)
     except (ValueError, TypeError, ChatError):
         return False
-    return abs(now - t) <= SKEW_S and verify_signature(pub, sig, fetch_message(station_id, t))
+    return abs(now - t) <= SKEW_S and verify_signature(pub, sig, fetch_message(station_id, t, hub))
 
 
 # -- stores ---------------------------------------------------------------------
@@ -314,9 +320,14 @@ def _read_json(path: str) -> Dict[str, Any]:
         return {}
 
 
+def _hops(value: Any) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= MAX_HOPS else 0
+
+
 class ChatStore:
     """What a hub holds for others (data/community_chat.json): the public room, direct messages per recipient and the
-    chat key records. Entries are {"r": time received, "m": message}; the file is written at most every 30 s."""
+    chat key records. Entries are {"r": time received, "m": message, "h": hops}; the hop count is stored beside the
+    message, never inside it (the signature covers the original). The file is written at most every 30 s."""
 
     def __init__(self, path: str):
         self.path = path
@@ -329,6 +340,7 @@ class ChatStore:
         self._last_save = 0.0
         self._last_r = 0.0
         self.version = 0
+        self.evicted = 0          # messages pushed out by a cap (stats)
         self._load()
 
     def _load(self) -> None:
@@ -336,10 +348,10 @@ class ChatStore:
         try:
             for e in data.get("public") or []:
                 if isinstance(e, dict) and isinstance(e.get("r"), (int, float)):
-                    self._pub.append({"r": float(e["r"]), "m": check_message(e["m"])})
+                    self._pub.append({"r": float(e["r"]), "m": check_message(e["m"]), "h": _hops(e.get("h"))})
             for to, lst in (data.get("dm") or {}).items():
                 if ID_RE.match(to):
-                    self._dm[to] = [{"r": float(e["r"]), "m": check_message(e["m"])} for e in lst]
+                    self._dm[to] = [{"r": float(e["r"]), "m": check_message(e["m"]), "h": _hops(e.get("h"))} for e in lst]
             for i, rec in (data.get("keys") or {}).items():
                 if ID_RE.match(i) and isinstance(rec, dict) and set(rec) == _KEY_FIELDS:
                     self._keys[i] = rec
@@ -352,28 +364,50 @@ class ChatStore:
         self._last_r = max(now, self._last_r + 1e-6)   # strictly increasing: a cursor never skips or repeats a message
         return self._last_r
 
-    def add(self, msg: Dict[str, Any], now: Optional[float] = None) -> bool:
-        """Store a checked message. False for a duplicate or an expired one."""
+    def add(self, msg: Dict[str, Any], now: Optional[float] = None, hops: int = 0) -> bool:
+        """Store a checked message that has travelled `hops` hub-to-hub hops. False for a duplicate or an expired one or
+        one beyond MAX_HOPS. Caps: public 2000, direct 200 per recipient and 5000 in all (oldest go first)."""
         now = time.time() if now is None else now
         with self._lock:
-            if msg["mid"] in self._mids or now - msg["t"] > TTL_S or msg["t"] > now + SKEW_S:
+            if msg["mid"] in self._mids or now - msg["t"] > TTL_S or msg["t"] > now + SKEW_S or not 0 <= hops <= MAX_HOPS:
                 return False
-            entry = {"r": self._next_r(now), "m": msg}
+            entry = {"r": self._next_r(now), "m": msg, "h": hops}
             if msg["to"] == PUBLIC:
                 self._pub.append(entry)
                 for old in self._pub[:-PUBLIC_CAP]:
                     self._mids.discard(old["m"]["mid"])
+                    self.evicted += 1
                 self._pub = self._pub[-PUBLIC_CAP:]
             else:
                 lst = self._dm.setdefault(msg["to"], [])
                 lst.append(entry)
                 for old in lst[:-DM_CAP]:
                     self._mids.discard(old["m"]["mid"])
+                    self.evicted += 1
                 self._dm[msg["to"]] = lst[-DM_CAP:]
+                self._trim_dm_global()
             self._mids.add(msg["mid"])
             self._dirty = True
             self.version += 1
         return True
+
+    def _trim_dm_global(self) -> None:
+        total = sum(len(v) for v in self._dm.values())
+        if total <= DM_GLOBAL_CAP:
+            return
+        allv = sorted(((e["r"], to, e["m"]["mid"]) for to, v in self._dm.items() for e in v))
+        drop = {mid for _, _, mid in allv[:total - DM_GLOBAL_CAP]}
+        for to in list(self._dm):
+            self._dm[to] = [e for e in self._dm[to] if e["m"]["mid"] not in drop]
+            if not self._dm[to]:
+                del self._dm[to]
+        self._mids -= drop
+        self.evicted += len(drop)
+
+    def dm_stats(self) -> Tuple[int, int]:
+        """(direct messages held, distinct recipients)."""
+        with self._lock:
+            return sum(len(v) for v in self._dm.values()), len(self._dm)
 
     def put_key(self, rec: Dict[str, Any]) -> bool:
         with self._lock:
@@ -397,12 +431,17 @@ class ChatStore:
             return self._keys.get(station_id)
 
     def fetch(self, since: float, dm_for: Optional[str] = None, limit: int = 500, max_bytes: int = 400 * 1024,
-              hidden: Optional[Any] = None) -> Tuple[List[Dict[str, Any]], float, bool]:
-        """(messages, next cursor, more). Public room plus the direct messages for `dm_for`, oldest first, received after
-        `since`; `hidden(sender id)` True drops that sender. The size and count caps cut the list, `more` says so."""
+              hidden: Optional[Any] = None, all_dm: bool = False,
+              hops_out: Optional[List[int]] = None) -> Tuple[List[Dict[str, Any]], float, bool]:
+        """(messages, next cursor, more). Public room plus the direct messages for `dm_for` (or every direct message
+        with `all_dm`: another hub pulling), oldest first, received after `since`; `hidden(sender id)` True drops that
+        sender. The size and count caps cut the list, `more` says so. With `hops_out` (a hub pull) the hop count of
+        each returned message is appended to it and messages already at MAX_HOPS are not handed on."""
         with self._lock:
             entries = [e for e in self._pub if e["r"] > since]
-            if dm_for:
+            if all_dm:
+                entries += [e for v in self._dm.values() for e in v if e["r"] > since]
+            elif dm_for:
                 entries += [e for e in self._dm.get(dm_for, []) if e["r"] > since]
         entries.sort(key=lambda e: e["r"])
         out: List[Dict[str, Any]] = []
@@ -417,6 +456,10 @@ class ChatStore:
             cursor = e["r"]
             if hidden is not None and hidden(e["m"]["from"]):
                 continue
+            if hops_out is not None:
+                if e.get("h", 0) >= MAX_HOPS:
+                    continue
+                hops_out.append(e.get("h", 0))
             used += size
             out.append(e["m"])
         return out, cursor, more

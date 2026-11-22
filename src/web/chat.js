@@ -92,6 +92,42 @@
         }
     }
 
+    // Statistics block (counters only, no content); every value is set with textContent
+    const statsEl = document.getElementById("cchat-stats-body");
+    const ROWS = [["Sent (public)", "sent_public"], ["Sent (private)", "sent_dm"], ["Received (public)", "recv_public"],
+        ["Received (private)", "recv_dm"], ["Send failures", "send_fail"], ["Hub: accepted from stations", "hub_accepted"],
+        ["Hub: pulled from hubs", "hub_pulled"], ["Hub: served to fetchers", "hub_served"], ["Refused: rate limit", "refused_rate"],
+        ["Refused: unknown station", "refused_unknown"], ["Refused: bad signature", "refused_sig"],
+        ["Refused: too old", "refused_old"], ["Refused: cap reached", "refused_cap"]];
+
+    function line(text) {
+        const p = document.createElement("div");
+        p.textContent = text;
+        return p;
+    }
+
+    async function loadStats() {
+        if (!statsEl) return;
+        try {
+            const res = await fetch("/api/community/chat/stats");
+            if (!res.ok) return;
+            const s = await res.json();
+            statsEl.textContent = "";
+            const day = new Date().toISOString().slice(0, 10);
+            const today = (s.days && s.days[day]) || {};
+            statsEl.appendChild(line(`Since ${new Date(s.since * 1000).toLocaleDateString()} (today in brackets)`));
+            ROWS.forEach(([label, key]) => statsEl.appendChild(line(`${label}: ${s.totals[key] || 0} (${today[key] || 0})`)));
+            statsEl.appendChild(line(`Held now: ${s.held.dm} private message(s) for ${s.held.recipients} station(s), ${s.held.public} public; waiting for a card: ${s.pending}`));
+            Object.keys(s.peers || {}).forEach((o) => {
+                const p = s.peers[o];
+                const last = p.last_ok ? new Date(p.last_ok * 1000).toLocaleString() : "never";
+                statsEl.appendChild(line(`${o}: pulled ${p.pulled}, served ${p.served}, failed sends ${p.send_fail}, failed pulls ${p.pull_fail}, last ok ${last}`));
+            });
+        } catch (e) { /* offline */ }
+    }
+    const statsBox = document.getElementById("cchat-stats");
+    if (statsBox) statsBox.addEventListener("toggle", () => { if (statsBox.open) loadStats(); });
+
     peerEl.addEventListener("change", () => { peer = peerEl.value; err(""); refresh(false); });
     blockEl.addEventListener("click", async () => {
         const st = data && data.stations.find((s) => s.id === peer);
