@@ -78,6 +78,7 @@ ICONS = {
     "plus": '<path d="M12 5v14M5 12h14"/>',
     "lock": '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
     "play": '<polygon points="6 4 20 12 6 20 6 4"/>',
+    "radar": '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><path d="M12 12l6-6"/><circle cx="12" cy="12" r="1.5"/>',
     "users": '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
 }
 
@@ -95,7 +96,7 @@ MORE_PATHS = "/flights3d,/satellites3d,/overhead,/focus,/calibration,/settings,/
 MENU = [
     ("Explore", False, [("/flights3d", "nav", "Flights 3D", "accent", False, False),
                         ("/satellites3d", "globe", "Satellites 3D", "accent", False, False),
-                        ("/overhead", "nav", "Overhead", "accent", False, False)]),
+                        ("/overhead", "radar", "Overhead", "accent", False, False)]),
     ("Camera", True, [("/focus", "search", "Focus", "violet", True, False),
                       ("/calibration", "camera", "Master dark", "violet", True, False),
                       ("/settings#image", "bars", "Image output", "violet", True, False),
