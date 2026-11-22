@@ -326,6 +326,9 @@
         o.autoPanPaddingBottomRight = [12, short ? 12 : 24];
         o.maxWidth = Math.max(160, Math.min(340, s.x - 24 - 46));
         o.maxHeight = Math.max(120, Math.min(460, s.y - o.autoPanPaddingTopLeft[1] - o.autoPanPaddingBottomRight[1] - 50));
+        // shrink the frame rather than make the visitor scroll a small popup (~150 px of text and buttons around it)
+        const img = p.getElement() && p.getElement().querySelector(".cm-pop img");
+        if (img) img.style.maxHeight = Math.max(80, o.maxHeight - 150) + "px";
         p.update();
     }
     map.on("popupopen", (e) => { popupOpen = true; openPopup = e.popup; fitPopup(e.popup); });
