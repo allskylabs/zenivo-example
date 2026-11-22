@@ -361,7 +361,11 @@
                     html: `<span class="cm-dot ${st}${isOwn ? " own" : ""}"></span>` }),
                 title: `${String(card.name || "Station")} (${st})`, keyboard: true, cmState: st, cmOwn: isOwn,
             }).addTo(layer);
-            marker.bindPopup(() => popupFor(card, isOwn), { keepInView: true });   // size and padding: fitPopup
+            // Leaflet re-runs a content function on every popup.update() (fitPopup, frame load): build the content once
+            // per opening, or each update swaps the DOM under the pointer (the frame never takes a click) and reloads the frame
+            let content = null;
+            marker.bindPopup(() => content || (content = popupFor(card, isOwn)), { keepInView: true });   // size and padding: fitPopup
+            marker.on("popupclose", () => { content = null; });
             pts.push([card.lat, card.lon]);
             const item = el("li");
             // The whole row is one hit button under the visible text; the message button sits beside the name on top of it
