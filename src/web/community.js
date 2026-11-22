@@ -299,6 +299,12 @@
         } else if (!(card.relays || relayed[card.id])) {
             box.appendChild(el("div", "meta", "This station has no public address, so it cannot be opened and shares only a small preview."));
         }
+        if (!isOwn && window.ZenivoChat && window.ZenivoChat.canDM(card.id)) {
+            const msg = el("button", "msg", "Message");
+            msg.type = "button";
+            msg.addEventListener("click", () => window.ZenivoChat.openDM(card.id));
+            box.appendChild(msg);
+        }
         return box;
     }
 

@@ -92,7 +92,19 @@
         }
     }
 
+    // ---- station chat widget (owner only; it renders nothing unless chat is on and the owner is signed in) ----
+    function loadChat() {
+        const v = "20261130a";
+        const css = document.createElement("link");
+        css.rel = "stylesheet"; css.href = "/static/css/chat.css?v=" + v;
+        document.head.appendChild(css);
+        const js = document.createElement("script");
+        js.src = "/static/chat-widget.js?v=" + v; js.defer = true;
+        document.head.appendChild(js);
+    }
+
     function init() {
+        loadChat();
         loadName();
         tickClock(); setInterval(tickClock, 5000);
         syncDot();
