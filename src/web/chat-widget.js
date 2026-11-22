@@ -126,14 +126,20 @@
             throw new Error(typeof detail === "string" && detail ? detail : `Error ${res.status}`);
         }
     }
+    let reqSeq = 0;
     async function refresh(poll) {
         try {
             const q = open && view === "thread" ? peer : "";
+            const seq = ++reqSeq;
             const res = await fetch(`${API}/local?peer=${encodeURIComponent(q)}${poll ? "&poll=1" : ""}`);
             if (res.status === 401 || res.status === 403 || res.status === 404) { teardown(); return false; }
             if (!res.ok) return true;
+            const next = await res.json();
+            // A slower, older request (e.g. the list fetch fired when the panel opened) must not
+            // overwrite the thread a newer request already loaded
+            if (seq !== reqSeq) return true;
             const prev = data;
-            data = await res.json();
+            data = next;
             updateBadge();
             notifyNew(prev);
             if (open) render();
