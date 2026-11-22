@@ -310,7 +310,7 @@
         const st = data.stations.find((x) => x.id === peer);
         titleEl.textContent = nameOf(peer);
         subEl.textContent = "";
-        if (isPub) subEl.textContent = "Public room";
+        if (isPub) subEl.textContent = "Everyone on the network";
         else {
             const lk = icon("lock");
             lk.style.cssText = "width:11px;height:11px;vertical-align:-1px;margin-right:4px";
@@ -373,7 +373,9 @@
 
         function fit() {
             ta.style.height = "auto";
-            ta.style.height = Math.min(ta.scrollHeight, 4 * 20 + 16) + "px";
+            const full = ta.scrollHeight + 2, cap = 4 * 20 + 16;
+            ta.style.height = Math.min(full, cap) + "px";
+            ta.style.overflowY = full > cap ? "auto" : "hidden";
             const n = ta.value.length;
             count.hidden = n < MAX - 100;
             count.textContent = `${n}/${MAX}`;

@@ -54,7 +54,7 @@
 
 .zcw-err { margin: 0; padding: 6px 12px; color: var(--danger); font-size: 12px; border-top: 1px solid var(--divider); }
 .zcw-form { display: flex; align-items: flex-end; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--divider); position: relative; flex: none; }
-.zcw-form textarea { flex: 1; min-width: 0; resize: none; max-height: calc(4 * 1.4em + 16px); padding: 8px 10px; border-radius: 18px; border: 1px solid var(--border-color);
+.zcw-form textarea { flex: 1; min-width: 0; resize: none; overflow-y: hidden; max-height: calc(4 * 1.4em + 16px); padding: 8px 10px; border-radius: 18px; border: 1px solid var(--border-color);
     background: var(--input); color: var(--text-primary); font: inherit; line-height: 1.4; }
 .zcw-send { background: var(--accent); color: var(--bg-primary); border: 0; border-radius: 50%; width: 36px; height: 36px; display: grid; place-items: center; cursor: pointer; flex: none; padding: 0; }
 .zcw-send:disabled { opacity: .5; cursor: default; }
