@@ -120,7 +120,9 @@ Stations can talk to each other: a public room and private (direct) messages. Th
 is **on by default but effective only while Community sharing is on**: turning sharing on turns chat on, and turning either
 off stops all chat traffic (no thread, no polling, no key, chat endpoints answer 404), deletes what this station held for
 others and keeps only the owner's own local history. The owner can untick "Chat with other stations" under Settings.
-Chat is owner-only in the UI (Community page, panel "Chat"); all remote text is shown as plain text.
+Chat is owner-only in the UI: a floating chat button (bottom right, on every page while signed in) opens the public room,
+private threads and the statistics; the Community station list and the station popup on the map have a **Message** button that
+opens a private thread with that station. All remote text is shown as plain text.
 
 **Realtime.** The browser holds a Server-Sent Events stream (`GET /api/community/chat/events`, admin only) and refreshes when
 the station's conversations change; the 30/60 s timer is only a fallback (120 s while the stream is open). Between station and
@@ -159,10 +161,10 @@ errors) from a hub that does not answer `wait`. Fetching messages needs the sign
   never message content or recipients: own messages sent (public/private) and received, send failures per hub; as a hub messages
   accepted from stations, pulled from hubs, served in answers, refused by reason (rate limit, unknown station, bad signature, too
   old, cap), private messages held now (count and number of distinct recipients) and the pending queue; per day for 30 days,
-  totals since start, and per peer hub pulled / served / last ok. Shown in the Community page chat panel ("Chat statistics") and
+  totals since start, and per peer hub pulled / served / last ok. Shown in the chat window ("Statistics") and
   as one line in Settings, Community. Written atomically, at most every 30 s.
 - **Clients** send to up to 3 hubs (seeds first, then stations with `chat: true`), poll them every gossip round (and every 30 s
-  while the chat panel is open) and decrypt private messages locally. A message from a sender whose card the receiver does not
+  while the chat window is open) and decrypt private messages locally. A message from a sender whose card the receiver does not
   know yet is kept in the pending queue (see "Forwarding").
 - **Block list**: the owner can block a station; its messages are hidden, not stored and not forwarded by this station.
 
