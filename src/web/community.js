@@ -152,7 +152,10 @@
             html: `<span class="cm-cl${own ? " own" : ""}" role="img" title="${label}" aria-label="${label}" style="background:conic-gradient(${stops.join(",")})"><span class="cm-cl-n">${total}</span></span>` });
     }
     const layer = clustered ? L.markerClusterGroup({
-        maxClusterRadius: 40, showCoverageOnHover: false, zoomToBoundsOnClick: true, spiderfyOnMaxZoom: true,
+        maxClusterRadius: 40, showCoverageOnHover: false,
+        // keep markers that pan out of view: otherwise a popup taller than a short (phone) map pans its own marker
+        // away, markercluster drops the marker and the popup closes with it
+        removeOutsideVisibleBounds: false, zoomToBoundsOnClick: true, spiderfyOnMaxZoom: true,
         spiderfyDistanceMultiplier: 1.3, animate: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
         spiderLegPolylineOptions: { weight: 1.5, color: tone("--text-secondary", "gray"), opacity: 0.6 },
         iconCreateFunction: clusterIcon,
@@ -345,7 +348,7 @@
                     html: `<span class="cm-dot ${st}${isOwn ? " own" : ""}"></span>` }),
                 title: `${String(card.name || "Station")} (${st})`, keyboard: true, cmState: st, cmOwn: isOwn,
             }).addTo(layer);
-            marker.bindPopup(() => popupFor(card, isOwn), { maxWidth: 340, keepInView: true, autoPanPaddingTopLeft: [16, 76], maxHeight: Math.max(220, Math.min(460, window.innerHeight - 200)), autoPanPaddingBottomRight: [16, 24] });
+            marker.bindPopup(() => popupFor(card, isOwn), { maxWidth: 340, keepInView: true, autoPanPaddingTopLeft: [16, 76], maxHeight: Math.max(160, Math.min(460, map.getSize().y - 110)), autoPanPaddingBottomRight: [16, 24] });
             pts.push([card.lat, card.lon]);
             const item = el("li");
             // The whole row is one hit button under the visible text; the message button sits beside the name on top of it
