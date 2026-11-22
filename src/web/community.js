@@ -314,11 +314,19 @@
     map.on("popupopen", () => { popupOpen = true; });
     map.on("popupclose", () => { popupOpen = false; });
 
+    // markercluster may call zoomToShowLayer's callback while the cluster is still re-forming after the zoom (the marker
+    // is not on the map yet, so openPopup does nothing): ask again until the marker itself is shown
+    function revealAndOpen(marker, tries) {
+        layer.zoomToShowLayer(marker, () => {
+            if (marker._map) marker.openPopup();
+            else if (tries > 0) setTimeout(() => revealAndOpen(marker, tries - 1), 300);
+        });
+    }
+
     function drawMarkers() {
         layer.clearLayers();
         stations = [];
         listEl.textContent = "";
-        listEl.classList.remove("dm-col");
         const accent = cssVar("--accent"), other = cssVar("--success");
         const valid = cards.filter((c) => c && finite(c.lat) && finite(c.lon) && Math.abs(c.lat) <= 90 && Math.abs(c.lon) <= 180);
         const rank = { online: 0, idle: 1, offline: 2 }, seenOf = (c) => { const t = Number(seenMap[c.id]) || Number(c.updated) || 0; return t > 1e12 ? t / 1000 : t; };
@@ -336,25 +344,39 @@
             marker.bindPopup(() => popupFor(card, isOwn), { maxWidth: 340, keepInView: true, autoPanPaddingTopLeft: [16, 76], maxHeight: Math.max(220, Math.min(460, window.innerHeight - 200)), autoPanPaddingBottomRight: [16, 24] });
             pts.push([card.lat, card.lon]);
             const item = el("li");
-            const btn = el("button");
+            // The whole row is one hit button under the visible text; the message button sits beside the name on top of it
+            // (a button cannot hold another button)
+            const btn = el("button", "hit");
             btn.type = "button";
+            btn.setAttribute("aria-label", `Show ${String(card.name || "Unnamed station")} on the map`);
+            const row = el("div", "row");
             const nm = el("span", isOwn ? "nm you" : "nm");
             nm.appendChild(el("i", `cm-led ${st}`));
             nm.appendChild(document.createTextNode(String(card.name || "Unnamed station")));
             if (isOwn) nm.appendChild(el("em", "you-pill", "You"));
-            btn.appendChild(nm);
-            btn.appendChild(el("span", "sub", card.camera || seenText(card, isOwn)));
+            if (!isOwn && window.ZenivoChat && window.ZenivoChat.canDM(card.id)) {
+                // admin only: the chat widget exists only for the signed-in owner
+                const dm = el("button", "dm");
+                dm.type = "button";
+                dm.title = "Message";
+                dm.setAttribute("aria-label", `Message ${String(card.name || "this station")}`);
+                dm.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+                dm.addEventListener("click", () => window.ZenivoChat.openDM(card.id));
+                nm.appendChild(dm);
+            }
+            row.appendChild(nm);
+            row.appendChild(el("span", "sub", card.camera || seenText(card, isOwn)));
             const rt = el("span", "st-r");
             rt.appendChild(el("b", `cm-state-lbl ${st}`, st === "online" ? "Online" : st === "idle" ? "Idle" : "Offline"));
             rt.appendChild(el("small", "", isOwn ? "now" : agoOnly(card)));
-            btn.appendChild(rt);
+            row.appendChild(rt);
             counts[st] += 1;
             btn.addEventListener("click", () => {
                 if (clustered) {
                     // the marker may sit inside a cluster: zoom or spiderfy until it shows, then open its popup
                     userMoved = true;
                     map.setView([card.lat, card.lon], Math.max(map.getZoom(), 6), { animate: false });
-                    layer.zoomToShowLayer(marker, () => marker.openPopup());
+                    revealAndOpen(marker, 5);
                 } else {
                     map.flyTo([card.lat, card.lon], Math.max(map.getZoom(), 6));
                     marker.openPopup();
@@ -362,17 +384,7 @@
                 if (window.matchMedia("(max-width: 768px)").matches) document.getElementById("cmap-wrap").scrollIntoView({ block: "start", behavior: "smooth" });
             });
             item.appendChild(btn);
-            if (!isOwn && window.ZenivoChat && window.ZenivoChat.canDM(card.id)) {
-                // admin only: the chat widget exists only for the signed-in owner
-                const dm = el("button", "dm");
-                dm.type = "button";
-                dm.title = "Message";
-                dm.setAttribute("aria-label", `Message ${String(card.name || "this station")}`);
-                dm.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
-                dm.addEventListener("click", () => window.ZenivoChat.openDM(card.id));
-                listEl.classList.add("dm-col");   // reserve the gutter on every row so the status column stays aligned
-                item.appendChild(dm);
-            }
+            item.appendChild(row);
             listEl.appendChild(item);
             stations.push({ card, marker });
         }

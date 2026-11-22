@@ -79,11 +79,10 @@
         #clist h2 { font-size: 13px; font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; gap: 8px; }
         #clist h2 span { color: var(--text-secondary); font-weight: 400; }
         #cstations { list-style: none; }
-        #cstations button {
-            display: block; width: 100%; min-height: 44px; text-align: left; padding: 8px 12px; cursor: pointer;
-            background: none; color: var(--text-primary); border: 0; border-bottom: 1px solid var(--border-color); font: inherit;
-        }
-        #cstations button:hover, #cstations button:focus-visible { background: var(--bg-card-sub); outline: none; }
+        #cstations li { position: relative; border-bottom: 1px solid var(--border-color); }
+        #cstations .hit { position: absolute; inset: 0; width: 100%; padding: 0; cursor: pointer; background: none; border: 0; font: inherit; }
+        #cstations li:hover .hit, #cstations .hit:focus-visible { background: var(--bg-card-sub); outline: none; }
+        #cstations .row { position: relative; pointer-events: none; min-height: 44px; padding: 8px 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: baseline; color: var(--text-primary); }
         #cstations .nm { display: block; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
         #cstations .sub { display: block; font-size: 12px; color: var(--text-secondary); }
         #cstations .you { color: var(--accent); }
@@ -92,15 +91,11 @@
         #cnote { padding: 10px 12px; color: var(--text-muted); font-size: 12px; }
         #clegend { position: absolute; left: 10px; bottom: 10px; z-index: 500; display: flex; gap: 14px; padding: 8px 12px; border-radius: 999px; background: color-mix(in srgb, var(--bg-card) 88%, transparent); border: 1px solid var(--border-color); font-size: 13px; color: var(--text-secondary); pointer-events: none; }
         #clegend .cm-led { margin-right: 6px; }
-        #cstations button { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: baseline; }
         #cstations .st-r { grid-column: 2; grid-row: 1 / span 2; text-align: right; display: flex; flex-direction: column; }
         #cstations .st-r b { font-size: 13px; font-weight: 700; }
         #cstations .st-r small { font-size: 12px; color: var(--text-secondary); }
-        #cstations li { position: relative; }
-        #cstations.dm-col li > button:first-child { padding-right: 52px; }
-        #cstations button.dm { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 36px; min-height: 36px; height: 36px; padding: 0; display: grid; place-items: center; border: 1px solid transparent; border-bottom: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--accent); }
-        #cstations button.dm:hover, #cstations button.dm:focus-visible { background: var(--accent-bg); border-color: var(--accent); }
-        #cstations button.dm svg { width: 18px; height: 18px; }
+        #cstations .dm { pointer-events: auto; display: inline-grid; place-items: center; width: 28px; height: 28px; margin: -6px 0 -6px 6px; padding: 0; vertical-align: middle; cursor: pointer; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--accent); }
+        #cstations .dm:hover, #cstations .dm:focus-visible { background: var(--accent-bg); border-color: var(--accent); outline: none; }
         #cstations .cm-state-lbl.online { color: var(--success); } #cstations .cm-state-lbl.idle { color: var(--warning); } #cstations .cm-state-lbl.offline { color: var(--text-muted); }
         @media (min-width: 769px) {
             body { overflow: hidden; }
@@ -114,9 +109,10 @@
             #cmap-wrap { flex: none; height: 50vh; height: 50dvh; min-height: 280px; margin: 12px 12px 0; border-radius: var(--radius-card); border: 1px solid var(--border-color); overflow: hidden; }
             #clist { width: calc(100% - 24px); flex: none; margin: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-card); overflow: hidden; }
             #clist h2 { font-size: 17px; font-weight: 700; padding: 14px 16px; }
-            #cstations button { min-height: 60px; padding: 10px 16px; }
+            #cstations .row { min-height: 60px; padding: 10px 16px; }
             #cstations .nm { font-size: 16px; } #cstations .sub { font-size: 13px; }
-            #cstations li:last-child button { border-bottom: 0; }
+            #cstations li:last-child { border-bottom: 0; }
+            #cstations .dm { width: 36px; height: 36px; margin: -10px 0 -10px 4px; }
         }
     </style>
 </head>
@@ -256,6 +252,6 @@
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"
             integrity="sha384-eXVCORTRlv4FUUgS/xmOyr66XBVraen8ATNLMESp92FKXLAMiKkerixTiBvXriZr" crossorigin=""></script>
-    <script src="/static/community.js?v=20261130g"></script>
+    <script src="/static/community.js?v=20261130h"></script>
 </body>
 </html>
