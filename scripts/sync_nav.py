@@ -42,9 +42,9 @@ HEAD = {
 # (group title or None, items). item = (href, icon entity, label, kind, data-tab) ; kind: "tab" = page of index.html (app.js
 # switches it), "link" = separate page, "blank" = new tab
 NAV = [
-    ("Sky", [("/community", "&#127760;", "Community", "link", ""),
-             ("/live", "&#9673;", "Live", "tab", "tab-live"),
+    ("Sky", [("/live", "&#9673;", "Live", "tab", "tab-live"),
              ("/sky", "&#10024;", "Sky view", "link", ""),
+             ("/community", "&#127760;", "Community", "link", ""),
              ("/flights3d", "&#9992;", "Flights 3D", "link", ""),
              ("/satellites3d", "&#128752;", "Satellites 3D", "link", ""),
              ("/overhead", "&#9737;", "Overhead", "link", "")]),
@@ -87,9 +87,9 @@ def icon(name, cls="m-svg", size=22):
             f'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{ICONS[name]}</svg>')
 
 
-# phone tab bar, same order as the sidebar: Community / Live / Sky / Archive / Menu (the rest lives in the Menu sheet)
-MOBILE = [("/community", "pin", "Community", "/community"), ("/live", "camera", "Live", "/live,/,/index.html"),
-          ("/sky", "star", "Sky", "/sky"), ("/gallery", "calendar", "Archive", "/gallery,/logs")]
+# phone tab bar, same order as the sidebar: Live / Sky / Community / Archive / Menu (the rest lives in the Menu sheet)
+MOBILE = [("/live", "camera", "Live", "/live,/,/index.html"), ("/sky", "star", "Sky", "/sky"),
+          ("/community", "pin", "Community", "/community"), ("/gallery", "calendar", "Archive", "/gallery,/logs")]
 MORE_PATHS = "/flights3d,/satellites3d,/overhead,/focus,/calibration,/settings,/obs"
 # Menu sheet groups: (title, admin-only group, [(href, icon, label, tone, admin item, new tab)])
 MENU = [
