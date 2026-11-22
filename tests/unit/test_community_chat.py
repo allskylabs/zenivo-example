@@ -150,3 +150,18 @@ class TestStats:
         assert len(s.snapshot()["days"]) == 30
         s.save(force=True)
         assert ChatStats(p).snapshot()["totals"]["send_fail"] == 40
+
+
+class TestLocalVersion:
+    def test_version_bumps_on_add_and_mark_read(self, alice, bob, tmp_path):
+        local = chat.LocalChat(str(tmp_path / "local.json"))
+        msg = chat.make_public(bob, "hi")
+        v0 = local.version
+        assert local.add(chat.PUBLIC, msg, "hi", incoming=True)
+        v1 = local.version
+        assert v1 > v0
+        local.mark_read(chat.PUBLIC)
+        assert local.version > v1
+        v2 = local.version
+        local.mark_read(chat.PUBLIC)                 # nothing left to mark: no change
+        assert local.version == v2

@@ -112,3 +112,18 @@
 .zcs-dot.ok { background: var(--success); }
 .zcs-dot.bad { background: var(--danger); }
 .zcs-grid.three .zcs-lbl { white-space: normal; }
+
+
+/* Alerts */
+.zcw-toasts { position: fixed; right: 16px; bottom: 80px; z-index: 80; display: flex; flex-direction: column; gap: 8px; width: min(320px, calc(100vw - 32px)); }
+.zcw-toast { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 12px; cursor: pointer;
+    background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); border-left: 3px solid var(--accent);
+    border-radius: var(--radius-card); box-shadow: 0 8px 24px rgba(0, 0, 0, .4); font: var(--font-size-body)/1.35 var(--font-sans); animation: zcw-in .16s ease-out; }
+.zcw-toast b { font-weight: 600; }
+.zcw-toast span { color: var(--text-secondary); overflow-wrap: anywhere; }
+.zcw-toast:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.zcw-alerts { margin: 12px auto 4px; display: block; padding: 6px 12px; background: transparent; color: var(--accent); border: 1px solid var(--border-color);
+    border-radius: var(--radius-pill); cursor: pointer; font: inherit; }
+.zcw-alerts-note { margin: 12px 0 4px; text-align: center; color: var(--text-secondary); font-size: 12px; }
+@media (max-width: 768px) { .zcw-toasts { bottom: calc(140px + env(safe-area-inset-bottom, 0px)); } }
+@media (prefers-reduced-motion: reduce) { .zcw-toast { animation: none; } }

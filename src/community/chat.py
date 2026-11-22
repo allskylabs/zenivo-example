@@ -536,6 +536,7 @@ class LocalChat:
         self._mids = {e["mid"] for lst in self.threads.values() for e in lst}
         self._dirty = False
         self._last_save = 0.0
+        self.version = 0          # bumped on every content change; the browser's event stream watches it
 
     def add(self, peer: str, msg: Dict[str, Any], text: str, incoming: bool, now: Optional[float] = None) -> bool:
         now = time.time() if now is None else now
@@ -550,6 +551,7 @@ class LocalChat:
                 self._mids.discard(old["mid"])
             self.threads[peer] = lst[-LOCAL_THREAD_CAP:]
             self._mids.add(msg["mid"])
+            self.version += 1
             if len(self.threads) > LOCAL_THREADS_MAX:
                 for p in sorted(self.threads, key=lambda k: self.threads[k][-1]["t"])[:len(self.threads) - LOCAL_THREADS_MAX]:
                     for e in self.threads.pop(p):
@@ -579,6 +581,8 @@ class LocalChat:
                     e["seen"] = True
                     changed = True
             self._dirty = self._dirty or changed
+            if changed:
+                self.version += 1
 
     def set_blocked(self, station_id: str, blocked: bool) -> None:
         with self._lock:
@@ -587,6 +591,7 @@ class LocalChat:
             elif not blocked:
                 self.blocked.discard(station_id)
             self._dirty = True
+            self.version += 1
 
     def is_blocked(self, station_id: str) -> bool:
         return station_id in self.blocked

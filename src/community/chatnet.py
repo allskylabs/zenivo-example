@@ -18,6 +18,10 @@ KEYS_EVERY_S = 10 * 60
 KEY_PUBLISH_EVERY_S = 12 * 3600
 MAX_POLL_HUBS = 5
 MAX_SEND_HUBS = 3
+LISTEN_HUBS = 2         # hubs held open with a long-poll
+LISTEN_WAIT_S = 25.0
+LISTEN_FALLBACK_S = 30.0
+SUPERVISE_S = 10.0
 MAX_PAGES = 4        # pages of a poll per hub (a hub cuts a reply at 500 messages or 200 KB)
 
 
@@ -36,6 +40,10 @@ class ChatNet:
         self._last_keys = 0.0
         self._published: Dict[str, float] = {}
         self.last: Dict[str, Any] = {}
+        self._ingest_lock = threading.Lock()
+        self._listen_lock = threading.Lock()
+        self._supervisor: Optional[threading.Thread] = None
+        self._listeners: Dict[str, threading.Thread] = {}
 
     def _fetch(self, *a: Any, **kw: Any) -> Any:
         return self.m.worker._fetch(*a, **kw)
@@ -98,26 +106,9 @@ class ChatNet:
         stats = m.chat_stats()
         as_hub = m.chat_hub()      # a hub pulls like a hub: all direct messages (ciphertext) and hop counts
         for base, priv in hubs:
-            ckey = base + "#hub" if as_hub else base      # a separate cursor: the two modes see different messages
             try:
                 for _ in range(MAX_PAGES):
-                    cursor = float(local.cursors.get(ckey, 0.0))
-                    reply = self._fetch(f"{base}/api/community/chat/messages?since={cursor!r}" + ("&hub=1" if as_hub else ""),
-                                        allow_private=priv, headers=chatmod.sign_fetch(me, hub=as_hub), timeout=15.0)
-                    msgs = reply.get("messages") if isinstance(reply, dict) else None
-                    nxt = reply.get("next") if isinstance(reply, dict) else None
-                    if not isinstance(msgs, list) or isinstance(nxt, bool) or not isinstance(nxt, (int, float)):
-                        raise ValueError("bad reply")
-                    hl = reply.get("hops") if as_hub else None
-                    if not isinstance(hl, list) or len(hl) != len(msgs):
-                        hl = [0] * len(msgs)
-                    for msg, h in list(zip(msgs, hl))[:500]:
-                        h = h if isinstance(h, int) and not isinstance(h, bool) and 0 <= h <= chatmod.MAX_HOPS else 0
-                        kind = m.chat_ingest(msg, hops=h, origin=base)
-                        if kind in ("public", "dm", "fwd"):
-                            got[kind] += 1
-                    if nxt > cursor:
-                        local.set_cursor(ckey, float(nxt))
+                    reply, cursor, nxt = self._pull_page(base, priv, as_hub, got)
                     if reply.get("more") is not True or not nxt > cursor:
                         break
                 got["hubs_ok"] += 1
@@ -133,6 +124,87 @@ class ChatNet:
         stats.save(force=False)
         self.last = got
         return got
+
+    def _pull_page(self, base: str, priv: bool, as_hub: bool, got: Dict[str, Any], wait: float = 0.0
+                   ) -> Tuple[Dict[str, Any], float, float]:
+        """One signed fetch from `base` after its cursor: ingest the messages, advance the cursor (never backwards: a
+        long-poll and a normal poll may run side by side). Returns (reply, cursor used, next). Raises on a bad reply."""
+        m = self.m
+        me = m._identity
+        local = m.chat_local()
+        ckey = base + "#hub" if as_hub else base      # a separate cursor: the two modes see different messages
+        cursor = float(local.cursors.get(ckey, 0.0))
+        url = f"{base}/api/community/chat/messages?since={cursor!r}" + ("&hub=1" if as_hub else "") + (f"&wait={wait:g}" if wait else "")
+        reply = self._fetch(url, allow_private=priv, headers=chatmod.sign_fetch(me, hub=as_hub),
+                            timeout=wait + 10.0 if wait else 15.0)
+        msgs = reply.get("messages") if isinstance(reply, dict) else None
+        nxt = reply.get("next") if isinstance(reply, dict) else None
+        if not isinstance(msgs, list) or isinstance(nxt, bool) or not isinstance(nxt, (int, float)):
+            raise ValueError("bad reply")
+        hl = reply.get("hops") if as_hub else None
+        if not isinstance(hl, list) or len(hl) != len(msgs):
+            hl = [0] * len(msgs)
+        with self._ingest_lock:
+            for msg, h in list(zip(msgs, hl))[:500]:
+                h = h if isinstance(h, int) and not isinstance(h, bool) and 0 <= h <= chatmod.MAX_HOPS else 0
+                kind = m.chat_ingest(msg, hops=h, origin=base)
+                if kind in ("public", "dm", "fwd"):
+                    got[kind] += 1
+            if nxt > float(local.cursors.get(ckey, 0.0)):
+                local.set_cursor(ckey, float(nxt))
+        return reply, cursor, float(nxt)
+
+    # -- long-poll listener: a hub holds the request until something is new, so messages arrive within a second --
+    def ensure_listener(self) -> None:
+        """Start (once) the supervisor thread that keeps one long-poll thread per hub (the first LISTEN_HUBS)."""
+        with self._listen_lock:
+            if self._supervisor is not None and self._supervisor.is_alive():
+                return
+            self._supervisor = threading.Thread(target=self._supervise, name="chat-listen", daemon=True)
+            self._supervisor.start()
+
+    def _supervise(self) -> None:
+        while self.m.chat_on():
+            try:
+                wanted = [b for b, _ in self.hubs()[:LISTEN_HUBS]]
+                with self._listen_lock:
+                    for base in wanted:
+                        t = self._listeners.get(base)
+                        if t is None or not t.is_alive():
+                            t = threading.Thread(target=self._listen, args=(base,), name="chat-listen-hub", daemon=True)
+                            self._listeners[base] = t
+                            t.start()
+            except Exception as exc:
+                logger.debug("Chat listener supervisor: %s", exc)
+            time.sleep(SUPERVISE_S)
+        with self._listen_lock:
+            self._supervisor = None
+
+    def _listen(self, base: str) -> None:
+        backoff = 0.0
+        while self.m.chat_on() and base in [b for b, _ in self.hubs()[:LISTEN_HUBS]]:
+            try:
+                priv = dict(self.hubs()).get(base, False)
+                self.m._ensure()
+                if self.m._identity is None:
+                    time.sleep(5.0)
+                    continue
+                t0 = time.monotonic()
+                got = {"public": 0, "dm": 0, "fwd": 0}
+                reply, cursor, nxt = self._pull_page(base, priv, self.m.chat_hub(), got, wait=LISTEN_WAIT_S)
+                backoff = 0.0
+                if reply.get("wait") is not True:       # an old hub ignores `wait`: do not hammer it
+                    time.sleep(LISTEN_FALLBACK_S)
+                elif time.monotonic() - t0 < 1.0 and not (reply.get("more") is True and nxt > cursor):
+                    time.sleep(1.0)
+                if any(got.values()):
+                    self.m.chat_local().save(force=False)
+            except Exception as exc:
+                backoff = min(max(backoff * 2, LISTEN_FALLBACK_S), 300.0)
+                logger.debug("Chat listen %s failed: %s", base, exc)
+                time.sleep(backoff)
+        with self._listen_lock:
+            self._listeners.pop(base, None)
 
     def _refresh_keys(self, hubs: List[Tuple[str, bool]]) -> None:
         m = self.m

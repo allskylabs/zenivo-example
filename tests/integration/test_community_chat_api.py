@@ -72,9 +72,10 @@ class TestChatAPI:
         msg = chat.make_public(a, "hello room")
         assert post(client, {"msg": msg}).json() == {"ok": True, "stored": True}
         assert post(client, {"msg": msg}).json()["stored"] is False       # duplicate
-        got = client.get("/api/community/chat/messages?since=0").json()
+        assert client.get("/api/community/chat/messages?since=0").status_code == 403      # signed headers are mandatory
+        got = client.get("/api/community/chat/messages?since=0", headers=chat.sign_fetch(a)).json()
         assert [m["body"] for m in got["messages"]] == ["hello room"]
-        assert client.get(f"/api/community/chat/messages?since={got['next']}").json()["messages"] == []
+        assert client.get(f"/api/community/chat/messages?since={got['next']}", headers=chat.sign_fetch(a)).json()["messages"] == []
         stranger = Identity(str(tmp_path / "stranger.pem"))             # never announced: card unknown
         assert post(client, {"msg": chat.make_public(stranger, "hi")}).status_code == 403
         forged = chat.make_public(a, "real")
@@ -91,8 +92,8 @@ class TestChatAPI:
         assert post(client, {"key": rec}).status_code == 200
         assert any(k["id"] == b.id for k in client.get("/api/community/chat/keys").json()["keys"])
         assert post(client, {"msg": chat.make_dm(a, b.id, rec["xpub"], "psst")}).json()["stored"] is True
-        public = client.get("/api/community/chat/messages?since=0").json()["messages"]
-        assert all(m["to"] == "*" for m in public)                       # anonymous fetch: no DMs
+        public = client.get("/api/community/chat/messages?since=0", headers=chat.sign_fetch(a)).json()["messages"]
+        assert all(m["to"] == "*" for m in public)                       # another station's fetch: no DMs for b
         mine = client.get("/api/community/chat/messages?since=0", headers=chat.sign_fetch(b)).json()["messages"]
         dm = [m for m in mine if m["to"] == b.id]
         assert len(dm) == 1 and chat.open_dm(dm[0], key_b) == "psst"
@@ -209,3 +210,26 @@ class TestForwarding:
         assert body["totals"]["hub_accepted"] >= 1 and body["totals"]["hub_pulled"] >= 1
         assert body["held"]["dm"] >= 1 and body["held"]["recipients"] >= 1 and "hub" in body
         assert "psst" not in st.text and "via two hubs" not in st.text
+
+
+class TestRealtime:
+    def test_long_poll_returns_early_on_a_new_message_and_empty_after_the_wait(self, client, tmp_path):
+        import threading
+        import time
+        settings(client, enabled=True, public_url=HUB, seeds=[], chat_enabled=True)
+        a = station(client, tmp_path / "a.pem")
+        b = station(client, tmp_path / "b.pem")
+        url = "/api/community/chat/messages?since={}&wait={}"
+        now = client.get(url.format(0, 0), headers=chat.sign_fetch(b)).json()["next"]
+        t0 = time.monotonic()
+        empty = client.get(url.format(now, 1), headers=chat.sign_fetch(b)).json()
+        assert empty["messages"] == [] and empty["wait"] is True and time.monotonic() - t0 >= 0.9
+        threading.Timer(0.6, lambda: post(client, {"msg": chat.make_public(a, "late news")})).start()
+        t0 = time.monotonic()
+        got = client.get(url.format(now, 10), headers=chat.sign_fetch(b)).json()
+        assert [m["body"] for m in got["messages"]] == ["late news"] and time.monotonic() - t0 < 5
+
+    def test_events_and_unsigned_fetch_are_admin_only(self, client):
+        from src.auth import policy
+        assert policy.classify("GET", "/api/community/chat/events", {}, "203.0.113.1") == policy.ADMIN
+        assert client.get("/api/community/chat/messages").status_code == 403

@@ -758,34 +758,38 @@ class CommunityManager:
         return {"ok": True, "stored": stored}
 
     def chat_fetch(self, since: float, station_id: Optional[str], t_header: Optional[str], sig_header: Optional[str],
-                   now: Optional[float] = None, hub: bool = False) -> Dict[str, Any]:
+                   now: Optional[float] = None, hub: bool = False, count: bool = True) -> Dict[str, Any]:
         """Hub: the public room, plus the direct messages of the station that signed the request headers. With `hub`
         (another hub pulling): every direct message (ciphertext) and the hop counts, only when the headers carry a
         hub-pull signature of a station whose card we know and which has an address itself (is a hub)."""
         if not self.chat_hub():
             raise chatmod.ChatRefused(404, "This station is not a chat hub")
-        dm_for = None
         origin = None
-        if hub or station_id or t_header or sig_header:
-            card = self._chat_card(station_id)
-            if card is None or not chatmod.verify_fetch(card.get("pubkey"), station_id, t_header, sig_header, now, hub=hub):
-                raise chatmod.ChatRefused(403, "Bad signature")
-            if hub:
-                if not card.get("url"):
-                    raise chatmod.ChatRefused(403, "Only hubs may pull all messages")
-                origin = card["url"]
-            dm_for = station_id
+        card = self._chat_card(station_id)        # signed headers are mandatory: guests get nothing, not even the public room
+        if card is None or not chatmod.verify_fetch(card.get("pubkey"), station_id, t_header, sig_header, now, hub=hub):
+            raise chatmod.ChatRefused(403, "Bad signature")
+        if hub:
+            if not card.get("url"):
+                raise chatmod.ChatRefused(403, "Only hubs may pull all messages")
+            origin = card["url"]
+        dm_for = station_id
         hops: Optional[List[int]] = [] if hub else None
         msgs, nxt, more = self.chat_store().fetch(since, dm_for=dm_for, limit=500, max_bytes=200 * 1024,
                                                   hidden=self.chat_local().is_blocked, all_dm=hub, hops_out=hops)
-        stats = self.chat_stats()
-        stats.inc("hub_served", len(msgs))
-        if origin:
-            stats.peer(origin, "served", len(msgs), ok=True)
+        if count:
+            self.chat_served(len(msgs), origin)
         out: Dict[str, Any] = {"messages": msgs, "next": nxt, "more": more}
+        if not count:
+            out["_origin"] = origin
         if hops is not None:
             out["hops"] = hops
         return out
+
+    def chat_served(self, n: int, origin: Optional[str]) -> None:
+        stats = self.chat_stats()
+        stats.inc("hub_served", n)
+        if origin:
+            stats.peer(origin, "served", n, ok=True)
 
     def chat_count(self, name: str, n: int = 1) -> None:
         self.chat_stats().inc(name, n)
@@ -835,7 +839,9 @@ class CommunityManager:
         if not self.chat_on():
             return
         self.chat_retry_pending()      # the gossip round has just merged cards
-        self.chat_net().round()
+        net = self.chat_net()
+        net.ensure_listener()
+        net.round()
         self.chat_stats().save(force=False)
         if self._chat_store is not None:
             self._chat_store.sweep(known=lambda i: self._registry.get(i) is not None)

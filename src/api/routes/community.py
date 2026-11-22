@@ -233,24 +233,84 @@ async def post_community_chat(request: Request, service: AllSkyService = Depends
         raise HTTPException(status_code=exc.status, detail=exc.detail)
 
 
+CHAT_WAIT_MAX_S = 25.0
+CHAT_EVENTS_MAX_S = 600.0
+CHAT_POLL_STEP_S = 0.5
+
+
 @router.get("/api/community/chat/messages")
-def get_community_chat_messages(request: Request, since: float = 0.0, hub: int = 0,
-                                service: AllSkyService = Depends(get_service)):
-    """Public room; plus the direct messages of the station that signed X-Zenivo-Id/-Time/-Sig. `hub=1`: another hub
-    pulling every direct message (ciphertext) with hop counts; needs a hub-pull signature of a station with an address."""
+async def get_community_chat_messages(request: Request, since: float = 0.0, hub: int = 0, wait: float = 0.0,
+                                      service: AllSkyService = Depends(get_service)):
+    """The public room plus the direct messages of the station that signed X-Zenivo-Id/-Time/-Sig (headers are
+    mandatory). `hub=1`: another hub pulling every direct message (ciphertext) with hop counts; needs a hub-pull
+    signature of a station with an address. `wait` (0..25 s): long-poll, hold the request while nothing is new."""
+    import asyncio
     import math
+    import time
+    from starlette.concurrency import run_in_threadpool
     from src.community.chat import ChatRefused
     mgr = service.community
     _chat_hub_or_404(mgr)
-    if not math.isfinite(since) or since < 0:
+    if not math.isfinite(since) or since < 0 or not math.isfinite(wait):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bad cursor")
+    wait = min(max(wait, 0.0), CHAT_WAIT_MAX_S)
     h = request.headers
+    args = (since, h.get("x-zenivo-id"), h.get("x-zenivo-time"), h.get("x-zenivo-sig"))
     try:
-        out = mgr.chat_fetch(since, h.get("x-zenivo-id"), h.get("x-zenivo-time"), h.get("x-zenivo-sig"), hub=bool(hub))
+        store = mgr.chat_store()
+        v0 = store.version
+        out = await run_in_threadpool(lambda: mgr.chat_fetch(*args, hub=bool(hub), count=False))
+        waited = False
+        if wait > 0 and not out["messages"]:
+            waited = True
+            end = time.monotonic() + wait
+            while time.monotonic() < end and store.version == v0:
+                if await request.is_disconnected():
+                    break
+                await asyncio.sleep(min(CHAT_POLL_STEP_S, max(0.0, end - time.monotonic())))
+            if store.version != v0:
+                out = await run_in_threadpool(lambda: mgr.chat_fetch(*args, hub=bool(hub), count=False))
+        mgr.chat_served(len(out["messages"]), out.pop("_origin", None))
+        if waited:
+            out["wait"] = True
     except ChatRefused as exc:
         raise HTTPException(status_code=exc.status, detail=exc.detail)
     return Response(content=json.dumps(out, separators=(",", ":")), media_type="application/json",
                     headers=_COMMUNITY_CORS)
+
+
+@router.get("/api/community/chat/events")
+async def get_community_chat_events(request: Request, service: AllSkyService = Depends(get_service)):
+    """Owner: Server-Sent Events; an event `chat` with the local chat version whenever the conversations change."""
+    import asyncio
+    import time
+    from fastapi.responses import StreamingResponse
+    from src.auth.middleware import is_admin
+    if not is_admin(request):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
+    mgr = service.community
+    _chat_on_or_404(mgr)
+    mgr.chat_net().ensure_listener()
+    local = mgr.chat_local()
+
+    async def gen():
+        end = time.monotonic() + CHAT_EVENTS_MAX_S
+        last_v = -1
+        last_ping = time.monotonic()
+        while time.monotonic() < end:
+            v = local.version
+            if v != last_v:
+                last_v = v
+                yield f"event: chat\ndata: {{\"v\":{v}}}\n\n"
+            elif time.monotonic() - last_ping >= 20:
+                last_ping = time.monotonic()
+                yield ": ping\n\n"
+            await asyncio.sleep(CHAT_POLL_STEP_S)
+            if await request.is_disconnected():
+                return
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"})
 
 
 @router.get("/api/community/chat/keys")
@@ -281,6 +341,7 @@ def get_community_chat_local(peer: str = "", poll: int = 0, service: AllSkyServi
     _chat_on_or_404(mgr)
     if peer and peer != chatmod.PUBLIC and not re.match(r"^[0-9a-f]{32}$", peer):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bad station id")
+    mgr.chat_net().ensure_listener()
     if poll:
         mgr.chat_net().poll()
     local = mgr.chat_local()

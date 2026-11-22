@@ -75,13 +75,49 @@
         return d.toLocaleDateString([], { month: "short", day: "numeric" });
     }
     function totalUnread() { return data ? data.conversations.reduce((a, c) => a + (c.unread || 0), 0) : 0; }
+    // ---- alerts for new incoming messages: toast, tab title, desktop notification when the tab is hidden ----
+    const baseTitle = document.title;
+    let toasts = null;
+    function openThread(id) {
+        if (!panel) return;
+        if (!open) setOpen(true);
+        go("thread", id);
+    }
+    function toast(id, text) {
+        if (!toasts) { toasts = el("div", "zcw-toasts"); toasts.setAttribute("role", "status"); toasts.setAttribute("aria-live", "polite"); document.body.appendChild(toasts); }
+        const t = el("button", "zcw-toast");
+        t.type = "button";
+        t.append(el("b", null, nameOf(id)), el("span", null, text));
+        t.addEventListener("click", () => { t.remove(); openThread(id); });
+        toasts.appendChild(t);
+        while (toasts.children.length > 3) toasts.firstChild.remove();
+        setTimeout(() => t.remove(), 6000);
+    }
+    function notifyNew(prev) {
+        if (!prev || !data) return;
+        const old = new Map(prev.conversations.map((c) => [c.peer, c.unread || 0]));
+        for (const c of data.conversations) {
+            if ((c.unread || 0) <= (old.get(c.peer) || 0)) continue;
+            const text = (c.last_text || "").slice(0, 80);
+            if (document.hidden) {
+                if ("Notification" in window && Notification.permission === "granted") {
+                    try {
+                        const n = new Notification(nameOf(c.peer), { body: text, tag: "zenivo-chat-" + c.peer });
+                        n.onclick = () => { window.focus(); openThread(c.peer); n.close(); };
+                    } catch (e) { /* not allowed here */ }
+                }
+            } else if (!(open && view === "thread" && peer === c.peer)) toast(c.peer, text);
+        }
+    }
     function updateBadge() {
         const n = totalUnread();
+        document.title = n ? `(${n}) ${baseTitle}` : baseTitle;
         badge.textContent = n ? (n > 99 ? "99+" : String(n)) : "";
         launch.setAttribute("aria-label", n ? `Open chat, ${n} unread` : "Open chat");
     }
 
     // ---- network ----
+    let events = null, live = false, kick = null;
     async function post(path, payload) {
         const res = await fetch(API + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
         if (!res.ok) {
@@ -96,8 +132,10 @@
             const res = await fetch(`${API}/local?peer=${encodeURIComponent(q)}${poll ? "&poll=1" : ""}`);
             if (res.status === 401 || res.status === 403 || res.status === 404) { teardown(); return false; }
             if (!res.ok) return true;
+            const prev = data;
             data = await res.json();
             updateBadge();
+            notifyNew(prev);
             if (open) render();
             if (open && view === "thread" && data.conversations.some((c) => c.peer === peer && c.unread)) {
                 fetch(API + "/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ peer }) })
@@ -111,11 +149,30 @@
         pollTimer = setTimeout(async () => {
             if (!document.hidden && !(await refresh(true))) return;
             schedule();
-        }, open ? 30000 : 60000);
+        }, live ? 120000 : open ? 30000 : 60000);
+    }
+    // Realtime: the station pushes an event when its conversations change; the timer is only the fallback
+    function listen() {
+        if (events || typeof EventSource === "undefined") return;
+        events = new EventSource(API + "/events");
+        events.addEventListener("chat", () => {
+            clearTimeout(kick);
+            kick = setTimeout(() => { if (launch) refresh(false); }, 300);
+        });
+        events.onopen = () => { live = true; schedule(); };
+        events.onerror = () => {
+            live = false; schedule();
+            if (events && events.readyState === 2) { events = null; setTimeout(() => { if (launch) listen(); }, 5000); }
+        };
     }
     function teardown() {
         clearTimeout(pollTimer); pollTimer = null;
+        clearTimeout(kick);
+        if (events) { events.close(); events = null; }
+        live = false;
         if (launch) { launch.remove(); panel.remove(); launch = panel = null; }
+        if (toasts) { toasts.remove(); toasts = null; }
+        document.title = baseTitle;
         open = false; data = null;
     }
 
@@ -230,6 +287,16 @@
         const dms = data.conversations.filter((c) => c.peer !== PUBLIC).sort((a, b) => b.last_t - a.last_t);
         dms.forEach((c) => s.appendChild(row(c.peer, c, c.unread)));
         if (!dms.length) empty(s, "chat", "No private conversations yet. Use New message to write to a station.");
+        if ("Notification" in window) {
+            const perm = Notification.permission;
+            if (perm === "denied") s.appendChild(el("p", "zcw-alerts-note", "Desktop alerts are blocked in the browser."));
+            else if (perm === "default") {
+                const ab = el("button", "zcw-alerts", "Enable desktop alerts");
+                ab.type = "button";
+                ab.addEventListener("click", () => { Notification.requestPermission().then(() => { if (view === "list") render(); }).catch(() => {}); });
+                s.appendChild(ab);
+            }
+        }
     }
     function renderNew() {
         body.textContent = "";
@@ -513,6 +580,7 @@
             build();
             updateBadge();
             schedule();
+            listen();
         }).catch(() => {});
     }
     // Used by the community map: a "Message" button in a station popup opens that private thread

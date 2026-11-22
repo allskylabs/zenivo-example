@@ -122,6 +122,12 @@ off stops all chat traffic (no thread, no polling, no key, chat endpoints answer
 others and keeps only the owner's own local history. The owner can untick "Chat with other stations" under Settings.
 Chat is owner-only in the UI (Community page, panel "Chat"); all remote text is shown as plain text.
 
+**Realtime.** The browser holds a Server-Sent Events stream (`GET /api/community/chat/events`, admin only) and refreshes when
+the station's conversations change; the 30/60 s timer is only a fallback (120 s while the stream is open). Between station and
+hub, `GET /api/community/chat/messages?wait=N` (N up to 25 s) is a long-poll: the hub holds the request until a message arrives
+and answers `"wait": true`; each station keeps one such request open to its first two hubs and backs off 30 s (up to 5 min on
+errors) from a hub that does not answer `wait`. Fetching messages needs the signed station headers; an unsigned request gets 403.
+
 - **Message** `{v:1, mid, from, to, t, body, sig}`: `to` is `"*"` (public room, at most 500 characters, control characters removed)
   or a 32-hex station id. `mid` is the first 16 bytes (hex) of sha256 of the canonical unsigned message. `sig` is the sender's
   station (Ed25519) signature over `zenivo-chat-v1\n` plus the canonical JSON. Unknown fields, NaN or huge numbers and bodies over 4 KB are refused.
