@@ -323,7 +323,7 @@
             bars(mine, days);
 
             const relay = section(wrap, "Hub relay", "messages this station carried for others");
-            tiles(relay, [["From stations", "hub_accepted"], ["Pulled from hubs", "hub_pulled"], ["Served", "hub_served"]], tot, today);
+            tiles(relay, [["From stations", "hub_accepted"], ["Pulled", "hub_pulled"], ["Served out", "hub_served"]], tot, today);
             relay.lastChild.classList.add("three");
 
             const held = st.held || {};

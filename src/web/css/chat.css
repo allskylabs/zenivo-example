@@ -111,3 +111,4 @@
 .zcs-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); flex: none; }
 .zcs-dot.ok { background: var(--success); }
 .zcs-dot.bad { background: var(--danger); }
+.zcs-grid.three .zcs-lbl { white-space: normal; }
