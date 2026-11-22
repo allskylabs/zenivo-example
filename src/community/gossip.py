@@ -226,6 +226,7 @@ class GossipWorker:
                         reply = self._fetch(base + "/api/community/announce", allow_private=allow_private, method="POST", payload=own)
                         res["announced"] = True
                         res["relay_offered"] = bool(isinstance(reply, dict) and reply.get("relay") is True)
+                        self.manager.note_chat_hub(base, isinstance(reply, dict) and reply.get("chat") is True, allow_private)
                         if base.startswith("https://"):   # the upload itself never allows private addresses
                             offers.append((base, res))
                     except Exception as exc:
@@ -240,6 +241,10 @@ class GossipWorker:
             except Exception:
                 logger.exception("Relay upload failed")
             self.manager.save_registry()
+            try:
+                self.manager.chat_round()
+            except Exception:
+                logger.exception("Chat round failed")
             self.last_targets = results
             others = sum(1 for r in results if r["ok"] and not r["self"])
             self.last_round = {"time": int(time.time()), "contacted": contacted, "ok": ok, "failed": failed, "new": new,

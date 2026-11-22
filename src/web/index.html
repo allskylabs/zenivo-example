@@ -1315,6 +1315,8 @@
                             <p class="field-note">The last two need a public URL. Turning the link off only removes it from the community map; whoever knows the address can still open the station, as before.</p>
                             <label class="checkbox-label"><input type="checkbox" id="community-relay" checked /> Relay previews for stations without a public address</label>
                             <p class="field-note">On by default; turn it off here if you do not want it. This station then stores and serves large preview images sent by other stations (re-encoded JPEG, at most 1280 px, up to 100 stations and 25 MB, kept 24 hours) so they can be seen without those stations opening their network. Turning it off deletes everything held and refuses new uploads.</p>
+                            <label class="checkbox-label"><input type="checkbox" id="community-chat" /> Chat with other stations</label>
+                            <p class="field-note" id="community-chat-note">On by default while sharing is on (it does nothing while sharing is off). Messages pass through hub stations (stations with chat on and a public address): public-room messages are readable by anyone, private messages are end-to-end encrypted, but hubs can see who talks to whom and when. Turning it off stops all chat traffic and deletes what this station held for others; your own conversation history stays. The chat is on the Community page.</p>
                         </div>
                         <div class="field">
                             <label for="community-seeds">Seed stations (one URL per line)</label>

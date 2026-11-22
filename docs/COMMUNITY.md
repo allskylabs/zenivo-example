@@ -114,6 +114,40 @@ through the cards it announces, but nobody can open it or fetch its preview from
 and its large preview goes to [relay stations](#preview-relays). Only stations with a public https URL are asked by others during gossip.
 Behind a reverse proxy the announce rate limit sees the proxy address, so all announces share one limit.
 
+## Chat
+
+Stations can talk to each other: a public room and private (direct) messages. The setting `chat_enabled` in `community.json`
+is **on by default but effective only while Community sharing is on**: turning sharing on turns chat on, and turning either
+off stops all chat traffic (no thread, no polling, no key, chat endpoints answer 404), deletes what this station held for
+others and keeps only the owner's own local history. The owner can untick "Chat with other stations" under Settings.
+Chat is owner-only in the UI (Community page, panel "Chat"); all remote text is shown as plain text.
+
+- **Message** `{v:1, mid, from, to, t, body, sig}`: `to` is `"*"` (public room, at most 500 characters, control characters removed)
+  or a 32-hex station id. `mid` is the first 16 bytes (hex) of sha256 of the canonical unsigned message. `sig` is the sender's
+  station (Ed25519) signature over `zenivo-chat-v1\n` plus the canonical JSON. Unknown fields, NaN or huge numbers and bodies over 4 KB are refused.
+- **Private body** `{epk, nonce, ct}`: ephemeral X25519 key agreement with the recipient's chat key, HKDF-SHA256 (info
+  `zenivo-chat-dm-v1`), ChaCha20-Poly1305; the header `from|to|t` is the associated data. Only the recipient can read it.
+- **Chat key**: the X25519 public key is published as a separate signed record `{id, xpub, t, sig}` (card key, domain
+  `zenivo-chat-key-v1\n`), so the signed card does not change. The private key is `data/community_chat_key.pem` (mode 0600),
+  created when chat becomes effective.
+- **Hubs**: a station with chat on and a public URL says `chat: true` in `/api/community/status` and in the announce answer, and
+  stores messages for others in `data/community_chat.json` (public room: 2000 messages, private: 200 per recipient, all 7 days).
+  Endpoints: `POST /api/community/chat/post` (signed message or key record from a station whose card the hub knows; limits: 30 per
+  minute per client address, 20 per minute and 300 per day per station, 16 KB body, clock skew at most 300 s),
+  `GET /api/community/chat/messages?since=` (public room; private messages only with the headers `X-Zenivo-Id`, `X-Zenivo-Time`,
+  `X-Zenivo-Sig` = signature over `zenivo-chat-fetch-v1\n<id>\n<time>`, within 300 s; about 500 messages / 200 KB per answer),
+  `GET /api/community/chat/keys`. Hubs also pull the public room from other hubs each gossip round.
+- **Clients** send to up to 3 hubs (seeds first, then stations with `chat: true`), poll them every gossip round (and every 30 s
+  while the chat panel is open) and decrypt private messages locally. A message from a sender whose card the receiver does not
+  know is dropped.
+- **Block list**: the owner can block a station; its messages are hidden, not stored and not forwarded by this station.
+
+Threat model for chat: hubs see who talks to whom and when (not private contents); anyone can create identities, so spam is
+limited by the rate limits above, size caps, expiry and the block list, not prevented; public messages are readable by everyone;
+private messages are **not replicated between hubs** (a pull returns the public room plus the private messages for the polling
+station), so sender and recipient need a hub in common (seeds are tried first); a replayed fetch header within 300 s only
+reveals ciphertext and metadata; there is no forward secrecy for the long-term key beyond the per-message ephemeral key on the sender side.
+
 ## Threat model
 
 - **Forged or altered cards**: a card is accepted only if the id matches the public key and the Ed25519 signature

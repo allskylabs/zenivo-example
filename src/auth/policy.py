@@ -12,17 +12,18 @@ PUBLIC, ADMIN, PAGE = "public", "admin", "page"
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 # Mutating requests that need no session. Everything else that is not GET/HEAD/OPTIONS requires the admin.
-OPEN_MUTATIONS = frozenset({"/api/auth/setup", "/api/auth/login", "/api/auth/logout", "/api/community/announce"})
+OPEN_MUTATIONS = frozenset({"/api/auth/setup", "/api/auth/login", "/api/auth/logout", "/api/community/announce",
+                            "/api/community/chat/post"})
 # Dynamic: POST /api/community/relay/<station id> (a station without a public URL pushes its preview; signed per request)
 _RELAY_POST = re.compile(r"^/api/community/relay/[0-9a-f]{32}$")
 # Other stations call this without a browser, so it has neither a session nor the CSRF origin check.
-NO_ORIGIN_CHECK = frozenset({"/api/community/announce"})
+NO_ORIGIN_CHECK = frozenset({"/api/community/announce", "/api/community/chat/post"})
 # Machine-to-machine ingest routes a local process may POST without a session (loopback peer, no proxy headers).
 # Nothing in Zenivo receives such pushes today (the ADS-B feeder only reads /api/adsb/aircraft), so the list is empty.
 LOCAL_INGEST: frozenset = frozenset()
 # GET routes that leak logs or settings: admin only. All other GETs are public.
 # (/docs, /redoc and /openapi.json are FastAPI's built-in pages; they sit outside /api but are matched by exact path.)
-ADMIN_GET = frozenset({"/api/logs", "/api/logs/download", "/api/community/settings", "/api/focus", "/api/focus/frame",
+ADMIN_GET = frozenset({"/api/logs", "/api/logs/download", "/api/community/settings", "/api/community/chat/local", "/api/focus", "/api/focus/frame",
                        "/api/focus/overview.jpg", "/api/storage", "/api/camera/devices", "/api/satellites/config", "/api/data-sources", "/api/system/resources", "/docs", "/redoc", "/openapi.json"})
 # WebSocket text actions a guest may send (they only read). Everything else needs the admin session + same-site origin.
 WS_GUEST_ACTIONS = frozenset({"ping", "get_telemetry", "get_status", "subscribe", "idle"})

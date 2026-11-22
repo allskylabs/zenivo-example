@@ -238,6 +238,7 @@ Rules and limits:
   off (which also makes the station answer 404 to uploads). A station with no reachable address never receives uploads. Honest note: a relay hosts images chosen by other stations. The risk is limited by the signature (only a known
   station key can store, one image per station), the server-side re-encoding (no metadata or active content), the
   caps, the 24 h lifetime and the switch.
+- Chat (on by default while Community sharing is on; Settings, "Chat with other stations"): signed public-room messages and end-to-end encrypted private messages travel through hub stations (stations with chat on and a public URL). `POST /api/community/chat/post` is open to other stations like announce (signed, known card required, rate limited). Hubs see who talks to whom and when. Turning chat or Community off stops all traffic and deletes what the station held for others. See docs/COMMUNITY.md "Chat".
 - The announce endpoint (`POST /api/community/announce`) is open to other stations without a session or a
   CSRF origin check (`NO_ORIGIN_CHECK` in `src/auth/policy.py`) and is rate limited to 30 per minute per client.
 
@@ -348,6 +349,9 @@ Everything else uses the process's default umask: protect the directory itself.
 | `ae_state.json` | Last auto exposure and gain (time, values), to resume after a restart within 2 hours | Low | default |
 | `community.json` | Community settings: switch, name, public URL, precision, preview switches, `relay_previews`, seed list. No secrets | Low | default |
 | `community_relay/<station id>.jpg` | While "Relay previews" is on (the default; the folder only fills when a station uploads): large preview images pushed by other stations (re-encoded JPEG, at most 100 files / 25 MB, deleted after 24 h; the folder is emptied when the switch is turned off) | Low | 0640 |
+| `community_chat.json` | While chat is effective (Community on and chat on, the default) on a station with a public URL: public-room and private (encrypted) messages other stations posted, and their chat key records (at most 2000 + 200 per recipient, deleted after 7 days; deleted when chat or Community is turned off) | Low | default |
+| `community_chat_local.json` | Your own chat history (plaintext), block list and cursors; kept when chat is turned off | Medium | default |
+| `community_chat_key.pem` | Private X25519 chat key for end-to-end encrypted messages; created when chat becomes effective | High | 0600 |
 | `community_relays.json` | Only for a station without a public URL: the relay stations that hold your preview (origin, last success, failures) | Low | default |
 | `community_peers.json` | Public cards of other stations and remembered station addresses | Low | default |
 | `frames/<date>/` | Archived sky frames (AVIF) and `telemetry.jsonl` (exposure, gain, star count, cloud cover). Kept 7 days by default | Medium | default |

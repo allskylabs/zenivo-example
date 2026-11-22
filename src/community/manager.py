@@ -13,6 +13,7 @@ from typing import Any, Callable, Deque, Dict, List, Optional
 
 from src.community import DEFAULT_SEEDS
 from src.community import card as cardmod
+from src.community import chat as chatmod
 from src.community import identity as idmod
 from src.community.card import CardError, PRECISIONS, seed_origin, to_origin
 from src.community.gossip import GossipWorker
@@ -47,6 +48,8 @@ DEFAULTS: Dict[str, Any] = {
     "seeds_set": False,
     # Receiver: store and serve large previews pushed by stations that have no public URL (on by default; the owner can turn it off)
     "relay_previews": True,
+    # Station-to-station chat (off by default; effective only while Community is on)
+    "chat_enabled": True,     # effective only while Community sharing is on
 }
 
 
@@ -79,6 +82,14 @@ class CommunityManager:
         self._relay_all: Deque[float] = deque()
         self._relay_out: Optional[Dict[str, Dict[str, Any]]] = None   # sender: origin -> {ok_t, fail, try_t}
         self._relay_payload: Optional[tuple] = None                   # (time, bytes, sha)
+        self._chat_store: Optional[chatmod.ChatStore] = None
+        self._chat_local: Optional[chatmod.LocalChat] = None
+        self._chat_key: Optional[chatmod.ChatKey] = None
+        self._chat_rec: Optional[Dict[str, Any]] = None
+        self._chat_hits: Dict[str, Deque[float]] = {}
+        self._chat_day: Dict[str, Deque[float]] = {}
+        self._chat_hubs: Dict[str, Dict[str, Any]] = {}   # origin -> {t, on, private}: what the last announce said
+        self._chat_net: Any = None
         self.worker = GossipWorker(self)
 
     # -- paths / settings --------------------------------------------------
@@ -139,6 +150,10 @@ class CommunityManager:
             if not (cur["enabled"] and cur["relay_previews"]):
                 if was_relay or os.path.isdir(self._path("community_relay")):
                     self.relay_store().clear()    # turning the relay off (or Community off) deletes what it holds
+            if not (cur["enabled"] and cur["chat_enabled"]):
+                self._chat_forget()      # chat off (or Community off): what this hub held for others is deleted
+            else:
+                self.chat_key()          # created on first use
         if cur["enabled"]:
             self.start()
             self.worker.trigger()
@@ -523,6 +538,202 @@ class CommunityManager:
         return {"state": state, "inbound_1h": inbound_1h, "last_inbound": last_in,
                 "known": self._registry.count() if self._registry is not None else 0}
 
+    # -- chat -------------------------------------------------------------
+    def chat_on(self) -> bool:
+        return bool(self.settings()["chat_enabled"]) and self.enabled
+
+    def chat_hub(self) -> bool:
+        """Chat is on and the station has a public address: it accepts and serves messages for others."""
+        return self.chat_on() and bool(self.settings()["public_url"])
+
+    def chat_key(self) -> chatmod.ChatKey:
+        with self._lock:
+            if self._chat_key is None:
+                self._chat_key = chatmod.ChatKey(self._path("community_chat_key.pem"))
+            return self._chat_key
+
+    def chat_store(self) -> chatmod.ChatStore:
+        with self._lock:
+            if self._chat_store is None:
+                self._chat_store = chatmod.ChatStore(self._path("community_chat.json"))
+            return self._chat_store
+
+    def chat_local(self) -> chatmod.LocalChat:
+        with self._lock:
+            if self._chat_local is None:
+                self._chat_local = chatmod.LocalChat(self._path("community_chat_local.json"))
+            return self._chat_local
+
+    def chat_net(self):
+        from src.community.chatnet import ChatNet
+        with self._lock:
+            if self._chat_net is None:
+                self._chat_net = ChatNet(self)
+            return self._chat_net
+
+    def _chat_forget(self) -> None:
+        """Delete the store of others' messages and key records (own local history and the key stay)."""
+        if self._chat_store is not None:
+            self._chat_store.clear()
+            self._chat_store = None
+        try:
+            os.unlink(self._path("community_chat.json"))
+        except OSError:
+            pass
+
+    def chat_rate(self, client: str, kind: str = "ip") -> None:
+        """Count one post (per client address 30/min before anything else; per verified station 20/min and 300/day)."""
+        now = time.time()
+        limit_min = 30 if kind == "ip" else 20
+        with self._lock:
+            hits = self._chat_hits.setdefault(f"{kind}:{client}", deque())
+            while hits and hits[0] < now - 60:
+                hits.popleft()
+            day = self._chat_day.setdefault(client, deque()) if kind == "station" else None
+            if day is not None:
+                while day and day[0] < now - 86400:
+                    day.popleft()
+            if len(hits) >= limit_min or (day is not None and len(day) >= 300):
+                raise RateLimited()
+            hits.append(now)
+            if day is not None:
+                day.append(now)
+            for table in (self._chat_hits, self._chat_day):
+                if len(table) > 2000:
+                    for k in [k for k, v in table.items() if not v or v[-1] < now - 86400]:
+                        del table[k]
+
+    def _chat_card(self, station_id: Any) -> Optional[Dict[str, Any]]:
+        if not isinstance(station_id, str) or not chatmod.ID_RE.match(station_id):
+            return None
+        self._ensure()
+        return self._registry.get(station_id)
+
+    def chat_ingest(self, msg: Any, now: Optional[float] = None, store: bool = True) -> str:
+        """A message that arrived from a hub: check it and file it. Returns "public", "dm", "dup" or "drop"."""
+        now = time.time() if now is None else now
+        try:
+            chatmod.check_message(msg)
+            if now - msg["t"] > chatmod.TTL_S or msg["t"] > now + chatmod.SKEW_S:
+                return "drop"
+            card = self._chat_card(msg["from"])
+            if card is None:
+                return "drop"
+            chatmod.verify_message(msg, card.get("pubkey"))
+        except chatmod.ChatError:
+            return "drop"
+        local = self.chat_local()
+        me = self._identity.id if self._identity else None
+        if local.is_blocked(msg["from"]):
+            return "drop"
+        if msg["to"] == chatmod.PUBLIC:
+            if store and self.chat_hub():
+                self.chat_store().add(msg, now)
+            return "public" if local.add(chatmod.PUBLIC, msg, msg["body"], incoming=msg["from"] != me, now=now) else "dup"
+        if msg["to"] == me:
+            try:
+                text = chatmod.open_dm(msg, self.chat_key())
+            except chatmod.ChatError:
+                return "drop"
+            return "dm" if local.add(msg["from"], msg, text, incoming=True, now=now) else "dup"
+        return "drop"
+
+    def accept_chat_post(self, payload: Any, now: Optional[float] = None) -> Dict[str, Any]:
+        """Hub: one message and/or the sender's chat key record, from a station whose card we know. The caller has
+        rate-limited the client address and bounded the body. Raises ChatRefused."""
+        now = time.time() if now is None else now
+        if not self.chat_hub():
+            raise chatmod.ChatRefused(404, "This station is not a chat hub")
+        if not isinstance(payload, dict) or not payload or not set(payload) <= {"msg", "key"}:
+            raise chatmod.ChatRefused(400, "Bad request")
+        msg, key = payload.get("msg"), payload.get("key")
+        if msg is not None:
+            sender = msg.get("from") if isinstance(msg, dict) else None
+        else:
+            sender = key.get("id") if isinstance(key, dict) else None
+        card = self._chat_card(sender)
+        if card is None:
+            raise chatmod.ChatRefused(403, "Unknown station")
+        if self._identity is not None and sender == self._identity.id:
+            raise chatmod.ChatRefused(400, "Own messages do not need a hub")
+        try:
+            if msg is not None:
+                chatmod.verify_message(msg, card.get("pubkey"))
+                chatmod.check_skew(msg, now)
+            if key is not None:
+                chatmod.verify_key_record(key, card.get("pubkey"), now)
+        except chatmod.ChatError as exc:
+            raise chatmod.ChatRefused(403 if "signature" in str(exc) else 400, str(exc))
+        try:
+            self.chat_rate(sender, "station")    # counted only for verified items: nobody can use up another station's quota
+        except RateLimited:
+            raise chatmod.ChatRefused(429, "Too many messages from this station")
+        store = self.chat_store()
+        stored = False
+        if key is not None:
+            store.put_key(key)
+        if msg is not None and not self.chat_local().is_blocked(sender):
+            stored = store.add(msg, now)
+            if stored:
+                self.chat_ingest(msg, now, store=False)    # a message for this hub's own owner lands in the local thread
+        store.save(force=False)
+        return {"ok": True, "stored": stored}
+
+    def chat_fetch(self, since: float, station_id: Optional[str], t_header: Optional[str], sig_header: Optional[str],
+                   now: Optional[float] = None) -> Dict[str, Any]:
+        """Hub: the public room, plus the direct messages of the station that signed the request headers."""
+        if not self.chat_hub():
+            raise chatmod.ChatRefused(404, "This station is not a chat hub")
+        dm_for = None
+        if station_id or t_header or sig_header:
+            card = self._chat_card(station_id)
+            if card is None or not chatmod.verify_fetch(card.get("pubkey"), station_id, t_header, sig_header, now):
+                raise chatmod.ChatRefused(403, "Bad signature")
+            dm_for = station_id
+        msgs, nxt, more = self.chat_store().fetch(since, dm_for=dm_for, limit=500, max_bytes=200 * 1024,
+                                                  hidden=self.chat_local().is_blocked)
+        return {"messages": msgs, "next": nxt, "more": more}
+
+    def chat_keys_payload(self) -> Dict[str, Any]:
+        if not self.chat_hub():
+            raise chatmod.ChatRefused(404, "This station is not a chat hub")
+        recs = self.chat_store().keys()
+        own = self.chat_own_key_record()
+        if own is not None and not any(r["id"] == own["id"] for r in recs):
+            recs.append(own)
+        return {"keys": recs}
+
+    def chat_own_key_record(self) -> Optional[Dict[str, Any]]:
+        self._ensure()
+        if self._identity is None or not self.chat_on():
+            return None
+        with self._lock:
+            if self._chat_rec is None or time.time() - self._chat_rec["t"] > 12 * 3600:
+                self._chat_rec = chatmod.make_key_record(self._identity, self.chat_key())
+            return self._chat_rec
+
+    def note_chat_hub(self, base: str, offered: bool, private: bool) -> None:
+        with self._lock:
+            self._chat_hubs[base] = {"t": time.time(), "on": bool(offered), "private": bool(private)}
+            if len(self._chat_hubs) > 100:
+                for k in sorted(self._chat_hubs, key=lambda k: self._chat_hubs[k]["t"])[:len(self._chat_hubs) - 100]:
+                    del self._chat_hubs[k]
+
+    def chat_hubs_known(self) -> Dict[str, Dict[str, Any]]:
+        with self._lock:
+            return {k: dict(v) for k, v in self._chat_hubs.items() if time.time() - v["t"] < 24 * 3600}
+
+    def chat_round(self) -> None:
+        """Called by the gossip worker after each round: poll the hubs, tidy and save."""
+        if not self.chat_on():
+            return
+        self.chat_net().round()
+        if self._chat_store is not None:
+            self._chat_store.sweep(known=lambda i: self._registry.get(i) is not None)
+            self._chat_store.save(force=False)
+        self.chat_local().sweep()
+        self.chat_local().save(force=False)
+
     def status(self, admin: bool = False) -> Dict[str, Any]:
         available, reason = idmod.availability()
         s = self.settings()
@@ -539,6 +750,7 @@ class CommunityManager:
             "last_round": dict(self.worker.last_round),
             "network": self.network(enabled),
             "default_seeds": list(DEFAULT_SEEDS),  # for the "restore built-in seeds" button in Settings
+            "chat": bool(enabled and s["chat_enabled"] and s["public_url"]),   # this station is a chat hub
             "relay": bool(enabled and s["relay_previews"]),   # senders read this: this station stores large previews
             "relays": self.relay_origins() if enabled and not s["public_url"] else [],  # stations holding OUR large preview (card `relays`)
         }

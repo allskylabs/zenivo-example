@@ -62,7 +62,7 @@ class TestRelayAPI:
         client.post("/api/community/settings", json={"relay_previews": True})
 
         assert upload(client, nat, body).status_code == 403                      # card unknown
-        assert client.post("/api/community/announce", json=nat_card).json() == {"ok": True, "relay": True}
+        assert client.post("/api/community/announce", json=nat_card).json() == {"ok": True, "relay": True, "chat": False}
         client.post("/api/community/announce", json=web_card)
         assert upload(client, web, body).status_code == 403                      # has a public url
         assert upload(client, nat, body, **{"X-Zenivo-Sig": "A" * 86 + "=="}).status_code == 403

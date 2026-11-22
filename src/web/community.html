@@ -75,6 +75,18 @@
         #clist { width: 320px; flex: 0 0 320px; overflow-y: auto; background: var(--bg-card); border-left: 1px solid var(--border-color); }
         #clist h2 { font-size: 13px; font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; gap: 8px; }
         #clist h2 span { color: var(--text-secondary); font-weight: 400; }
+        #cchat { border-top: 1px solid var(--border-color); }
+        #cchat-bar { display: flex; gap: 6px; padding: 8px 12px; }
+        #cchat-bar select { flex: 1; min-width: 0; }
+        #cchat-log { max-height: 280px; overflow-y: auto; padding: 4px 12px; font-size: 13px; }
+        #cchat-log .cm { margin: 6px 0; overflow-wrap: anywhere; }
+        #cchat-log .cm b { font-weight: 600; }
+        #cchat-log .cm time { color: var(--text-secondary); font-size: 11px; margin-left: 6px; }
+        #cchat-log .cm.mine { color: var(--text-secondary); }
+        #cchat-form { display: flex; gap: 6px; padding: 8px 12px; }
+        #cchat-form input { flex: 1; min-width: 0; }
+        #cchat-err { color: var(--danger, #e5484d); font-size: 12px; padding: 0 12px; }
+        .cchat-note { color: var(--text-secondary); font-size: 11px; padding: 4px 12px 12px; }
         #cstations { list-style: none; }
         #cstations button {
             display: block; width: 100%; min-height: 44px; text-align: left; padding: 8px 12px; cursor: pointer;
@@ -239,6 +251,15 @@
             <div id="cempty" hidden></div>
             <ul id="cstations"></ul>
             <p id="cnote">Stations without a public address appear on the map but cannot be opened.</p>
+            <section id="cchat" data-admin hidden aria-label="Station chat">
+                <h2>Chat <span id="cchat-unread"></span></h2>
+                <div id="cchat-bar"><select id="cchat-peer" aria-label="Conversation"></select>
+                    <button type="button" id="cchat-block" title="Hide this station's messages and stop forwarding them">Block</button></div>
+                <div id="cchat-log" role="log" aria-live="polite"></div>
+                <form id="cchat-form" autocomplete="off"><input id="cchat-text" maxlength="500" placeholder="Message" aria-label="Message"><button type="submit">Send</button></form>
+                <p id="cchat-err" role="alert" hidden></p>
+                <p class="cchat-note">Messages pass through hub stations. Private messages are end-to-end encrypted; hubs see who talks to whom and when.</p>
+            </section>
         </aside>
     </main>
     </div><!-- .app-main -->
@@ -249,5 +270,6 @@
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"
             integrity="sha384-eXVCORTRlv4FUUgS/xmOyr66XBVraen8ATNLMESp92FKXLAMiKkerixTiBvXriZr" crossorigin=""></script>
     <script src="/static/community.js?v=20261128c"></script>
+    <script src="/static/chat.js?v=20261129a"></script>
 </body>
 </html>

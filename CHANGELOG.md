@@ -6,6 +6,10 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Community: opt-out station chat (public room and end-to-end encrypted private messages) through hub stations, effective only while Community sharing is on (`chat_enabled`, default on; untick "Chat with other stations" in Settings). Signed messages, rate limits, block list, 7-day expiry; the chat panel is on the Community page. See docs/COMMUNITY.md "Chat".
+
 ## [1.3.0-beta.3] - 2026-11-18
 
 ### Fixed

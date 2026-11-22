@@ -308,6 +308,20 @@ class ObsOverlayRequest(BaseModel):
 
 
 
+class ChatSendRequest(BaseModel):
+    to: str = Field(..., pattern=r"^(\*|[0-9a-f]{32})$", description="'*' = public room, else a station id")
+    body: str = Field(..., min_length=1, max_length=2000)
+
+
+class ChatBlockRequest(BaseModel):
+    id: str = Field(..., pattern=r"^[0-9a-f]{32}$")
+    blocked: bool = True
+
+
+class ChatReadRequest(BaseModel):
+    peer: str = Field(..., pattern=r"^(\*|[0-9a-f]{32})$")
+
+
 class CommunitySettingsRequest(BaseModel):
     """Community sharing settings; omitted fields keep their value."""
     enabled: Optional[bool] = None
@@ -320,6 +334,7 @@ class CommunitySettingsRequest(BaseModel):
     allow_open: Optional[bool] = Field(None, description="Let the community map link to this station's own page (public URL)")
     relay_previews: Optional[bool] = Field(None, description="Store and serve large previews pushed by stations without a public URL (default true; re-encoded JPEG, 1280 px, 100 stations / 25 MB, 24 h)")
     seeds: Optional[List[str]] = Field(None, max_length=10, description="Stations to ask first, one URL each (http allowed for a LAN)")
+    chat_enabled: Optional[bool] = Field(None, description="Chat with other stations through hub stations (off by default; needs Community on)")
 
     @field_validator("name")
     @classmethod

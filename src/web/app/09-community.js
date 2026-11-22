@@ -8,6 +8,7 @@
     const previewEl = document.getElementById("community-preview");
     const openEl = document.getElementById("community-open");
     const relayEl = document.getElementById("community-relay");
+    const chatEl = document.getElementById("community-chat");
     const seedsEl = document.getElementById("community-seeds");
     const statusEl = document.getElementById("community-status");
 
@@ -155,6 +156,15 @@
     }
     [urlEl, previewEl, openEl].forEach((e) => e.addEventListener("change", updateUrlHint));
 
+    // Chat needs sharing on: until then the box is disabled with a hint
+    function syncChat() {
+        if (!chatEl) return;
+        chatEl.disabled = !box.checked;
+        const note = document.getElementById("community-chat-note");
+        if (note) note.classList.toggle("is-muted", !box.checked);
+    }
+    box.addEventListener("change", syncChat);
+
     async function loadStatus() {
         try {
             const res = await fetch("/api/community/status");
@@ -174,6 +184,8 @@
             previewEl.checked = s.share_preview !== false;
             openEl.checked = s.allow_open !== false;
             relayEl.checked = s.relay_previews !== false;
+            if (chatEl) chatEl.checked = s.chat_enabled !== false;
+            syncChat();
             seedsEl.value = (s.seeds || []).join("\n");
             updateUrlHint();
         } catch (err) { /* optional feature */ }
@@ -190,6 +202,7 @@
             share_preview: previewEl.checked,
             allow_open: openEl.checked,
             relay_previews: relayEl.checked,
+            chat_enabled: chatEl ? chatEl.checked : true,
             seeds: seedsEl.value.split("\n").map((l) => l.trim()).filter(Boolean),
         });
         setTimeout(loadStatus, 1500);
