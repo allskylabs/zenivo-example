@@ -581,6 +581,7 @@
             updateBadge();
             schedule();
             listen();
+            window.dispatchEvent(new Event("zenivo-chat-ready"));
         }).catch(() => {});
     }
     // Used by the community map: a "Message" button in a station popup opens that private thread

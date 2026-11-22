@@ -359,6 +359,17 @@
                 if (window.matchMedia("(max-width: 768px)").matches) document.getElementById("cmap-wrap").scrollIntoView({ block: "start", behavior: "smooth" });
             });
             item.appendChild(btn);
+            if (!isOwn && window.ZenivoChat && window.ZenivoChat.canDM(card.id)) {
+                // admin only: the chat widget exists only for the signed-in owner
+                const dm = el("button", "dm");
+                dm.type = "button";
+                dm.title = "Message";
+                dm.setAttribute("aria-label", `Message ${String(card.name || "this station")}`);
+                dm.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+                dm.addEventListener("click", () => window.ZenivoChat.openDM(card.id));
+                item.classList.add("has-dm");
+                item.appendChild(dm);
+            }
             listEl.appendChild(item);
             stations.push({ card, marker });
         }
@@ -417,6 +428,8 @@
         }
     }
 
+    // the chat widget loads after this page's list: redraw once it knows which stations take messages
+    window.addEventListener("zenivo-chat-ready", () => { if (!popupOpen && !spiderfied) drawMarkers(); });
     refresh();
     setInterval(refresh, 60000);
 })();
