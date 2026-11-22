@@ -42,12 +42,12 @@ HEAD = {
 # (group title or None, items). item = (href, icon entity, label, kind, data-tab) ; kind: "tab" = page of index.html (app.js
 # switches it), "link" = separate page, "blank" = new tab
 NAV = [
-    ("Sky", [("/live", "&#9673;", "Live", "tab", "tab-live"),
+    ("Sky", [("/community", "&#127760;", "Community", "link", ""),
+             ("/live", "&#9673;", "Live", "tab", "tab-live"),
              ("/sky", "&#10024;", "Sky view", "link", ""),
-             ("/overhead", "&#9737;", "Overhead", "link", ""),
              ("/flights3d", "&#9992;", "Flights 3D", "link", ""),
              ("/satellites3d", "&#128752;", "Satellites 3D", "link", ""),
-             ("/community", "&#127760;", "Community", "link", "")]),
+             ("/overhead", "&#9737;", "Overhead", "link", "")]),
     ("Archive", [("/gallery", "&#9638;", "Gallery &amp; Events", "tab", "tab-gallery"),
                  ("/logs", "&#8801;", "Activity Log", "tab", "tab-logs")]),
     ("Camera", [("/focus", "&#9678;", "Focus", "tab", "tab-focus"),
@@ -87,16 +87,15 @@ def icon(name, cls="m-svg", size=22):
             f'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{ICONS[name]}</svg>')
 
 
-# phone tab bar: Live / Sky / Overhead (= the lists page, /overhead) / Archive / Menu (the rest lives in the Menu sheet)
-MOBILE = [("/live", "camera", "Live", "/live,/,/index.html"), ("/sky", "star", "Sky", "/sky"),
-          ("/overhead", "nav", "Overhead", "/overhead"), ("/gallery", "calendar", "Archive", "/gallery,/logs")]
-MORE_PATHS = "/flights3d,/satellites3d,/community,/focus,/calibration,/settings,/obs"
+# phone tab bar, same order as the sidebar: Community / Live / Sky / Archive / Menu (the rest lives in the Menu sheet)
+MOBILE = [("/community", "pin", "Community", "/community"), ("/live", "camera", "Live", "/live,/,/index.html"),
+          ("/sky", "star", "Sky", "/sky"), ("/gallery", "calendar", "Archive", "/gallery,/logs")]
+MORE_PATHS = "/flights3d,/satellites3d,/overhead,/focus,/calibration,/settings,/obs"
 # Menu sheet groups: (title, admin-only group, [(href, icon, label, tone, admin item, new tab)])
 MENU = [
     ("Explore", False, [("/flights3d", "nav", "Flights 3D", "accent", False, False),
                         ("/satellites3d", "globe", "Satellites 3D", "accent", False, False),
-                        ("/community", "pin", "Community", "accent", False, False),
-                        ("/logs", "clock", "Activity log", "accent", True, False)]),
+                        ("/overhead", "nav", "Overhead", "accent", False, False)]),
     ("Camera", True, [("/focus", "search", "Focus", "violet", True, False),
                       ("/calibration", "camera", "Master dark", "violet", True, False),
                       ("/settings#image", "bars", "Image output", "violet", True, False),
@@ -105,7 +104,8 @@ MENU = [
                        ("/settings#skymask", "shield", "Sky mask", "ok", True, False),
                        ("/settings#integrations", "plus", "Integrations", "ok", True, False),
                        ("/settings#community", "users", "Sharing", "ok", True, False),
-                       ("/settings#admin", "lock", "Admin", "ok", True, False)]),
+                       ("/settings#admin", "lock", "Admin", "ok", True, False),
+                       ("/logs", "clock", "Activity log", "ok", True, False)]),
     ("Streaming", False, [("/obs/dock", "play", "OBS dock", "warn", True, False),
                           ("/obs", "play", "OBS preview", "warn", False, True)]),
 ]
