@@ -94,7 +94,7 @@
 
     // ---- station chat widget (owner only; it renders nothing unless chat is on and the owner is signed in) ----
     function loadChat() {
-        const v = "20261130b";
+        const v = "20261130c";
         const css = document.createElement("link");
         css.rel = "stylesheet"; css.href = "/static/css/chat.css?v=" + v;
         document.head.appendChild(css);

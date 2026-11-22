@@ -248,15 +248,56 @@
         fill();
         q.focus();
     }
-    const ROWS = [["Sent (public)", "sent_public"], ["Sent (private)", "sent_dm"], ["Received (public)", "recv_public"],
-        ["Received (private)", "recv_dm"], ["Send failures", "send_fail"], ["Hub: accepted from stations", "hub_accepted"],
-        ["Hub: pulled from hubs", "hub_pulled"], ["Hub: served to fetchers", "hub_served"], ["Refused: rate limit", "refused_rate"],
-        ["Refused: unknown station", "refused_unknown"], ["Refused: bad signature", "refused_sig"],
-        ["Refused: too old", "refused_old"], ["Refused: cap reached", "refused_cap"]];
-    function stat(parent, k, v) {
-        const r = el("div", "zcw-stat");
-        r.append(el("span", null, k), el("span", null, v));
-        parent.appendChild(r);
+    const REFUSED = [["Rate limit", "refused_rate"], ["Unknown station", "refused_unknown"], ["Bad signature", "refused_sig"],
+        ["Too old", "refused_old"], ["Cap reached", "refused_cap"]];
+    const nf = (n) => (n || 0).toLocaleString();
+    function ago(ts) {
+        if (!ts) return "never";
+        const d = Math.max(0, Date.now() / 1000 - ts);
+        if (d < 60) return "just now";
+        if (d < 3600) return Math.floor(d / 60) + " min ago";
+        if (d < 86400) return Math.floor(d / 3600) + " h ago";
+        return Math.floor(d / 86400) + " d ago";
+    }
+    function section(parent, title, hint) {
+        const sec = el("section", "zcs-sec");
+        const h = el("h4", "zcs-h", title);
+        if (hint) h.appendChild(el("small", null, hint));
+        sec.appendChild(h);
+        parent.appendChild(sec);
+        return sec;
+    }
+    function tiles(sec, items, tot, today) {
+        const g = el("div", "zcs-grid");
+        items.forEach(([label, key, tone]) => {
+            const t = el("div", "zcs-tile" + (tone ? " " + tone : ""));
+            t.append(el("div", "zcs-num", nf(tot[key])), el("div", "zcs-lbl", label));
+            const td = today[key] || 0;
+            t.appendChild(el("div", "zcs-today" + (td ? " up" : ""), td ? "+" + nf(td) + " today" : "none today"));
+            g.appendChild(t);
+        });
+        sec.appendChild(g);
+    }
+    function bars(sec, days) {
+        const keys = ["sent_public", "sent_dm", "recv_public", "recv_dm"];
+        const out = [];
+        for (let i = 13; i >= 0; i--) {
+            const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+            const c = days[d] || {};
+            out.push([d, keys.reduce((a, k) => a + (c[k] || 0), 0)]);
+        }
+        const max = Math.max(1, ...out.map((x) => x[1]));
+        const w = el("div", "zcs-bars");
+        out.forEach(([d, v]) => {
+            const b = el("div", "zcs-bar" + (v ? "" : " zero"));
+            b.style.height = Math.max(3, Math.round((v / max) * 100)) + "%";
+            b.title = d + ": " + v + " message" + (v === 1 ? "" : "s");
+            w.appendChild(b);
+        });
+        sec.appendChild(w);
+        const ax = el("div", "zcs-axis");
+        ax.append(el("span", null, "14 days ago"), el("span", null, "today"));
+        sec.appendChild(ax);
     }
     function renderStats() {
         const s = mkScroll();
@@ -270,14 +311,65 @@
             const st = await res.json();
             if (view !== "stats") return;
             s.textContent = "";
-            const today = (st.days && st.days[new Date().toISOString().slice(0, 10)]) || {};
-            stat(s, "Since", new Date(st.since * 1000).toLocaleDateString());
-            ROWS.forEach(([label, key]) => stat(s, label, `${st.totals[key] || 0} (today ${today[key] || 0})`));
-            stat(s, "Held now", `${st.held.dm} private for ${st.held.recipients} station(s), ${st.held.public} public`);
-            stat(s, "Waiting for a card", String(st.pending));
-            Object.keys(st.peers || {}).forEach((o) => {
+            const tot = st.totals || {}, days = st.days || {};
+            const today = days[new Date().toISOString().slice(0, 10)] || {};
+            const wrap = el("div", "zcs");
+            s.appendChild(wrap);
+            wrap.appendChild(el("div", "zcs-since", "Counting since " + new Date(st.since * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })));
+
+            const mine = section(wrap, "Your messages");
+            tiles(mine, [["Sent · public", "sent_public"], ["Sent · private", "sent_dm", "violet"],
+                ["Received · public", "recv_public"], ["Received · private", "recv_dm", "violet"]], tot, today);
+            bars(mine, days);
+
+            const relay = section(wrap, "Hub relay", "messages this station carried for others");
+            tiles(relay, [["From stations", "hub_accepted"], ["Pulled from hubs", "hub_pulled"], ["Served", "hub_served"]], tot, today);
+            relay.lastChild.classList.add("three");
+
+            const held = st.held || {};
+            const q = section(wrap, "Queue");
+            const ql = el("div", "zcs-list");
+            const qrow = (label, val, sub) => {
+                const r = el("div", "zcs-li");
+                const l = el("span", null, label);
+                if (sub) l.appendChild(el("small", null, sub));
+                r.append(l, el("b", null, val));
+                ql.appendChild(r);
+            };
+            qrow("Held private", nf(held.dm), held.recipients ? "for " + held.recipients + " station" + (held.recipients === 1 ? "" : "s") : "");
+            qrow("Held public", nf(held.public));
+            qrow("Waiting for a station card", nf(st.pending));
+            q.appendChild(ql);
+
+            const prob = section(wrap, "Problems");
+            const refused = REFUSED.filter(([, k]) => tot[k]);
+            const fails = tot.send_fail || 0;
+            if (!refused.length && !fails) {
+                prob.appendChild(el("div", "zcs-ok", "No refused messages and no failed sends."));
+            } else {
+                const pl = el("div", "zcs-chips");
+                if (fails) pl.appendChild(el("span", "zcs-chip bad", "Send failures " + nf(fails)));
+                refused.forEach(([label, k]) => pl.appendChild(el("span", "zcs-chip warn", label + " " + nf(tot[k]))));
+                prob.appendChild(pl);
+            }
+
+            const peers = Object.keys(st.peers || {});
+            const hs = section(wrap, "Hubs", peers.length ? peers.length + " connected" : "");
+            if (!peers.length) hs.appendChild(el("div", "zcs-ok muted", "No hub contacted yet."));
+            peers.forEach((o) => {
                 const p = st.peers[o];
-                stat(s, o, `pulled ${p.pulled}, served ${p.served}, failed sends ${p.send_fail}, failed pulls ${p.pull_fail}, last ok ${p.last_ok ? new Date(p.last_ok * 1000).toLocaleString() : "never"}`);
+                const bad = (p.send_fail || p.pull_fail) && (!p.last_ok || Date.now() / 1000 - p.last_ok > 600);
+                const card = el("div", "zcs-hub");
+                const top = el("div", "zcs-hub-top");
+                top.append(el("span", "zcs-dot" + (bad ? " bad" : p.last_ok ? " ok" : "")), el("b", null, o.replace(/^https?:\/\//, "").replace(/\/$/, "")),
+                    el("small", null, "ok " + ago(p.last_ok)));
+                if (p.last_ok) top.lastChild.title = new Date(p.last_ok * 1000).toLocaleString();
+                const ch = el("div", "zcs-chips");
+                ch.append(el("span", "zcs-chip", "pulled " + nf(p.pulled)), el("span", "zcs-chip", "served " + nf(p.served)));
+                if (p.send_fail) ch.appendChild(el("span", "zcs-chip bad", "send fail " + nf(p.send_fail)));
+                if (p.pull_fail) ch.appendChild(el("span", "zcs-chip bad", "pull fail " + nf(p.pull_fail)));
+                card.append(top, ch);
+                hs.appendChild(card);
             });
         } catch (e) {
             if (view === "stats") { s.textContent = ""; empty(s, "stats", "Statistics are not available."); }
