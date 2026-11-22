@@ -318,7 +318,17 @@
         return box;
     }
 
-    map.on("popupopen", (e) => { popupOpen = true; openPopup = e.popup; });
+    // Size the popup to the map it opens on: a phone map is short, so the desktop padding (room for the zoom
+    // buttons) and height cap would push the popup past the map's edges
+    function fitPopup(p) {
+        const s = map.getSize(), short = s.y < 360, o = p.options;
+        o.autoPanPaddingTopLeft = [12, short ? 12 : 76];
+        o.autoPanPaddingBottomRight = [12, short ? 12 : 24];
+        o.maxWidth = Math.max(160, Math.min(340, s.x - 24 - 46));
+        o.maxHeight = Math.max(120, Math.min(460, s.y - o.autoPanPaddingTopLeft[1] - o.autoPanPaddingBottomRight[1] - 50));
+        p.update();
+    }
+    map.on("popupopen", (e) => { popupOpen = true; openPopup = e.popup; fitPopup(e.popup); });
     map.on("popupclose", () => { popupOpen = false; openPopup = null; });
 
     // markercluster may call zoomToShowLayer's callback while the cluster is still re-forming after the zoom (the marker
@@ -348,7 +358,7 @@
                     html: `<span class="cm-dot ${st}${isOwn ? " own" : ""}"></span>` }),
                 title: `${String(card.name || "Station")} (${st})`, keyboard: true, cmState: st, cmOwn: isOwn,
             }).addTo(layer);
-            marker.bindPopup(() => popupFor(card, isOwn), { maxWidth: 340, keepInView: true, autoPanPaddingTopLeft: [16, 76], maxHeight: Math.max(160, Math.min(460, map.getSize().y - 110)), autoPanPaddingBottomRight: [16, 24] });
+            marker.bindPopup(() => popupFor(card, isOwn), { keepInView: true });   // size and padding: fitPopup
             pts.push([card.lat, card.lon]);
             const item = el("li");
             // The whole row is one hit button under the visible text; the message button sits beside the name on top of it
