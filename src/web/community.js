@@ -51,6 +51,8 @@
     const css = getComputedStyle(document.documentElement);
     const tone = (name, fallback) => (css.getPropertyValue(name) || "").trim() || fallback;
     const world = L.latLngBounds([-85, -180], [85, 180]);
+    let popupOpen = false;   // do not rebuild the markers under an open popup
+    let openPopup = null;    // the open Leaflet popup, re-laid out when its frame loads
     const map = L.map("cmap", {
         minZoom: 0.5, zoomSnap: 0.25, maxZoom: 9, preferCanvas: true, maxBounds: world.pad(0.6), maxBoundsViscosity: 0.6,
         attributionControl: false,
@@ -269,9 +271,12 @@
         if (src) {
             const img = document.createElement("img");
             img.alt = `Latest frame of ${String(card.name || "the station")}`;
-            img.loading = "lazy";
             img.referrerPolicy = "no-referrer";
-            img.addEventListener("error", () => img.remove());
+            // The frame arrives after the popup has opened and panned into view; the popup then grows upward and its
+            // top (the station name) ends up under the map edge. Re-layout and re-pan once the frame is in.
+            const relayout = () => { if (openPopup && openPopup.isOpen()) openPopup.update(); };
+            img.addEventListener("load", relayout);
+            img.addEventListener("error", () => { img.remove(); relayout(); });
             img.src = src;
             // Click to enlarge: the large preview when the station offers one, else the same small image scaled up
             const relays = base ? [] : relaySources(card);
@@ -310,9 +315,8 @@
         return box;
     }
 
-    let popupOpen = false;   // do not rebuild the markers under an open popup
-    map.on("popupopen", () => { popupOpen = true; });
-    map.on("popupclose", () => { popupOpen = false; });
+    map.on("popupopen", (e) => { popupOpen = true; openPopup = e.popup; });
+    map.on("popupclose", () => { popupOpen = false; openPopup = null; });
 
     // markercluster may call zoomToShowLayer's callback while the cluster is still re-forming after the zoom (the marker
     // is not on the map yet, so openPopup does nothing): ask again until the marker itself is shown
