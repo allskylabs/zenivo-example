@@ -1,29 +1,30 @@
 # STATE: imx335-allsky (Zenivo)
 
-Updated 2026-11-23 by PM. main = 1b62a84 (local, nothing pushed). Release tag v1.3.0-beta.5 done; later fixes unreleased.
+Updated 2026-11-24 by worker kind-bassi for the PM. Release tag v1.3.0-beta.5; later work is unreleased, nothing pushed.
 
-## Owner decisions (2026-11-23)
-- **UI: full clean rebuild, no more patching the old UI.** Icons first, less text (see ~/.claude/CLAUDE.md "opnai design rules"). Mockups (23 pages) in docs/design/mockups/ and the owner's opnai account (permanent, never delete/edit). Plan: docs/design/ui-redesign-plan.md.
-- Mockup features: build Admin /api/system tiles and Overlay-text switch; drop Airports layer and flight route v1; keep /sky planetarium restyled.
-- Deploys: static web = rsync, no restart; any Pi service restart: worker messages PM first (a restart gives a 502 for ~20-90 s).
+## Owner decisions
+- **UI: full clean rebuild on the ds system, no more patching the old UI.** Mockups (23 pages) in docs/design/mockups/ and the owner's opnai account (permanent, never edit).
+- **Icons first WITH short visible labels.** Never hide status, values, names or menu labels in a tooltip; long text goes behind an info icon. Text >= 12 px.
+- **One function, one control per page** (dedupe rule, docs/design/ui-critique.md Update 10b): no second link/button for the same destination; the sidebar owns navigation, Settings list owns the rest.
+- Deploys: static web = rsync to Pi + mini-PC, md5 check, no restart. Any Pi service restart: tell the PM first (502 for ~20-90 s).
 
-## Done today
-- focus peaking + remembered checkbox (localStorage); release 1.3.0-beta.5.
-- star-boost cloud grain fix (CLOUD_NOISE_SCALE 1.5), first-paint star-map overlay guards (05b-sky-reticle.js, full.html).
-- cloud cover: absolute day method (b/r p90, sun exclusion, median 5), labelled set tests/fixtures/cloud_labels, audit docs/design/cloud-cover-audit.md.
-- events: flash/meteor gates, SGP4 + ADS-B cross-check, fragment grouping, confidence, owner true/false labels (events/labels.jsonl), audit docs/design/events-detectors-audit.md.
-- UI S0: ds-tokens/base/components, Lucide sprite, ds-demo.html, ds lint (1b62a84).
-- Facebook: release comment posted on the Allsky Camera group post; new group "Zenivo Allsky" created by Worker-1 (cover not yet committed: docs/zenivo-group-cover.jpg).
+## Done
+- UI rebuild on ds for all pages: Live, Overhead, Sign-in, Archive + event viewer, Sky, Community, Admin, Logs, OBS dock, full.html, Flights/Satellites chrome, Settings.
+- Sidebar: primary nav + one Settings item, Admin for admins only, collapse toggle + Ctrl+B, smooth expand/collapse animation, collapsed-rail tooltips, phone Menu sheet with the same grouping; Settings deep links (`/settings#community`) kept.
+- Topbar: old-style labelled chips (status + fps, mode, UTC/Local clocks, Red Vision), visible captions restored.
+- Event grid and viewer; Overhead card header (count chips, filter segment, sort).
+- Object info card: anchored popover with arrow, Alt/Az/RA/Dec/Rise/Set labels, text actions, Esc closes, bottom sheet on mobile.
+- Full-width desktop pages, By-day placeholders, compact toasts, hidden-attr fix (layers sheet uses data-open).
+- icons.svg `?v=` fix: asset rewriter ate the `#fragment` of sprite URLs (src/api/main.py); needed a Pi service restart.
+- Admin pane: version label, wrapping, autofill style, sign-out rows.
+- Earlier: focus peaking, star-boost cloud grain fix, cloud cover day method + labelled set, events detector gates + owner labels (audits in docs/design/).
 
-## Done: UI rebuild on ds (2026-11-23)
-Live, Overhead, Sign-in, Archive+event viewer, Sky, Community, Admin, Logs, OBS dock, full.html, 3D page chrome (Flights/Satellites), Settings 3a/3b, cleanup (112 dead legacy CSS rules pruned, redesign-data.css + ds-demo-phone.html deleted, ?v=20261202a). Overhead sits under Menu by design (5-tab shell); the Menu tab highlights.
-
-## Remaining (unverified / open)
-- Plan section 9: legacy index.html pages (Live/Archive/Settings/Calibration/Focus) still load style.css + redesign*.css/pages.css/phone.css (live rules); ds_lint --report still shows hex/px/z-index in those, flights3d.html scene colours (44 hex), sky_catalog.js (99 hex), app/*.js canvas hex. Default ds_lint = 0.
-- Red mode on every page, Lighthouse-style a11y pass, loading/empty/error states per page, `data-ui` flag check: not verified.
-
-## In progress
-nothing. Next: detector follow-ups: measure gates on real new events after a few days; tune from owner labels. Cloud: watch a few days, add mislabelled frames to the set. Night moon handling not done.
+## Open
+- **Skyview not rebuilt via vite:** deps `astrophoto` and `hoan.uk/client/node_modules` are missing on the laptop and the runners. The bundle was patched by hand and the source patched in tools/skyview/src/layers.ts:343; a real rebuild needs those deps.
+- 390 px screenshots not saved: toasts, day tiles, object info card, Settings/Admin highlight in the Menu sheet (only docs/design/critique/nav-390-menu-sheet.jpg exists). The Menu sheet clips OBS dock/Settings below the fold (scroll), and the Menu tab's data-paths includes /settings.
+- Owner phone review pending.
+- Detector follow-ups: measure gates on real new events after a few days and tune from owner labels; add mislabelled cloud frames to the set; night moon exclusion not done.
+- Legacy: some pages still load style.css + redesign*.css (ds_lint --report shows hex/px/z-index there); red mode on every page, a11y pass, loading/empty/error states not verified.
 
 ## Workers
-All workers idle. Max 3 at once.
+None running. Max 3 at once.
