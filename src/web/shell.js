@@ -57,10 +57,23 @@
                 : hhmm(new Date()) + " " + offsetLabel();
             if (el.textContent !== txt) el.textContent = txt;
         }
+        const txt = (id) => { const e = $(id); return e ? e.textContent.trim() : ""; };
+        const stT = txt("nav-system-status") || "Online";
+        const stEl = $("zt-status");
+        const tip = [stT, txt("sensor-subtitle"), txt("nav-camera-mode"), txt("nav-fps").replace(/^\s*·\s*/, "")].filter(Boolean).join(" · ");
+        if (stEl && stEl.title !== tip) { stEl.title = tip; stEl.setAttribute("aria-label", tip); }
+        const clEl = $("zt-clocks");
+        const lab = txt("nav-local-label");
+        const ctip = "UTC " + txt("nav-utc-clock") + (lab ? " · " + lab : "");
+        if (clEl && clEl.title !== ctip) { clEl.title = ctip; clEl.setAttribute("aria-label", ctip); }
         const utc = $("nav-utc-clock");
         // the dashboard (core.js) drives the UTC/local clocks itself; other pages get a plain UTC tick
         if (utc && typeof window.updateClock !== "function") {
             const d = new Date();
+            const lc = $("nav-local-clock");
+            if (lc) lc.textContent = hhmm(d);
+            const ll = $("nav-local-label");
+            if (ll) ll.textContent = "Local (" + offsetLabel().replace("UTC", "GMT") + ")";
             utc.textContent = String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0") + ":" + String(d.getUTCSeconds()).padStart(2, "0");
         }
     }
