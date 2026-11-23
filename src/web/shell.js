@@ -159,6 +159,27 @@
         (DESKTOP.addEventListener ? DESKTOP.addEventListener("change", syncRole) : DESKTOP.addListener(syncRole));
         z.addEventListener("click", (e) => { if (e.target.closest("a.zs__item")) closeMenu(); });
         window.addEventListener("hashchange", markActive);
+        initTip(z);
+    }
+
+    // Collapsed-rail tooltip: one fixed bubble (the scrolling nav would clip a CSS one).
+    function initTip(z) {
+        const tip = document.createElement("div");
+        tip.className = "zs-tip"; tip.setAttribute("role", "tooltip"); tip.hidden = true;
+        document.body.appendChild(tip);
+        const hide = () => { tip.hidden = true; };
+        const show = (el) => {
+            if (!document.documentElement.classList.contains("zs-collapsed") || !DESKTOP.matches) return hide();
+            tip.textContent = el.getAttribute("data-tip"); tip.hidden = false;
+            const r = el.getBoundingClientRect();
+            tip.style.left = (r.right + 8) + "px";
+            tip.style.top = Math.max(4, r.top + (r.height - tip.offsetHeight) / 2) + "px";
+        };
+        z.addEventListener("mouseover", (e) => { const el = e.target.closest("[data-tip]"); el ? show(el) : hide(); });
+        z.addEventListener("focusin", (e) => { const el = e.target.closest("[data-tip]"); el ? show(el) : hide(); });
+        z.addEventListener("mouseleave", hide); z.addEventListener("focusout", hide);
+        z.addEventListener("click", hide);
+        const n = z.querySelector(".zs__nav"); if (n) n.addEventListener("scroll", hide, { passive: true });
     }
 
     function init() {
