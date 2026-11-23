@@ -1,5 +1,5 @@
 
-.lg { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-3); max-width: var(--content-max); margin: 0 auto; color: var(--c-text); font-family: var(--font-ui); }
+.lg { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-3); max-width: var(--content-max); margin: 0 auto; color: var(--c-text); font-family: var(--font-ui); }
 .lg [hidden] { display: none !important; }
 .lg-bar { display: flex; align-items: center; gap: var(--s-2); }
 .lg-summary { display: flex; align-items: center; gap: var(--s-2); flex: 1; min-width: 0; flex-wrap: wrap; }
@@ -23,3 +23,6 @@
 .lg-sk { display: flex; gap: var(--s-3); align-items: center; min-height: 56px; padding: var(--s-2) var(--s-4); border-bottom: 1px solid var(--c-divider); }
 .lg-sk .ds-skeleton:first-child { flex: none; width: 36px; height: 36px; border-radius: var(--r-sm); }
 .lg-sk .ds-skeleton:last-child { flex: 1; height: 16px; }
+.lg-chips { flex-wrap: wrap; }
+.lg-more { display: flex; justify-content: center; padding: var(--s-2); }
+.lg-more .ds-btn { min-height: var(--tap); min-width: var(--tap); gap: var(--s-1); }

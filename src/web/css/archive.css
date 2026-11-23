@@ -3,7 +3,7 @@
 [hidden] { display: none !important; }
 .arc { max-width: var(--content-max); margin: 0 auto; padding: 0 var(--s-3) var(--s-6); }
 
-.arc-bar { position: sticky; top: 0; z-index: var(--z-nav); display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); padding: var(--s-2) 0; background: var(--c-bg); }
+.arc-bar { flex-wrap: wrap; position: sticky; top: 0; z-index: var(--z-nav); display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); padding: var(--s-2) 0; background: var(--c-bg); }
 .arc-segs { display: inline-flex; padding: var(--s-1); gap: var(--s-1); background: var(--c-surface-2); border-radius: var(--r-pill); }
 .arc-seg { display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2); min-width: var(--tap); min-height: var(--tap); padding: 0 var(--s-3); border: 0; border-radius: var(--r-pill); background: transparent; color: var(--c-text-2); font: inherit; font-size: var(--fs-14); font-weight: 600; cursor: pointer; }
 .arc-seg[aria-selected="true"] { background: var(--c-accent-bg); color: var(--c-accent); }

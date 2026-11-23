@@ -206,3 +206,5 @@ button[hidden], a[hidden], img[hidden] { display: none !important; }
     #cam-foot { display: none !important; }
     #info { bottom: calc(var(--s-3) + var(--tap) + var(--s-2)); }
 }
+#list li.sc-empty { white-space: normal; justify-content: center; color: var(--c-text-2); cursor: default; }
+#list ul { overflow-x: hidden; scrollbar-width: thin; scrollbar-color: var(--c-border) transparent; }

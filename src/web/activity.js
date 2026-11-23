@@ -53,8 +53,11 @@
         return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     }
 
+    const PAGE = 50;
+    let lgAll = [], lgShown = PAGE;
     function renderList(entries) {
         if (!list) return;
+        if (entries !== lgAll) { lgAll = entries; }
         list.replaceChildren();
         if (!entries.length) {
             const li = el("li", "ds-empty");
@@ -66,7 +69,7 @@
         const today = new Date().toDateString();
         const yest = new Date(Date.now() - 86400000).toDateString();
         let lastDay = "";
-        for (const e of entries) {
+        for (const e of entries.slice(0, lgShown)) {
             const dt = new Date(e.ts);
             const dayKey = isNaN(dt) ? "" : dt.toDateString();
             if (dayKey && dayKey !== lastDay) {
@@ -90,6 +93,18 @@
             if (e.details) li.title = JSON.stringify(e.details, null, 1);
             li.append(ic, body, tm);
             list.appendChild(li);
+        }
+        if (entries.length > lgShown) {
+            const more = el("li", "lg-more");
+            const b = el("button", "ds-btn ds-btn--ghost");
+            b.type = "button";
+            b.appendChild(icon("chevron-down"));
+            b.appendChild(el("span", "", `${entries.length - lgShown}`));
+            b.setAttribute("aria-label", "Show more");
+            b.title = "Show more";
+            b.addEventListener("click", () => { lgShown += PAGE; renderList(lgAll); });
+            more.appendChild(b);
+            list.appendChild(more);
         }
     }
 
@@ -205,8 +220,8 @@
         loadPage().catch((err) => { if (list) { list.replaceChildren(); const li = el("li", "ds-empty"); li.appendChild(icon("wifi-off")); li.appendChild(el("p", "ds-empty__title", err.message)); list.appendChild(li); } });
         loadStorage();
         setInterval(loadStorage, 60000);
-        if (levelSel) levelSel.addEventListener("change", () => loadPage().catch(() => {}));
-        if (catSel) catSel.addEventListener("change", () => loadPage().catch(() => {}));
+        if (levelSel) levelSel.addEventListener("change", () => { lgShown = PAGE; loadPage().catch(() => {}); });
+        if (catSel) catSel.addEventListener("change", () => { lgShown = PAGE; loadPage().catch(() => {}); });
     }
     if (cleanupBtn) {
         cleanupBtn.addEventListener("click", async () => {

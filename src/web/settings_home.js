@@ -10,7 +10,7 @@
     // [group, rows]; row = [href, section, icon, title, keywords, admin, sub()]
     const GROUPS = [
         ["Camera", [
-            ["/focus", "", "crosshair", "Focus", "lens sharpness assistant hfr", true, () => { const t = text("settings-focus-history"); return /no focus saved/i.test(t) ? "" : t.split("\n")[0].replace(/\s+/g, " ").slice(0, 48); }],
+            ["/focus", "", "crosshair", "Focus", "lens sharpness assistant hfr", true, () => { const tr = document.querySelector("#settings-focus-history tbody tr"); if (!tr) return ""; const c = tr.cells; return [c[3] && c[3].textContent, c[2] && c[2].textContent].map((x) => (x || "").trim()).filter((x) => x && x !== "—").join(" · "); }],
             ["/calibration", "", "moon", "Master dark", "calibration dark frames hot pixels", true, () => ""],
             ["/settings#image", "image", "image", "Image output", "camera resolution orientation flip mirror white balance capture", true, () => [...new Set([text("camera-current-badge").replace(/^--$/, ""), text("output-res-badge")].filter(Boolean))].join(" · ")],
             ["/settings#detection", "detection", "eye", "Detection", "events meteors aircraft flashes sensitivity", true, () => { const n = document.querySelectorAll("input[data-event]:checked").length; return n ? `${n} on` : ""; }],

@@ -28,10 +28,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
-    <link rel="stylesheet" href="/static/tokens.css?v=20261202h">
-    <link rel="stylesheet" href="/style.css?v=20261202h">
+    <link rel="stylesheet" href="/static/tokens.css?v=20261203a">
+    <link rel="stylesheet" href="/style.css?v=20261203a">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
-    <link rel="stylesheet" href="/static/css/scene3d.css?v=20261202h">
+    <link rel="stylesheet" href="/static/css/scene3d.css?v=20261203a">
     <script type="importmap">
         { "imports": {
             "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -1231,7 +1231,7 @@
                     <div class="r1"><span><span class="cs">${esc(a.name)}</span><span class="grp ${esc(a.group)}">${a.group === "stations" ? "Station" : "Bright"}</span></span>
                         <span class="meta">${Math.round(a.alt_deg)}° · ${Math.round(a.az_deg)}° ${compass(a.az_deg)}</span></div>
                     <div class="r2"><span class="meta">${km(a.range_km)} · h ${km(a.height_km)}</span><span class="tags">${tags}</span></div></li>`;
-            }).join("") : `<li><span class="meta">${filter === "visible" ? "No satellite is naked-eye visible right now (above the horizon, sunlit, dark sky). Choose “Above horizon” to see those that are up but unlit." : "No satellites match."}</span></li>`;
+            }).join("") : `<li class="sc-empty" title="${filter === "visible" ? "Visible = above the horizon, sunlit, dark sky. Choose Above horizon to see those that are up but unlit." : ""}"><span class="meta">${filter === "visible" ? "None visible now" : "No match"}</span></li>`;
         }
         $("sat-list").addEventListener("click", (e) => {
             const li = e.target.closest("li[data-id]");

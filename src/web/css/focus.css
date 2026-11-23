@@ -109,3 +109,11 @@ details.focus-chart-card > summary::-webkit-details-marker { display: none; }
     .focus-side { position: sticky; top: var(--s-3); max-height: calc(100vh - var(--s-6)); overflow-y: auto; }
 }
 @media (prefers-reduced-motion: reduce) { .focus-meter-fill { transition: none; } }
+
+/* Narrow screens: the 9-column history becomes When · Score · action (full table stays on /focus desktop) */
+@media (max-width: 600px) {
+    .focus-history th:nth-child(2), .focus-history td:nth-child(2), .focus-history th:nth-child(3), .focus-history td:nth-child(3),
+    .focus-history th:nth-child(5), .focus-history td:nth-child(5), .focus-history th:nth-child(6), .focus-history td:nth-child(6),
+    .focus-history th:nth-child(7), .focus-history td:nth-child(7), .focus-history th:nth-child(8), .focus-history td:nth-child(8) { display: none; }
+    .focus-history td:last-child .ds-btn { min-height: var(--tap); min-width: var(--tap); }
+}
