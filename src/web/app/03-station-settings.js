@@ -15,7 +15,7 @@ let stationFormDirty = false;
 function setStationFormDirty(dirty) {
     stationFormDirty = dirty;
 }
-document.querySelectorAll('[data-sgroup="station"] .settings-grid input:not([readonly])').forEach((el) =>
+document.querySelectorAll('[data-sgroup="station"] .sa-stack input:not([readonly])').forEach((el) =>
     el.addEventListener("input", () => setStationFormDirty(true))
 );
 

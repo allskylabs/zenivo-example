@@ -1,508 +1,225 @@
-        <!-- PAGE: Settings (/settings) -->
+        <!-- PAGE: Settings (/settings): home list (left pane on desktop) + one sub-page at a time -->
         <section id="tab-settings" class="tab-content" data-sub="image">
-            <!-- Phone settings home (built by settings_home.js; shown only while /settings has no #section) -->
-            <div class="settings-home" id="settings-home" hidden>
-                <label class="sh-search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="search" id="sh-q" placeholder="Search settings" aria-label="Search settings" autocomplete="off"></label>
+            <div class="settings-shell">
+            <aside class="settings-home sa-home" id="settings-home" aria-label="Settings">
+                <label class="sa-search"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-search"></use></svg><input type="search" id="sh-q" placeholder="Search" aria-label="Search settings" autocomplete="off"></label>
                 <div id="sh-groups"></div>
-                <p class="sh-none" id="sh-none" hidden>No setting matches.</p>
-            </div>
-            <a class="settings-back" href="/settings" id="settings-back">&lsaquo; Settings</a>
-            <nav class="mobile-subnav" aria-label="Settings sections">
-                <a href="/settings#image" data-sub="image">Image Output</a>
-                <a href="/settings#detection" data-sub="detection">Detection</a>
-                <a href="/settings#station" data-sub="station">Station &amp; Optics</a>
-                <a href="/settings#skymask" data-sub="skymask">Sky Mask</a>
-                <a href="/settings#integrations" data-sub="integrations">Integrations</a>
-                <a href="/settings#community" data-sub="community">Community</a>
-                <a href="/settings#admin" data-sub="admin">Admin</a>
-            </nav>
-            <p class="settings-autosave-note text-muted">Changes are saved automatically.</p>
-            <div class="card settings-card" id="settings-focus-card" data-sgroup="station">
+                <div class="ds-empty sh-none" id="sh-none" hidden><svg class="ds-icon ds-icon--lg" aria-hidden="true"><use href="/static/icons.svg#i-search"></use></svg><span class="sr-only">No setting matches</span></div>
+            </aside>
+            <div class="settings-main">
+            <a class="ds-btn ds-btn--ghost settings-back" href="/settings" id="settings-back" aria-label="Settings"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-left"></use></svg><span>Settings</span></a>
+            <div class="card settings-card sa" id="settings-focus-card" data-sgroup="station">
                 <div class="card-header">
                     <h2>Focus</h2>
-                    <a class="btn btn-sm btn-outline" href="/focus">Open focus assistant</a>
+                    <a class="ds-btn ds-btn--ghost ds-btn--icon" href="/focus" aria-label="Open focus assistant"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg></a>
                 </div>
                 <div class="focus-history" id="settings-focus-history"><span class="text-muted">No focus saved yet.</span></div>
             </div>
-            <!-- Camera Card: pick the active camera when several are attached -->
-            <div class="card settings-card" data-sgroup="image">
-                <div class="card-header">
-                    <h2>Camera</h2>
-                    <span class="badge badge-accent" id="camera-current-badge">--</span>
-                </div>
-                <p class="description">
-                    Choose which attached camera Zenivo uses (ZWO ASI, IMX335 USB, Raspberry Pi camera, webcam). The choice is saved
-                    and used at the next start unless <code>--camera</code> is given on the command line. Switching pauses capture for a few seconds.
-                </p>
-                <div class="camera-pick">
-                    <div class="field">
-                        <label for="camera-device">Active camera</label>
-                        <select id="camera-device"></select>
-                    </div>
-                    <button type="button" class="btn btn-sm btn-outline" id="camera-rescan" data-no-autosave title="Look for cameras plugged in after the page was loaded">&#8635; Rescan</button>
-                </div>
-                <small class="field-note" id="camera-scan-note"></small>
-            </div>
+<div class="card settings-card sa" id="sa-image" data-sgroup="image">
+<div class="card-header"><h2>Image output</h2><span class="ds-chip ds-chip--info" id="output-res-badge">2592 × 1944</span></div>
+<section class="ds-card ds-card--flush sa-group" aria-label="Image size">
+<div class="sa-head"><h3 class="ds-card__title">Image size</h3></div>
 
+<div class="ds-list">
+<div class="ds-row sa-row"><label class="sa-lab" for="output-resolution"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Master frame</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-res" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><select class="sa-input sa-select" id="output-resolution"><option value="2592x1944">2592 × 1944 (5.0 MP, native sensor)</option></select></div>
+<p class="sa-note" id="sa-i-res" hidden>The one size everything else is derived from. The sensor always reads the full frame; every output below is downscaled from it and never larger. Smaller sizes cost much less CPU and reduce noise and file size.</p>
+<div class="sa-pad"><div class="sa-tiles sa-tiles--size" id="size-pipeline"><div class="sa-tile"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg><b id="size-live">--</b><small>Live view</small></div><div class="sa-tile"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><b id="size-analysis">--</b><small>Analysis</small></div><div class="sa-tile"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-film"></use></svg><b id="size-archive">--</b><small>Archive</small></div></div></div>
+</div>
+</section>
+<section class="ds-card ds-card--flush sa-group" aria-label="Live view">
+<div class="sa-head"><h3 class="ds-card__title">Live view</h3></div>
 
-            <!-- Image Output Card: resolution + orientation -->
-            <div class="card settings-card" data-sgroup="image">
-                <div class="card-header">
-                    <h2>Image Output</h2>
-                    <span class="badge badge-accent" id="output-res-badge">2592 × 1944</span>
-                </div>
-                <p class="description">
-                    Changes apply immediately. The sensor always reads the full frame; RAW10 frames are binned 2×2 / 4×4 before
-                    demosaicing when the master size allows, otherwise downscaled by pixel averaging. Smaller sizes cost much less CPU
-                    and also reduce noise and file size.
-                </p>
-                <div class="settings-grid">
-                    <!-- 1. One master frame; every other size below is a downscale of it (never an upscale) -->
-                    <fieldset class="settings-group field-wide">
-                        <legend>Image size</legend>
-                        <div class="field">
-                            <label for="output-resolution">Master frame</label>
-                            <select id="output-resolution">
-                                <option value="2592x1944">2592 × 1944 (5.0 MP, native sensor)</option>
-                            </select>
-                        </div>
-                        <p class="field-note">
-                            The one size everything else is derived from. Each output below is downscaled from it and is never larger
-                            than it. Resulting sizes:
-                        </p>
-                        <ul class="size-pipeline" id="size-pipeline">
-                            <li><span>Live view</span><strong id="size-live">--</strong></li>
-                            <li><span>Star &amp; cloud analysis</span><strong id="size-analysis">--</strong></li>
-                            <li><span>Archive (timelapse, keogram, startrails)</span><strong id="size-archive">--</strong></li>
-                        </ul>
-                    </fieldset>
-                    <!-- 2. Live view: what viewers see (size, quality, night star boost) -->
-                    <fieldset class="settings-group">
-                        <legend>Live view</legend>
-                        <div class="field-grid">
-                            <div class="field">
-                                <label for="perf-stream-width">Width</label>
-                                <select id="perf-stream-width" data-size-select></select>
-                            </div>
-                            <div class="field">
-                                <label for="perf-stream-quality">JPEG quality <span class="field-sub">(live view)</span></label>
-                                <span class="range-value" id="perf-stream-quality-val">75</span>
-                                <input type="range" id="perf-stream-quality" name="perf-stream-quality" min="40" max="95" step="1" value="75" />
-                            </div>
-                            <label class="toggle-row field-wide" for="star-boost-enabled">
-                                <span class="toggle-text"><span class="toggle-title">Night star boost</span><span class="toggle-hint">Brighten stars by binning</span></span>
-                                <input type="checkbox" id="star-boost-enabled" class="switch" />
-                            </label>
-                            <div class="field">
-                                <label for="star-boost-bin">Bin window</label>
-                                <select id="star-boost-bin">
-                                    <option value="2">2 × 2 (sharpest)</option>
-                                    <option value="3">3 × 3</option>
-                                    <option value="4">4 × 4 (brightest)</option>
-                                </select>
-                            </div>
-                        </div>
-                        <p class="field-note">Star boost sums each star's light over an N×N window above the sky background (stars ~N² brighter, noise only ~N×). It only affects the live view and snapshots, only while the sun is below −6° and only inside the sky mask; star count, cloud cover and archived frames are unchanged.</p>
-                    </fieldset>
-                    <!-- 3. Sky analysis: star count and cloud cover -->
-                    <fieldset class="settings-group">
-                        <legend>Star count &amp; cloud cover</legend>
-                        <div class="field-grid">
-                            <label class="toggle-row field-wide" for="perf-sky-enabled">
-                                <span class="toggle-text"><span class="toggle-title">Sampling</span><span class="toggle-hint">Sample day and night</span></span>
-                                <input type="checkbox" id="perf-sky-enabled" class="switch" checked />
-                            </label>
-                            <div class="field">
-                                <label for="perf-sky-interval">Interval (min)</label>
-                                <input type="number" id="perf-sky-interval" data-scale="60" min="0.5" max="60" step="0.5" value="5" />
-                            </div>
-                            <div class="field">
-                                <label for="perf-analysis-width">Analysis width</label>
-                                <select id="perf-analysis-width" data-size-select></select>
-                            </div>
-                        </div>
-                        <p class="field-note">Stars are counted only at night. Each sample is plotted under Live → Cloud Cover History. A smaller analysis width is much cheaper on CPU.</p>
-                    </fieldset>
-                    <!-- 4. Capture timing -->
-                    <fieldset class="settings-group">
-                        <legend>Capture timing</legend>
-                        <div class="field-grid">
-                            <div class="field">
-                                <label for="perf-capture-interval">Min. time between captures (s)</label>
-                                <input type="number" id="perf-capture-interval" min="0.4" max="60" step="0.1" value="1.0" />
-                            </div>
-                            <div class="field">
-                                <label for="perf-bg-capture">Time between captures with no viewer (s, 0 = back to back)</label>
-                                <input type="number" id="perf-bg-capture" min="0" max="3600" step="1" value="0" />
-                            </div>
-                        </div>
-                        <p class="field-note">Raise these if the computer runs hot; exposures longer than the interval are not affected. <span id="perf-bin-note"></span></p>
-                    </fieldset>
-                    <!-- White balance (RAW10 night mode) -->
-                    <fieldset class="settings-group">
-                        <legend>White Balance</legend>
-                        <div class="field-grid cols2">
-                            <div class="field field-wide">
-                                <label for="wb-mode">Mode</label>
-                                <select id="wb-mode">
-                                    <option value="auto">Auto (gray-world)</option>
-                                    <option value="manual">Manual</option>
-                                </select>
-                            </div>
-                            <div class="field">
-                                <label for="wb-r-gain">Red gain (R/G)</label>
-                                <input type="number" id="wb-r-gain" min="0.4" max="4" step="0.01" value="1.00" />
-                            </div>
-                            <div class="field">
-                                <label for="wb-b-gain">Blue gain (B/G)</label>
-                                <input type="number" id="wb-b-gain" min="0.4" max="4" step="0.01" value="1.00" />
-                            </div>
-                        </div>
-                        <p class="field-note">
-                            Applies to RAW10 frames (night, or exposure ≥ 0.4 s) and as a gentle correction on top of the camera ISP in MJPG mode (daytime).
-                            In use: <strong id="wb-applied" class="text-accent">--</strong>
-                        </p>
-                    </fieldset>
+<div class="ds-list">
+<div class="ds-row sa-row"><label class="sa-lab" for="perf-stream-width"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Width</span></span></label><select class="sa-input sa-select" id="perf-stream-width" data-size-select></select></div>
+<div class="ds-row sa-row sa-row--stack"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg></span><div class="ds-row__body"><label class="ds-row__title" for="perf-stream-quality">JPEG quality</label><input class="sa-range" type="range" id="perf-stream-quality" name="perf-stream-quality" min="40" max="95" step="1" value="75"></div><b class="sa-val" id="perf-stream-quality-val">75</b></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="star-boost-enabled"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Night star boost</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-boost" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><label class="ds-switch"><input type="checkbox" id="star-boost-enabled"><span class="ds-switch__track"></span></label></div>
+<p class="sa-note" id="sa-i-boost" hidden>Sums each star's light over an N×N window above the sky background (stars ~N² brighter, noise only ~N×). Only the live view and snapshots, only while the sun is below −6° and only inside the sky mask; star count, cloud cover and archived frames are unchanged.</p>
+<div class="ds-row sa-row"><label class="sa-lab" for="star-boost-bin"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layers"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Bin window</span></span></label><select class="sa-input sa-select" id="star-boost-bin"><option value="2">2 × 2</option><option value="3">3 × 3</option><option value="4">4 × 4</option></select></div>
+</div>
+</section>
+<section class="ds-card ds-card--flush sa-group" aria-label="Star count and cloud cover">
+<div class="sa-head"><h3 class="ds-card__title">Star count & cloud cover</h3></div>
 
-                    <!-- Image orientation -->
-                    <fieldset class="settings-group">
-                        <legend>Orientation (Mirror / Flip / Rotate)</legend>
-                        <div class="toggle-list">
-                            <label class="toggle-row" for="orient-flip-h">
-                                <span class="toggle-text">
-                                    <span class="toggle-title">Horizontal mirror</span>
-                                    <span class="toggle-hint">Swap left ↔ right (East/West)</span>
-                                </span>
-                                <input type="checkbox" id="orient-flip-h" class="switch" />
-                            </label>
-                            <label class="toggle-row" for="orient-flip-v">
-                                <span class="toggle-text">
-                                    <span class="toggle-title">Vertical flip</span>
-                                    <span class="toggle-hint">Swap top ↕ bottom (North/South)</span>
-                                </span>
-                                <input type="checkbox" id="orient-flip-v" class="switch" />
-                            </label>
-                            <label class="toggle-row" for="orient-rot180">
-                                <span class="toggle-text">
-                                    <span class="toggle-title">Rotate 180°</span>
-                                    <span class="toggle-hint">For an upside-down mounted camera</span>
-                                </span>
-                                <input type="checkbox" id="orient-rot180" class="switch" />
-                            </label>
-                            <label class="toggle-row" for="orient-rot180-day" id="orient-rot180-day-row">
-                                <span class="toggle-text">
-                                    <span class="toggle-title">Rotate 180° — day frames only</span>
-                                    <span class="toggle-hint">RTS5869: day (MJPG) frames come out upside-down after a power cycle while night (RAW10) frames are upright</span>
-                                </span>
-                                <input type="checkbox" id="orient-rot180-day" class="switch" />
-                            </label>
-                        </div>
-                        <div class="orient-footer">
-                            <span id="orient-status" class="text-muted">Native sensor orientation (no transform)</span>
-                            <button id="btn-orient-reset" class="btn btn-sm btn-outline" type="button">Reset</button>
-                        </div>
-                    </fieldset>
+<div class="ds-list">
+<div class="ds-row sa-row"><label class="sa-lab" for="perf-sky-enabled"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Sampling</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-samp" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><label class="ds-switch"><input type="checkbox" id="perf-sky-enabled" checked><span class="ds-switch__track"></span></label></div>
+<p class="sa-note" id="sa-i-samp" hidden>Stars are counted only at night. Each sample is plotted under Live → Cloud cover history. A smaller analysis width is much cheaper on CPU.</p>
+<div class="ds-row sa-row"><label class="sa-lab" for="perf-sky-interval"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Interval (min)</span></span></label><input class="sa-input sa-num" type="number" id="perf-sky-interval" data-scale="60" min="0.5" max="60" step="0.5" value="5"></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="perf-analysis-width"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Analysis width</span></span></label><select class="sa-input sa-select" id="perf-analysis-width" data-size-select></select></div>
+</div>
+</section>
+<section class="ds-card ds-card--flush sa-group" aria-label="Capture timing">
+<div class="sa-head"><h3 class="ds-card__title">Capture timing</h3></div>
 
-                </div>
-            </div>
+<div class="ds-list">
+<div class="ds-row sa-row"><label class="sa-lab" for="perf-capture-interval"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Min. between captures (s)</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-cap" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><input class="sa-input sa-num" type="number" id="perf-capture-interval" min="0.4" max="60" step="0.1" value="1.0"></div>
+<p class="sa-note" id="sa-i-cap" hidden>Raise these if the computer runs hot; exposures longer than the interval are not affected.</p>
+<div class="ds-row sa-row"><label class="sa-lab" for="perf-bg-capture"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">No viewer (s, 0 = back to back)</span></span></label><input class="sa-input sa-num" type="number" id="perf-bg-capture" min="0" max="3600" step="1" value="0"></div>
+<p class="sa-status" id="perf-bin-note"></p>
+</div>
+</section>
+<section class="ds-card ds-card--flush sa-group" aria-label="White balance">
+<div class="sa-head"><h3 class="ds-card__title">White balance</h3></div>
 
-            <!-- Detection Card: sky events + cloud cover -->
-            <div class="card settings-card" data-sgroup="detection">
-                <div class="card-header">
-                    <h2>Detection</h2>
-                </div>
-                <p class="description">Meteor, aircraft, satellite, flash and cloud detection, and the cloud cover analysis.</p>
-                <div class="settings-grid">
-                    <fieldset class="settings-group">
-                        <legend>Event detection</legend>
-                        <div class="field-grid">
-                            <div class="field">
-                                <label class="checkbox-label"><input type="checkbox" id="evt-meteor" data-event="meteor" checked /> ☄️ Meteors</label>
-                            </div>
-                            <div class="field">
-                                <label class="checkbox-label"><input type="checkbox" id="evt-plane" data-event="plane" checked /> ✈️ Aircraft</label>
-                            </div>
-                            <div class="field">
-                                <label class="checkbox-label"><input type="checkbox" id="evt-satellite" data-event="satellite" /> 🛰️ Satellites</label>
-                            </div>
-                            <div class="field">
-                                <label class="checkbox-label"><input type="checkbox" id="evt-flash" data-event="flash" /> ⚡ Flashes / lightning</label>
-                            </div>
-                            <div class="field">
-                                <label class="checkbox-label"><input type="checkbox" id="evt-clouds" data-event="clouds" /> ☁️ Clouds arriving / clearing</label>
-                            </div>
-                        </div>
-                        <p class="field-note">
-                            Streaks and flashes are looked for at night only (sun below −8°), on a 640 px gray copy of each new frame compared with the previous one: a few ms per frame.
-                            A streak in a single frame is a meteor; a dashed one or one that continues along the same line in the next frame is an aircraft (faint and steady: a satellite).
-                            Cloud changes reuse the cloud cover samples, so they need “Star count &amp; cloud cover” on. Set a sky mask (plate solving) to ignore roads and windows.
-                            Events are listed under Gallery &amp; Events.
-                            <span id="evt-status"></span>
-                        </p>
-                    </fieldset>
-                    <fieldset class="settings-group">
-                        <legend>Cloud Cover</legend>
-                        <div class="field-grid cols2">
-                            <div class="field">
-                                <label for="roi-left">Sky region left (%)</label>
-                                <input type="number" id="roi-left" data-roi="0" min="0" max="95" step="1" value="0" />
-                            </div>
-                            <div class="field">
-                                <label for="roi-top">Sky region top (%)</label>
-                                <input type="number" id="roi-top" data-roi="1" min="0" max="95" step="1" value="0" />
-                            </div>
-                            <div class="field">
-                                <label for="roi-right">Sky region right (%)</label>
-                                <input type="number" id="roi-right" data-roi="2" min="5" max="100" step="1" value="100" />
-                            </div>
-                            <div class="field">
-                                <label for="roi-bottom">Sky region bottom (%)</label>
-                                <input type="number" id="roi-bottom" data-roi="3" min="5" max="100" step="1" value="100" />
-                            </div>
-                        </div>
-                        <p class="field-note">
-                            Only this part of the frame is analysed: exclude buildings, trees and the horizon (e.g. bottom 40% if the lower part shows rooftops).
-                            The clear-sky reference is learned automatically; reset it after moving or re-aiming the camera.
-                            <span id="cloud-ref-note" class="text-muted"></span>
-                        </p>
-                        <button type="button" class="btn btn-sm btn-outline" id="btn-cloud-ref-reset">Reset learned clear-sky reference</button>
-                    </fieldset>
-                    <fieldset class="settings-group field-wide" id="dayobj-group">
-                        <legend>Daytime objects (birds, insects, aircraft)</legend>
-                        <div class="field">
-                            <label class="checkbox-label"><input type="checkbox" id="dayobj-enabled" checked /> Detect daytime objects</label>
-                        </div>
-                        <div class="field">
-                            <span class="field-label">Record these kinds</span>
-                            <div class="dayobj-classes">
-                                <label class="checkbox-label"><input type="checkbox" data-dayobj-class="plane" checked /> Aircraft</label>
-                                <label class="checkbox-label"><input type="checkbox" data-dayobj-class="bird" checked /> Birds</label>
-                                <label class="checkbox-label"><input type="checkbox" data-dayobj-class="insect" checked /> Insects</label>
-                                <label class="checkbox-label"><input type="checkbox" data-dayobj-class="object" checked /> Other objects</label>
-                            </div>
-                        </div>
-                        <div class="field-grid">
-                            <div class="field">
-                                <label for="dayobj-sensitivity">Sensitivity</label>
-                                <select id="dayobj-sensitivity">
-                                    <option value="low">Low (fewer, surer detections)</option>
-                                    <option value="normal" selected>Normal</option>
-                                    <option value="high">High (more, also fainter ones)</option>
-                                </select>
-                            </div>
-                            <div class="field">
-                                <label for="dayobj-days">Keep for (days)</label>
-                                <input type="number" id="dayobj-days" min="1" max="90" step="1" value="14" />
-                            </div>
-                            <div class="field">
-                                <label for="dayobj-mb">Max log size (MB)</label>
-                                <input type="number" id="dayobj-mb" min="5" max="500" step="5" value="50" />
-                            </div>
-                        </div>
-                        <details class="params-summary">
-                            <summary>Advanced</summary>
-                            <div class="field-grid cols2">
-                                <div class="field">
-                                    <label for="dayobj-min-area">Smallest object (px)</label>
-                                    <input type="number" id="dayobj-min-area" min="1" max="100" step="1" value="2" />
-                                </div>
-                                <div class="field">
-                                    <label for="dayobj-max-area">Largest object (px)</label>
-                                    <input type="number" id="dayobj-max-area" min="5" max="5000" step="5" value="700" />
-                                </div>
-                                <div class="field">
-                                    <label for="dayobj-contrast">Minimum contrast (levels)</label>
-                                    <input type="number" id="dayobj-contrast" min="3" max="100" step="1" placeholder="from sensitivity" />
-                                </div>
-                            </div>
-                            <p class="field-note">Sizes are in pixels at 640 px frame width. Contrast is how far an object must differ from the sky behind it (0&ndash;255 levels); empty uses the value of the chosen sensitivity.</p>
-                        </details>
-                        <p class="field-note">
-                            By day a small dark or bright dot that moves against the sky is followed across frames and classified from its size, speed and wing-beat flicker.
-                            Rain on the dome pauses recording. The frame interval by day (Image Output) sets what can be caught: insects and fast birds need under a second.
-                            <span id="dayobj-status"></span>
-                        </p>
-                    </fieldset>
-                </div>
-            </div>
+<div class="ds-list">
+<div class="ds-row sa-row"><label class="sa-lab" for="wb-mode"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sun"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Mode</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-wb" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><select class="sa-input sa-select" id="wb-mode"><option value="auto">Auto (gray-world)</option><option value="manual">Manual</option></select></div>
+<p class="sa-note" id="sa-i-wb" hidden>Applies to RAW10 frames (night, or exposure ≥ 0.4 s) and as a gentle correction on top of the camera ISP in MJPG mode (daytime).</p>
+<div class="ds-row sa-row"><label class="sa-lab" for="wb-r-gain"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-circle-check"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Red gain (R/G)</span></span></label><input class="sa-input sa-num" type="number" id="wb-r-gain" min="0.4" max="4" step="0.01" value="1.00"></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="wb-b-gain"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-circle-check"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Blue gain (B/G)</span></span></label><input class="sa-input sa-num" type="number" id="wb-b-gain" min="0.4" max="4" step="0.01" value="1.00"></div>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">In use</span></span><span class="ds-row__value" id="wb-applied">--</span></div>
+</div>
+</section>
+<section class="ds-card ds-card--flush sa-group" aria-label="Orientation">
+<div class="sa-head"><h3 class="ds-card__title">Orientation</h3></div>
 
-            <!-- Station & Camera Settings Card -->
-            <div class="card settings-card" data-sgroup="station">
-                <div class="page-header">
-                    <div class="page-header-text">
-                        <h2>Station &amp; Optics</h2>
-                        <p class="page-sub">Location and lens model used for sky solving, labels and flight overlay.</p>
-                    </div>
-                    <div class="page-header-actions">
-                        <span class="badge badge-accent" id="station-solve-badge">NOT SOLVED YET</span>
-                    </div>
-                </div>
-                <p class="description">
-                    Plate-solving on a starry night measures the lens and mounting parameters and saves them automatically, as does
-                    <strong>Locate via GPS / IP</strong> for the coordinates. Fields you edit by hand are saved as soon as you leave them.
-                </p>
+<div class="ds-list">
+<div class="ds-row sa-row"><label class="sa-lab" for="orient-flip-h"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-arrow-up-right"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Mirror left ↔ right</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-fh" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><label class="ds-switch"><input type="checkbox" id="orient-flip-h"><span class="ds-switch__track"></span></label></div>
+<p class="sa-note" id="sa-i-fh" hidden>Swap East/West.</p>
+<div class="ds-row sa-row"><label class="sa-lab" for="orient-flip-v"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-arrow-up-right"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Flip top ↕ bottom</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-fv" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><label class="ds-switch"><input type="checkbox" id="orient-flip-v"><span class="ds-switch__track"></span></label></div>
+<p class="sa-note" id="sa-i-fv" hidden>Swap North/South.</p>
+<div class="ds-row sa-row"><label class="sa-lab" for="orient-rot180"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Rotate 180°</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-r180" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><label class="ds-switch"><input type="checkbox" id="orient-rot180"><span class="ds-switch__track"></span></label></div>
+<p class="sa-note" id="sa-i-r180" hidden>For an upside-down mounted camera.</p>
+<div class="ds-row sa-row" id="orient-rot180-day-row"><label class="sa-lab" for="orient-rot180-day"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Rotate 180° (day frames)</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-r180d" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><label class="ds-switch"><input type="checkbox" id="orient-rot180-day"><span class="ds-switch__track"></span></label></div>
+<p class="sa-note" id="sa-i-r180d" hidden>RTS5869: day (MJPG) frames come out upside-down after a power cycle while night (RAW10) frames are upright.</p>
+<div class="sa-actions"><span id="orient-status" class="sa-status">Native sensor orientation (no transform)</span><button id="btn-orient-reset" class="ds-btn ds-btn--ghost" type="button" aria-label="Reset orientation"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg><span>Reset</span></button></div>
+</div>
+</section>
+</div>
+<div class="card settings-card sa" id="sa-camera" data-sgroup="image">
+<div class="card-header"><h2>Camera</h2><span class="ds-chip" id="camera-current-badge">--</span></div>
+<section class="ds-card ds-card--flush sa-group" aria-label="Camera">
+<div class="sa-head"><h3 class="ds-card__title">Camera</h3><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-cam" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+<p class="sa-note" id="sa-i-cam" hidden>Choose which attached camera Zenivo uses (ZWO ASI, IMX335 USB, Raspberry Pi camera, webcam). The choice is used at the next start unless <code>--camera</code> is given. Switching pauses capture for a few seconds.</p>
+<div class="ds-list">
+<div class="ds-row sa-row"><label class="sa-lab" for="camera-device"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Active camera</span></span></label><select class="sa-input sa-select" id="camera-device"></select><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="camera-rescan" data-no-autosave title="Rescan" aria-label="Rescan cameras"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-refresh-cw"></use></svg></button></div>
+<p class="sa-status" id="camera-scan-note"></p>
+</div>
+</section>
+</div>
+<div class="card settings-card sa" id="sa-detection" data-sgroup="detection">
+<div class="card-header"><h2>Detection</h2></div>
+<section class="ds-card ds-card--flush sa-group" aria-label="Events">
+<div class="sa-head"><h3 class="ds-card__title">Events</h3><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-evt" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+<p class="sa-note" id="sa-i-evt" hidden>Streaks and flashes are looked for at night only (sun below −8°) on a 640 px gray copy of each new frame compared with the previous one. A streak in a single frame is a meteor; a dashed one or one continuing in the next frame is an aircraft (faint and steady: a satellite). Cloud changes reuse the cloud cover samples, so they need “Star count &amp; cloud cover” on. Set a sky mask to ignore roads and windows. Events are listed under Archive.</p>
+<div class="ds-list">
+<div class="ds-row sa-row"><label class="sa-lab" for="evt-meteor"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-star"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Meteors</span></span></label><label class="ds-switch"><input type="checkbox" id="evt-meteor" data-event="meteor" checked><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="evt-plane"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Aircraft</span></span></label><label class="ds-switch"><input type="checkbox" id="evt-plane" data-event="plane" checked><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="evt-satellite"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Satellites</span></span></label><label class="ds-switch"><input type="checkbox" id="evt-satellite" data-event="satellite"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="evt-flash"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-zap"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Flashes / lightning</span></span></label><label class="ds-switch"><input type="checkbox" id="evt-flash" data-event="flash"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="evt-clouds"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Clouds arriving / clearing</span></span></label><label class="ds-switch"><input type="checkbox" id="evt-clouds" data-event="clouds"><span class="ds-switch__track"></span></label></div>
+<p class="sa-status" id="evt-status"></p>
+</div>
+</section>
+<section class="ds-card ds-card--flush sa-group" aria-label="Cloud cover region">
+<div class="sa-head"><h3 class="ds-card__title">Cloud cover region</h3><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-roi" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+<p class="sa-note" id="sa-i-roi" hidden>Only this part of the frame is analysed: exclude buildings, trees and the horizon (e.g. bottom 40% if the lower part shows rooftops). The clear-sky reference is learned automatically; reset it after moving or re-aiming the camera.</p>
+<div class="ds-list">
+<div class="ds-row sa-row"><label class="sa-lab" for="roi-left"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-left"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Left (%)</span></span></label><input class="sa-input sa-num" type="number" id="roi-left" data-roi="0" min="0" max="95" step="1" value="0"></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="roi-top"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-up"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Top (%)</span></span></label><input class="sa-input sa-num" type="number" id="roi-top" data-roi="1" min="0" max="95" step="1" value="0"></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="roi-right"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Right (%)</span></span></label><input class="sa-input sa-num" type="number" id="roi-right" data-roi="2" min="5" max="100" step="1" value="100"></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="roi-bottom"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Bottom (%)</span></span></label><input class="sa-input sa-num" type="number" id="roi-bottom" data-roi="3" min="5" max="100" step="1" value="100"></div>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Clear-sky reference</span><span class="ds-row__sub" id="cloud-ref-note"></span></span><button type="button" class="ds-btn ds-btn--ghost" id="btn-cloud-ref-reset" aria-label="Reset learned clear-sky reference"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg><span>Reset</span></button></div>
+</div>
+</section>
+<section class="ds-card ds-card--flush sa-group" id="dayobj-group" aria-label="Daytime objects">
+<div class="sa-head"><h3 class="ds-card__title">Daytime objects</h3><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-day" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+<p class="sa-note" id="sa-i-day" hidden>By day a small dark or bright dot that moves against the sky is followed across frames and classified from its size, speed and wing-beat flicker. Rain on the dome pauses recording. The frame interval by day (Image output) sets what can be caught: insects and fast birds need under a second.</p>
+<div class="ds-list">
+<div class="ds-row sa-row"><label class="sa-lab" for="dayobj-enabled"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Detect daytime objects</span></span></label><label class="ds-switch"><input type="checkbox" id="dayobj-enabled" checked><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Aircraft</span></span><span class="ds-switch"><input type="checkbox" data-dayobj-class="plane" checked><span class="ds-switch__track"></span></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-balloon"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Birds</span></span><span class="ds-switch"><input type="checkbox" data-dayobj-class="bird" checked><span class="ds-switch__track"></span></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Insects</span></span><span class="ds-switch"><input type="checkbox" data-dayobj-class="insect" checked><span class="ds-switch__track"></span></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-circle-help"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Other objects</span></span><span class="ds-switch"><input type="checkbox" data-dayobj-class="object" checked><span class="ds-switch__track"></span></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="dayobj-sensitivity"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Sensitivity</span></span></label><select class="sa-input sa-select" id="dayobj-sensitivity"><option value="low">Low</option><option value="normal" selected>Normal</option><option value="high">High</option></select></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="dayobj-days"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-calendar-days"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Keep for (days)</span></span></label><input class="sa-input sa-num" type="number" id="dayobj-days" min="1" max="90" step="1" value="14"></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="dayobj-mb"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-hard-drive"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Max log size (MB)</span></span></label><input class="sa-input sa-num" type="number" id="dayobj-mb" min="5" max="500" step="5" value="50"></div>
+<details class="sa-details"><summary><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg><span>Advanced</span></summary><div class="ds-list"><div class="ds-row sa-row"><label class="sa-lab" for="dayobj-min-area"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-minus"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Smallest object (px)</span></span></label><input class="sa-input sa-num" type="number" id="dayobj-min-area" min="1" max="100" step="1" value="2"></div><div class="ds-row sa-row"><label class="sa-lab" for="dayobj-max-area"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plus"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Largest object (px)</span></span></label><input class="sa-input sa-num" type="number" id="dayobj-max-area" min="5" max="5000" step="5" value="700"></div><div class="ds-row sa-row"><label class="sa-lab" for="dayobj-contrast"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sun"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Min. contrast (0–255)</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-contrast" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><input class="sa-input sa-num" type="number" id="dayobj-contrast" min="3" max="100" step="1" placeholder="auto"></div>
+<p class="sa-note" id="sa-i-contrast" hidden>Sizes are in pixels at 640 px frame width. Contrast is how far an object must differ from the sky behind it; empty uses the value of the chosen sensitivity.</p></div></details>
+<p class="sa-status" id="dayobj-status"></p>
+</div>
+</section>
+</div>
+<div class="card settings-card sa" id="sa-station" data-sgroup="station">
+<div class="card-header"><h2>Station &amp; optics</h2><span class="ds-chip ds-chip--warn" id="station-solve-badge">NOT SOLVED YET</span></div>
+<div class="sa-stack">
+<section class="ds-card ds-card--flush sa-group" aria-label="Location">
+<div class="sa-head"><h3 class="ds-card__title">Location</h3></div>
 
-                <div class="settings-grid">
-                    <!-- Station coordinates -->
-                    <fieldset class="settings-group">
-                        <legend>Station Coordinates</legend>
-                        <div class="field-grid cols2">
-                            <div class="field field-wide">
-                                <label for="station-name">Station name</label>
-                                <input type="text" id="station-name" value="My station" />
-                            </div>
-                            <div class="field">
-                                <label for="station-lat">Latitude (°N)</label>
-                                <input type="number" id="station-lat" min="-90" max="90" step="0.00001" value="0" />
-                            </div>
-                            <div class="field">
-                                <label for="station-lon">Longitude (°E)</label>
-                                <input type="number" id="station-lon" min="-180" max="180" step="0.00001" value="0" />
-                            </div>
-                            <div class="field">
-                                <label for="station-elev">Elevation (m)</label>
-                                <input type="number" id="station-elev" min="-500" max="9000" step="1" value="20" />
-                            </div>
-                            <div class="field field-end">
-                                <button id="btn-station-auto-gps" class="btn btn-sm btn-outline" type="button" title="Uses browser GPS if allowed; otherwise your public IP address is sent to a third-party geolocation service (ipwho.is or ipapi.co)">📍 Locate via GPS / IP</button>
-                                <small class="field-note">Without GPS, your public IP address is sent to a geolocation service.</small>
-                            </div>
-                            <div class="field field-wide">
-                                <label for="station-remote-solver">Remote plate solver</label>
-                                <select id="station-remote-solver">
-                                    <option value="https://virtuallab3d.com" selected>Zenivo network — virtuallab3d.com</option>
-                                    <option value="">Off (never upload)</option>
-                                </select>
-                                <small class="field-note">When on, a frame, the station coordinates and the time are sent to this server to solve the plate. Choose Off to send nothing.</small>
-                            </div>
-                        </div>
-                    </fieldset>
+<div class="ds-list">
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-map-pin"></use></svg></span><label class="ds-row__body" for="station-name"><span class="ds-row__title">Station name</span><input class="sa-input" type="text" id="station-name" value="My station"></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="station-lat"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-compass"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Latitude (°N)</span></span></label><input class="sa-input sa-num" type="number" id="station-lat" min="-90" max="90" step="0.00001" value="0"></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="station-lon"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-compass"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Longitude (°E)</span></span></label><input class="sa-input sa-num" type="number" id="station-lon" min="-180" max="180" step="0.00001" value="0"></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="station-elev"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-arrow-up-right"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Elevation (m)</span></span></label><input class="sa-input sa-num" type="number" id="station-elev" min="-500" max="9000" step="1" value="20"></div>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Locate via GPS / IP</span></span><button id="btn-station-auto-gps" class="ds-btn" type="button" title="Uses browser GPS if allowed; otherwise your public IP address is sent to a third-party geolocation service (ipwho.is or ipapi.co)" aria-label="Locate via GPS or IP"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-map-pin"></use></svg><span>Locate</span></button></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="station-remote-solver"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Remote plate solver</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-solver" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><select class="sa-input sa-select" id="station-remote-solver"><option value="https://virtuallab3d.com" selected>Zenivo network</option><option value="">Off (never upload)</option></select></div>
+<p class="sa-note" id="sa-i-solver" hidden>When on, a frame, the station coordinates and the time are sent to this server to solve the plate (virtuallab3d.com). Choose Off to send nothing. Without GPS, Locate sends your public IP address to a geolocation service.</p>
+</div>
+</section>
+<section class="ds-card ds-card--flush sa-group" aria-label="Sensor and lens">
+<div class="sa-head"><h3 class="ds-card__title">Sensor & lens</h3></div>
 
-                    <!-- Sensor & lens identity (read-only, reported by the camera) -->
-                    <fieldset class="settings-group">
-                        <legend>Sensor &amp; Lens</legend>
-                        <div class="field-grid kv-grid">
-                            <div class="field">
-                                <label for="st-f-tz">Station timezone</label>
-                                <select id="st-f-tz" class="mono" title="Clock, observing day and file names of this station follow it"></select>
-                                <small id="st-f-tz-note" class="muted"></small>
-                            </div>
-                            <div class="field">
-                                <label for="st-f-sensor">Sensor</label>
-                                <input type="text" id="st-f-sensor" class="mono" readonly />
-                            </div>
-                            <div class="field">
-                                <label for="st-f-pixel">Pixel size (&micro;m)</label>
-                                <input type="text" id="st-f-pixel" class="mono" readonly />
-                            </div>
-                            <div class="field">
-                                <label for="st-f-lens">Lens type</label>
-                                <input type="text" id="st-f-lens" class="mono" readonly />
-                            </div>
-                            <div class="field">
-                                <label for="st-f-circle">Image circle (px)</label>
-                                <input type="text" id="st-f-circle" class="mono" readonly />
-                            </div>
-                        </div>
-                    </fieldset>
+<div class="ds-list">
+<div class="ds-row sa-row"><label class="sa-lab" for="st-f-tz"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Timezone</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-tz" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><select class="sa-input sa-select" id="st-f-tz" title="Clock, observing day and file names of this station follow it"></select></div>
+<p class="sa-note" id="sa-i-tz" hidden>The station clock, observing day and file names follow this timezone.</p>
+<p class="sa-status" id="st-f-tz-note"></p>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cpu"></use></svg></span><label class="ds-row__body" for="st-f-sensor"><span class="ds-row__title">Sensor</span><input class="sa-input" type="text" id="st-f-sensor" readonly></label></div>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg></span><label class="ds-row__body" for="st-f-pixel"><span class="ds-row__title">Pixel size (µm)</span><input class="sa-input" type="text" id="st-f-pixel" readonly></label></div>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg></span><label class="ds-row__body" for="st-f-lens"><span class="ds-row__title">Lens type</span><input class="sa-input" type="text" id="st-f-lens" readonly></label></div>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg></span><label class="ds-row__body" for="st-f-circle"><span class="ds-row__title">Image circle (px)</span><input class="sa-input" type="text" id="st-f-circle" readonly></label></div>
+</div>
+</section>
+<section class="ds-card ds-card--flush sa-group" aria-label="Lens and optics">
+<div class="sa-head"><h3 class="ds-card__title">Lens & optics</h3></div>
 
-                    <!-- Lens & optics -->
-                    <fieldset class="settings-group">
-                        <legend>Lens &amp; Optics</legend>
-                        <div class="field-grid cols2">
-                            <div class="field">
-                                <label for="opt-focal">Focal length (mm)</label>
-                                <input type="number" id="opt-focal" min="0.5" max="500" step="0.01" value="1.65" />
-                            </div>
-                            <div class="field">
-                                <label for="opt-fov-d">Diagonal FOV (°)</label>
-                                <input type="number" id="opt-fov-d" min="1" max="260" step="0.1" value="225.0" />
-                            </div>
-                            <div class="field">
-                                <label for="opt-fov-h">Horizontal FOV (°)</label>
-                                <input type="number" id="opt-fov-h" min="1" max="240" step="0.1" value="180.0" />
-                            </div>
-                            <div class="field">
-                                <label for="opt-fov-v">Vertical FOV (°)</label>
-                                <input type="number" id="opt-fov-v" min="1" max="240" step="0.1" value="135.0" />
-                            </div>
-                            <div class="field">
-                                <label for="opt-cx">Optical center X (px)</label>
-                                <input type="number" id="opt-cx" min="0" max="2592" step="0.5" value="1296.0" />
-                            </div>
-                            <div class="field">
-                                <label for="opt-cy">Optical center Y (px)</label>
-                                <input type="number" id="opt-cy" min="0" max="1944" step="0.5" value="972.0" />
-                            </div>
-                            <div class="field">
-                                <label for="opt-r90">Horizon radius R90 (px)</label>
-                                <input type="number" id="opt-r90" min="100" max="2500" step="0.5" value="894.2" />
-                            </div>
-                        </div>
-                    </fieldset>
+<div class="ds-list">
+<div class="ds-row sa-row"><label class="sa-lab" for="opt-focal"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Focal length (mm)</span></span></label><input class="sa-input sa-num" type="number" id="opt-focal" min="0.5" max="500" step="0.01" value="1.65"></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="opt-fov-d"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Diagonal FOV (°)</span></span></label><input class="sa-input sa-num" type="number" id="opt-fov-d" min="1" max="260" step="0.1" value="225.0"></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="opt-fov-h"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Horizontal FOV (°)</span></span></label><input class="sa-input sa-num" type="number" id="opt-fov-h" min="1" max="240" step="0.1" value="180.0"></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="opt-fov-v"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Vertical FOV (°)</span></span></label><input class="sa-input sa-num" type="number" id="opt-fov-v" min="1" max="240" step="0.1" value="135.0"></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="opt-cx"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Optical center X (px)</span></span></label><input class="sa-input sa-num" type="number" id="opt-cx" min="0" max="2592" step="0.5" value="1296.0"></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="opt-cy"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Optical center Y (px)</span></span></label><input class="sa-input sa-num" type="number" id="opt-cy" min="0" max="1944" step="0.5" value="972.0"></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="opt-r90"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-circle-help"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Horizon radius R90 (px)</span></span></label><input class="sa-input sa-num" type="number" id="opt-r90" min="100" max="2500" step="0.5" value="894.2"></div>
+</div>
+</section>
+<section class="ds-card ds-card--flush sa-group" aria-label="Mounting">
+<div class="sa-head"><h3 class="ds-card__title">Mounting</h3></div>
 
-                    <!-- Mount orientation -->
-                    <fieldset class="settings-group">
-                        <legend>Camera Mounting</legend>
-                        <div class="field-grid cols2">
-                            <div class="field">
-                                <label for="ori-npa">North position angle (°)</label>
-                                <input type="number" id="ori-npa" min="0" max="360" step="0.1" value="0.0" />
-                            </div>
-                            <div class="field">
-                                <label for="ori-tilt">Zenith tilt (°)</label>
-                                <input type="number" id="ori-tilt" min="0" max="90" step="0.1" value="0.0" />
-                            </div>
-                            <div class="field">
-                                <label for="ori-az">Azimuth offset (°) <span class="badge badge-accent badge-auto" title="Refined from star matches by plate-solving">AUTO</span></label>
-                                <input type="number" id="ori-az" min="0" max="360" step="0.1" value="180.0" />
-                            </div>
-                        </div>
-                        <p class="field-note">Optical center and angles use native sensor coordinates; the sky overlay applies mirror/flip automatically.</p>
-                    </fieldset>
-                </div>
-
-                <div class="settings-actions">
-                    <button id="btn-station-solve" class="btn btn-primary btn-block" type="button">🔭 Capture &amp; Auto Plate-Solve</button>
-                    <label class="checkbox-label" title="Ignore the saved lens: re-read the sensor and re-measure focal length, distortion and optical centre from a 90 s star-tracking series (clear night). The old values are kept if the solve fails.">
-                        <input type="checkbox" id="chk-station-deep" data-no-autosave> Deep solve (re-measure lens &amp; sensor)
-                    </label>
-                </div>
-
-
-                <div class="solver-card">
-                    <h3>Solver status</h3>
-                    <div class="solver-grid">
-                        <div class="telem-box"><span class="telem-label">Last solve</span><span class="telem-value mono" id="st-solve-last">--</span></div>
-                        <div class="telem-box"><span class="telem-label">Matched stars</span><span class="telem-value mono" id="st-solve-stars">--</span></div>
-                        <div class="telem-box"><span class="telem-label">Source</span><span class="telem-value mono" id="st-solve-source">--</span></div>
-                    </div>
-                </div>
-
-                <div id="station-alert" class="alert-box hidden mt-3"></div>
-
-
-                <details class="params-summary">
-                    <summary>Camera, lens &amp; station parameter summary</summary>
-                    <div class="params-grid">
-                        <div class="telem-box"><span class="telem-label">Sensor &amp; resolution</span><span class="telem-value" id="st-sensor">Sony Starvis IMX335 (2592&times;1944, 2.0&mu;m)</span></div>
-                        <div class="telem-box"><span class="telem-label">Lens &amp; focal length</span><span class="telem-value text-accent" id="st-focal">1.65 mm (Fisheye AllSky)</span></div>
-                        <div class="telem-box"><span class="telem-label">Pixel scale</span><span class="telem-value" id="st-pixscale">250.00 arcsec/px</span></div>
-                        <div class="telem-box"><span class="telem-label">FOV horizontal &times; vertical</span><span class="telem-value" id="st-fov-hv">180.0&deg; &times; 135.0&deg;</span></div>
-                        <div class="telem-box"><span class="telem-label">Diagonal FOV</span><span class="telem-value text-accent" id="st-fov-diag">225.0&deg;</span></div>
-                        <div class="telem-box"><span class="telem-label">Optical center</span><span class="telem-value" id="st-opt-center">(1296.0, 972.0) px</span></div>
-                        <div class="telem-box"><span class="telem-label">Sensor center offset &amp; R90</span><span class="telem-value" id="st-center-offset">&Delta;(0.0, 0.0) px &bull; R90=894 px</span></div>
-                        <div class="telem-box"><span class="telem-label">Station coordinates</span><span class="telem-value" id="st-coords">--</span></div>
-                        <div class="telem-box"><span class="telem-label">Field center (RA / Dec J2000)</span><span class="telem-value text-accent" id="st-radec">--</span></div>
-                        <div class="telem-box"><span class="telem-label">Azimuth &amp; Alt</span><span class="telem-value" id="st-az-alt">Az 180.0&deg; (S) &bull; Alt 90.0&deg;</span></div>
-                        <div class="telem-box"><span class="telem-label">Zenith tilt</span><span class="telem-value text-accent" id="st-tilt">0.00&deg;</span></div>
-                        <div class="telem-box"><span class="telem-label">North position angle</span><span class="telem-value" id="st-north-pa">0.00&deg;</span></div>
-                        <div class="telem-box"><span class="telem-label">WCS matrix (CD)</span><span class="telem-value" id="st-cd-matrix">[-6.94e-02, 0, 0, -6.94e-02]</span></div>
-                        <div class="telem-box"><span class="telem-label">Solve source &amp; constellations</span><span class="telem-value" id="st-solver-meta">Not plate-solved yet</span></div>
-                    </div>
-                </details>
-            </div>
-
+<div class="ds-list">
+<div class="ds-row sa-row"><label class="sa-lab" for="ori-npa"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-compass"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">North position angle (°)</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-mount" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><input class="sa-input sa-num" type="number" id="ori-npa" min="0" max="360" step="0.1" value="0.0"></div>
+<p class="sa-note" id="sa-i-mount" hidden>Optical center and angles use native sensor coordinates; the sky overlay applies mirror/flip automatically.</p>
+<div class="ds-row sa-row"><label class="sa-lab" for="ori-tilt"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-triangle-alert"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Zenith tilt (°)</span></span></label><input class="sa-input sa-num" type="number" id="ori-tilt" min="0" max="90" step="0.1" value="0.0"></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="ori-az"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-compass"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Azimuth offset (°)</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-az" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><input class="sa-input sa-num" type="number" id="ori-az" min="0" max="360" step="0.1" value="180.0"></div>
+<p class="sa-note" id="sa-i-az" hidden>Refined from star matches by plate-solving (AUTO).</p>
+</div>
+</section>
+<section class="ds-card ds-card--flush sa-group" aria-label="Plate solve">
+<div class="sa-head"><h3 class="ds-card__title">Plate solve</h3><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-solvehelp" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+<p class="sa-note" id="sa-i-solvehelp" hidden>Plate-solving on a starry night measures the lens and mounting parameters and saves them automatically, as does Locate for the coordinates. Fields you edit by hand are saved as soon as you leave them.</p>
+<div class="ds-list">
+<div class="ds-row sa-row"><button id="btn-station-solve" class="ds-btn ds-btn--primary sa-solve" type="button" aria-label="Capture and auto plate-solve"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg><span>Capture &amp; solve</span></button></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="chk-station-deep"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-search"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Deep solve</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-deep" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><label class="ds-switch"><input type="checkbox" id="chk-station-deep" data-no-autosave><span class="ds-switch__track"></span></label></div>
+<p class="sa-note" id="sa-i-deep" hidden>Ignore the saved lens: re-read the sensor and re-measure focal length, distortion and optical centre from a 90 s star-tracking series (clear night). The old values are kept if the solve fails.</p>
+<div class="sa-pad"><div class="sa-tiles sa-tiles--size"><div class="sa-tile"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg><b id="st-solve-last">--</b><small>Last solve</small></div><div class="sa-tile"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-star"></use></svg><b id="st-solve-stars">--</b><small>Stars</small></div><div class="sa-tile"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg><b id="st-solve-source">--</b><small>Source</small></div></div></div>
+<div id="station-alert" class="alert-box hidden"></div>
+</div>
+</section>
+</div>
+<details class="sa-details ds-card ds-card--flush sa-group"><summary><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-list"></use></svg><span>Parameter summary</span></summary><div class="ds-list">
+<div class="ds-row sa-row"><span class="ds-row__body"><span class="ds-row__title">Sensor & resolution</span></span><span class="ds-row__value sa-wrap" id="st-sensor">--</span></div>
+<div class="ds-row sa-row"><span class="ds-row__body"><span class="ds-row__title">Lens & focal length</span></span><span class="ds-row__value sa-wrap" id="st-focal">--</span></div>
+<div class="ds-row sa-row"><span class="ds-row__body"><span class="ds-row__title">Pixel scale</span></span><span class="ds-row__value sa-wrap" id="st-pixscale">--</span></div>
+<div class="ds-row sa-row"><span class="ds-row__body"><span class="ds-row__title">FOV H × V</span></span><span class="ds-row__value sa-wrap" id="st-fov-hv">--</span></div>
+<div class="ds-row sa-row"><span class="ds-row__body"><span class="ds-row__title">Diagonal FOV</span></span><span class="ds-row__value sa-wrap" id="st-fov-diag">--</span></div>
+<div class="ds-row sa-row"><span class="ds-row__body"><span class="ds-row__title">Optical center</span></span><span class="ds-row__value sa-wrap" id="st-opt-center">--</span></div>
+<div class="ds-row sa-row"><span class="ds-row__body"><span class="ds-row__title">Center offset & R90</span></span><span class="ds-row__value sa-wrap" id="st-center-offset">--</span></div>
+<div class="ds-row sa-row"><span class="ds-row__body"><span class="ds-row__title">Coordinates</span></span><span class="ds-row__value sa-wrap" id="st-coords">--</span></div>
+<div class="ds-row sa-row"><span class="ds-row__body"><span class="ds-row__title">Field center RA/Dec</span></span><span class="ds-row__value sa-wrap" id="st-radec">--</span></div>
+<div class="ds-row sa-row"><span class="ds-row__body"><span class="ds-row__title">Azimuth & altitude</span></span><span class="ds-row__value sa-wrap" id="st-az-alt">--</span></div>
+<div class="ds-row sa-row"><span class="ds-row__body"><span class="ds-row__title">Zenith tilt</span></span><span class="ds-row__value sa-wrap" id="st-tilt">--</span></div>
+<div class="ds-row sa-row"><span class="ds-row__body"><span class="ds-row__title">North position angle</span></span><span class="ds-row__value sa-wrap" id="st-north-pa">--</span></div>
+<div class="ds-row sa-row"><span class="ds-row__body"><span class="ds-row__title">WCS matrix (CD)</span></span><span class="ds-row__value sa-wrap" id="st-cd-matrix">--</span></div>
+<div class="ds-row sa-row"><span class="ds-row__body"><span class="ds-row__title">Solve source</span></span><span class="ds-row__value sa-wrap" id="st-solver-meta">--</span></div>
+</div></details>
+</div>
             <!-- Sky Mask Card -->
             <div class="card settings-card" data-sgroup="skymask">
                 <div class="card-header">
@@ -906,6 +623,8 @@
                         <button type="button" class="ds-btn ds-btn--danger" id="sa-confirm-ok"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg>OK</button>
                     </div>
                 </div>
+            </div>
+            </div>
             </div>
         </section>
 

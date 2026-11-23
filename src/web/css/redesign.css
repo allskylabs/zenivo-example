@@ -247,28 +247,6 @@ body:has(#left-col) .panel button.on { border-color: color-mix(in srgb, var(--ac
 }
 /* ---------- Phase 3: Settings, camera and admin pages ---------- */
 /* Settings home (phone): grouped list + search; the sections themselves keep their hash-driven switching */
-.settings-home, .settings-back { display: none; }
-.settings-home[hidden] { display: none !important; }
-#tab-settings[data-sub="home"] .settings-home:not([hidden]) { display: block; }
-#tab-settings[data-sub="home"] [data-sgroup], #tab-settings[data-sub="home"] .mobile-subnav, #tab-settings[data-sub="home"] .settings-autosave-note, #tab-settings[data-sub="home"] .settings-back { display: none; }
-.sh-search { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; margin-bottom: 8px; border-radius: var(--radius-card); background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-muted); }
-.sh-search input { flex: 1; min-width: 0; min-height: 44px; border: 0; background: none; color: var(--text-primary); font: inherit; font-size: 16px; outline: none; }
-.sh-title { padding: 18px 4px 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
-.sh-group[hidden], .sh-row[hidden], .sh-none[hidden] { display: none; }
-.sh-card { border-radius: var(--radius-card); background: var(--bg-card); border: 1px solid var(--border-color); overflow: hidden; }
-.sh-row { --tone: var(--accent); display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 8px 14px; color: var(--text-primary); text-decoration: none; border-bottom: 1px solid var(--divider); }
-.sh-row:last-child { border-bottom: 0; }
-.sh-row.tone-violet { --tone: var(--violet); }
-.sh-row.tone-ok { --tone: var(--success); }
-.sh-row.tone-warn { --tone: var(--warning); }
-.sh-ic { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--radius-tile); background: var(--bg-card-sub); color: var(--tone); }
-.sh-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.sh-tx b { font-size: 17px; font-weight: 600; }
-.sh-tx small { font-size: 13px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sh-tx small[hidden] { display: none; }
-.sh-chev { flex: none; font-size: 24px; line-height: 1; color: var(--text-muted); }
-.sh-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.sh-none { padding: 24px 4px; color: var(--text-secondary); text-align: center; }
 /* Cards, fieldsets, rows, inputs, switches and buttons of the settings pages (same element ids and handlers, only restyled) */
 #tab-settings .card-header h2, #tab-settings .settings-group legend { font-size: 16px; font-weight: 700; color: var(--text-primary); text-transform: none; letter-spacing: 0; }
 #tab-settings .settings-group { border-radius: var(--radius-tile); border-color: var(--border-color); }
@@ -288,7 +266,7 @@ body:has(#left-col) .panel button.on { border-color: color-mix(in srgb, var(--ac
 #tab-settings .toggle-row { min-height: 56px; border-radius: var(--radius-tile); }
 #tab-settings .toggle-title { font-size: 15px; }
 @media (max-width: 768px) {
-    #tab-settings .settings-back, #tab-focus .settings-back-sub, #tab-calibration .settings-back-sub { display: inline-flex; align-items: center; min-height: 44px; margin: 0 0 4px; font-size: 16px; font-weight: 600; color: var(--accent); text-decoration: none; }
+    #tab-focus .settings-back-sub, #tab-calibration .settings-back-sub { display: inline-flex; align-items: center; min-height: 44px; margin: 0 0 4px; font-size: 16px; font-weight: 600; color: var(--accent); text-decoration: none; }
     #tab-settings .settings-card { padding: 16px; }
     /* setting row: text left, switch right */
     #tab-settings label:has(> input[type="checkbox"]):not(.toggle-row) { display: flex; flex-direction: row-reverse; align-items: center; justify-content: space-between; gap: 14px; width: 100%; min-height: 48px; white-space: normal; font-size: 15px; color: var(--text-primary); }

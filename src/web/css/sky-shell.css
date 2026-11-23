@@ -55,13 +55,6 @@
 @media (max-width: 1280px) {
     #tab-live .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
 }
-/* settings sub-navigation: always visible (the rail has no sub-items) */
-.mobile-subnav { display: flex; gap: var(--space-2, 8px); overflow-x: auto; margin-bottom: var(--space-3, 12px); padding-bottom: 4px; }
-.mobile-subnav a {
-    flex: 0 0 auto; padding: 0.4rem 0.8rem; border-radius: var(--radius-pill, 999px);
-    border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.8125rem; text-decoration: none; min-height: 36px; display: inline-flex; align-items: center;
-}
-.mobile-subnav a.active { color: var(--accent); border-color: var(--accent); background: var(--bg-card-sub); }
 /* Live viewport overlays */
 .vp-status { position: absolute; top: 12px; left: 12px; display: flex; gap: 8px; z-index: 2; pointer-events: none; }
 .vp-pill {

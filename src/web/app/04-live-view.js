@@ -207,7 +207,7 @@ if (stationCard) {
         const st = data.station_config || data.station;
         setStationFormDirty(false);
         if (st) updateStationUI(st);
-    }, { selector: ".settings-grid input" });
+    }, { selector: ".sa-stack input" });
 }
 
 // Button 3: Capture & Plate-Solve via the remote plate solver (Only when user clicks!)
