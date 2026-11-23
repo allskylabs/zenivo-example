@@ -19,7 +19,7 @@ from src.hardware.driver import get_camera_driver, CameraDriverInterface, descri
 from src.hardware.v4l2_mmap import configure_white_balance, set_raw10_bin
 from src.calibration.auto_exposure import DayNightAutoExposure
 from src.calibration.dark import DarkCalibrationEngine
-from src.analytics.cloud_cover import CloudReference, analyze_cloud_cover
+from src.analytics.cloud_cover import CloudReference, _status, analyze_cloud_cover
 from src.analytics.cloud_history import CloudHistory
 from src.analytics.sky_events import SkyEventDetector
 
@@ -134,6 +134,7 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
         "min_capture_interval_s": 2.0,  # floor between real captures while viewers poll
         "analysis_max_width": 960,      # star/cloud analysis runs on a frame downscaled to this width
         "sky_analysis_enabled": 1,      # star count / cloud cover sampling on (1) or off (0)
+        "cloud_day_abs": 1,             # day cloud cover: absolute blue-sky test + 5-sample median (0 = old relative map only)
         "analysis_interval_s": 300.0,   # star/cloud sampling every 5 min (day and night); frames in between reuse it
         "stream_max_width": 960,        # live WebSocket JPEG width
         "stream_jpeg_quality": 75,      # live WebSocket JPEG quality
@@ -144,6 +145,7 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
         "min_capture_interval_s": (0.4, 60.0),
         "analysis_max_width": (320, 2592),
         "sky_analysis_enabled": (0, 1),
+        "cloud_day_abs": (0, 1),
         "analysis_interval_s": (10.0, 3600.0),
         "stream_max_width": (320, 2592),
         "stream_jpeg_quality": (40, 95),
@@ -437,6 +439,25 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
         self.station_config["update"] = cfg
         self._save_station_config()
 
+    DAY_SMOOTH_N = 5  # day samples (5 min apart) in the median: a passing glare / sun-disc frame cannot flip the state
+
+    def _smooth_day_cloud(self, stats: Dict[str, Any]) -> Dict[str, Any]:
+        """Median of the last few day readings (the day estimate is noisier than the night one); resets at night."""
+        hist = getattr(self, "_day_cc_hist", None)
+        if hist is None:
+            hist = self._day_cc_hist = []
+        cc = stats.get("cloud_cover_pct")
+        if stats.get("method") != "day" or cc is None or not int(self.performance.get("cloud_day_abs", 1)):
+            if stats.get("method") != "day":
+                hist.clear()
+            return stats
+        hist.append(float(cc))
+        del hist[:-self.DAY_SMOOTH_N]
+        med = sorted(hist)[len(hist) // 2]
+        if med != cc:
+            stats = {**stats, "cloud_cover_raw": cc, "cloud_cover_pct": round(med, 1), "status": _status(med)}
+        return stats
+
     def _sky_stats(self, frame: np.ndarray, is_pytest: bool, meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Star count / cloud cover, at most once per analysis_interval_s; each sample goes to the cloud history."""
         now = time.time()
@@ -460,8 +481,9 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
             stats = analyze_cloud_cover(
                 analysis_frame, exposure_s, gain_db, sun_elev, roi=self.sky_roi, reference=self.cloud_reference,
                 sky_polygons=self.station_config.get("sky_mask"), star_ref=self._star_ref(),
-                circle=self._lens_circle(),
+                circle=self._lens_circle(), day_abs=bool(int(self.performance.get("cloud_day_abs", 1))),
             )
+            stats = self._smooth_day_cloud(stats)
         except Exception:
             stats = {"star_count": 0, "cloud_cover_pct": None, "status": "unknown", "method": "", "confidence": 0.0}
         self.cloud_history.append({

@@ -51,6 +51,15 @@ TEMPLATE_Q_COLOUR = 0.7           # clear sky is the bluer side of the colour re
 TEMPLATE_Q_LUM = 0.3              # ... and the darker side of the luminance residuals
 MIN_TEMPLATE_SAMPLES = 24         # before this the template is used but trusted less
 MIN_SKY_LEVEL = 20.0              # median sky DN below this: black / failed frame
+# Absolute day test: the envelope fit measures colour RELATIVE to the bluest part of the frame, so a uniform overcast
+# (every pixel equally grey) looks like a clear sky. Here a sky with no clearly blue pixels at all is cloud.
+DAY_BLUE_P90 = 1.20               # p90 of B/R at or above this: blue sky is visible, trust the relative map
+DAY_GREY_P90 = 1.05               # p90 of B/R at or below this: a flat grey sky (uniform overcast)
+DAY_BLUE_DUSK = 0.08              # added to DAY_BLUE_P90 with the sun below the horizon: even a grey dusk sky has a blue cast
+DAY_SUN_DILATE = 9                # work pixels: extra margin around the saturated sun disc / glare for this test
+# Night: a catalogue match this bad while many stars ARE visible means a stale pointing, not a cloudy sky
+STALE_CLARITY = 0.1
+STALE_MIN_STARS = 6
 
 
 def _status(cc: Optional[float]) -> str:
@@ -233,7 +242,7 @@ def cloud_map(
         small = np.repeat(small[:, :, None], 3, axis=2)
     sky = sky_work_mask((wh, ww), sky_polygons, roi, circle)
     out: Dict[str, Any] = {"cloud": None, "valid": None, "sky_frac": 0.0, "saturated_frac": 0.0,
-                           "sky_level": 0.0, "res_c": None, "res_l": None}
+                           "sky_level": 0.0, "res_c": None, "res_l": None, "br_p90": None}
     if not sky.any():
         return out
     sat = small.max(axis=2) >= 248
@@ -248,6 +257,11 @@ def cloud_map(
         return out
 
     c_raw, l_raw = np.log(b / r), np.log(lum)
+    if not night:
+        # Absolute blue test, away from the sun disc and its glare (saturated pixels plus a margin)
+        far = valid & ~cv2.dilate(sat.astype(np.uint8), np.ones((DAY_SUN_DILATE,) * 2, np.uint8)).astype(bool)
+        if far.sum() >= 50:
+            out["br_p90"] = float(np.exp(np.percentile(c_raw[far], 90)))
     nc, nl = _pixel_noise(c_raw, valid), _pixel_noise(l_raw, valid)
     c = cv2.GaussianBlur(c_raw, (0, 0), SMOOTH_SIGMA)
     l = cv2.GaussianBlur(l_raw, (0, 0), SMOOTH_SIGMA)
@@ -280,6 +294,7 @@ def analyze_cloud_cover(
     count_stars: bool = True,
     star_ref: Optional[Dict[str, Any]] = None,
     circle: Optional[Sequence[float]] = None,
+    day_abs: bool = True,
 ) -> Dict[str, Any]:
     """
     Estimate cloud cover of one frame.
@@ -293,6 +308,7 @@ def analyze_cloud_cover(
         sky_polygons: station sky mask ({"sky": [...], "obstruction": [...]} in frame fractions).
         count_stars: at night also count the stars in the sky (reported only).
         circle: lens image circle (cx, cy, r) in fractions of the frame (width, height, width); outside it is not sky.
+        day_abs: by day also apply the absolute blue-sky test (a uniform overcast has no blue pixels at all).
         star_ref: {"solution", "lat", "lon", "when"} (star-solved pointing, station, aware datetime). At night
             the catalogue stars that should be visible are looked for; a sky showing far fewer than expected
             (thin cloud, haze, a uniform overcast the colour map cannot see) raises the cloud cover.
@@ -329,6 +345,12 @@ def analyze_cloud_cover(
         with reference.lock:
             reference.learn(cm["res_c"], cm["res_l"], valid)
 
+    if day_abs and not night and cm["br_p90"] is not None:
+        blue = DAY_BLUE_P90 + (DAY_BLUE_DUSK if sun_elev < 0.0 else 0.0)
+        grey = (blue - cm["br_p90"]) / (blue - DAY_GREY_P90)
+        result["day_grey"] = round(min(1.0, max(0.0, grey)), 2)
+        cc = max(cc, result["day_grey"])
+
     if night and count_stars:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) if frame.ndim == 3 else frame
         _, _, stars = detect_stars_blob(np.ascontiguousarray(gray))
@@ -337,14 +359,20 @@ def analyze_cloud_cover(
         result["star_count"] = sum(
             1 for s in stars if valid[min(mh - 1, int(s["y"] * mh / fh)), min(mw - 1, int(s["x"] * mw / fw))])
 
+    clarity_used = False
     if star_ref is not None and sun_elev < -12.0:
         try:
             sc = star_clarity(frame, star_ref["solution"], star_ref["lat"], star_ref["lon"], star_ref["when"], valid)
             result.update(stars_expected=sc["expected"], stars_seen=sc["seen"], star_clarity=sc["clarity"],
                           star_shift_px=sc.get("shift_px"))
             if sc["clarity"] is not None:
-                # A clear sky shows about CLEAR_STAR_FRACTION of the catalogue stars above the glow
-                cc = max(cc, max(0.0, 1.0 - sc["clarity"] / CLEAR_STAR_FRACTION))
+                if sc["clarity"] < STALE_CLARITY and result["star_count"] >= STALE_MIN_STARS and cc < 0.3:
+                    # Many stars stand out but none where the catalogue puts them: the stored pointing is stale
+                    result["star_ref_stale"] = True
+                else:
+                    # A clear sky shows about CLEAR_STAR_FRACTION of the catalogue stars above the glow
+                    cc = max(cc, max(0.0, 1.0 - sc["clarity"] / CLEAR_STAR_FRACTION))
+                    clarity_used = True
         except Exception:
             pass
 
@@ -353,6 +381,8 @@ def analyze_cloud_cover(
         confidence *= 0.75
     if -12.0 < sun_elev < 5.0:
         confidence *= 0.6  # twilight: the sky colour changes across the frame by the minute
+    if night and sun_elev < -12.0 and not clarity_used:
+        confidence *= 0.7  # colour / luma only: no (valid) star evidence either way
     if cc < 0.05:
         confidence *= 0.7  # clear, or a uniform overcast with no structure to see
     confidence *= min(1.0, cm["sky_frac"] / 0.8)

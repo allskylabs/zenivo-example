@@ -56,3 +56,18 @@ Missing: no stored frames at 03:00-05:00 and none with moon found in the sample,
 
 ### Both
 Offline harness: reuse `cloud_backfill.py` on labelled frames, produce table + confusion matrix before changing the live code. Phase 2 = implement behind a flag, compare old vs new on the labelled set.
+
+## Phase 2 result (day method, offline on the labelled set)
+
+Set: 46 thumbnails (640 px) in `tests/fixtures/cloud_labels/` with my visual % in `labels.csv`; harness `scripts/cloud_label_eval.py`, check `tests/unit/test_cloud_labels.py`.
+
+| Day frames (sun > -6°, n=22) | MAE % | Worst error % | Overcast (label ≥80) read < 50% |
+|---|---|---|---|
+| Old (relative envelope map) | 50.8 | 92.8 | 16 |
+| New (absolute b/r p90 + sun exclusion) | 13.7 | 38.0 | 0 |
+
+Method: p90 of b/r over valid sky pixels (saturated sun disc dilated 9x9 excluded); ≥1.20 = blue sky (0%), ≤1.05 = grey (100%), linear between, +0.08 blue offset when sun < 0 (dusk/dawn overcast is bluish); `cc = max(old, day_grey)`. Service adds a median of the last 5 day samples (reset at night). Flag: performance setting `cloud_day_abs` (default 1; 0 = old behaviour).
+
+Caveats: thresholds fitted on the same set (in-sample); remaining errors: clear frame 20261122_160431 reads ~40 (label 5, same as old), haze 20261122_120129 reads 63 (label 30).
+
+Night: the history shows no evidence of moon/stale-solve false alarms (85-100% nights are genuinely overcast). Added defensive guards only: a clarity < 0.1 with ≥6 stars and low colour cloud is treated as a stale star reference and ignored; confidence ×0.7 when clarity is not used. Moon-distance exclusion skipped (needs az/el projection, not cheap). Offline night numbers are not meaningful (no star reference in the harness).

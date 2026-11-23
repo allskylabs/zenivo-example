@@ -84,6 +84,7 @@ class PerformanceSettingsRequest(BaseModel):
     min_capture_interval_s: Optional[float] = Field(None, ge=0.4, le=60, description="Minimum seconds between captures")
     analysis_max_width: Optional[int] = Field(None, ge=320, le=2592, description="Star/cloud analysis width")
     sky_analysis_enabled: Optional[bool] = Field(None, description="Turn star count / cloud cover sampling on or off")
+    cloud_day_abs: Optional[bool] = Field(None, description="Day cloud cover: absolute blue-sky test and median smoothing")
     analysis_interval_s: Optional[float] = Field(
         None, ge=10, le=3600, description="Seconds between star/cloud samples"
     )
