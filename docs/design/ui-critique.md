@@ -225,3 +225,13 @@ Shots: `docs/design/critique/d-before-live-1568.jpg`, `d-after-live-1568.jpg`.
 | 390 px (Live, Overhead card, day tiles) | no horizontal overflow (only the events carousel scrolls by design); Overhead card tabs and rows fit; toast not triggered during the check |
 | #20 sky mask fill | OPEN: source is `tools/skyview/src`; needs a vite rebuild on a lan runner (no Node builds on the laptop), then copy the bundle into `src/web/sky/` |
 | #23 chart colour, #24 map attribution, #26 satellites header | OPEN: each needs markup/JS changes across pages and per-page screenshot review |
+
+## Update 12 - last four open items (deployed `?v=20261204p`)
+| Item | Status |
+|---|---|
+| #23 chart colour | done: `#cloud-chart` and `#fv-chart` line = accent at 70 % (`color-mix`), axis labels use the UI font (`css/activity-cloud.css`) |
+| #24 map attribution | done: Community map attribution moved bottom-left, wraps, surface background, 12 px (`community.js`, `css/community.css`); checked at 1568 px, does not overlap the zoom controls. flights3d keeps Leaflet compact attribution (unchanged) |
+| #26 satellites header | done: `#status` is three icon + number stats (visible / above / total), `#sky` icon + Dark/Day + sun altitude, `#tle` age; meaning in tooltips and aria-label, values stay visible (`satellites3d.html`, `css/scene3d.css`); checked at 1568 px |
+| #20 sky mask fill | done by patch, with a blocker: the orange polygon is the camera frame, with the camera picture drawn on the sky at alpha .92 (hid the stars). Now .6 in `src/web/sky/core-D2YY-WWd.js` (renamed for cache-busting; refs updated in `sky.js`, `dome3d-*.js`) and the same literal in `tools/skyview/src/layers.ts:343`. Verified in real Chrome: stars and lines show through the picture. md5 repo = Pi = live `faef231b6ad30429746ccf11bba839e4` |
+| #20 rebuild blocker | `tools/skyview` cannot be rebuilt: deps `@astrophoto/sky-engine`, `@astrophoto/sky-data`, `astronomy-engine`, `three` live in unpublished sibling repos (`../../../astrophoto`, `../../../hoan.uk/client/node_modules`), absent on the laptop and on CT 236/237. Command once they exist on a runner: `cd tools/skyview && NODE_OPTIONS=--max-old-space-size=512 timeout -k 5 200 ../../../astrophoto/node_modules/.bin/vite build --config vite.config.mjs` |
+Not done: 390 px screenshots and saved before/after PNGs for these four (only 1568 px viewed live); chart colour verified by CSS, not by eye.
