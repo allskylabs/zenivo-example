@@ -1,0 +1,222 @@
+        <!-- TAB: Focus assistant (zoom, score and curve fit in one screen) -->
+        <section id="tab-focus" class="tab-content">
+            <a class="settings-back settings-back-sub" href="/settings">&lsaquo; Settings</a>
+            <div class="focus-layout" id="focus-layout">
+                <div class="card focus-main">
+                    <div class="card-header">
+                        <h2>Focus Zoom <span class="text-muted" id="focus-zoom-label"></span></h2>
+                        <div class="header-actions focus-actions">
+                            <label class="checkbox-label"><input type="checkbox" id="focus-stretch" checked> Stretch</label>
+                            <label class="checkbox-label"><input type="checkbox" id="focus-markers" checked> Markers</label>
+                            <label class="checkbox-label"><input type="checkbox" id="focus-peaking" checked> Peaking</label>
+                            <label class="checkbox-label"><input type="checkbox" id="focus-crosshair"> Crosshair</label>
+                        </div>
+                    </div>
+                    <div class="focus-view-row">
+                        <div class="focus-zoom-wrap" id="focus-zoom-wrap">
+                            <canvas id="focus-zoom-canvas"></canvas>
+                            <div class="focus-zoom-empty" id="focus-zoom-empty"><span>Press <strong>Start focus mode</strong> (Live focus card) to stream a native-resolution crop.</span></div>
+                        </div>
+                        <aside class="focus-aside">
+                            <div class="focus-aside-title">Overview <span class="text-muted">click to move · arrow keys nudge</span></div>
+                            <div class="focus-overview-wrap" id="focus-overview-wrap">
+                                <img id="focus-overview" alt="Whole frame">
+                                <div class="focus-roi-box" id="focus-roi-box"></div>
+                            </div>
+                        </aside>
+                    </div>
+                    <div class="focus-charts-grid">
+                        <!-- Chart 1: Lens V-Curve (lens position vs star size HFR / sharpness) -->
+                        <div class="focus-chart-card">
+                            <div class="focus-chart-head">
+                                <div class="focus-chart-title-wrap">
+                                    <strong id="focus-lens-chart-title">Lens V-Curve</strong>
+                                    <span class="focus-badge" id="focus-chart-fit-badge">V-CURVE</span>
+                                </div>
+                                <div class="focus-seg" id="focus-chart-metric">
+                                    <button data-chart-metric="starsize" class="active" title="Star size: HFR / FWHM (px), smaller is sharper">Star size (HFR)</button>
+                                    <button data-chart-metric="sharpness" title="Sharpness: edge contrast, higher is sharper">Sharpness</button>
+                                </div>
+                                <div class="header-actions focus-chart-actions">
+                                    <button class="btn btn-sm btn-outline" id="focus-go-best" hidden title="Return to the sharpest lens position found on the chart">★ Best (<span id="focus-best-pos-val">—</span>)</button>
+                                    <button class="btn btn-sm btn-outline" id="focus-record-point" title="Record a measurement at the current lens position">Record point</button>
+                                    <button class="btn btn-sm btn-outline" id="focus-reset" title="Clear the chart data and start over (R)">Reset (R)</button>
+                                </div>
+                            </div>
+                            <canvas id="focus-lens-chart" class="focus-chart"></canvas>
+                            <div class="focus-chart-summary" id="focus-chart-summary">
+                                <span>Lens position: <b id="focus-curve-cur-pos">—</b></span>
+                                <span id="focus-curve-best-wrap">· Sharpest point: <b id="focus-curve-best-info" class="text-success">—</b></span>
+                                <span id="focus-curve-n-wrap">· Measured: <b id="focus-curve-points-count">0</b> positions</span>
+                                <span id="focus-curve-hint" class="text-muted">· Click the chart to pick a position</span>
+                            </div>
+                        </div>
+
+                        <!-- Chart 2: Live Time History (sharpness and star size over consecutive frames) -->
+                        <details class="focus-chart-card focus-chart-details" id="focus-time-details">
+                            <summary class="focus-chart-head">
+                                <div class="focus-chart-title-wrap">
+                                    <strong id="focus-time-chart-title">Live Time History</strong>
+                                    <span class="focus-badge">TIME STREAM</span>
+                                </div>
+                                <div class="focus-chart-subtext text-muted">
+                                    Sharpness &amp; HFR over consecutive frames
+                                </div>
+                            </summary>
+                            <canvas id="focus-time-chart" class="focus-chart"></canvas>
+                            <div class="focus-chart-summary">
+                                <span>Range: <b id="focus-time-range-info">last 60 frames</b></span>
+                                <span id="focus-time-status-info" class="text-muted">· Shaded band: background noise level</span>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+                <div class="focus-side">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Live focus</h2>
+                            <span class="focus-badge" id="focus-badge">OFF</span>
+                        </div>
+                        <div class="focus-actions-row">
+                            <button class="btn btn-primary" id="focus-toggle" title="Start focus mode">Start focus mode</button>
+                            <button class="btn btn-outline" id="focus-finish" hidden title="Leave focus mode without saving the lens position or result">Stop without saving</button>
+                        </div>
+                        <p class="focus-hint text-muted focus-cta-hint" id="focus-toggle-hint">Streams fast native-resolution frames with a live sharpness score. Auto-exposure and archiving pause until you finish.</p>
+                        <button class="btn btn-sm btn-outline btn-block focus-keep" id="focus-keep" hidden>Still focusing — keep focus mode on</button>
+                        <div class="focus-score">
+                            <div class="focus-score-label" id="focus-score-label">Score</div>
+                            <div class="focus-score-value" id="focus-score-value">—</div>
+                            <div class="focus-score-sub" id="focus-score-sub">&nbsp;</div>
+                            <div class="focus-meter" title="Bar spans 80–100 % of the best score"><div class="focus-meter-fill" id="focus-meter-fill"></div></div>
+                            <div class="focus-score-sub"><span id="focus-quality">—</span> of best <span id="focus-best">—</span> <span class="focus-trend" id="focus-trend"></span></div>
+                            <details class="focus-adv focus-adv-flat">
+                                <summary>Statistics</summary>
+                            <div class="focus-stats focus-stats-card">
+                                <span>Min <b id="focus-stat-min">—</b></span>
+                                <span>Max <b id="focus-stat-max">—</b></span>
+                                <span title="Frame-to-frame score noise; changes smaller than this mean nothing">Noise <b id="focus-stat-noise">—</b></span>
+                                <span>Frames <b id="focus-stat-n">0</b></span>
+                            </div>
+                            <div class="focus-statline" id="focus-statline">—</div>
+                            </details>
+                        </div>
+                        <details class="focus-adv">
+                            <summary>Measurement settings</summary>
+                                                <div class="focus-field">
+                            <span class="focus-field-label">Measure</span>
+                            <div class="focus-seg" id="focus-method">
+                                <button data-method="auto" class="active" title="Auto: star size (HFR/FWHM px) at night, edge contrast by day">Auto</button>
+                                <button data-method="stars" title="Measure star size HFR / FWHM (px): smaller stars are sharper">Stars (HFR)</button>
+                                <button data-method="lights" title="Measure light-spot size HFR (px): smaller is sharper">Lights</button>
+                                <button data-method="contrast" title="Measure edge contrast (daytime: buildings, trees, horizon)">Day</button>
+                            </div>
+                        </div>
+                        <div class="focus-field">
+                            <span class="focus-field-label" title="Focus region (ROI) mode: Auto picks the best star or detail, Manual keeps the spot you click">Focus position</span>
+                            <div class="focus-seg" id="focus-roi-mode">
+                                <button data-roi-mode="auto" class="active" title="Automatically find the brightest star (night) or the most detailed area (day)">Auto</button>
+                                <button data-roi-mode="manual" title="Manual: keep the focus box where you click on the image">Manual</button>
+                            </div>
+                        </div>
+                        <div class="focus-field">
+                            <span class="focus-field-label" title="Robust running average (min and max dropped) of the last N frames">Smoothing</span>
+                            <div class="focus-seg" id="focus-smooth">
+                                <button data-smooth="1" title="Every frame as measured">Off</button>
+                                <button data-smooth="3">3</button>
+                                <button data-smooth="5" class="active">5</button>
+                                <button data-smooth="9">9</button>
+                                <button data-smooth="15" title="Steadiest, but lags ~1.5 s at 10 fps">15</button>
+                            </div>
+                        </div>
+                        <div class="focus-field">
+                            <span class="focus-field-label">Zoom region</span>
+                            <select id="focus-roi-size">
+                                <option value="128">128 px (max zoom)</option>
+                                <option value="192">192 px</option>
+                                <option value="256" selected>256 px</option>
+                                <option value="384">384 px</option>
+                                <option value="512">512 px</option>
+                                <option value="768">768 px</option>
+                            </select>
+                        </div>
+                        <div class="btn-group focus-btns">
+                            <button class="btn btn-sm btn-outline" id="focus-pick-star" title="Find and lock onto the best unsaturated bright star">Find star</button>
+                            <button class="btn btn-sm btn-outline" id="focus-pick-light" title="Find and lock onto the clearest light spot">Find light</button>
+                            <button class="btn btn-sm btn-outline" id="focus-auto-point" title="Automatically place the focus region on a star (night) or detail (day)">Auto point</button>
+                        </div>
+                        </details>
+                    </div>
+                    <div class="card" id="focus-lens-card">
+                        <div class="card-header">
+                            <h2>Focus mode <span class="focus-badge" id="focus-lens-type-badge">MANUAL</span></h2>
+                            <div class="focus-seg focus-afmf" id="focus-lens-mode">
+                                <button data-lens-mode="auto" id="focus-lens-mode-af" title="Autofocus: the app finds focus by itself (sweep on stars, lights or detail) and keeps it (temperature, periodic checks). Click again to refocus now.">Autofocus</button>
+                                <button data-lens-mode="manual" id="focus-lens-mode-mf" title="MF: manual focus with the slider or dial; points are plotted on the curve">Manual</button>
+                            </div>
+                        </div>
+                        <div class="focus-lens-pos"><b id="focus-lens-pos">—</b> <span class="text-muted" id="focus-lens-dist"></span></div>
+                        <div class="focus-lens-step">Lens step <b id="focus-lens-step">—</b> <span class="text-muted">/ <span id="focus-lens-step-max">1023</span></span></div>
+                        <div class="btn-group focus-btns focus-lens-run">
+                            <button class="btn btn-outline" id="focus-run-af" title="Start focus mode (if it is off) and sweep the lens to find focus">Run autofocus sweep</button>
+                            <button class="btn btn-outline" id="focus-lens-cancel" hidden>Abort</button>
+                        </div>
+                        <div class="focus-hint text-muted focus-af-hint" id="focus-run-af-hint">Starts focus mode by itself, then sweeps the lens to find the sharpest position.</div>
+                        <div class="focus-meter" id="focus-lens-progress-wrap" hidden><div class="focus-meter-fill good" id="focus-lens-progress"></div></div>
+                        <div class="focus-hint focus-lens-status"><span id="focus-lens-msg">&nbsp;</span></div>
+                        <input type="range" id="focus-lens-slider" min="0" max="3" step="0.005" value="0" aria-label="Lens position (dioptres)">
+                        <div class="btn-group focus-btns focus-lens-nudge">
+                            <button class="btn btn-outline" data-lens-step="-10">−10</button>
+                            <button class="btn btn-outline" data-lens-step="-1">−1</button>
+                            <button class="btn btn-outline" data-lens-step="1">+1</button>
+                            <button class="btn btn-outline" data-lens-step="10">+10</button>
+                        </div>
+                        <details class="focus-adv">
+                            <summary>Autofocus options</summary>
+                        <div class="focus-field focus-af-row" id="focus-af-row" hidden>
+                            <span class="focus-field-label">Refocus every</span>
+                            <select id="focus-refocus-every" title="AF runs a full sweep this often (when there is something to focus on)">
+                                <option value="0">Off</option>
+                                <option value="1">1 h</option>
+                                <option value="2">2 h</option>
+                                <option value="3">3 h</option>
+                                <option value="6">6 h</option>
+                                <option value="12">12 h</option>
+                            </select>
+                            <button class="btn btn-sm btn-outline" id="focus-refocus-now" title="Find focus now (enters focus mode for the sweep)">Refocus now</button>
+                        </div>
+                        <div class="focus-hint text-muted" id="focus-lens-saved">&nbsp;</div>
+                        <div class="focus-hint text-muted" id="focus-lens-comp"></div>
+                        <div class="focus-hint text-muted" id="focus-lens-track-msg"></div>
+                        <button class="btn btn-sm btn-outline" id="focus-lens-reset-learning" title="Forget the focus-vs-temperature samples, e.g. after moving or refitting the camera">Reset temperature learning</button>
+                        </details>
+                    </div>
+                    <details class="card focus-details">
+                        <summary>Exposure while focusing <span class="text-muted" id="focus-exp-summary"></span></summary>
+                        <p class="text-muted focus-hint">Auto-exposure pauses in focus mode so the score stays comparable. If the light changed, meter once. Short exposures refresh faster and blur less.</p>
+                        <div class="btn-group focus-btns">
+                            <button class="btn btn-sm btn-outline" id="focus-auto-exp" title="Meter the zoom region (brightest parts to ~80 %), then hold that exposure">Auto expose</button>
+                            <button class="btn btn-sm btn-outline focus-exp-preset" data-exp="1.0" data-gain="36">Stars 1 s · 36 dB</button>
+                            <button class="btn btn-sm btn-outline focus-exp-preset" data-exp="0.1" data-gain="24">Lights 0.1 s · 24 dB</button>
+                            <button class="btn btn-sm btn-outline focus-exp-preset" data-exp="0.005" data-gain="0">Day 5 ms</button>
+                        </div>
+                        <div class="focus-exp-row">
+                            <label>Exposure (s) <input type="number" id="focus-exp" min="0.00015" max="30" step="any"></label>
+                            <label>Gain (dB) <input type="number" id="focus-gain" min="0" max="72" step="0.5"></label>
+                            <button class="btn btn-sm btn-outline" id="focus-exp-apply">Apply</button>
+                        </div>
+                    </details>
+                    <div class="card focus-howto" id="focus-howto">
+                        <h2>How to focus</h2>
+                        <ul class="focus-hint">
+                            <li>Aim at a bright star near the centre (or a distant light by day), then press Start focus mode.</li>
+                            <li>Move the lens until the star size drops or the sharpness score rises; the Best marker shows the sharpest position.</li>
+                            <li>Press Finish &amp; save to keep the lens position and leave focus mode.</li>
+                        </ul>
+                    </div>
+                    <details class="card focus-details" id="focus-history-details">
+                        <summary>Saved focus history <span class="text-muted" id="focus-history-count"></span></summary>
+                        <div class="focus-history" id="focus-history"></div>
+                    </details>
+                </div>
+            </div>
+        </section>

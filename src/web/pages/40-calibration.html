@@ -1,0 +1,81 @@
+        <!-- PAGE: Master Dark Calibration (/calibration) -->
+        <section id="tab-calibration" class="tab-content">
+            <a class="settings-back settings-back-sub" href="/settings">&lsaquo; Settings</a>
+            <div class="card">
+                <div class="card-header">
+                    <h2>Master Dark Calibration Routine (AC1 / AC3)</h2>
+                    <span class="badge badge-accent" id="dark-status-badge">READY</span>
+                </div>
+                <p class="description">
+                    Cover the camera lens/dome, then click the button below. The system will automatically capture and median-stack all
+                    <strong>7 Standard Master Dark Profiles</strong> (0.5s &ndash; 15.0s / 12 &ndash; 48 dB) in 10-bit Bayer RAW (<code>.npy</code>) and hot pixel maps into <code>data/calibration/darks/</code> without needing manual parameter selection.
+                </p>
+
+                <!-- Hidden parameter inputs retained for automated test suite compatibility -->
+                <div class="hidden" aria-hidden="true">
+                    <input type="number" id="dark-frames-count" min="3" max="50" value="9" />
+                    <input type="number" id="dark-exposure" min="0.001" max="90.0" step="0.1" value="2.0" />
+                    <input type="number" id="dark-gain" min="0" max="72" step="1" value="36" />
+                </div>
+
+                <!-- Single 1-Click Button on Web UI -->
+                <div class="btn-group" style="flex-wrap: wrap; margin-bottom: 1rem;">
+                    <button id="btn-trigger-dark" class="btn btn-primary">Capture &amp; Build All Master Dark Profiles (0.5s &ndash; 15.0s)</button>
+                </div>
+
+                <!-- Live Calibration Status & Progress Bar -->
+                <div id="dark-progress-panel" class="calibration-status-panel">
+                    <div class="calibration-status-header">
+                        <span id="dark-status-text">Ready — Cover lens and click button above to capture 10-bit RAW Master Dark profiles (0.5s – 15.0s).</span>
+                        <span id="dark-progress-pct" class="mono-val">0%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div id="dark-progress-bar" class="progress-fill" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <!-- Persistent Calibration Notification Banner -->
+                <div id="dark-alert" class="alert-box hidden mt-3"></div>
+
+                <!-- Standard 6-Profile Matrix -->
+                <div class="section-heading mt-4">
+                    <h2>Standard Astronomical Dark Profiles Matrix</h2>
+                </div>
+                <div class="events-table-wrapper">
+                    <table class="events-table">
+                        <thead>
+                            <tr>
+                                <th>Profile</th>
+                                <th>Exposure &amp; Gain</th>
+                                <th>Stack Frames</th>
+                                <th>Status</th>
+                                <th>File / Updated (local)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dark-profiles-matrix-body">
+                            <tr><td colspan="5" class="text-muted" style="text-align:center;">Loading standard profile matrix...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Saved Master Dark Calibration Library Files -->
+                <div class="section-heading mt-4">
+                    <h2>Saved Master Dark Files on Disk (<code>data/calibration/darks/</code>)</h2>
+                </div>
+                <div class="events-table-wrapper">
+                    <table class="events-table">
+                        <thead>
+                            <tr>
+                                <th>Filename</th>
+                                <th>Size</th>
+                                <th>Last Updated (local)</th>
+                                <th>Preview</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dark-library-body">
+                            <tr><td colspan="4" class="text-muted" style="text-align:center;">Loading calibration library...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>

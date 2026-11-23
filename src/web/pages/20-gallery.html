@@ -1,0 +1,78 @@
+        <!-- TAB 2: Gallery & Events -->
+        <section id="tab-gallery" class="tab-content">
+            <div class="gallery-container gal-mode-products" id="gallery-container">
+                <div class="gal-head">
+                    <h2>Gallery &amp; Events</h2>
+                    <div class="gal-tabs" id="gallery-tabs" role="tablist">
+                        <button type="button" class="gal-tab active" role="tab" data-gmode="products">Products</button>
+                        <button type="button" class="gal-tab" role="tab" data-gmode="day">By day</button>
+                        <button type="button" class="gal-tab" role="tab" data-gmode="events">Events</button>
+                    </div>
+                </div>
+                <!-- Astronomical Products Section -->
+                <div class="gal-pane gal-pane-products">
+                <div class="section-heading" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                        <h2>Products</h2>
+                        <span class="badge badge-accent" id="gallery-date">Today's Archive</span>
+                        <span class="badge badge-success" id="gallery-frame-count">0 Frames Archived</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <label for="timelapse-fps-select" class="text-muted" style="font-size: 0.78rem;">Playback speed:</label>
+                        <select id="timelapse-fps-select" style="background: var(--bg-card-sub); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.35rem 0.5rem; border-radius: 6px; font-size: 0.8rem;">
+                            <option value="12" selected>12 FPS</option>
+                            <option value="24">24 FPS</option>
+                            <option value="30">30 FPS</option>
+                        </select>
+                        <button id="btn-build-timelapse" data-admin class="btn btn-primary btn-sm">🎬 Build / Update Timelapse Now</button>
+                    </div>
+                </div>
+                <div id="gallery-alert" class="alert-box hidden mt-3"></div>
+                <div class="products-grid" id="products-grid">
+                    <!-- injected dynamically via src/web/app/ -->
+                </div>
+
+                <div class="tl-builder card" id="timelapse-builder" data-admin>
+                    <div class="tl-title">Timelapse builder</div>
+                    <div class="tl-grid">
+                        <div class="tl-field"><label for="tl-from">From</label><input type="date" id="tl-from"></div>
+                        <div class="tl-field"><label for="tl-to">To</label><input type="date" id="tl-to"></div>
+                        <div class="tl-field"><label for="tl-fps">Frame rate (fps)</label><input type="number" id="tl-fps" min="1" max="60" value="24"></div>
+                        <div class="tl-field"><label for="tl-res">Resolution</label>
+                            <select id="tl-res">
+                                <option value="0" selected>Native (archived size)</option>
+                                <option value="1280">1280 px wide</option>
+                                <option value="960">960 px wide</option>
+                                <option value="640">640 px wide</option>
+                            </select>
+                        </div>
+                    </div>
+                    <label class="tl-check"><input type="checkbox" id="tl-overlay"> Overlay timestamp</label>
+                    <button type="button" id="tl-build" class="btn btn-primary tl-build-btn">Build timelapse</button>
+                    <div id="tl-result" class="tl-result hidden"></div>
+                </div>
+                </div>
+
+                <!-- By Day: products, timelapse and sky events grouped per local day -->
+                <div class="gal-pane gal-pane-day">
+                <div class="section-heading mt-4" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                        <h2 id="gallery-day-title">By Day</h2>
+                        <span class="badge" id="day-count-badge">0 Days</span>
+                    </div>
+                    <div class="events-filter zchips" id="events-filter" role="group" aria-label="Event type">
+                        <button type="button" class="zchip active" data-type="">All</button>
+                        <button type="button" class="zchip" data-type="meteor">Meteors</button>
+                        <button type="button" class="zchip" data-type="plane">Aircraft</button>
+                        <button type="button" class="zchip" data-type="satellite">Satellites</button>
+                        <button type="button" class="zchip" data-type="clouds">Clouds</button>
+                        <button type="button" class="zchip" data-type="flash">Flashes</button>
+                    </div>
+                </div>
+                <div id="day-list" class="day-list">
+                    <!-- One block per day, injected via src/web/app/ -->
+                </div>
+                </div>
+            </div>
+        </section>
+

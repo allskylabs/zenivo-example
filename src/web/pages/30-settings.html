@@ -1,0 +1,867 @@
+        <!-- PAGE: Settings (/settings) -->
+        <section id="tab-settings" class="tab-content" data-sub="image">
+            <!-- Phone settings home (built by settings_home.js; shown only while /settings has no #section) -->
+            <div class="settings-home" id="settings-home" hidden>
+                <label class="sh-search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="search" id="sh-q" placeholder="Search settings" aria-label="Search settings" autocomplete="off"></label>
+                <div id="sh-groups"></div>
+                <p class="sh-none" id="sh-none" hidden>No setting matches.</p>
+            </div>
+            <a class="settings-back" href="/settings" id="settings-back">&lsaquo; Settings</a>
+            <nav class="mobile-subnav" aria-label="Settings sections">
+                <a href="/settings#image" data-sub="image">Image Output</a>
+                <a href="/settings#detection" data-sub="detection">Detection</a>
+                <a href="/settings#station" data-sub="station">Station &amp; Optics</a>
+                <a href="/settings#skymask" data-sub="skymask">Sky Mask</a>
+                <a href="/settings#integrations" data-sub="integrations">Integrations</a>
+                <a href="/settings#community" data-sub="community">Community</a>
+                <a href="/settings#admin" data-sub="admin">Admin</a>
+            </nav>
+            <p class="settings-autosave-note text-muted">Changes are saved automatically.</p>
+            <div class="card settings-card" id="settings-focus-card" data-sgroup="station">
+                <div class="card-header">
+                    <h2>Focus</h2>
+                    <a class="btn btn-sm btn-outline" href="/focus">Open focus assistant</a>
+                </div>
+                <div class="focus-history" id="settings-focus-history"><span class="text-muted">No focus saved yet.</span></div>
+            </div>
+            <!-- Camera Card: pick the active camera when several are attached -->
+            <div class="card settings-card" data-sgroup="image">
+                <div class="card-header">
+                    <h2>Camera</h2>
+                    <span class="badge badge-accent" id="camera-current-badge">--</span>
+                </div>
+                <p class="description">
+                    Choose which attached camera Zenivo uses (ZWO ASI, IMX335 USB, Raspberry Pi camera, webcam). The choice is saved
+                    and used at the next start unless <code>--camera</code> is given on the command line. Switching pauses capture for a few seconds.
+                </p>
+                <div class="camera-pick">
+                    <div class="field">
+                        <label for="camera-device">Active camera</label>
+                        <select id="camera-device"></select>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline" id="camera-rescan" data-no-autosave title="Look for cameras plugged in after the page was loaded">&#8635; Rescan</button>
+                </div>
+                <small class="field-note" id="camera-scan-note"></small>
+            </div>
+
+
+            <!-- Image Output Card: resolution + orientation -->
+            <div class="card settings-card" data-sgroup="image">
+                <div class="card-header">
+                    <h2>Image Output</h2>
+                    <span class="badge badge-accent" id="output-res-badge">2592 × 1944</span>
+                </div>
+                <p class="description">
+                    Changes apply immediately. The sensor always reads the full frame; RAW10 frames are binned 2×2 / 4×4 before
+                    demosaicing when the master size allows, otherwise downscaled by pixel averaging. Smaller sizes cost much less CPU
+                    and also reduce noise and file size.
+                </p>
+                <div class="settings-grid">
+                    <!-- 1. One master frame; every other size below is a downscale of it (never an upscale) -->
+                    <fieldset class="settings-group field-wide">
+                        <legend>Image size</legend>
+                        <div class="field">
+                            <label for="output-resolution">Master frame</label>
+                            <select id="output-resolution">
+                                <option value="2592x1944">2592 × 1944 (5.0 MP, native sensor)</option>
+                            </select>
+                        </div>
+                        <p class="field-note">
+                            The one size everything else is derived from. Each output below is downscaled from it and is never larger
+                            than it. Resulting sizes:
+                        </p>
+                        <ul class="size-pipeline" id="size-pipeline">
+                            <li><span>Live view</span><strong id="size-live">--</strong></li>
+                            <li><span>Star &amp; cloud analysis</span><strong id="size-analysis">--</strong></li>
+                            <li><span>Archive (timelapse, keogram, startrails)</span><strong id="size-archive">--</strong></li>
+                        </ul>
+                    </fieldset>
+                    <!-- 2. Live view: what viewers see (size, quality, night star boost) -->
+                    <fieldset class="settings-group">
+                        <legend>Live view</legend>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="perf-stream-width">Width</label>
+                                <select id="perf-stream-width" data-size-select></select>
+                            </div>
+                            <div class="field">
+                                <label for="perf-stream-quality">JPEG quality <span class="field-sub">(live view)</span></label>
+                                <span class="range-value" id="perf-stream-quality-val">75</span>
+                                <input type="range" id="perf-stream-quality" name="perf-stream-quality" min="40" max="95" step="1" value="75" />
+                            </div>
+                            <label class="toggle-row field-wide" for="star-boost-enabled">
+                                <span class="toggle-text"><span class="toggle-title">Night star boost</span><span class="toggle-hint">Brighten stars by binning</span></span>
+                                <input type="checkbox" id="star-boost-enabled" class="switch" />
+                            </label>
+                            <div class="field">
+                                <label for="star-boost-bin">Bin window</label>
+                                <select id="star-boost-bin">
+                                    <option value="2">2 × 2 (sharpest)</option>
+                                    <option value="3">3 × 3</option>
+                                    <option value="4">4 × 4 (brightest)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <p class="field-note">Star boost sums each star's light over an N×N window above the sky background (stars ~N² brighter, noise only ~N×). It only affects the live view and snapshots, only while the sun is below −6° and only inside the sky mask; star count, cloud cover and archived frames are unchanged.</p>
+                    </fieldset>
+                    <!-- 3. Sky analysis: star count and cloud cover -->
+                    <fieldset class="settings-group">
+                        <legend>Star count &amp; cloud cover</legend>
+                        <div class="field-grid">
+                            <label class="toggle-row field-wide" for="perf-sky-enabled">
+                                <span class="toggle-text"><span class="toggle-title">Sampling</span><span class="toggle-hint">Sample day and night</span></span>
+                                <input type="checkbox" id="perf-sky-enabled" class="switch" checked />
+                            </label>
+                            <div class="field">
+                                <label for="perf-sky-interval">Interval (min)</label>
+                                <input type="number" id="perf-sky-interval" data-scale="60" min="0.5" max="60" step="0.5" value="5" />
+                            </div>
+                            <div class="field">
+                                <label for="perf-analysis-width">Analysis width</label>
+                                <select id="perf-analysis-width" data-size-select></select>
+                            </div>
+                        </div>
+                        <p class="field-note">Stars are counted only at night. Each sample is plotted under Live → Cloud Cover History. A smaller analysis width is much cheaper on CPU.</p>
+                    </fieldset>
+                    <!-- 4. Capture timing -->
+                    <fieldset class="settings-group">
+                        <legend>Capture timing</legend>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="perf-capture-interval">Min. time between captures (s)</label>
+                                <input type="number" id="perf-capture-interval" min="0.4" max="60" step="0.1" value="1.0" />
+                            </div>
+                            <div class="field">
+                                <label for="perf-bg-capture">Time between captures with no viewer (s, 0 = back to back)</label>
+                                <input type="number" id="perf-bg-capture" min="0" max="3600" step="1" value="0" />
+                            </div>
+                        </div>
+                        <p class="field-note">Raise these if the computer runs hot; exposures longer than the interval are not affected. <span id="perf-bin-note"></span></p>
+                    </fieldset>
+                    <!-- White balance (RAW10 night mode) -->
+                    <fieldset class="settings-group">
+                        <legend>White Balance</legend>
+                        <div class="field-grid cols2">
+                            <div class="field field-wide">
+                                <label for="wb-mode">Mode</label>
+                                <select id="wb-mode">
+                                    <option value="auto">Auto (gray-world)</option>
+                                    <option value="manual">Manual</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="wb-r-gain">Red gain (R/G)</label>
+                                <input type="number" id="wb-r-gain" min="0.4" max="4" step="0.01" value="1.00" />
+                            </div>
+                            <div class="field">
+                                <label for="wb-b-gain">Blue gain (B/G)</label>
+                                <input type="number" id="wb-b-gain" min="0.4" max="4" step="0.01" value="1.00" />
+                            </div>
+                        </div>
+                        <p class="field-note">
+                            Applies to RAW10 frames (night, or exposure ≥ 0.4 s) and as a gentle correction on top of the camera ISP in MJPG mode (daytime).
+                            In use: <strong id="wb-applied" class="text-accent">--</strong>
+                        </p>
+                    </fieldset>
+
+                    <!-- Image orientation -->
+                    <fieldset class="settings-group">
+                        <legend>Orientation (Mirror / Flip / Rotate)</legend>
+                        <div class="toggle-list">
+                            <label class="toggle-row" for="orient-flip-h">
+                                <span class="toggle-text">
+                                    <span class="toggle-title">Horizontal mirror</span>
+                                    <span class="toggle-hint">Swap left ↔ right (East/West)</span>
+                                </span>
+                                <input type="checkbox" id="orient-flip-h" class="switch" />
+                            </label>
+                            <label class="toggle-row" for="orient-flip-v">
+                                <span class="toggle-text">
+                                    <span class="toggle-title">Vertical flip</span>
+                                    <span class="toggle-hint">Swap top ↕ bottom (North/South)</span>
+                                </span>
+                                <input type="checkbox" id="orient-flip-v" class="switch" />
+                            </label>
+                            <label class="toggle-row" for="orient-rot180">
+                                <span class="toggle-text">
+                                    <span class="toggle-title">Rotate 180°</span>
+                                    <span class="toggle-hint">For an upside-down mounted camera</span>
+                                </span>
+                                <input type="checkbox" id="orient-rot180" class="switch" />
+                            </label>
+                            <label class="toggle-row" for="orient-rot180-day" id="orient-rot180-day-row">
+                                <span class="toggle-text">
+                                    <span class="toggle-title">Rotate 180° — day frames only</span>
+                                    <span class="toggle-hint">RTS5869: day (MJPG) frames come out upside-down after a power cycle while night (RAW10) frames are upright</span>
+                                </span>
+                                <input type="checkbox" id="orient-rot180-day" class="switch" />
+                            </label>
+                        </div>
+                        <div class="orient-footer">
+                            <span id="orient-status" class="text-muted">Native sensor orientation (no transform)</span>
+                            <button id="btn-orient-reset" class="btn btn-sm btn-outline" type="button">Reset</button>
+                        </div>
+                    </fieldset>
+
+                </div>
+            </div>
+
+            <!-- Detection Card: sky events + cloud cover -->
+            <div class="card settings-card" data-sgroup="detection">
+                <div class="card-header">
+                    <h2>Detection</h2>
+                </div>
+                <p class="description">Meteor, aircraft, satellite, flash and cloud detection, and the cloud cover analysis.</p>
+                <div class="settings-grid">
+                    <fieldset class="settings-group">
+                        <legend>Event detection</legend>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="evt-meteor" data-event="meteor" checked /> ☄️ Meteors</label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="evt-plane" data-event="plane" checked /> ✈️ Aircraft</label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="evt-satellite" data-event="satellite" /> 🛰️ Satellites</label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="evt-flash" data-event="flash" /> ⚡ Flashes / lightning</label>
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="evt-clouds" data-event="clouds" /> ☁️ Clouds arriving / clearing</label>
+                            </div>
+                        </div>
+                        <p class="field-note">
+                            Streaks and flashes are looked for at night only (sun below −8°), on a 640 px gray copy of each new frame compared with the previous one: a few ms per frame.
+                            A streak in a single frame is a meteor; a dashed one or one that continues along the same line in the next frame is an aircraft (faint and steady: a satellite).
+                            Cloud changes reuse the cloud cover samples, so they need “Star count &amp; cloud cover” on. Set a sky mask (plate solving) to ignore roads and windows.
+                            Events are listed under Gallery &amp; Events.
+                            <span id="evt-status"></span>
+                        </p>
+                    </fieldset>
+                    <fieldset class="settings-group">
+                        <legend>Cloud Cover</legend>
+                        <div class="field-grid cols2">
+                            <div class="field">
+                                <label for="roi-left">Sky region left (%)</label>
+                                <input type="number" id="roi-left" data-roi="0" min="0" max="95" step="1" value="0" />
+                            </div>
+                            <div class="field">
+                                <label for="roi-top">Sky region top (%)</label>
+                                <input type="number" id="roi-top" data-roi="1" min="0" max="95" step="1" value="0" />
+                            </div>
+                            <div class="field">
+                                <label for="roi-right">Sky region right (%)</label>
+                                <input type="number" id="roi-right" data-roi="2" min="5" max="100" step="1" value="100" />
+                            </div>
+                            <div class="field">
+                                <label for="roi-bottom">Sky region bottom (%)</label>
+                                <input type="number" id="roi-bottom" data-roi="3" min="5" max="100" step="1" value="100" />
+                            </div>
+                        </div>
+                        <p class="field-note">
+                            Only this part of the frame is analysed: exclude buildings, trees and the horizon (e.g. bottom 40% if the lower part shows rooftops).
+                            The clear-sky reference is learned automatically; reset it after moving or re-aiming the camera.
+                            <span id="cloud-ref-note" class="text-muted"></span>
+                        </p>
+                        <button type="button" class="btn btn-sm btn-outline" id="btn-cloud-ref-reset">Reset learned clear-sky reference</button>
+                    </fieldset>
+                    <fieldset class="settings-group field-wide" id="dayobj-group">
+                        <legend>Daytime objects (birds, insects, aircraft)</legend>
+                        <div class="field">
+                            <label class="checkbox-label"><input type="checkbox" id="dayobj-enabled" checked /> Detect daytime objects</label>
+                        </div>
+                        <div class="field">
+                            <span class="field-label">Record these kinds</span>
+                            <div class="dayobj-classes">
+                                <label class="checkbox-label"><input type="checkbox" data-dayobj-class="plane" checked /> Aircraft</label>
+                                <label class="checkbox-label"><input type="checkbox" data-dayobj-class="bird" checked /> Birds</label>
+                                <label class="checkbox-label"><input type="checkbox" data-dayobj-class="insect" checked /> Insects</label>
+                                <label class="checkbox-label"><input type="checkbox" data-dayobj-class="object" checked /> Other objects</label>
+                            </div>
+                        </div>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="dayobj-sensitivity">Sensitivity</label>
+                                <select id="dayobj-sensitivity">
+                                    <option value="low">Low (fewer, surer detections)</option>
+                                    <option value="normal" selected>Normal</option>
+                                    <option value="high">High (more, also fainter ones)</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="dayobj-days">Keep for (days)</label>
+                                <input type="number" id="dayobj-days" min="1" max="90" step="1" value="14" />
+                            </div>
+                            <div class="field">
+                                <label for="dayobj-mb">Max log size (MB)</label>
+                                <input type="number" id="dayobj-mb" min="5" max="500" step="5" value="50" />
+                            </div>
+                        </div>
+                        <details class="params-summary">
+                            <summary>Advanced</summary>
+                            <div class="field-grid cols2">
+                                <div class="field">
+                                    <label for="dayobj-min-area">Smallest object (px)</label>
+                                    <input type="number" id="dayobj-min-area" min="1" max="100" step="1" value="2" />
+                                </div>
+                                <div class="field">
+                                    <label for="dayobj-max-area">Largest object (px)</label>
+                                    <input type="number" id="dayobj-max-area" min="5" max="5000" step="5" value="700" />
+                                </div>
+                                <div class="field">
+                                    <label for="dayobj-contrast">Minimum contrast (levels)</label>
+                                    <input type="number" id="dayobj-contrast" min="3" max="100" step="1" placeholder="from sensitivity" />
+                                </div>
+                            </div>
+                            <p class="field-note">Sizes are in pixels at 640 px frame width. Contrast is how far an object must differ from the sky behind it (0&ndash;255 levels); empty uses the value of the chosen sensitivity.</p>
+                        </details>
+                        <p class="field-note">
+                            By day a small dark or bright dot that moves against the sky is followed across frames and classified from its size, speed and wing-beat flicker.
+                            Rain on the dome pauses recording. The frame interval by day (Image Output) sets what can be caught: insects and fast birds need under a second.
+                            <span id="dayobj-status"></span>
+                        </p>
+                    </fieldset>
+                </div>
+            </div>
+
+            <!-- Station & Camera Settings Card -->
+            <div class="card settings-card" data-sgroup="station">
+                <div class="page-header">
+                    <div class="page-header-text">
+                        <h2>Station &amp; Optics</h2>
+                        <p class="page-sub">Location and lens model used for sky solving, labels and flight overlay.</p>
+                    </div>
+                    <div class="page-header-actions">
+                        <span class="badge badge-accent" id="station-solve-badge">NOT SOLVED YET</span>
+                    </div>
+                </div>
+                <p class="description">
+                    Plate-solving on a starry night measures the lens and mounting parameters and saves them automatically, as does
+                    <strong>Locate via GPS / IP</strong> for the coordinates. Fields you edit by hand are saved as soon as you leave them.
+                </p>
+
+                <div class="settings-grid">
+                    <!-- Station coordinates -->
+                    <fieldset class="settings-group">
+                        <legend>Station Coordinates</legend>
+                        <div class="field-grid cols2">
+                            <div class="field field-wide">
+                                <label for="station-name">Station name</label>
+                                <input type="text" id="station-name" value="My station" />
+                            </div>
+                            <div class="field">
+                                <label for="station-lat">Latitude (°N)</label>
+                                <input type="number" id="station-lat" min="-90" max="90" step="0.00001" value="0" />
+                            </div>
+                            <div class="field">
+                                <label for="station-lon">Longitude (°E)</label>
+                                <input type="number" id="station-lon" min="-180" max="180" step="0.00001" value="0" />
+                            </div>
+                            <div class="field">
+                                <label for="station-elev">Elevation (m)</label>
+                                <input type="number" id="station-elev" min="-500" max="9000" step="1" value="20" />
+                            </div>
+                            <div class="field field-end">
+                                <button id="btn-station-auto-gps" class="btn btn-sm btn-outline" type="button" title="Uses browser GPS if allowed; otherwise your public IP address is sent to a third-party geolocation service (ipwho.is or ipapi.co)">📍 Locate via GPS / IP</button>
+                                <small class="field-note">Without GPS, your public IP address is sent to a geolocation service.</small>
+                            </div>
+                            <div class="field field-wide">
+                                <label for="station-remote-solver">Remote plate solver</label>
+                                <select id="station-remote-solver">
+                                    <option value="https://virtuallab3d.com" selected>Zenivo network — virtuallab3d.com</option>
+                                    <option value="">Off (never upload)</option>
+                                </select>
+                                <small class="field-note">When on, a frame, the station coordinates and the time are sent to this server to solve the plate. Choose Off to send nothing.</small>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <!-- Sensor & lens identity (read-only, reported by the camera) -->
+                    <fieldset class="settings-group">
+                        <legend>Sensor &amp; Lens</legend>
+                        <div class="field-grid kv-grid">
+                            <div class="field">
+                                <label for="st-f-tz">Station timezone</label>
+                                <select id="st-f-tz" class="mono" title="Clock, observing day and file names of this station follow it"></select>
+                                <small id="st-f-tz-note" class="muted"></small>
+                            </div>
+                            <div class="field">
+                                <label for="st-f-sensor">Sensor</label>
+                                <input type="text" id="st-f-sensor" class="mono" readonly />
+                            </div>
+                            <div class="field">
+                                <label for="st-f-pixel">Pixel size (&micro;m)</label>
+                                <input type="text" id="st-f-pixel" class="mono" readonly />
+                            </div>
+                            <div class="field">
+                                <label for="st-f-lens">Lens type</label>
+                                <input type="text" id="st-f-lens" class="mono" readonly />
+                            </div>
+                            <div class="field">
+                                <label for="st-f-circle">Image circle (px)</label>
+                                <input type="text" id="st-f-circle" class="mono" readonly />
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <!-- Lens & optics -->
+                    <fieldset class="settings-group">
+                        <legend>Lens &amp; Optics</legend>
+                        <div class="field-grid cols2">
+                            <div class="field">
+                                <label for="opt-focal">Focal length (mm)</label>
+                                <input type="number" id="opt-focal" min="0.5" max="500" step="0.01" value="1.65" />
+                            </div>
+                            <div class="field">
+                                <label for="opt-fov-d">Diagonal FOV (°)</label>
+                                <input type="number" id="opt-fov-d" min="1" max="260" step="0.1" value="225.0" />
+                            </div>
+                            <div class="field">
+                                <label for="opt-fov-h">Horizontal FOV (°)</label>
+                                <input type="number" id="opt-fov-h" min="1" max="240" step="0.1" value="180.0" />
+                            </div>
+                            <div class="field">
+                                <label for="opt-fov-v">Vertical FOV (°)</label>
+                                <input type="number" id="opt-fov-v" min="1" max="240" step="0.1" value="135.0" />
+                            </div>
+                            <div class="field">
+                                <label for="opt-cx">Optical center X (px)</label>
+                                <input type="number" id="opt-cx" min="0" max="2592" step="0.5" value="1296.0" />
+                            </div>
+                            <div class="field">
+                                <label for="opt-cy">Optical center Y (px)</label>
+                                <input type="number" id="opt-cy" min="0" max="1944" step="0.5" value="972.0" />
+                            </div>
+                            <div class="field">
+                                <label for="opt-r90">Horizon radius R90 (px)</label>
+                                <input type="number" id="opt-r90" min="100" max="2500" step="0.5" value="894.2" />
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <!-- Mount orientation -->
+                    <fieldset class="settings-group">
+                        <legend>Camera Mounting</legend>
+                        <div class="field-grid cols2">
+                            <div class="field">
+                                <label for="ori-npa">North position angle (°)</label>
+                                <input type="number" id="ori-npa" min="0" max="360" step="0.1" value="0.0" />
+                            </div>
+                            <div class="field">
+                                <label for="ori-tilt">Zenith tilt (°)</label>
+                                <input type="number" id="ori-tilt" min="0" max="90" step="0.1" value="0.0" />
+                            </div>
+                            <div class="field">
+                                <label for="ori-az">Azimuth offset (°) <span class="badge badge-accent badge-auto" title="Refined from star matches by plate-solving">AUTO</span></label>
+                                <input type="number" id="ori-az" min="0" max="360" step="0.1" value="180.0" />
+                            </div>
+                        </div>
+                        <p class="field-note">Optical center and angles use native sensor coordinates; the sky overlay applies mirror/flip automatically.</p>
+                    </fieldset>
+                </div>
+
+                <div class="settings-actions">
+                    <button id="btn-station-solve" class="btn btn-primary btn-block" type="button">🔭 Capture &amp; Auto Plate-Solve</button>
+                    <label class="checkbox-label" title="Ignore the saved lens: re-read the sensor and re-measure focal length, distortion and optical centre from a 90 s star-tracking series (clear night). The old values are kept if the solve fails.">
+                        <input type="checkbox" id="chk-station-deep" data-no-autosave> Deep solve (re-measure lens &amp; sensor)
+                    </label>
+                </div>
+
+
+                <div class="solver-card">
+                    <h3>Solver status</h3>
+                    <div class="solver-grid">
+                        <div class="telem-box"><span class="telem-label">Last solve</span><span class="telem-value mono" id="st-solve-last">--</span></div>
+                        <div class="telem-box"><span class="telem-label">Matched stars</span><span class="telem-value mono" id="st-solve-stars">--</span></div>
+                        <div class="telem-box"><span class="telem-label">Source</span><span class="telem-value mono" id="st-solve-source">--</span></div>
+                    </div>
+                </div>
+
+                <div id="station-alert" class="alert-box hidden mt-3"></div>
+
+
+                <details class="params-summary">
+                    <summary>Camera, lens &amp; station parameter summary</summary>
+                    <div class="params-grid">
+                        <div class="telem-box"><span class="telem-label">Sensor &amp; resolution</span><span class="telem-value" id="st-sensor">Sony Starvis IMX335 (2592&times;1944, 2.0&mu;m)</span></div>
+                        <div class="telem-box"><span class="telem-label">Lens &amp; focal length</span><span class="telem-value text-accent" id="st-focal">1.65 mm (Fisheye AllSky)</span></div>
+                        <div class="telem-box"><span class="telem-label">Pixel scale</span><span class="telem-value" id="st-pixscale">250.00 arcsec/px</span></div>
+                        <div class="telem-box"><span class="telem-label">FOV horizontal &times; vertical</span><span class="telem-value" id="st-fov-hv">180.0&deg; &times; 135.0&deg;</span></div>
+                        <div class="telem-box"><span class="telem-label">Diagonal FOV</span><span class="telem-value text-accent" id="st-fov-diag">225.0&deg;</span></div>
+                        <div class="telem-box"><span class="telem-label">Optical center</span><span class="telem-value" id="st-opt-center">(1296.0, 972.0) px</span></div>
+                        <div class="telem-box"><span class="telem-label">Sensor center offset &amp; R90</span><span class="telem-value" id="st-center-offset">&Delta;(0.0, 0.0) px &bull; R90=894 px</span></div>
+                        <div class="telem-box"><span class="telem-label">Station coordinates</span><span class="telem-value" id="st-coords">--</span></div>
+                        <div class="telem-box"><span class="telem-label">Field center (RA / Dec J2000)</span><span class="telem-value text-accent" id="st-radec">--</span></div>
+                        <div class="telem-box"><span class="telem-label">Azimuth &amp; Alt</span><span class="telem-value" id="st-az-alt">Az 180.0&deg; (S) &bull; Alt 90.0&deg;</span></div>
+                        <div class="telem-box"><span class="telem-label">Zenith tilt</span><span class="telem-value text-accent" id="st-tilt">0.00&deg;</span></div>
+                        <div class="telem-box"><span class="telem-label">North position angle</span><span class="telem-value" id="st-north-pa">0.00&deg;</span></div>
+                        <div class="telem-box"><span class="telem-label">WCS matrix (CD)</span><span class="telem-value" id="st-cd-matrix">[-6.94e-02, 0, 0, -6.94e-02]</span></div>
+                        <div class="telem-box"><span class="telem-label">Solve source &amp; constellations</span><span class="telem-value" id="st-solver-meta">Not plate-solved yet</span></div>
+                    </div>
+                </details>
+            </div>
+
+            <!-- Sky Mask Card -->
+            <div class="card settings-card" data-sgroup="skymask">
+                <div class="card-header">
+                    <h2>Sky Mask</h2>
+                </div>
+                <details class="params-summary" id="sky-mask-editor" open>
+                    <summary>Plate-solve sky mask (outline the open sky)</summary>
+                    <div class="mask-canvas-wrap">
+                        <img id="mask-img" alt="Live frame for drawing the sky mask">
+                        <canvas id="mask-canvas"></canvas>
+                    </div>
+                    <div class="settings-actions tool-chips">
+                        <button id="mask-auto" class="btn btn-sm btn-outline" type="button" title="Detect the open sky from the current frame, then edit it">✨ Auto-detect</button>
+                        <button id="mask-new-sky" class="btn btn-sm btn-outline" type="button">＋ Sky polygon</button>
+                        <button id="mask-new-obs" class="btn btn-sm btn-outline" type="button">＋ Obstruction</button>
+                        <button id="mask-undo" class="btn btn-sm btn-outline" type="button">↶ Undo point</button>
+                        <button id="mask-clear" class="btn btn-sm btn-outline" type="button">🗑 Clear all</button>
+                    </div>
+                    <div class="settings-actions apply-row">
+                        <button id="mask-save" class="btn btn-primary btn-block" type="button">✔ Apply mask</button>
+                    </div>
+                    <p class="field-note">Press Auto-detect to propose the mask from the current frame (best at night),
+                        or click on the frame to outline open sky (green) and lit buildings, trees or
+                        poles to ignore (red). Nothing is stored until you press Apply, so you can fix the proposal first. The plate solver only uses stars inside the sky and outside obstructions,
+                        on top of its own automatic sky detection.</p>
+                    <div id="mask-alert" class="alert-box hidden mt-3"></div>
+                </details>
+                <details class="params-summary" id="star-align" open>
+                    <summary>Align by stars (when the automatic solve is wrong)</summary>
+                    <div class="mask-canvas-wrap">
+                        <img id="align-img" alt="Live frame for picking stars">
+                        <canvas id="align-canvas"></canvas>
+                    </div>
+                    <div class="settings-actions tool-chips">
+                        <button id="align-refresh" class="btn btn-sm btn-outline" type="button">⟳ New frame</button>
+                        <button id="align-undo" class="btn btn-sm btn-outline" type="button">↶ Undo star</button>
+                        <button id="align-clear" class="btn btn-sm btn-outline" type="button">🗑 Clear</button>
+                        <button id="align-identify" class="btn btn-sm btn-outline" type="button">🔍 Identify</button>
+                    </div>
+                    <div class="settings-actions apply-row">
+                        <button id="align-apply" class="btn btn-primary btn-block" type="button" disabled>✔ Apply</button>
+                    </div>
+                    <p class="field-note">Click 4 or more stars you can really see on the open sky (inside the green
+                        outline), spread over the frame, brightest first. The solver identifies them from their mutual
+                        angles, shows the result, and only stores it when you press Apply.</p>
+                    <div id="align-alert" class="alert-box hidden mt-3"></div>
+                </details>
+            </div>
+
+            <!-- Integrations Card -->
+            <div class="card settings-card" id="data-sources-card" data-sgroup="integrations" data-admin>
+                <div class="card-header">
+                    <h2>Data sources</h2>
+                    <button type="button" class="btn btn-sm btn-outline" id="data-sources-refresh" data-no-autosave title="Check every source again">&#8635; Refresh</button>
+                </div>
+                <p class="description">Everything this station fetches from outside, and whether it works now. Each source can be switched off below; nothing is sent to a source that is off.</p>
+                <div id="data-sources-list" class="data-sources" aria-live="polite"><span class="field-note">Loading…</span></div>
+            </div>
+
+            <div class="card settings-card" id="integrations-card" data-sgroup="integrations">
+                <div class="card-header">
+                    <h2>Integrations</h2>
+                </div>
+                <div class="settings-grid">
+                    <fieldset class="settings-group">
+                        <legend>1. Your receiver (primary)</legend>
+                        <div class="field-grid adsb-grid">
+                            <div class="field">
+                                <label for="adsb-host">ADS-B receiver (SBS-1 feed)</label>
+                                <input type="text" id="adsb-host" placeholder="e.g. 192.168.1.50" maxlength="253" />
+                            </div>
+                            <div class="field">
+                                <label for="adsb-port">Port</label>
+                                <input type="number" id="adsb-port" min="1" max="65535" value="30003" />
+                            </div>
+                            <div class="field">
+                                <label class="checkbox-label"><input type="checkbox" id="adsb-enabled" /> Name the flight</label>
+                            </div>
+                        </div>
+                        <p class="field-note">
+                            With a local ADS-B receiver (dump1090, readsb or a Flightradar24 feeder: BaseStation port 30003), each aircraft event is matched
+                            to the flight whose position, projected with the star-solved camera pointing, lies on the streak. A “meteor” that matches a flight becomes an aircraft.
+                            The feed is only read at night while aircraft detection is on.
+                            <span id="adsb-status"></span>
+                        </p>
+                        <div class="field" data-admin>
+                            <label class="checkbox-label"><input type="checkbox" id="adsb-contribute" /> Share what my receiver hears with the Zenivo network</label>
+                        </div>
+                        <p class="field-note" data-admin>
+                            Off by default. When on, this station sends the aircraft positions your receiver decoded (public broadcast data) to
+                            <span id="adsb-network-host">the Zenivo network server (the origin of your remote solver URL; nothing is sent while that is empty)</span>,
+                            signed with this station's key, every 5 s while your receiver delivers. The server sees this station's IP address and can estimate
+                            where your receiver is from what it hears. Data from adsb.fi, adsb.lol or Flightradar24 is never forwarded.
+                            <span id="adsb-contribute-status" aria-live="polite"></span>
+                        </p>
+                    </fieldset>
+                    <fieldset class="settings-group" data-admin>
+                        <legend>2. Public network (fallback)</legend>
+                        <div class="field">
+                            <label class="checkbox-label"><input type="checkbox" id="adsb-public-fallback" /> Use a public ADS-B network when my receiver is not delivering</label>
+                        </div>
+                        <p class="field-note">
+                            Off by default. Used only while your receiver is missing, not connected, or silent for more than 90 s; polling stops as soon as it is back.
+                            When on, this station sends its position rounded to 0.5 degree (about 55 km), in this order: to the Zenivo network (only if a remote solver URL is set), then to
+                            <a href="https://adsb.fi" target="_blank" rel="noopener">adsb.fi</a>, and to
+                            <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a>; the next one is used when one fails or returns no aircraft for 2 minutes. The data is for personal, non-commercial use.
+                        </p>
+                        <p class="field-note" id="adsb-source-status" aria-live="polite"></p>
+                    </fieldset>
+                    <fieldset class="settings-group fr24-block" data-admin>
+                        <legend>3. Flightradar24 (optional, your own account)</legend>
+                        <div class="field">
+                            <label class="checkbox-label"><input type="checkbox" id="fr24-enabled" /> Use Flightradar24</label>
+                        </div>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="fr24-email">Account e-mail (optional)</label>
+                                <input type="email" id="fr24-email" name="fr24-account" maxlength="254" autocomplete="off" data-no-autosave spellcheck="false" />
+                            </div>
+                            <div class="field">
+                                <label for="fr24-password">Account password (optional)</label>
+                                <input type="password" id="fr24-password" maxlength="254" autocomplete="new-password" data-no-autosave placeholder="Not shown once sent" />
+                            </div>
+                            <div class="field field-wide">
+                                <label for="fr24-token">Subscription token (optional)</label>
+                                <div class="fr24-token-row">
+                                    <input type="password" id="fr24-token" maxlength="1024" autocomplete="new-password" data-no-autosave spellcheck="false" />
+                                    <span class="text-muted" id="fr24-token-state"></span>
+                                    <button type="button" class="btn btn-sm btn-outline" id="btn-fr24-signin">Send to Flightradar24</button>
+                                    <button type="button" class="btn btn-sm btn-outline" id="btn-fr24-clear-token" hidden>Clear token</button>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="field-note" id="fr24-status" aria-live="polite"></p>
+                        <p class="field-note">
+                            Off by default. When on, this station asks flightradar24.com for the aircraft positions around it; without credentials the public feed is used.
+                            Credentials are stored on this station only (token and e-mail in data/station_config.json, the password in memory only, never shown again).
+                        </p>
+                        <p class="field-note">
+                            This uses Flightradar24's web endpoints, which are not an official public API. You are responsible for using it within Flightradar24's terms; a subscription token is the supported way for account holders.
+                        </p>
+                    </fieldset>
+                    <fieldset class="settings-group sondes-block" data-admin>
+                        <legend>Weather balloons (SondeHub)</legend>
+                        <div class="field">
+                            <label class="checkbox-label"><input type="checkbox" id="sondes-enabled" checked /> Show radiosondes on the Live page</label>
+                        </div>
+                        <p class="field-note">
+                            When on, the station asks api.v2.sondehub.org for the weather balloons within 350 km, about every 20 s while a Live page is open.
+                            The position sent is rounded to 0.5° (about 55 km); the exact location never leaves this station.
+                        </p>
+                    </fieldset>
+                    <fieldset class="settings-group hs-fieldset" id="wx-block" data-admin data-hs-title="Weather &amp; forecast" data-hs-switch="wx-enabled">
+                        <legend>Weather and forecast</legend>
+                        <div class="field">
+                            <label class="checkbox-label"><input type="checkbox" id="wx-enabled" /> Show the weather and 48 h forecast around the station</label>
+                        </div>
+                        <div class="field">
+                            <label for="wx-refresh">Refresh</label>
+                            <select id="wx-refresh">
+                                <option value="15">every 15 min</option><option value="30">every 30 min</option>
+                                <option value="60">every hour</option><option value="180">every 3 hours</option>
+                            </select>
+                        </div>
+                        <div id="wx-now" class="wx-now" aria-live="polite"></div>
+                        <div class="field">
+                            <button type="button" class="btn btn-sm btn-outline btn-block" id="wx-refresh-now" data-no-autosave>&#8635; Update now</button>
+                        </div>
+                        <div id="wx-hours" class="wx-hours" aria-label="Next hours"></div>
+                        <p class="field-note">
+                            Off by default. When on, the station asks api.open-meteo.com (free, no account) for the weather at its position, rounded to 0.1° (about 11 km);
+                            no name, address or picture is sent. Same data at <code>GET /api/weather</code>.
+                        </p>
+                    </fieldset>
+                    <fieldset class="settings-group sat-block" id="sat-block" data-admin>
+                        <legend>Satellites (orbits)</legend>
+                        <div class="field">
+                            <label class="checkbox-label"><input type="checkbox" id="sat-enabled" checked /> Show satellites on the Live and Sky pages</label>
+                        </div>
+                        <div class="field">
+                            <label for="sat-source">Orbit source</label>
+                            <select id="sat-source">
+                                <option value="celestrak">CelesTrak (choose groups)</option>
+                                <option value="satnogs">SatNOGS DB (community catalogue, about 1700 satellites)</option>
+                            </select>
+                            <p class="field-note">SatNOGS (db.satnogs.org) is an open, volunteer-run satellite database. It serves one file with every satellite, about 250 KB per download, so the groups below do not apply. Only the request itself is sent, never your position.</p>
+                        </div>
+                        <div class="field" id="sat-groups-field">
+                            <label>Groups to track</label>
+                            <div class="sat-groups" id="sat-groups">
+                                <label class="checkbox-label"><input type="checkbox" data-sat-group="stations" /> Space stations (ISS, Tiangong)</label>
+                                <label class="checkbox-label"><input type="checkbox" data-sat-group="visual" /> Brightest, naked-eye</label>
+                                <label class="checkbox-label"><input type="checkbox" data-sat-group="weather" /> Weather</label>
+                                <label class="checkbox-label"><input type="checkbox" data-sat-group="noaa" /> NOAA</label>
+                                <label class="checkbox-label"><input type="checkbox" data-sat-group="gps-ops" /> GPS</label>
+                                <label class="checkbox-label"><input type="checkbox" data-sat-group="galileo" /> Galileo</label>
+                                <label class="checkbox-label"><input type="checkbox" data-sat-group="science" /> Science</label>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="sat-refresh">Download orbits every</label>
+                            <select id="sat-refresh">
+                                <option value="6">6 hours</option>
+                                <option value="12">12 hours</option>
+                                <option value="24">24 hours</option>
+                                <option value="72">3 days</option>
+                                <option value="168">7 days</option>
+                            </select>
+                        </div>
+                        <details class="params-summary">
+                            <summary>Advanced: another orbit source</summary>
+                            <div class="field">
+                                <label for="sat-url">TLE address (https, with {group})</label>
+                                <input type="text" id="sat-url" maxlength="300" spellcheck="false" placeholder="https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=tle" />
+                            </div>
+                            <p class="field-note">Leave empty for CelesTrak. The address must be public (https) and return three-line TLE sets for the group named by <code>{group}</code>.</p>
+                        </details>
+                        <div class="settings-actions">
+                            <button type="button" class="btn btn-sm btn-outline" id="sat-refresh-now" data-no-autosave>&#8595; Download now</button>
+                        </div>
+                        <p class="field-note" id="sat-status" aria-live="polite"></p>
+                        <p class="field-note">
+                            When on, the station asks celestrak.org for orbit data (no position is sent). Satellites are computed locally; a long list slows the live view on a small host, so keep only the groups you want to see.
+                        </p>
+                    </fieldset>
+                </div>
+            </div>
+
+            <!-- Community Card: opt-in station sharing (docs/COMMUNITY.md) -->
+            <div class="card settings-card" id="community-card" data-sgroup="community">
+                <div class="card-header">
+                    <h2>Community</h2>
+                    <a class="btn btn-sm btn-outline" href="/community">Open community map</a>
+                </div>
+                <div class="settings-grid">
+                    <fieldset class="settings-group">
+                        <legend>Share this station</legend>
+                        <div class="field">
+                            <label class="checkbox-label"><input type="checkbox" id="community-enabled" /> Share this station with the community</label>
+                        </div>
+                        <p class="field-note">
+                            Shares the station name, an approximate location and, if enabled, a small preview image with other Zenivo stations. Anyone can see it.
+                            It is off until you turn it on. The location is rounded as set under Admin &rarr; Public location precision.
+                        </p>
+                        <div class="field-grid cm-ident">
+                            <div class="field">
+                                <label for="community-name">Station name</label>
+                                <input type="text" id="community-name" maxlength="60" placeholder="Defaults to the station location name" />
+                            </div>
+                            <div class="field">
+                                <label for="community-url">Public URL (optional, https)</label>
+                                <input type="url" id="community-url" maxlength="200" placeholder="https://sky.example.org" />
+                            </div>
+                        </div>
+                        <div class="cm-options">
+                            <label class="checkbox-label"><input type="checkbox" id="community-thumb" checked /> Share a preview image</label>
+                            <label class="checkbox-label"><input type="checkbox" id="community-preview" checked /> Let visitors enlarge the preview (up to 1280 px)</label>
+                            <label class="checkbox-label"><input type="checkbox" id="community-open" checked /> Let the map link to this station's page</label>
+                            <p class="field-note cm-url-hint" id="community-url-hint" hidden></p>
+                            <p class="field-note">The last two need a public URL. Turning the link off only removes it from the community map; whoever knows the address can still open the station, as before.</p>
+                            <label class="checkbox-label"><input type="checkbox" id="community-relay" checked /> Relay previews for stations without a public address</label>
+                            <p class="field-note">On by default; turn it off here if you do not want it. This station then stores and serves large preview images sent by other stations (re-encoded JPEG, at most 1280 px, up to 100 stations and 25 MB, kept 24 hours) so they can be seen without those stations opening their network. Turning it off deletes everything held and refuses new uploads.</p>
+                            <label class="checkbox-label"><input type="checkbox" id="community-chat" /> Chat with other stations</label>
+                            <p class="field-note" id="community-chat-note">On by default while sharing is on (it does nothing while sharing is off). Messages pass through hub stations (stations with chat on and a public address): public-room messages are readable by anyone, private messages are end-to-end encrypted, but hubs can see who talks to whom and when. Turning it off stops all chat traffic and deletes what this station held for others; your own conversation history stays. The chat is on the Community page.</p>
+                        </div>
+                        <div class="field">
+                            <label for="community-seeds">Seed stations (one URL per line)</label>
+                            <textarea id="community-seeds" rows="3" maxlength="2000" spellcheck="false" placeholder="https://sky.example.org"></textarea>
+                            <p class="field-note">Stations asked first in every round. The built-in ones are listed here and can be removed; with an empty list this station only talks to stations it already knows. <button type="button" class="btn btn-sm btn-outline" id="btn-community-seeds-default">Restore built-in</button></p>
+                        </div>
+                        <p class="field-note" id="community-status" aria-live="polite">Loading&hellip;</p>
+                        <div class="cm-health" id="community-health" hidden>
+                            <div class="cm-health-head">
+                                <span class="cm-net" id="community-net" data-state="off">Network</span>
+                                <button type="button" class="btn btn-sm btn-outline" id="btn-community-check">Check now</button>
+                            </div>
+                            <p class="field-note" id="community-net-note"></p>
+                            <p class="field-note" id="community-chat-stats" hidden></p>
+                            <ul class="cm-targets" id="community-targets" aria-label="Stations contacted in the last round"></ul>
+                        </div>
+                    </fieldset>
+                </div>
+            </div>
+
+            <!-- Admin Card: password and what guests see (docs/SECURITY.md) -->
+            <div class="card settings-card" id="admin-card" data-sgroup="admin">
+                <div class="card-header">
+                    <h2>Admin</h2>
+                </div>
+                <div class="settings-grid">
+                    <fieldset class="settings-group adm-sys" id="admin-system">
+                        <legend>System</legend>
+                        <div class="adm-tiles" role="group" aria-label="Host load">
+                            <div class="adm-tile" data-k="cpu"><span>CPU</span><b>--</b><i class="adm-bar"><u></u></i></div>
+                            <div class="adm-tile" data-k="ram"><span>RAM</span><b>--</b><i class="adm-bar"><u></u></i><small></small></div>
+                            <div class="adm-tile" data-k="disk"><span>Disk</span><b>--</b><i class="adm-bar"><u></u></i><small></small></div>
+                            <div class="adm-tile" data-k="temp"><span>Temp</span><b>--</b><i class="adm-bar"><u></u></i></div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="settings-group">
+                        <legend>Public location precision</legend>
+                        <p class="field-note">Visitors who are not signed in, and the community card, see the station location rounded to this grid. You always see the exact location.</p>
+                        <div class="field">
+                            <label for="admin-precision">Rounded to</label>
+                            <select id="admin-precision">
+                                <option value="0">Exact (no rounding)</option>
+                                <option value="0.01">About 1 km (0.01&deg;)</option>
+                                <option value="0.1" selected>About 10 km (0.1&deg;)</option>
+                                <option value="1">About 100 km (1&deg;)</option>
+                            </select>
+                        </div>
+                    </fieldset>
+                    <fieldset class="settings-group" id="restart-box">
+                        <legend>Service</legend>
+                        <a class="link-row" href="/logs"><span class="link-tx"><b>Activity log</b><small>Errors and events</small></span><span class="ds-chev" aria-hidden="true"></span></a>
+                        <div class="field">
+                            <button type="button" class="btn btn-sm btn-outline" id="btn-restart">Restart Zenivo</button>
+                        </div>
+                        <p class="field-note">Restarts the program (about 30 seconds offline), e.g. when the camera returns black pictures or stops answering. Capture, auto exposure and the sky mask pick up where they were.</p>
+                        <p class="field-note" id="restart-status" aria-live="polite"></p>
+                    </fieldset>
+                    <fieldset class="settings-group" id="update-box">
+                        <legend>Software update</legend>
+                        <div class="kv-row"><span>Version</span><span class="field-note" id="upd-line">Checking&hellip;</span></div>
+                        <label class="toggle-row" for="upd-auto">
+                            <span class="toggle-text"><span class="toggle-title">Check for updates automatically</span><span class="toggle-hint">Once a day, from GitHub; nothing about this station is sent</span></span>
+                            <input type="checkbox" id="upd-auto" class="switch" checked />
+                        </label>
+                        <div class="field btn-pair">
+                            <button type="button" class="btn btn-sm btn-outline" id="upd-check">Check now</button>
+                            <button type="button" class="btn btn-sm btn-primary" id="upd-apply" hidden>Update now</button>
+                        </div>
+                        <div class="field"><button type="button" class="btn btn-sm btn-outline btn-textlink" id="upd-rollback" hidden>Go back to the previous version</button></div>
+                        <p class="field-note" id="upd-notes" hidden></p>
+                        <p class="field-note" id="upd-status" aria-live="polite"></p>
+                    </fieldset>
+                    <fieldset class="settings-group">
+                        <legend>Password and sessions</legend>
+                        <form id="admin-password-form" autocomplete="on">
+                            <input type="text" name="username" value="admin" autocomplete="username" hidden readonly aria-hidden="true" tabindex="-1">
+                            <div class="field-grid stack-grid">
+                                <div class="field">
+                                    <label for="admin-current">Current password</label>
+                                    <input type="password" id="admin-current" autocomplete="current-password" maxlength="256" />
+                                </div>
+                                <div class="field">
+                                    <label for="admin-new">New password (10 characters or more)</label>
+                                    <input type="password" id="admin-new" autocomplete="new-password" maxlength="256" />
+                                </div>
+                            </div>
+                            <div class="field btn-pair">
+                                <button type="submit" class="btn btn-sm btn-primary" id="btn-admin-password">Change password</button>
+                                <button type="button" class="btn btn-sm btn-outline btn-danger-text" id="btn-admin-logout-all">Sign out everywhere</button>
+                            </div>
+                        </form>
+                        <p class="field-note">Changing the password signs out every other browser. Forgot it? On the station run <code>python3 run_allsky.py --reset-admin</code>.</p>
+                        <p class="field-note" id="admin-status" aria-live="polite"></p>
+                    </fieldset>
+                </div>
+            </div>
+        </section>
+

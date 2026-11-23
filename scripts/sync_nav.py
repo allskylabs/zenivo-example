@@ -12,6 +12,8 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 WEB = os.path.join(os.path.dirname(__file__), "..", "src", "web")
 PAGES = {"index.html": None, "sky.html": "/sky", "overhead.html": "/overhead", "flights3d.html": "/flights3d", "satellites3d.html": "/satellites3d",
          "community.html": "/community", "login.html": "/login"}
@@ -233,13 +235,17 @@ def patch_page(name, text, current, is_index):
 def main() -> int:
     stale = []
     for name, cur in PAGES.items():
-        path = os.path.join(WEB, name)
+        # index.html is generated (scripts/build_index.py): its shared chrome lives in pages/00-shell.html
+        path = os.path.join(WEB, "pages/00-shell.html" if name == "index.html" else name)
         old = open(path, encoding="utf-8").read()
         new = patch_page(name, old, cur, cur is None)
         if new != old:
             stale.append(name)
             if "--check" not in sys.argv:
                 open(path, "w", encoding="utf-8").write(new)
+    if "--check" not in sys.argv:
+        import build_index
+        build_index.main()
     print(("stale: " if "--check" in sys.argv else "updated: ") + (", ".join(stale) or "none"))
     return 1 if stale and "--check" in sys.argv else 0
 

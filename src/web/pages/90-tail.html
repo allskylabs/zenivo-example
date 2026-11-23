@@ -1,0 +1,84 @@
+    </main>
+    </div><!-- /app-main -->
+    </div><!-- /app-shell -->
+    <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <span>Zenivo · all-sky observatory edge station</span>
+        <span>Platform Synchronization</span>
+    </footer>
+
+    <!-- App JavaScript -->
+    <!-- Layers sheet: switches drive the same checkboxes the old chips did (hidden below, ids unchanged), see app/08d-live-ui.js -->
+    <div class="zsheet-backdrop" id="layers-backdrop" hidden></div>
+    <div class="zsheet" id="layers-sheet" role="dialog" aria-modal="true" aria-labelledby="layers-title" hidden>
+        <div class="m-sheet-grip" aria-hidden="true"></div>
+        <div class="zsheet-head"><h2 id="layers-title">Layers</h2><button type="button" class="zsheet-done" id="layers-done">Done</button></div>
+        <h3 class="m-sheet-title">Sky</h3>
+        <div class="lay-row"><div class="lay-txt"><b>Stars</b></div><button type="button" class="sw" role="switch" aria-checked="false" data-chk="chk-sky-overlay" aria-label="Stars"><i></i></button></div>
+        <div class="lay-row"><div class="lay-txt"><b>Names &amp; constellations</b></div><button type="button" class="sw" role="switch" aria-checked="false" data-chk="chk-sky-labels" aria-label="Names and constellations"><i></i></button></div>
+        <div class="lay-row"><div class="lay-txt"><b>Alt/Az grid</b></div><button type="button" class="sw" role="switch" aria-checked="false" data-chk="chk-grid-overlay" aria-label="Alt/Az grid"><i></i></button></div>
+        <div class="lay-row"><div class="lay-txt"><b>RA/Dec grid</b></div><button type="button" class="sw" role="switch" aria-checked="false" data-chk="chk-eq-grid" aria-label="RA/Dec grid"><i></i></button></div>
+        <h3 class="m-sheet-title">Objects</h3>
+        <div class="lay-row"><div class="lay-txt"><b>Aircraft</b><small id="lay-sub-aircraft">--</small></div><button type="button" class="sw" role="switch" aria-checked="false" data-chk="chk-aircraft-overlay" aria-label="Aircraft"><i></i></button></div>
+        <div class="lay-row"><div class="lay-txt"><b>Satellites</b><small id="lay-sub-satellites">--</small></div><button type="button" class="sw" role="switch" aria-checked="false" data-chk="chk-satellite-overlay" aria-label="Satellites"><i></i></button></div>
+        <div class="lay-row"><div class="lay-txt"><b>Radiosondes</b><small id="lay-sub-sondes">--</small></div><button type="button" class="sw" role="switch" aria-checked="false" data-chk="chk-sonde-overlay" aria-label="Radiosondes"><i></i></button></div>
+        <div class="lay-row"><div class="lay-txt"><b>Airports</b><small>ICAO markers near the horizon</small></div><button type="button" class="sw" role="switch" aria-checked="false" data-chk="chk-airports-overlay" aria-label="Airports"><i></i></button></div>
+        <h3 class="m-sheet-title">Picture</h3>
+        <div class="lay-row"><div class="lay-txt"><b>Overlay text</b><small>time, exposure and sidereal time on the picture</small></div><button type="button" class="sw" role="switch" aria-checked="true" data-chk="chk-overlay-text" aria-label="Overlay text"><i></i></button></div>
+        <p class="lay-note">The lists stay live even when a layer is hidden.</p>
+        <div hidden>
+            <input type="checkbox" id="chk-sky-overlay"><input type="checkbox" id="chk-sky-labels"><input type="checkbox" id="chk-grid-overlay"><input type="checkbox" id="chk-eq-grid">
+            <input type="checkbox" id="chk-aircraft-overlay"><input type="checkbox" id="chk-sonde-overlay"><input type="checkbox" id="chk-satellite-overlay"><input type="checkbox" id="chk-airports-overlay"><input type="checkbox" id="chk-overlay-text" checked>
+        </div>
+    </div>
+
+    <script src="/static/sky_catalog.js"></script>
+    <script src="/static/activity.js?v=20261122b"></script>
+    <script src="/static/focus/core.js?v=20261115a"></script>
+    <script src="/static/focus/state.js?v=20261125b"></script>
+    <script src="/static/focus/curve.js?v=20261115a"></script>
+    <script src="/static/focus/charts.js?v=20261115a"></script>
+    <script src="/static/focus/controls.js?v=20261125a"></script>
+    <script src="/static/focus/lens.js?v=20261125a"></script>
+    <script src="/static/overlay_decode.js?v=1"></script>
+    <script defer src="/static/zoom_pan.js?v=20261126a"></script>
+    <script defer src="/static/app/01-core.js?v=20261124c"></script>
+    <script defer src="/static/app/02-controls-calibration.js?v=20261128a"></script>
+    <script defer src="/static/app/03-station-settings.js?v=20261124c"></script>
+    <script defer src="/static/app/04-live-view.js?v=20261123g"></script>
+    <script defer src="/static/app/05-sky-overlay.js?v=20261115a"></script>
+    <script defer src="/static/app/05b-sky-reticle.js?v=20261125a"></script>
+    <script defer src="/static/app/05c-aircraft-overlay.js?v=20261124b"></script>
+    <script defer src="/static/app/06-telemetry.js?v=20261127a"></script>
+    <script defer src="/static/app/07-cloud.js?v=20261126a"></script>
+    <script defer src="/static/app/08-gallery-adsb.js?v=20261126a"></script>
+    <script defer src="/static/app/08b-events-live.js?v=20261126a"></script>
+    <script defer src="/static/app/08c-adsb-settings.js?v=20261117a"></script>
+    <script defer src="/static/app/08d-live-ui.js?v=20261124c"></script>
+    <script defer src="/static/app/09-community.js?v=20261114b"></script>
+    <script defer src="/static/app/10-admin.js?v=20261124b"></script>
+    <script defer src="/static/settings_home.js?v=1"></script>
+    <script defer src="/static/settings_layout.js?v=1"></script>
+    <script>
+    // Settings sub-navigation: one section at a time, driven by the URL hash (/settings#detection)
+    (function () {
+        var sec = document.getElementById("tab-settings");
+        var subs = ["home", "image", "detection", "station", "skymask", "integrations", "community", "admin"];
+        function apply() {
+            var h = (location.hash || "").replace("#", "");
+            var sub = subs.indexOf(h) > 0 ? h : (window.matchMedia("(max-width: 768px)").matches && location.pathname === "/settings" ? "home" : "image");
+            sec.setAttribute("data-sub", sub);
+            document.querySelectorAll("#settings-subnav .side-sub, .mobile-subnav a").forEach(function (a) {
+                a.classList.toggle("active", a.getAttribute("data-sub") === sub && location.pathname === "/settings");
+            });
+            if (sub === "skymask") window.dispatchEvent(new Event("resize"));
+        }
+        window.addEventListener("hashchange", apply);
+        window.addEventListener("resize", function () { if (!location.hash) apply(); });
+        apply();
+    })();
+    </script>
+</body>
+</html>
