@@ -189,3 +189,10 @@ Rule: icon + SHORT visible label wherever meaning, status or a value matters; to
 - Sky toolbar: Layers / Planets / 3D / Now captions on desktop (`sky.html` `data-cap`, `css/sky.css`).
 - Overhead page tabs and Events/Archive segments already carried names (checked).
 Screenshots: `critique/live-text-restored-1568.png`, `live-text-restored-390.jpg`, `sky-captions-1568.jpg`.
+
+## Update 9: full width, By-day placeholders, toast
+
+- **Full width (desktop):** `--content-max` is now `none` (`css/ds-tokens.css:76`); `.container`, Live, Archive, Overhead, Community and Logs fill the viewport with 24-32 px padding (`css/shell.css` >=1024). Grids use `auto-fill minmax()` (`css/archive.css`). `.oh` got `width:100%` (`css/overhead.css:3`). Settings detail pane stays 960 px left-aligned (`css/settings-admin.css`). Checked at 1568 (Live, Sky, Overhead, Community, Logs, Settings, Gallery); the browser viewport caps near 1600, so 2000+ is by the same rules, not eyeballed.
+- **Empty "Mon, Nov 23" tiles:** cause = the night had events but no products yet (timelapse/keogram/startrails build ~05:48 next morning), and `renderDays` padded to 3 blank tiles. Now one row with a clock icon and "Products build after the night ends" (or image-off "No products for this night" for old days); partly missing products get labelled icon tiles; unloaded thumbs show a shimmer skeleton; a failed load shows image-off + "Could not load" (`app/08-gallery-adsb.js` renderDays + listeners, `css/archive.css`).
+- **Toast:** top-right under the topbar, max 380 px, title + one-line summary, raw text behind a chevron, close button, errors sticky, info auto-dismiss 5 s, dedupe, max 4, big numbers grouped (`js/ds.js` toast/splitMsg/fmtNums, `css/ds-components.css`).
+- Screenshots: `critique/g-after-byday-toast.jpg`, `g-after-overhead-full.jpg`, `g-after-logs-full.jpg`.

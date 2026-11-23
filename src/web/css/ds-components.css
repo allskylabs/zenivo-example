@@ -231,38 +231,52 @@ a.ds-row:hover, button.ds-row:hover { background: var(--c-surface-2); }
 @keyframes ds-sheet-fade { from { opacity: 0; } to { opacity: 1; } }
 
 /* ---------- Toast ---------- */
+/* top-right under the topbar, never over the centre; errors stay until closed */
 .ds-toasts {
     position: fixed;
-    left: var(--s-4);
-    right: var(--s-4);
-    bottom: calc(var(--tabbar-h) + var(--s-4) + env(safe-area-inset-bottom, 0px));
+    top: calc(var(--topbar-h) + var(--s-3));
+    right: var(--s-3);
+    width: min(380px, calc(100vw - 2 * var(--s-3)));
     z-index: var(--z-toast);
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     gap: var(--s-2);
     pointer-events: none;
 }
 .ds-toast {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--s-3);
-    max-width: 420px;
-    padding: var(--s-3) var(--s-4);
+    padding: var(--s-2) var(--s-2) var(--s-2) var(--s-3);
     border: 1px solid var(--c-border);
+    border-inline-start: 3px solid var(--c-info);
     border-radius: var(--r-md);
     background: var(--c-surface-3);
     color: var(--c-text);
-    font: 600 var(--fs-14) / var(--lh-tight) var(--font-ui);
+    font: 500 var(--fs-14) / var(--lh-tight) var(--font-ui);
     box-shadow: var(--shadow-2);
     pointer-events: auto;
     animation: ds-sheet-up var(--dur) var(--ease);
 }
+.ds-toast > .ds-icon { flex: none; margin-top: 2px; }
+.ds-toast__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ds-toast__title { font-weight: 600; }
+.ds-toast__sum { color: var(--c-text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-toast.is-open .ds-toast__sum { white-space: normal; }
+.ds-toast__raw { margin: var(--s-1) 0 0; max-height: 40vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 var(--fs-12) / 1.4 var(--font-mono); color: var(--c-text-2); }
+.ds-toast__acts { flex: none; display: flex; }
+.ds-toast__btn { display: inline-flex; align-items: center; justify-content: center; width: var(--tap); height: var(--tap); margin: calc(-1 * var(--s-2)) 0; border: 0; background: transparent; color: var(--c-text-2); border-radius: var(--r-md); cursor: pointer; }
+.ds-toast__btn:hover { color: var(--c-text); background: var(--c-surface-2); }
+.ds-toast.is-open [aria-expanded] .ds-icon { transform: rotate(180deg); }
+.ds-toast--ok { border-inline-start-color: var(--c-ok); }
+.ds-toast--warn { border-inline-start-color: var(--c-warn); }
+.ds-toast--danger { border-inline-start-color: var(--c-danger); }
 .ds-toast--ok .ds-icon { color: var(--c-ok); }
 .ds-toast--warn .ds-icon { color: var(--c-warn); }
 .ds-toast--danger .ds-icon { color: var(--c-danger); }
 .ds-toast--info .ds-icon { color: var(--c-info); }
-@media (min-width: 1024px) { .ds-toasts { bottom: var(--s-6); left: calc(var(--rail-w) + var(--s-4)); } }
+.ds-toast__btn .ds-icon { color: inherit; }
 
 /* ---------- Empty state + skeleton ---------- */
 .ds-empty { display: flex; flex-direction: column; align-items: center; gap: var(--s-3); padding: var(--s-8) var(--s-4); text-align: center; color: var(--c-text-2); }

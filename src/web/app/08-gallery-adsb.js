@@ -111,11 +111,21 @@ function renderDays() {
         [["keogram", "Keogram", "activity"], ["startrails", "Startrails", "sparkles"]].forEach(([k, name, ic]) => {
             if (p[k]) thumbs.push(`<a class="arc-thumb" href="${escapeHtml(p[k].url)}" data-viewer="${name} — ${escapeHtml(day.date)}" aria-label="${name} ${escapeHtml(day.date)}"><img src="${escapeHtml(p[k].url)}" alt="${name} ${escapeHtml(day.date)}" loading="lazy" /><span class="arc-badge">${arcIcon(ic)}</span></a>`);
         });
-        while (thumbs.length < 3) thumbs.push(`<div class="arc-thumb arc-thumb--empty" aria-hidden="true"></div>`);
+        // missing products: one labelled row (the day's products are built after the night ends), never blank tiles
+        const missing = [["timelapse", "Timelapse", "film"], ["keogram", "Keogram", "activity"], ["startrails", "Startrails", "sparkles"]].filter(([k]) => !p[k]);
+        const pending = day.date >= todayKey || (day.date === dayKeyOf(new Date(Date.now() - 86400000)) && new Date().getHours() < 7);
+        if (missing.length === 3) thumbs.length = 0, thumbs.push(`<div class="arc-thumb arc-thumb--none">${arcIcon(pending ? "clock" : "image-off")}<span>${pending ? "Products build after the night ends" : "No products for this night"}</span></div>`);
+        else missing.forEach(([, name, ic]) => thumbs.push(`<div class="arc-thumb arc-thumb--empty">${arcIcon(ic)}<span>${name}</span></div>`));
         const evChip = day.events
             ? `<button type="button" class="ds-chip" data-arc-day="${escapeHtml(day.date)}" aria-label="${day.events} events on ${escapeHtml(day.date)}" title="Show events">${arcIcon("zap")}<b>${day.events}</b></button>` : "";
         return `<section class="arc-day"><header class="arc-day__head">${arcIcon("moon-star")}<b>${escapeHtml(label)}</b>${day.date === todayKey ? `<span class="arc-badge">${arcIcon("clock")}</span>` : ""}${evChip}</header><div class="arc-day__thumbs">${thumbs.join("")}</div></section>`;
     }).join("");
+}
+// thumbnails: skeleton until loaded, error icon on failure (capture phase: load/error do not bubble)
+if (dayList) {
+    dayList.addEventListener("loadeddata", (e) => { const t = e.target.closest && e.target.closest(".arc-thumb"); if (t) t.classList.add("is-loaded"); }, true);
+    dayList.addEventListener("load", (e) => { const t = e.target.closest && e.target.closest(".arc-thumb"); if (t) t.classList.add("is-loaded"); }, true);
+    dayList.addEventListener("error", (e) => { const t = e.target.closest && e.target.closest(".arc-thumb"); if (!t) return; t.classList.add("is-error"); e.target.remove(); t.insertAdjacentHTML("afterbegin", `${arcIcon("image-off")}<span>Could not load</span>`); }, true);
 }
 if (dayList) dayList.addEventListener("click", (e) => {
     const b = e.target.closest("[data-arc-day]");

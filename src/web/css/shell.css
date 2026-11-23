@@ -158,3 +158,8 @@ html.embed { --rail-w: 0px; }
     :root { transition: none !important; }
     .zs__label, .zs__title, .zs__ver > span, .zs__ver .ds-icon, .zs__toggle .ds-icon, .zs__edge .ds-icon { transition: none !important; }
 }
+
+/* full-width pages: more gutter on desktop instead of a capped column */
+@media (min-width: 1024px) {
+    .lg, .oh, .cm { padding: var(--s-5) var(--s-6); }
+}
