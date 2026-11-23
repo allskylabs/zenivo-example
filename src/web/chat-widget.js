@@ -22,7 +22,7 @@
     };
 
     let data = null, peer = null, view = "list", open = false, sending = false, stick = true, lastCount = -1;
-    let pollTimer = null, launch, badge, panel, titleEl, subEl, body, leftEl, rightEl, lastFocus = null;
+    let thread = null, pollTimer = null, launch, badge, panel, titleEl, subEl, body, leftEl, rightEl, lastFocus = null;
 
     function el(tag, cls, text) {
         const e = document.createElement(tag);
@@ -218,6 +218,7 @@
         if (!panel || v === open) return;
         open = v;
         panel.hidden = !v;
+        fitViewport();
         launch.setAttribute("aria-expanded", v ? "true" : "false");
         if (v) {
             lastFocus = document.activeElement;
@@ -488,14 +489,16 @@
         }
         rightEl.appendChild(closeBtn);
 
-        const oldSc = body.querySelector(".zcw-scroll");
-        const keepTop = oldSc ? oldSc.scrollTop : 0;
+        // Same thread already on screen: refresh only the message list. The textarea, its focus and the on-screen
+        // keyboard must survive polls, SSE events and our own send (re-creating it closed the keyboard on every send).
+        if (thread && thread.peer === peer && thread.form.isConnected && body.contains(thread.form)) { thread.paint(); return; }
         body.textContent = "";
         const sc = el("div", "zcw-scroll");
         sc.setAttribute("role", "log"); sc.setAttribute("aria-live", "polite"); sc.setAttribute("aria-label", "Messages");
         const list = el("div", "zcw-msgs");
         sc.appendChild(list);
-        const msgs = data.peer === peer ? data.messages : [];
+        function fillMsgs(msgs) {
+        list.textContent = "";
         if (!msgs.length) empty(list, isPub ? "globe" : "chat", isPub ? "The public room is quiet. Write the first message." : "No messages yet. Say hello.");
         let day = "", prev = null;
         msgs.forEach((m) => {
@@ -516,6 +519,7 @@
             list.appendChild(b);
             prev = who;
         });
+        }
         const chip = el("button", "zcw-chip", "New messages");
         chip.type = "button"; chip.hidden = true;
         chip.addEventListener("click", () => { stick = true; sc.scrollTop = sc.scrollHeight; chip.hidden = true; });
@@ -528,7 +532,7 @@
         const form = el("form", "zcw-form");
         form.autocomplete = "off";
         const ta = el("textarea");
-        ta.rows = 1; ta.maxLength = MAX; ta.placeholder = "Message"; ta.setAttribute("aria-label", "Message"); ta.value = draft;
+        ta.rows = 1; ta.maxLength = MAX; ta.setAttribute("enterkeyhint", "send"); ta.setAttribute("autocapitalize", "sentences"); ta.placeholder = "Message"; ta.setAttribute("aria-label", "Message"); ta.value = draft;
         const count = el("span", "zcw-count");
         count.hidden = true;
         const send = el("button", "zcw-send");
@@ -551,29 +555,54 @@
         ta.addEventListener("keydown", (e) => {
             if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
         });
+        // The send button must never take focus (focus loss = keyboard closes). pointerdown/mousedown cover mouse and
+        // modern touch; touchstart is non-passive and submits itself because cancelling it also cancels the click.
+        const keep = (e) => e.preventDefault();
+        send.addEventListener("pointerdown", keep);
+        send.addEventListener("mousedown", keep);
+        send.addEventListener("touchstart", keep, { passive: false });
+        send.addEventListener("touchend", (e) => { e.preventDefault(); if (!send.disabled) form.requestSubmit(); }, { passive: false });
         form.addEventListener("submit", async (e) => {
             e.preventDefault();
             const text = ta.value.trim();
             if (!text || sending) return;
-            sending = true; send.disabled = true; send.setAttribute("aria-busy", "true"); showErr("");
+            sending = true; ta.readOnly = true; send.setAttribute("aria-busy", "true"); showErr("");
             try {
                 await post("/send", { to: peer, body: text });
-                ta.value = ""; stick = true;
+                ta.value = ""; stick = true; fit();
+                ta.focus({ preventScroll: true });
                 await refresh(false);
             } catch (er) { showErr(er.message); }
-            sending = false;
-            const t2 = body.querySelector("textarea");
-            if (t2) { t2.focus(); t2.dispatchEvent(new Event("input")); }
+            sending = false; ta.readOnly = false; fit();
             send.removeAttribute("aria-busy");
+            if (document.activeElement !== ta) ta.focus({ preventScroll: true });
         });
         fit();
 
-        const grew = lastCount >= 0 && msgs.length > lastCount;
-        lastCount = msgs.length;
-        if (stick || lastCount === msgs.length && !grew && keepTop === 0) sc.scrollTop = sc.scrollHeight;
-        else { sc.scrollTop = keepTop; if (grew) chip.hidden = false; }
-        if (hadFocus || draft === "") ta.focus();
+        function paint() {
+            const keepTop = sc.scrollTop;
+            const msgs = data.peer === peer ? data.messages : [];
+            fillMsgs(msgs);
+            const grew = lastCount >= 0 && msgs.length > lastCount;
+            lastCount = msgs.length;
+            if (stick || !grew && keepTop === 0) sc.scrollTop = sc.scrollHeight;
+            else { sc.scrollTop = keepTop; if (grew) chip.hidden = false; }
+        }
+        thread = { peer, form, paint };
+        paint();
+        if (hadFocus || draft === "") ta.focus({ preventScroll: true });
     }
+
+    // Phone: the panel is full screen; follow the visual viewport so the input stays above the keyboard
+    function fitViewport() {
+        if (!panel) return;
+        const vv = window.visualViewport;
+        if (!vv || !open || !window.matchMedia("(max-width: 640px)").matches) { panel.style.top = panel.style.height = panel.style.bottom = ""; return; }
+        panel.style.top = vv.offsetTop + "px"; panel.style.bottom = "auto"; panel.style.height = vv.height + "px";
+        const sc = body.querySelector(".zcw-scroll");
+        if (sc && stick) sc.scrollTop = sc.scrollHeight;
+    }
+    if (window.visualViewport) { visualViewport.addEventListener("resize", fitViewport); visualViewport.addEventListener("scroll", fitViewport); }
 
     // ---- start: only when the owner is signed in and chat is on (200); anything else renders nothing ----
     function start() {

@@ -55,7 +55,7 @@
 .zcw-err { margin: 0; padding: 6px 12px; color: var(--danger); font-size: 12px; border-top: 1px solid var(--divider); }
 .zcw-form { display: flex; align-items: flex-end; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--divider); position: relative; flex: none; }
 .zcw-form textarea { flex: 1; min-width: 0; resize: none; overflow-y: hidden; max-height: calc(4 * 1.4em + 16px); padding: 8px 10px; border-radius: 18px; border: 1px solid var(--border-color);
-    background: var(--input); color: var(--text-primary); font: inherit; line-height: 1.4; }
+    background: var(--input); color: var(--text-primary); font: inherit; font-size: max(16px, 1em); line-height: 1.4; }
 .zcw-send { background: var(--accent); color: var(--bg-primary); border: 0; border-radius: 50%; width: 36px; height: 36px; display: grid; place-items: center; cursor: pointer; flex: none; padding: 0; }
 .zcw-send:disabled { opacity: .5; cursor: default; }
 .zcw-send svg { width: 18px; height: 18px; }
@@ -66,8 +66,7 @@
 .zcw-menu button { display: block; width: 100%; background: none; border: 0; color: var(--text-primary); padding: 8px 14px; text-align: left; cursor: pointer; border-radius: var(--radius-sm); font: inherit; white-space: nowrap; }
 .zcw-menu button:hover { background: var(--hover); }
 
-@media (max-width: 640px) { .zcw-launch { display: none; } }
-@media (max-width: 768px) { .zcw-launch { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); } }
+@media (max-width: 1023px) { .zcw-launch { width: 56px; height: 56px; right: 14px; bottom: calc(var(--tabbar-h, 64px) + 14px + env(safe-area-inset-bottom, 0px)); z-index: 80; } }
 @media (max-width: 640px) {
     .zcw { inset: 0; width: auto; height: auto; max-height: none; border-radius: 0; border: 0; padding-bottom: env(safe-area-inset-bottom, 0px); z-index: 90; }
 }
