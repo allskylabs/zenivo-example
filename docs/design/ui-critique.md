@@ -85,3 +85,26 @@ Counts: **P1 = 6, P2 = 14, P3 = 8.**
 `docs/design/critique/`: `d1568-{sky,overhead,archive,settings,community,flights3d,satellites3d}.jpg`, `m390-{settings-focus-table,settings-community,settings-admin,obs-dock}.jpg`.
 
 Questions skipped: a worker does not ask the owner; sign-in, red mode and `/full /focus /calibration` left for a follow-up pass.
+
+---
+
+## Fix status (2026-11-23)
+
+Commits on main: 609c22c (P1 batch), 0cd61ea (shared tier). Deployed to the Pi, md5 verified.
+
+| Item | Status |
+|---|---|
+| P1 #1 Focus subtitle | done (`settings_home.js:13`) |
+| P1 #2 Focus table at 390 | done (`css/focus.css`, columns hidden <600px, 44px button) |
+| P1 #3 Archive toolbar wrap | done (`css/archive.css:6`) |
+| P1 #4 Community collapse | done, verified live (`css/community.css:3`) |
+| P1 #5 Logs collapse + paging | done, 30089px to 5838px (`activity.js`, `css/activity-log.css`) |
+| P1 #6 Satellites empty state | done (`satellites3d.html:1234`, `css/scene3d.css`) |
+| Pattern: 44px targets | done for presets, settings selects, page-back (`phone.css:9`, `redesign.css:305,375`, `redesign-pages.css:7`) |
+| Pattern: 12px type floor | done across css/*.css; remaining 0px are intentional icon-only buttons (`.btn-lock`) |
+| Pattern: chip-row overflow cue | done (fade mask, `ds-components.css:305`) |
+| Pattern: themed scrollbars | done on Satellites list; other `overflow:auto` panels OPEN |
+| Pattern: row anatomy, empty/loading values, unified header, table-to-card beyond Focus | OPEN |
+| P2 #7-#20 | partly covered by type floor and 44px fixes; the rest OPEN (OBS dock button heights `obs_dock.html:21,45`, community marker hit area `community.js:116,313`, `.arc-day__head`) |
+| P3 #21-#28 | OPEN |
+| Extra pass (red mode, /full, /focus, /calibration, Sign-in, 390 3D pages) | OPEN; /gallery, /live, /overhead, /settings at 390 checked: no horizontal overflow (scrollWidth 375) |
