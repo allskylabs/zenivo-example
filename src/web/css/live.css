@@ -34,21 +34,37 @@
 #tab-live .vp-bar .vp-layers b { font-family: var(--font-num); }
 #tab-live .sel-ring { position: absolute; width: 36px; height: 36px; margin: -18px 0 0 -18px; border: 2px solid var(--c-accent); border-radius: 50%; pointer-events: none; }
 
-/* ---------- Tap-for-info card ---------- */
-#tab-live .obj-card { --tone: var(--c-accent); position: relative; padding: var(--s-3); background: var(--c-surface-1); border: 1px solid var(--c-border); border-inline-start: 3px solid var(--tone); border-radius: var(--r-lg); color: var(--c-text); }
-#tab-live .oc-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); }
-#tab-live .oc-chip { display: inline-flex; align-items: center; justify-content: center; width: var(--tap); height: var(--tap); border-radius: var(--r-pill); background: var(--c-surface-2); color: var(--tone); }
-#tab-live .oc-title { margin: var(--s-1) 0 0; font-size: var(--fs-18); font-weight: 700; line-height: var(--lh-tight); }
-#tab-live .oc-sub { margin: 0; font-size: var(--fs-12); color: var(--c-text-2); }
-#tab-live .oc-stats { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-2); }
-#tab-live .oc-stats > div { display: inline-flex; align-items: center; gap: var(--s-1); min-height: 32px; padding: 0 var(--s-2); border-radius: var(--r-md); background: var(--c-surface-2); font-size: var(--fs-14); }
-#tab-live .oc-stats .ds-icon { color: var(--c-text-2); }
-#tab-live .oc-stats b { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
-#tab-live .oc-actions { display: flex; gap: var(--s-2); margin-top: var(--s-2); }
-#tab-live .oc-btn, #tab-live .oc-close { display: inline-flex; align-items: center; justify-content: center; min-width: var(--tap); min-height: var(--tap); border: 1px solid var(--c-border); border-radius: var(--r-pill); background: var(--c-surface-2); color: var(--c-text); cursor: pointer; text-decoration: none; }
+/* ---------- Tap-for-info card: popover anchored to the picked object (arrow), bottom sheet on phones ---------- */
+#tab-live #obj-card { --tone: var(--c-accent); position: fixed; z-index: 60; left: 0; top: 0; right: auto; bottom: auto; margin: 0; width: min(340px, calc(100vw - 20px)); max-height: calc(100vh - 20px); overflow: visible; padding: var(--s-3); background: var(--c-surface-1); border: 1px solid var(--c-border); border-inline-start: 3px solid var(--tone); border-radius: var(--r-lg); color: var(--c-text); box-shadow: 0 14px 40px rgba(0, 0, 0, .55); animation: oc-pop .16s var(--zs-ease, ease-out); }
+#tab-live #obj-card[hidden] { display: none; }
+@keyframes oc-pop { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
+#tab-live .oc-arrow { position: absolute; width: 12px; height: 12px; background: var(--c-surface-1); border: 1px solid var(--c-border); transform: rotate(45deg); pointer-events: none; }
+#obj-card[data-side="right"] .oc-arrow { left: -8px; top: calc(var(--ay, 50%) - 6px); border-width: 0 0 1px 1px; }
+#obj-card[data-side="left"] .oc-arrow { right: -8px; top: calc(var(--ay, 50%) - 6px); border-width: 1px 1px 0 0; }
+#obj-card[data-side="below"] .oc-arrow { top: -8px; left: calc(var(--ax, 50%) - 6px); border-width: 1px 0 0 1px; }
+#obj-card[data-side="above"] .oc-arrow { bottom: -8px; left: calc(var(--ax, 50%) - 6px); border-width: 0 1px 1px 0; }
+#tab-live .oc-head { display: flex; align-items: center; gap: var(--s-2); }
+#tab-live .oc-chip { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 40px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--tone) 18%, var(--c-surface-2)); color: var(--tone); }
+#tab-live .oc-who { flex: 1; min-width: 0; }
+#tab-live .oc-title { margin: 0; font-size: var(--fs-18); font-weight: 700; line-height: var(--lh-tight); overflow-wrap: anywhere; }
+#tab-live .oc-sub { margin: 2px 0 0; font-size: var(--fs-14); color: var(--c-text-2); overflow-wrap: anywhere; }
+#tab-live .oc-close { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--tap); height: var(--tap); margin: -6px -6px -6px 0; border: 0; border-radius: var(--r-pill); background: none; color: var(--c-text-2); cursor: pointer; }
+#tab-live .oc-stats { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); margin-top: var(--s-3); }
+#tab-live .oc-stat { display: grid; grid-template-columns: 16px auto 1fr; align-items: center; column-gap: 6px; min-height: 36px; padding: 0 var(--s-2); border-radius: var(--r-md); background: var(--c-surface-2); font-size: var(--fs-14); min-width: 0; }
+#tab-live .oc-stat .ds-icon { width: 16px; height: 16px; color: var(--c-text-2); }
+#tab-live .oc-stat small { font-size: var(--fs-12); font-weight: 600; color: var(--c-text-2); }
+#tab-live .oc-stat b { justify-self: end; font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+#tab-live .oc-actions { display: flex; gap: var(--s-2); margin-top: var(--s-3); }
+#tab-live .oc-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: var(--tap); padding: 0 var(--s-3); border: 1px solid var(--c-border); border-radius: var(--r-pill); background: var(--c-surface-2); color: var(--c-text); font: 600 var(--fs-14) / 1 inherit; white-space: nowrap; cursor: pointer; text-decoration: none; }
 #tab-live .oc-btn:hover, #tab-live .oc-close:hover { border-color: var(--c-accent); color: var(--c-accent); }
 #tab-live .oc-btn:focus-visible, #tab-live .oc-close:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
-.viewport-card.is-fs #obj-card, #tab-live .live-view:fullscreen ~ .obj-card { position: absolute; }
+@media (max-width: 768px) {
+  #tab-live #obj-card { left: 8px !important; right: 8px; top: auto !important; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); width: auto; max-width: 480px; margin: 0 auto; max-height: 55vh; overflow-y: auto; border-radius: var(--r-lg) var(--r-lg) var(--r-md) var(--r-md); animation-name: oc-sheet; }
+  #tab-live .oc-arrow { display: none; }
+}
+@keyframes oc-sheet { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { #tab-live #obj-card { animation: none; } }
+.viewport-card.is-fs #obj-card, #tab-live .live-view:fullscreen ~ .obj-card { position: fixed; }
 
 /* ---------- Status strip: icon + value tiles ---------- */
 #tab-live .now-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-2); }

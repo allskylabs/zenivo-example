@@ -386,37 +386,39 @@
                     link: ["SondeHub", `https://sondehub.org/${encodeURIComponent(d.serial)}`, true],
                     stats: [["Altitude", d.altitude_m != null ? `${num(d.altitude_m)} m` : "--"], ["Distance", d.distance_km != null ? `${num(d.distance_km, 1)} km` : "--"], ...aa(d.alt_deg, d.az_deg)] };
             case "planet":
-                return { title: d.name, sub: magTxt(d.mag), link: ["Open in Sky map", "/sky"], stats: [...aa(d.alt, d.az), ["RA", fmtRa(d.ra)], ["Dec", fmtDec(d.dec)], ...riseSetRows(c)] };
+                return { title: d.name, sub: magTxt(d.mag), link: ["Show in Sky", "/sky"], stats: [...aa(d.alt, d.az), ["RA", fmtRa(d.ra)], ["Dec", fmtDec(d.dec)], ...riseSetRows(c)] };
             case "star":
-                return { title: d.name, sub: [d.bayer, d.con ? `in ${conName(d.con) || d.con}` : "", magTxt(d.mag)].filter(Boolean).join(" · "), link: ["Open in Sky map", "/sky"],
+                return { title: d.name, sub: [d.bayer, d.con ? `in ${conName(d.con) || d.con}` : "", magTxt(d.mag)].filter(Boolean).join(" · "), link: ["Show in Sky", "/sky"],
                     stats: [...aa(d.alt, d.az), ["RA", fmtRa(d.ra)], ["Dec", fmtDec(d.dec)], ...riseSetRows(c)] };
             case "dso":
-                return { title: `${d.id} ${d.name}`, sub: ["Messier object", magTxt(d.mag)].filter(Boolean).join(" · "), link: ["Open in Sky map", "/sky"],
+                return { title: `${d.id} ${d.name}`, sub: ["Messier object", magTxt(d.mag)].filter(Boolean).join(" · "), link: ["Show in Sky", "/sky"],
                     stats: [...aa(d.alt, d.az), ["RA", fmtRa(d.ra)], ["Dec", fmtDec(d.dec)], ...riseSetRows(c)] };
             case "sun":
             case "moon":
-                return { title: d.name, sub: d.illum != null ? `${Math.round(d.illum * 100)}% illuminated` : "", link: ["Open in Sky map", "/sky"], stats: [...aa(d.alt, d.az), ...riseSetRows(c)] };
+                return { title: d.name, sub: d.illum != null ? `${Math.round(d.illum * 100)}% illuminated` : "", link: ["Show in Sky", "/sky"], stats: [...aa(d.alt, d.az), ...riseSetRows(c)] };
             default: {
                 const k = ((window.ALLSKY_CATALOG || {}).constellations || []).find((x) => x.id === d.id);
-                return { title: d.name, sub: d.common || "Constellation", link: ["Open in Sky map", "/sky"],
+                return { title: d.name, sub: d.common || "Constellation", link: ["Show in Sky", "/sky"],
                     stats: [["Altitude", `${Math.round(d.alt)}°`], ...(k ? [["RA", fmtRa(k.ra)], ["Dec", fmtDec(k.dec)]] : [])] };
             }
         }
     }
 
     const IC = { aircraft: "plane", satellite: "satellite", sonde: "balloon", planet: "star", star: "star", dso: "telescope", sun: "sun", moon: "moon", con: "sparkles" };
-    const FIC = { Altitude: "arrow-up-right", Height: "arrow-up-right", Speed: "activity", Distance: "map-pin", Azimuth: "compass", "Alt / Az": "compass", RA: "crosshair", Dec: "crosshair", Rises: "sun", Sets: "moon", Visibility: "eye", Visible: "eye" };
+    const FIC = { Altitude: "arrow-up-right", Alt: "arrow-up-right", Height: "arrow-up-right", Speed: "activity", Distance: "map-pin", Azimuth: "compass", Az: "compass", "Alt / Az": "compass", RA: "crosshair", Dec: "crosshair", Rise: "sun", Set: "moon", Visibility: "eye", Visible: "eye" };
+    // Short visible labels (never icon-only): the icon is decoration
+    const SHORT = { Altitude: "Alt", Azimuth: "Az", Rises: "Rise", Sets: "Set", "Alt / Az": "Alt/Az", Distance: "Dist" };
     const svg = (n) => `<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-${n}"/></svg>`;
     function renderCard(c) {
         const k = KIND[c.kind] || [c.kind, "accent"];
         const info = describe(c);
-        const stats = info.stats.map(([l, v]) => `<div title="${esc(l)}" aria-label="${esc(l)}: ${esc(v)}">${svg(FIC[l] || "info")}<b>${esc(v)}</b></div>`).join("");
-        const link = info.link ? `<a class="oc-btn" href="${esc(info.link[1])}"${info.link[2] ? ' target="_blank" rel="noopener"' : ""} title="${esc(info.link[0])}" aria-label="${esc(info.link[0])}">${svg("arrow-up-right")}</a>` : "";
-        const html = `<div class="oc-head"><span class="oc-chip" style="--tone:var(--${k[1]})" title="${esc(k[0])}">${svg(IC[c.kind] || "info")}</span>
-            <button type="button" class="oc-close" id="obj-close" aria-label="Close" title="Close">${svg("x")}</button></div>
-            <h3 class="oc-title">${esc(info.title)}</h3><p class="oc-sub">${esc(info.sub)}</p>
+        const stats = info.stats.map(([l, v]) => { const sl = SHORT[l] || l; return `<div class="oc-stat" title="${esc(l)}">${svg(FIC[sl] || FIC[l] || "info")}<small>${esc(sl)}</small><b>${esc(v)}</b></div>`; }).join("");
+        const link = info.link ? `<a class="oc-btn" href="${esc(info.link[1])}"${info.link[2] ? ' target="_blank" rel="noopener"' : ""}>${svg(info.link[2] ? "arrow-up-right" : "map")}<span>${esc(info.link[0])}</span></a>` : "";
+        const html = `<span class="oc-arrow" aria-hidden="true"></span><div class="oc-head"><span class="oc-chip" style="--tone:var(--${k[1]})">${svg(IC[c.kind] || "info")}</span>
+            <div class="oc-who"><h3 class="oc-title">${esc(info.title)}</h3><p class="oc-sub">${esc([k[0], info.sub].filter(Boolean).join(" · "))}</p></div>
+            <button type="button" class="oc-close" id="obj-close" aria-label="Close (Esc)" title="Close (Esc)">${svg("x")}</button></div>
             <div class="oc-stats">${stats}</div>
-            <div class="oc-actions">${link}<button type="button" class="oc-btn" id="obj-zoom" aria-label="Zoom here" title="Zoom here">${svg("plus")}</button></div>`;
+            <div class="oc-actions">${link}<button type="button" class="oc-btn" id="obj-zoom">${svg("plus")}<span>Zoom in here</span></button></div>`;
         if (card.dataset.html !== html) { card.innerHTML = html; card.dataset.html = html; }
         card.style.setProperty("--tone", `var(--${k[1]})`);
         card.hidden = false;
@@ -444,6 +446,9 @@
         card.style.left = `${Math.round(clamp(left, m, vw - W - m))}px`;
         card.style.top = `${Math.round(clamp(top, m, floor - H))}px`;
         card.dataset.side = side;
+        const lf = Math.round(clamp(left, m, vw - W - m)), tp = Math.round(clamp(top, m, floor - H));
+        card.style.setProperty("--ax", `${Math.round(Math.max(18, Math.min(W - 18, ax - lf)))}px`);
+        card.style.setProperty("--ay", `${Math.round(Math.max(18, Math.min(H - 18, ay - tp)))}px`);
     }
     function select(c) {
         sel = { kind: c.kind, key: c.key, last: c };
