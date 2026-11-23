@@ -100,12 +100,12 @@ def render_head(name):
              'S="image detection station skymask integrations community admin".split(" "),t=M[h];if(h==="community")t="/community";'
              'else if(S.indexOf(h)>-1)t="/settings#"+h;if(t&&t!==p)location.replace(t)})()</script>',
              '<link rel="stylesheet" href="/static/css/ds-tokens.css?v=20261123a">',
-             '<link rel="stylesheet" href="/static/css/ds-components.css?v=20261204d">',
-             '<link rel="stylesheet" href="/static/css/shell.css?v=20261204d">',
-             '<script src="/static/auth.js?v=20261204d"></script>',
+             '<link rel="stylesheet" href="/static/css/ds-components.css?v=20261204e">',
+             '<link rel="stylesheet" href="/static/css/shell.css?v=20261204e">',
+             '<script src="/static/auth.js?v=20261204e"></script>',
              '<script src="/static/js/ds.js?v=20261123a" defer></script>',
              '<script src="/static/brand/version.js?v=4" defer></script>',
-             '<script src="/static/shell.js?v=20261204d" defer></script>', "<!-- head-brand:end -->"]
+             '<script src="/static/shell.js?v=20261204e" defer></script>', "<!-- head-brand:end -->"]
     return "\n    ".join(lines)
 
 
@@ -158,7 +158,7 @@ def render(current, is_index):
           f'                    <button class="zs__item" type="button" id="m-chat-btn" data-tip="Chat" aria-label="Chat">{ic("message-circle")}<span class="zs__label">Chat</span></button>',
           '                </div>',
           f'                <a class="zs__item" href="/login" data-auth-link data-tip="Sign in" aria-label="Sign in">{ic("log-in")}<span class="zs__label" data-auth-label>Sign in</span></a>',
-          '                <div class="zs__meta"><small class="zs__ver" id="app-version" data-app-version>Zenivo</small></div>',
+          f'                <a class="zs__ver" id="zs-ver" href="https://github.com/hoanb1/zenivo/releases" target="_blank" rel="noopener noreferrer" title="Release notes / GitHub" aria-label="Release notes / GitHub">{ic("tag")}<span id="app-version" data-app-version>Zenivo</span>{ic("arrow-up-right")}</a>',
           '            </div>', '        </div>',
           f'        <button class="zs__edge" type="button" id="zs-edge" tabindex="-1" aria-hidden="true" title="Collapse menu (Ctrl+B)">{ic("chevron-left")}</button>', '    </aside>', '    <!-- chrome:end -->']
     return "\n".join(o)

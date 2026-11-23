@@ -20,12 +20,12 @@
     <script>try{if(localStorage.getItem("zenivo.nav")==="0")document.documentElement.classList.add("zs-collapsed")}catch(e){}</script>
     <script>(function(){var p=location.pathname.replace(/\/+$/,"")||"/";if(p!=="/"&&p!=="/live"&&p!=="/index.html")return;var h=location.hash.replace(/^#\/?/,"").toLowerCase(),M={archive:"/gallery",gallery:"/gallery",events:"/gallery",sky:"/sky",overhead:"/overhead",community:"/community",flights:"/flights3d",flights3d:"/flights3d",satellites:"/satellites3d",satellites3d:"/satellites3d",settings:"/settings",calibration:"/calibration",logs:"/logs",activity:"/logs",focus:"/focus",live:"/live"},S="image detection station skymask integrations community admin".split(" "),t=M[h];if(h==="community")t="/community";else if(S.indexOf(h)>-1)t="/settings#"+h;if(t&&t!==p)location.replace(t)})()</script>
     <link rel="stylesheet" href="/static/css/ds-tokens.css?v=20261123a">
-    <link rel="stylesheet" href="/static/css/ds-components.css?v=20261204d">
-    <link rel="stylesheet" href="/static/css/shell.css?v=20261204d">
-    <script src="/static/auth.js?v=20261204d"></script>
+    <link rel="stylesheet" href="/static/css/ds-components.css?v=20261204e">
+    <link rel="stylesheet" href="/static/css/shell.css?v=20261204e">
+    <script src="/static/auth.js?v=20261204e"></script>
     <script src="/static/js/ds.js?v=20261123a" defer></script>
     <script src="/static/brand/version.js?v=4" defer></script>
-    <script src="/static/shell.js?v=20261204d" defer></script>
+    <script src="/static/shell.js?v=20261204e" defer></script>
     <!-- head-brand:end -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
@@ -117,7 +117,7 @@
                     <button class="zs__item" type="button" id="m-chat-btn" data-tip="Chat" aria-label="Chat"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-message-circle"></use></svg><span class="zs__label">Chat</span></button>
                 </div>
                 <a class="zs__item" href="/login" data-auth-link data-tip="Sign in" aria-label="Sign in"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-log-in"></use></svg><span class="zs__label" data-auth-label>Sign in</span></a>
-                <div class="zs__meta"><small class="zs__ver" id="app-version" data-app-version>Zenivo</small></div>
+                <a class="zs__ver" id="zs-ver" href="https://github.com/hoanb1/zenivo/releases" target="_blank" rel="noopener noreferrer" title="Release notes / GitHub" aria-label="Release notes / GitHub"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-tag"></use></svg><span id="app-version" data-app-version>Zenivo</span><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-arrow-up-right"></use></svg></a>
             </div>
         </div>
         <button class="zs__edge" type="button" id="zs-edge" tabindex="-1" aria-hidden="true" title="Collapse menu (Ctrl+B)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-left"></use></svg></button>

@@ -54,7 +54,11 @@ html.zs-collapsed { --rail-w: 64px; }
 .zs__utils .zs__item { flex: 1; justify-content: center; padding: 0; }
 .zs__utils .zs__label { display: none; }
 .zs__meta { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); padding-left: var(--s-3); }
-.zs__ver { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-12); color: var(--c-text-3); }
+.zs__ver { display: flex; align-items: center; gap: var(--s-2); min-width: 0; min-height: 32px; padding: 0 var(--s-3); border-radius: var(--r-md); font-size: var(--fs-12); color: var(--c-text-3); text-decoration: none; }
+.zs__ver:hover { background: var(--c-surface-2); color: var(--c-text); }
+.zs__ver:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -2px; }
+.zs__ver > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zs__ver .ds-icon { flex: 0 0 auto; width: 14px; height: 14px; }
 .zs__top, .zs__edge { display: none; }
 .zs__toggle { display: none; flex: 0 0 auto; width: var(--tap); height: var(--tap); align-items: center; justify-content: center; border: 0; border-radius: var(--r-md); background: none; color: var(--c-text-2); cursor: pointer; }
 .zs__toggle:hover { background: var(--c-surface-2); color: var(--c-text); }
@@ -85,7 +89,8 @@ html.zs-collapsed { --rail-w: 64px; }
     html.zs-collapsed .zs__edge .ds-icon { transform: rotate(180deg); }
     .zs__utils .zs__item { min-width: 0; }
     /* collapsed icon rail: labels live in aria-label + title, sections become hairlines */
-    html.zs-collapsed .zs__label, html.zs-collapsed .zs__title, html.zs-collapsed .zs__ver { display: none; }
+    html.zs-collapsed .zs__label, html.zs-collapsed .zs__title, html.zs-collapsed .zs__ver > span, html.zs-collapsed .zs__ver .ds-icon:last-child { display: none; }
+    html.zs-collapsed .zs__ver { justify-content: center; padding: 0; }
     html.zs-collapsed .zs__item { justify-content: center; padding: 0; }
     html.zs-collapsed .zs__nav { padding: 0 var(--s-2); scrollbar-width: none; }
     html.zs-collapsed .zs__utils { flex-direction: column; }
