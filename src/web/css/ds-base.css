@@ -1,4 +1,5 @@
 /* ds base: applies ONLY inside .ds-root or [data-ui="2"], so loading it on a legacy page changes nothing. */
+[hidden] { display: none !important; }
 .ds-root,
 [data-ui="2"] {
     background: var(--c-bg);

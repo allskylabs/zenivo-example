@@ -1,6 +1,6 @@
 
 #tab-gallery .sr-only, .arc-ev .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-#tab-gallery [hidden], .arc-ev [hidden] { display: none !important; }
+[hidden] { display: none !important; }
 .arc { max-width: var(--content-max); margin: 0 auto; padding: 0 var(--s-3) var(--s-6); }
 
 .arc-bar { position: sticky; top: 0; z-index: var(--z-nav); display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); padding: var(--s-2) 0; background: var(--c-bg); }
