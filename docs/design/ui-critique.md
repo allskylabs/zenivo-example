@@ -175,3 +175,8 @@ Deployed, md5 equal on repo, Pi, allsky.hoan.uk.
 
 Critique: density is 5 columns at 1568 px and 2 at 390 px with even gutters; rhythm is image, one mono footer line, repeat; hover/focus use the ds accent border (focus-visible too). Left: the unseen dot is the only colour accent in the footer, so scanning for new events works.
 Screenshots: `events-grid-after-1568.jpg`, `events-grid-after-390.jpg` (before = owner's screenshot).
+
+## Update 7: Live/viewer image does not fit the frame
+Cause: `.viewport-wrapper` was `width:100%; aspect-ratio; max-height:78vh`. When the height cap bites (4:3 or square frame on a wide column) the box stays full width, so the picture is letterboxed with dark side bands and the overlays (LIVE, info, zoom, layers) sit on the bands.
+Fix: stage width = `min(100%, 78dvh * w/h)` (`--fw/--fh` set by the server in the page shell and by JS from the real frame size), centred; overlays are children of the stage, so they anchor to the image box. Same for the event viewer (`.ev-zoom`, 72dvh, `--ev-w/--ev-h`). Fisheye is never cropped (contain). Checked: 16:9 frame 840x473 unchanged; simulated 4:3 at 757 px height = 787x590 box (was 842x590). Shot: `live-frame-sim43-1568.jpg` (the 16:9 test frame inside the 4:3 box, so bands there are the simulation).
+Left as is: full.html (OBS overlay, intentional cover with a fit-contain switch), obs_dock preview (16:9 box, contain, max 240px), Community dialog (already follows the image, Update 5).
