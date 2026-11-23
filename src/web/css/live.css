@@ -112,11 +112,11 @@
 #tab-live .live-events-empty .ds-icon { width: 32px; height: 32px; color: var(--c-text-3); }
 /* ---------- Recent events: 16:9 thumbnail cards, one icon per type, one-line meta ---------- */
 #tab-live .live-events-list { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--s-2); overflow-x: auto; scroll-snap-type: x proximity; }
-#tab-live .live-event { --pill: var(--c-accent); flex: 0 0 200px; scroll-snap-align: start; display: flex; flex-direction: column; border: 1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-surface-2); overflow: hidden; cursor: pointer; transition: border-color .15s, background .15s; }
+#tab-live .live-events-list .live-event { --pill: var(--c-accent); grid-template-columns: none; align-items: stretch; gap: 0; padding: 0; width: auto; flex: 0 0 200px; scroll-snap-align: start; display: flex; flex-direction: column; border: 1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-surface-2); overflow: hidden; cursor: pointer; transition: border-color .15s, background .15s; }
 #tab-live .live-event:hover, #tab-live .live-event:focus-visible { border-color: var(--pill); outline: none; }
 #tab-live .live-event.fresh { border-color: var(--c-accent); }
 #tab-live .live-event .ev-thumb { position: relative; aspect-ratio: 16 / 9; background: var(--c-bg); }
-#tab-live .live-event .ev-thumb img, #tab-live .live-event .no-thumb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: flex; align-items: center; justify-content: center; color: var(--c-text-3); }
+#tab-live .live-events-list .live-event .ev-thumb img, #tab-live .live-events-list .live-event .no-thumb { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; border: 0; border-radius: 0; object-fit: cover; display: flex; align-items: center; justify-content: center; color: var(--c-text-3); }
 #tab-live .live-event .ev-badge { position: absolute; top: var(--s-2); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-pill); background: var(--c-scrim); }
 #tab-live .live-event .ev-badge .ds-icon { width: 16px; height: 16px; }
 #tab-live .live-event .ev-badge--type { left: var(--s-2); color: var(--pill); }
@@ -133,7 +133,7 @@
 #tab-live .live-events-card .badge .ds-icon { width: 14px; height: 14px; }
 @media (min-width: 1024px) {
     #tab-live .live-events-list { flex-direction: column; overflow-x: hidden; overflow-y: auto; max-height: 72vh; }
-    #tab-live .live-event { flex: none; }
+    #tab-live .live-events-list .live-event { flex: none; }
 }
 
 

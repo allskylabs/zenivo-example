@@ -548,7 +548,7 @@ function renderLiveEvents(evData) {
     liveEventsCount.title = `Latest ${events.length} events · ${recent} in the last 24 hours`;
     liveEventsCount.setAttribute("aria-label", liveEventsCount.title);
 
-    const on = Object.entries(evData.enabled || {}).filter(([, v]) => v).map(([k]) => EVENT_LABELS[k] || k);
+    const on = Object.entries(evData.enabled || {}).filter(([, v]) => v).map(([k]) => EVT_NAME[k] || k);
     const night = evData.night;
     liveEventsStatus.innerHTML = on.length
         ? `<span class="dot ${night ? "on" : ""}"></span>${night ? "Watching" : "Paused until dark"} · ${on.map((l) => l.split(" ")[0]).join(" ")}`
@@ -571,7 +571,7 @@ function renderLiveEvents(evData) {
         li.setAttribute("role", "button");
         li.style.setProperty("--pill", evTypeColor(ev.type));
         liveEventsSeen.add(ev.event_id);
-        const label = EVENT_LABELS[ev.type] || EVT_NAME[ev.type] || ev.type;
+        const label = EVT_NAME[ev.type] || ev.type;
         const who = evCallsign(ev) || evSat(ev);
         const day = evDayLabel(when);
         const conf = ev.confidence == null ? "" : Math.round(ev.confidence * 100);
