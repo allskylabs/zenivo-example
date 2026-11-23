@@ -193,7 +193,6 @@ details.acc[hidden] { display: none; }
 .gal-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .day-strip { display: none; padding: 14px 14px 10px; margin-top: 1rem; border-radius: var(--radius-card); background: var(--bg-card); border: 1px solid var(--border-color); }
 .gal-mode-day .day-strip { display: block; }
-.gal-mode-day .day-block:not(.sel) { display: none; }
 .ds-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .ds-head b { font-size: 18px; font-weight: 700; }
 .ds-nav { width: 40px; height: 40px; border: 0; border-radius: 12px; background: none; color: var(--text-secondary); font-size: 20px; cursor: pointer; }
@@ -204,30 +203,16 @@ details.acc[hidden] { display: none; }
 .ds-d.empty { opacity: 0.55; }
 .ds-d.active { background: color-mix(in srgb, var(--accent) 24%, var(--bg-card-sub)); border-color: var(--accent); color: var(--text-primary); opacity: 1; }
 .ds-d:focus-visible, .ds-nav:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.events-filter.zchips { margin: 0; }
 @media (max-width: 768px) {
     .gal-head h2 { display: none; }
     .gal-head { margin-bottom: 12px; }
     .gal-tabs { width: 100%; }
     #tab-gallery .section-heading { margin-top: 0 !important; }
     #tab-gallery .section-heading h2 { font-size: 18px; }
-    .events-filter.zchips { flex-wrap: wrap; overflow: visible; }
-    /* product tiles: timelapse full width, keogram and startrails side by side */
-    .products-grid, .day-products { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-    .products-grid .product-card:has(video), .day-products > video { grid-column: 1 / -1; }
-    .product-card { border-radius: var(--radius-card); }
-    .day-block { border-radius: var(--radius-card); }
-    /* events: 2-column card grid instead of a table */
-    .day-block .events-table-wrapper { border: 0; background: none; overflow: visible; }
+/* product tiles: timelapse full width{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .events-table, .events-table tbody { display: block; }
     .events-table thead { display: none; }
     .events-table tbody { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-    .events-table .event-row { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: var(--radius-tile); background: var(--bg-card-sub); border: 1px solid var(--border-color); min-width: 0; }
-    .events-table .event-row td { display: block; padding: 0; border: 0; background: none; font-family: var(--font-sans); min-width: 0; }
-    .events-table .event-row td:nth-child(n+4) { display: none; }
-    .events-table .event-thumb { max-width: none; max-height: none; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; }
-    .events-table .event-row td:nth-child(3) { font-size: 12px; color: var(--text-secondary); font-family: var(--font-num); }
-    .events-table .event-row:hover td { background: none; }
 }
 /* ---------- Phase 2: Event detail (viewer) ---------- */
 .ev-topbar, .ev-back { display: none; }
@@ -241,29 +226,9 @@ details.acc[hidden] { display: none; }
 .evm-rows dt { color: var(--text-secondary); }
 .evm-rows dd { margin: 0; font-family: var(--font-num); text-align: right; }
 @media (max-width: 760px) {
-    .event-viewer { background: var(--bg-primary); backdrop-filter: none; }
-    .ev-panel { display: flex; flex-direction: column; background: var(--bg-primary); border: 0; box-shadow: none; padding: 0 12px calc(24px + env(safe-area-inset-bottom, 0px)); }
     .ev-topbar { order: 0; display: flex; align-items: center; gap: 8px; min-height: 52px; font-size: 18px; }
     .ev-back { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-left: -8px; border: 0; background: none; color: var(--text-primary); font-size: 24px; border-radius: 12px; cursor: pointer; }
-    .ev-images { order: 1; gap: 10px; }
-    .ev-fig { border-radius: var(--radius-card); }
-    .ev-head { order: 2; margin: 12px 0 0; padding: 14px 16px 0; border-radius: var(--radius-card) var(--radius-card) 0 0; background: var(--bg-card); border: 1px solid var(--border-color); border-bottom: 0; flex-wrap: nowrap; }
-    .ev-when { flex: 1; text-align: right; align-items: flex-end; }
-    .ev-when strong { font-family: var(--font-num); font-size: 15px; white-space: nowrap; }
-    .ev-panel { position: relative; }
-    .ev-nav { position: absolute; top: 6px; right: 8px; width: auto; margin: 0; }
-    .ev-nav .ev-close, .ev-nav .ev-pos { display: none; }
-    .ev-nav button { width: 40px; height: 40px; }
-    .ev-summary { order: 3; margin: 0; padding: 10px 16px; font-size: 14px; color: var(--text-secondary); background: var(--bg-card); border: 1px solid var(--border-color); border-top: 0; border-bottom: 0; }
-    .ev-facts { order: 4; display: block; padding: 0 16px 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-top: 0; border-radius: 0 0 var(--radius-card) var(--radius-card); }
-    .ev-facts div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 12px 0; border: 0; border-top: 1px solid var(--divider); border-radius: 0; background: none; }
-    .ev-facts dt { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; }
-    .ev-facts dd { margin: 0; font-size: 15px; text-align: right; font-family: var(--font-num); }
     .ev-match { order: 5; margin-top: 12px; padding: 16px; border-radius: var(--radius-card); background: var(--bg-card); border: 1px solid var(--border-color); }
-    .ev-actions { order: 6; flex-direction: column; margin-top: 12px; padding: 16px; border-radius: var(--radius-card); background: var(--bg-card); border: 1px solid var(--border-color); }
-    .ev-actions .btn { min-height: 48px; justify-content: center; border-radius: 999px; font-size: 15px; font-weight: 700; }
-    .ev-actions .ev-open-crop { background: var(--accent); border-color: var(--accent); color: var(--bg-primary); }
-    [data-theme="red"] .ev-actions .ev-open-crop { color: #1a0000; }
 }
 /* ---------- Phase 2: Activity log ---------- */
 #log-filter-level { display: none; }

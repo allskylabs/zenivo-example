@@ -3,10 +3,6 @@
 
 /* ---- Live picture: "Overlay text" off hides the capture-info box (the sidereal-time line is skipped in drawReticle) ---- */
 .viewport-wrapper.no-otext > .frame-info { display: none; }
-
-/* ---- Event viewer: Copy link / Delete ---- */
-.ev-actions .ev-del { border-color: color-mix(in srgb, var(--danger) 55%, transparent); color: var(--danger); }
-.ev-actions .ev-del[data-armed="1"] { background: var(--danger); color: #fff; }
 .ev-actions-note { margin: 2px 0 0; text-align: center; font-size: 12px; color: var(--text-secondary); }
 :root.is-admin .ev-actions-note { display: none; }
 

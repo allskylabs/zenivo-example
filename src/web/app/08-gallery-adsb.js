@@ -1,198 +1,19 @@
-/* Zenivo dashboard (part of the former app.js): Gallery, events, timelapse builder and ADS-B settings.
+/* Zenivo dashboard (part of the former app.js): Archive (Products / By day / Events), timelapse builder and shared event helpers.
  * Classic script: top-level declarations are shared with the other src/web/app/*.js files; load order is fixed in index.html. */
 
-// Gallery & Events Fetcher + On-Demand Timelapse Builder
+// Archive page: Products | By day | Events (rebuilt, icons first). The Events list and the detail viewer live in 08b-events-live.js.
 // ------------------------------------------------------------------
-const galleryDateEl = document.getElementById("gallery-date");
+const arcIcon = (n) => `<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-${n}"></use></svg>`;
+const galleryDateEl = document.getElementById("gallery-date-t");
 const galleryFrameCountEl = document.getElementById("gallery-frame-count");
-const btnBuildTimelapse = document.getElementById("btn-build-timelapse");
-const timelapseFpsSelect = document.getElementById("timelapse-fps-select");
 const galleryAlert = document.getElementById("gallery-alert");
-
-if (btnBuildTimelapse) {
-    btnBuildTimelapse.addEventListener("click", async () => {
-        const fps = timelapseFpsSelect ? parseFloat(timelapseFpsSelect.value) || 12 : 12;
-        btnBuildTimelapse.disabled = true;
-        btnBuildTimelapse.textContent = "⏳ Building MP4 timelapse...";
-        showAlert(galleryAlert, `⏳ Compiling today's frames into an H.264 timelapse (${fps} FPS), keogram & startrails...`, "info", true);
-        try {
-            const res = await fetch(`/api/gallery/generate?fps=${encodeURIComponent(fps)}`, {
-                method: "POST",
-            });
-            const data = await res.json();
-            if (res.ok) {
-                if (data.gallery) {
-                    renderGallery(data.gallery);
-                } else {
-                    await loadGalleryAndEvents();
-                }
-                showAlert(
-                    galleryAlert,
-                    `✅ Timelapse created (${data.archived_frames_count || 0} frames → ${data.duration_s || 0}s @ ${data.fps || fps} FPS, ${data.size_kb || 0} KB)!`,
-                    "success",
-                    true
-                );
-            } else {
-                showAlert(galleryAlert, `❌ Timelapse build failed: ${data.detail || "Unknown error"}`, "error", true);
-            }
-        } catch (err) {
-            showAlert(galleryAlert, `❌ Connection error while building timelapse: ${err.message}`, "error", true);
-        } finally {
-            btnBuildTimelapse.disabled = false;
-            btnBuildTimelapse.textContent = "🎬 Build / Update Timelapse Now";
-        }
-    });
-}
-
-if (currentPage === "tab-gallery") setTimeout(() => loadGalleryAndEvents(), 0);
-
-// Gallery top tabs: Products | By day | Events (same data, different views)
 const galleryContainer = document.getElementById("gallery-container");
 const galleryTabs = document.getElementById("gallery-tabs");
-const galleryDayTitle = document.getElementById("gallery-day-title");
-function setGalleryMode(mode) {
-    if (!galleryContainer || !galleryTabs) return;
-    galleryContainer.classList.remove("gal-mode-products", "gal-mode-day", "gal-mode-events");
-    galleryContainer.classList.add(`gal-mode-${mode}`);
-    if (typeof placeEventsFilter === "function") placeEventsFilter();
-    galleryTabs.querySelectorAll(".gal-tab").forEach((b) => {
-        b.classList.toggle("active", b.dataset.gmode === mode);
-        b.setAttribute("aria-selected", b.dataset.gmode === mode ? "true" : "false");
-    });
-    if (galleryDayTitle) galleryDayTitle.textContent = mode === "events" ? "Events" : "By Day";
-    try { localStorage.setItem("galleryMode", mode); } catch (e) { /* ignore */ }
-}
-if (galleryTabs) {
-    galleryTabs.addEventListener("click", (e) => {
-        const b = e.target.closest(".gal-tab");
-        if (b) setGalleryMode(b.dataset.gmode);
-    });
-    let savedMode = "products";
-    try { savedMode = localStorage.getItem("galleryMode") || "products"; } catch (e) { /* ignore */ }
-    setGalleryMode(["products", "day", "events"].includes(savedMode) ? savedMode : "products");
-}
-
-// Timelapse builder: custom date range -> POST /api/timelapse/build
-const tlBuild = document.getElementById("tl-build");
-if (tlBuild) {
-    const tlFrom = document.getElementById("tl-from");
-    const tlTo = document.getElementById("tl-to");
-    const tlResult = document.getElementById("tl-result");
-    const todayKey = dayKeyOf(new Date());
-    tlTo.value = todayKey;
-    tlFrom.value = dayKeyOf(new Date(Date.now() - 86400000));
-    tlBuild.addEventListener("click", async () => {
-        const q = new URLSearchParams({
-            date_from: tlFrom.value,
-            date_to: tlTo.value,
-            fps: document.getElementById("tl-fps").value || "24",
-            width: document.getElementById("tl-res").value,
-            overlay: document.getElementById("tl-overlay").checked ? "true" : "false",
-        });
-        tlBuild.disabled = true;
-        tlBuild.textContent = "Building...";
-        tlResult.classList.remove("hidden");
-        destroyZooms(tlZooms);
-        tlResult.textContent = "Encoding frames, this can take a minute.";
-        try {
-            const res = await fetch(`/api/timelapse/build?${q}`, { method: "POST" });
-            const d = await res.json();
-            if (res.ok) {
-                const url = `${d.timelapse_url}?t=${Date.now()}`;
-                tlResult.innerHTML = `${d.video_frames_count} frames, ${d.duration_s}s @ ${d.fps} fps, ${formatSize(d.size_kb)} · <a href="${escapeHtml(url)}" download>Download</a><div class="tl-zoom"><video controls loop muted playsinline src="${escapeHtml(url)}"></video></div>`;
-                zoomVideo(tlResult.querySelector("video"), tlZooms);
-            } else {
-                tlResult.textContent = `Build failed: ${d.detail || "unknown error"}`;
-            }
-        } catch (err) {
-            tlResult.textContent = `Connection error: ${err.message}`;
-        } finally {
-            tlBuild.disabled = false;
-            tlBuild.textContent = "Build timelapse";
-        }
-    });
-}
-
-async function loadGalleryAndEvents() {
-    try {
-        const resGal = await fetch("/api/gallery");
-        if (resGal.ok) {
-            const data = await resGal.json();
-            renderGallery(data);
-        }
-
-        await loadEvents();
-    } catch (err) {
-        console.error("Failed to load gallery/events:", err);
-    }
-}
-
-function renderGallery(data) {
-    productsGrid.innerHTML = "";
-    destroyZooms(cardZooms);
-    if (galleryDateEl && data && data.date) {
-        galleryDateEl.textContent = `Archive: ${data.date} (${tzLabel})`;
-    }
-    if (galleryFrameCountEl && data && data.archived_frames_count !== undefined) {
-        galleryFrameCountEl.textContent = `${data.archived_frames_count} Frames Archived Today`;
-    }
-
-    if (!data || !data.items || data.items.length === 0) {
-        productsGrid.innerHTML = "<p class='text-muted'>No products recorded yet.</p>";
-        return;
-    }
-
-    const cacheBust = Date.now();
-    data.items.forEach((item) => {
-        const card = document.createElement("div");
-        card.className = "product-card";
-        const mediaUrl = `${item.url}?t=${cacheBust}`;
-        const sizeBadge = item.size_kb ? `${item.size_kb.toFixed(1)} KB` : "Pending";
-        const nRejected = item.rejected ? Object.values(item.rejected).reduce((a, b) => a + b, 0) : 0;
-        const framesBadge = item.frame_count !== undefined
-            ? `${item.frame_count} frames` + (nRejected ? ` (${nRejected} rejected)` : "")
-            : "";
-        const tsFormatted = item.timestamp ? fmtLocalIso(item.timestamp) : "";
-
-        let mediaHtml = "";
-        if (item.type === "timelapse") {
-            mediaHtml = `
-                <video controls autoplay loop muted playsinline preload="metadata" src="${escapeHtml(mediaUrl)}">
-                    Your browser does not support MP4 video.
-                </video>
-            `;
-        } else {
-            mediaHtml = `
-                <a href="${escapeHtml(mediaUrl)}" data-viewer="${escapeHtml(item.title || item.type)}" title="Click to view full size" style="width:100%;height:100%;display:block;">
-                    <img src="${escapeHtml(mediaUrl)}" alt="${escapeHtml(item.title || item.type)}" loading="lazy" />
-                </a>
-            `;
-        }
-
-        card.innerHTML = `
-            <div class="product-media">
-                ${mediaHtml}
-            </div>
-            <div class="product-info">
-                <div class="product-title">
-                    <span>${escapeHtml(item.title || item.type)}</span>
-                    <span class="badge badge-accent">${sizeBadge}</span>
-                </div>
-                <div class="product-meta">
-                    <span>${framesBadge}${framesBadge && tsFormatted ? " • " : ""}${tsFormatted}</span>
-                    <a href="${escapeHtml(mediaUrl)}" download class="btn btn-sm btn-outline" style="padding: 0.15rem 0.5rem; font-size: 0.75rem; text-decoration: none;">⬇️ Download</a>
-                </div>
-            </div>
-        `;
-        productsGrid.appendChild(card);
-        if (item.type === "timelapse") { attachVideoInfo(card.querySelector("video"), item.info_url); zoomVideo(card.querySelector("video"), cardZooms); }
-    });
-    galleryHistory = data.history || [];
-    renderDays();
-}
+let galleryHistory = [];
+let eventsMeta = { total_count: 0, enabled: {}, counts: {} };
 
 // Zoom + pan for timelapse videos (zoom_pan.js); the wheel needs Ctrl/Cmd here so the page still scrolls over the tiles
-const cardZooms = [], dayZooms = [], tlZooms = [];
+const cardZooms = [], tlZooms = [];
 function destroyZooms(list) { list.splice(0).forEach((z) => z.destroy()); }
 function zoomVideo(video, list) {
     if (!video || !video.parentElement || !window.ZenivoZoomPan) return;
@@ -204,167 +25,193 @@ function formatSize(kb) {
     return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb.toFixed(0)} KB`;
 }
 
-// Gallery "By Day": one collapsible block per local day (newest first) holding that day's
-// timelapse / keogram / startrails and its sky events. Today's live products stay in the grid above.
-let galleryHistory = [];
-let eventsMeta = { total_count: 0, enabled: {} };
-
 function dayKeyOf(date) {
     const p = (n) => String(n).padStart(2, "0");
     const sd = stationDate(date);
     return `${sd.getUTCFullYear()}-${p(sd.getUTCMonth() + 1)}-${p(sd.getUTCDate())}`;
 }
 
-let gallerySelDay = "";
-// Date strip for the By day view: one chip per day (oldest to newest), the selected day's block is the only one shown
-function renderDayStrip(days) {
-    let strip = document.getElementById("day-strip");
-    if (!strip) {
-        strip = document.createElement("div");
-        strip.id = "day-strip";
-        strip.className = "day-strip";
-        dayList.parentNode.insertBefore(strip, dayList);
-        strip.addEventListener("click", (e) => {
-            const nav = e.target.closest("[data-ds-step]");
-            if (nav) {
-                const sc = strip.querySelector(".ds-scroll");
-                sc.scrollBy({ left: Number(nav.dataset.dsStep) * sc.clientWidth * 0.8, behavior: "smooth" });
-                return;
-            }
-            const b = e.target.closest("[data-day]");
-            if (!b) return;
-            gallerySelDay = b.dataset.day;
-            renderDays();
-        });
-    }
-    const asc = [...days].reverse();
-    const utc = (k) => new Date(`${k}T00:00:00Z`);
-    const month = utc(gallerySelDay).toLocaleDateString(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
-    strip.innerHTML = `<div class="ds-head"><b>${escapeHtml(month)}</b>
-        <span><button type="button" class="ds-nav" data-ds-step="-1" aria-label="Earlier days">&larr;</button><button type="button" class="ds-nav" data-ds-step="1" aria-label="Later days">&rarr;</button></span></div>
-        <div class="ds-scroll">${asc.map((d) => {
-            const n = d.events.length + (d.product && d.product.timelapse ? 1 : 0);
-            return `<button type="button" class="ds-d${d.date === gallerySelDay ? " active" : ""}${n ? "" : " empty"}" data-day="${escapeHtml(d.date)}" aria-pressed="${d.date === gallerySelDay}">
-                <span>${escapeHtml(utc(d.date).toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" }))}</span><b>${Number(d.date.slice(8))}</b></button>`;
-        }).join("")}</div>`;
-    const act = strip.querySelector(".ds-d.active");
-    if (act) { const sc = strip.querySelector(".ds-scroll"); sc.scrollLeft = act.offsetLeft - sc.clientWidth / 2 + act.offsetWidth / 2; }
+// A state block with an icon, a short title and an optional retry (ds-empty)
+function arcState(icon, title, retryId) {
+    return `<div class="ds-empty">${arcIcon(icon)}<p class="ds-empty__title">${escapeHtml(title)}</p>`
+        + (retryId ? `<button type="button" class="ds-btn" id="${retryId}" aria-label="Retry" title="Retry">${arcIcon("rotate-ccw")}</button>` : "") + `</div>`;
 }
 
+// ---------- view switch (segmented control) ----------
+function setGalleryMode(mode) {
+    if (!galleryContainer || !galleryTabs) return;
+    galleryContainer.dataset.gmode = mode;
+    galleryTabs.querySelectorAll(".arc-seg").forEach((b) => b.setAttribute("aria-selected", b.dataset.gmode === mode ? "true" : "false"));
+    ["products", "day", "events"].forEach((m) => { const p = document.getElementById(`pane-${m}`); if (p) p.hidden = m !== mode; });
+    const rb = document.getElementById("btn-arc-range"), sb = document.getElementById("btn-arc-seen");
+    if (rb) rb.hidden = mode !== "events";
+    if (sb) sb.hidden = mode !== "events";
+    if (mode !== "events") { const r = document.getElementById("arc-range"); if (r) r.hidden = true; if (rb) rb.setAttribute("aria-expanded", "false"); }
+    if (mode !== "events" && typeof closeEventViewer === "function") closeEventViewer();
+    try { localStorage.setItem("galleryMode", mode); } catch (e) { /* ignore */ }
+}
+if (galleryTabs) {
+    galleryTabs.addEventListener("click", (e) => {
+        const b = e.target.closest(".arc-seg");
+        if (b) setGalleryMode(b.dataset.gmode);
+    });
+    let savedMode = "products";
+    try { savedMode = localStorage.getItem("galleryMode") || "products"; } catch (e) { /* ignore */ }
+    setGalleryMode(["products", "day", "events"].includes(savedMode) ? savedMode : "products");
+}
+
+// ---------- Products ----------
+function renderGallery(data) {
+    productsGrid.innerHTML = "";
+    destroyZooms(cardZooms);
+    if (galleryDateEl && data && data.date) galleryDateEl.textContent = `${data.date} ${tzLabel}`;
+    if (galleryFrameCountEl && data && data.archived_frames_count !== undefined) galleryFrameCountEl.textContent = String(data.archived_frames_count);
+    galleryHistory = (data && data.history) || [];
+    if (!data || !data.items || data.items.length === 0) {
+        productsGrid.innerHTML = arcState("film", "No products yet");
+        return;
+    }
+    const cacheBust = Date.now();
+    data.items.forEach((item) => {
+        const card = document.createElement("figure");
+        card.className = "arc-card";
+        const mediaUrl = `${item.url}?t=${cacheBust}`;
+        const title = item.title || item.type;
+        const nRejected = item.rejected ? Object.values(item.rejected).reduce((a, b) => a + b, 0) : 0;
+        const media = item.type === "timelapse"
+            ? `<video controls autoplay loop muted playsinline preload="metadata" src="${escapeHtml(mediaUrl)}" aria-label="${escapeHtml(title)}"></video>`
+            : `<a href="${escapeHtml(mediaUrl)}" data-viewer="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><img src="${escapeHtml(mediaUrl)}" alt="${escapeHtml(title)}" loading="lazy" /></a>`;
+        const badges = [`<span class="arc-badge">${arcIcon(item.type === "timelapse" ? "film" : "image")}${escapeHtml(title)}</span>`];
+        if (item.frame_count !== undefined) badges.push(`<span class="arc-badge" title="Frames${nRejected ? `, ${nRejected} rejected` : ""}">${arcIcon("layers")}${item.frame_count}</span>`);
+        if (item.size_kb) badges.push(`<span class="arc-badge">${formatSize(item.size_kb)}</span>`);
+        card.innerHTML = `<div class="arc-card__media">${media}<div class="arc-card__bar">${badges.join("")}</div></div>
+            <figcaption class="arc-card__foot"><span>${item.timestamp ? escapeHtml(fmtLocalIso(item.timestamp)) : ""}</span>
+            <a class="ds-btn ds-btn--ghost ds-btn--icon" href="${escapeHtml(mediaUrl)}" download aria-label="Download ${escapeHtml(title)}" title="Download">${arcIcon("download")}</a></figcaption>`;
+        productsGrid.appendChild(card);
+        if (item.type === "timelapse") { attachVideoInfo(card.querySelector("video"), item.info_url); zoomVideo(card.querySelector("video"), cardZooms); }
+    });
+}
+
+// ---------- By day: one card per night, newest first, empty days collapsed ----------
 function renderDays() {
     if (!dayList) return;
-    const evf = document.getElementById("events-filter"), evHead = document.querySelector(".gal-pane-day .section-heading");
-    if (evf && evHead && dayList.contains(evf)) evHead.appendChild(evf);   // keep the chips alive across the re-render
     const todayKey = dayKeyOf(new Date());
     const byDay = new Map();
-    const ensure = (key) => {
-        if (!byDay.has(key)) byDay.set(key, { date: key, product: null, events: [] });
-        return byDay.get(key);
-    };
-    ensure(todayKey);
+    const ensure = (k) => { if (!byDay.has(k)) byDay.set(k, { date: k, product: null, events: 0 }); return byDay.get(k); };
     galleryHistory.forEach((d) => { ensure(d.date).product = d; });
-    tableEvents.forEach((ev, i) => ensure(dayKeyOf(new Date(ev.timestamp))).events.push(i));
-
-    const days = [...byDay.values()].sort((a, b) => (a.date < b.date ? 1 : -1));
-    if (dayCountBadge) dayCountBadge.textContent = `${days.length} ${days.length === 1 ? "Day" : "Days"}`;
-
-    let notice = "";
-    if (tableEvents.length === 0) {
-        const on = Object.entries(eventsMeta.enabled || {}).filter(([, v]) => v).map(([k]) => EVENT_LABELS[k] || k);
-        notice = `No events yet. Detecting: ${on.join(", ") || "nothing (turn types on in Settings)"}.`;
-    } else if (eventsMeta.total_count > tableEvents.length) {
-        notice = `Showing the newest ${tableEvents.length} of ${eventsMeta.total_count} events.`;
-    }
-    if (!days.some((d) => d.date === gallerySelDay)) gallerySelDay = days[0].date;
-    destroyZooms(dayZooms);
-    dayList.innerHTML = (notice ? `<p class="text-muted day-notice">${notice}</p>` : "")
-        + days.map((day) => dayBlockHtml(day, todayKey, day.date === gallerySelDay)).join("");
-    renderDayStrip(days);
-    placeEventsFilter();
-    dayList.querySelectorAll("video[data-info]").forEach((v) => { attachVideoInfo(v, v.dataset.info); zoomVideo(v, dayZooms); });
-}
-
-const EVENT_NAMES = { meteor: "Meteor", plane: "Aircraft", satellite: "Satellite", clouds: "Clouds", flash: "Flash" };
-
-// By day shows the filter chips inside the Events card; Events mode keeps them at the top of the pane
-function placeEventsFilter() {
-    const f = document.getElementById("events-filter");
-    if (!f) return;
-    const slot = galleryContainer && galleryContainer.classList.contains("gal-mode-day") ? dayList.querySelector(".day-block.sel .day-evhead") : null;
-    if (slot) slot.after(f);
-    else { const head = document.querySelector(".gal-pane-day .section-heading"); if (head && f.parentNode !== head) head.appendChild(f); }
-}
-
-function dayBlockHtml(day, todayKey, first) {
-    const isToday = day.date === todayKey;
-    const p = day.product || {};
-    const evs = day.events;
-    const tl = p.timelapse;
-    const utc = new Date(`${day.date}T00:00:00Z`);
-    const longDate = utc.toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" });
-    const weekDate = utc.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
-
-    const tiles = [];
-    if (!isToday) {
-        if (tl) tiles.push(`<div class="day-tl"><video controls loop muted playsinline preload="metadata" src="${escapeHtml(tl.url)}#t=0.5" data-info="${escapeHtml(tl.url.replace(/\.mp4$/, ".json"))}"></video><span class="dt-label">Timelapse</span>${tl.size_kb ? `<span class="dt-cap">${formatSize(tl.size_kb)}</span>` : ""}</div>`);
-        [["keogram", "Keogram"], ["startrails", "Startrails"]].forEach(([k, label]) => {
-            if (p[k]) tiles.push(`<a class="day-tile" href="${escapeHtml(p[k].url)}" data-viewer="${label} \u2014 ${escapeHtml(day.date)}" title="View ${label}"><img src="${escapeHtml(p[k].url)}" alt="${label} ${escapeHtml(day.date)}" loading="lazy" /><span class="dt-label">${label}</span></a>`);
+    (typeof arcEvents !== "undefined" ? arcEvents : []).forEach((ev) => { ensure(dayKeyOf(new Date(ev.start_ts * 1000))).events++; });
+    const days = [...byDay.values()].filter((d) => d.product || d.events).sort((a, b) => (a.date < b.date ? 1 : -1));
+    if (!days.length) { dayList.innerHTML = arcState("calendar-days", "No days archived yet"); return; }
+    dayList.innerHTML = days.map((day) => {
+        const p = day.product || {};
+        const utc = new Date(`${day.date}T00:00:00Z`);
+        const label = utc.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+        const thumbs = [];
+        if (p.timelapse) thumbs.push(`<div class="arc-thumb"><video controls loop muted playsinline preload="metadata" src="${escapeHtml(p.timelapse.url)}#t=0.5" aria-label="Timelapse ${escapeHtml(day.date)}"></video><span class="arc-badge">${arcIcon("film")}</span></div>`);
+        [["keogram", "Keogram", "activity"], ["startrails", "Startrails", "sparkles"]].forEach(([k, name, ic]) => {
+            if (p[k]) thumbs.push(`<a class="arc-thumb" href="${escapeHtml(p[k].url)}" data-viewer="${name} — ${escapeHtml(day.date)}" aria-label="${name} ${escapeHtml(day.date)}"><img src="${escapeHtml(p[k].url)}" alt="${name} ${escapeHtml(day.date)}" loading="lazy" /><span class="arc-badge">${arcIcon(ic)}</span></a>`);
         });
-    }
-    const night = `<section class="card day-night"><div class="day-cardhead"><h3>Night of ${escapeHtml(longDate)}</h3><span>${tiles.length} ${tiles.length === 1 ? "product" : "products"}</span></div>
-        ${tiles.length ? `<div class="day-products">${tiles.join("")}</div>` : `<p class="text-muted day-empty">${isToday ? "Tonight's products are on the Products tab." : "No products for this night."}</p>`}
-        ${tl ? `<a href="${escapeHtml(tl.url)}" download class="day-dl">Download timelapse</a>` : ""}</section>`;
-
-    const cards = evs.map((i) => {
-        const ev = tableEvents[i], dur = eventDuration(ev);
-        const thumb = ev.thumbnail_url ? `<img src="${escapeHtml(ev.thumbnail_url)}" alt="" loading="lazy" />` : "";
-        return `<button type="button" class="evc" data-event-idx="${i}" style="--pill:${EVENT_COLORS[ev.type] || "var(--accent)"}" title="${escapeHtml(ev.timestamp)}">
-            <span class="evc-th">${thumb}<i class="evc-dot" aria-hidden="true"></i></span>
-            <b>${escapeHtml(EVENT_NAMES[ev.type] || ev.type)}</b>
-            <small>${escapeHtml(fmtLocalIso(ev.timestamp, true).slice(0, 5))}${dur ? " \u00b7 " + fmtSeconds(dur) : ""}</small></button>`;
+        while (thumbs.length < 3) thumbs.push(`<div class="arc-thumb arc-thumb--empty" aria-hidden="true"></div>`);
+        const evChip = day.events
+            ? `<button type="button" class="ds-chip" data-arc-day="${escapeHtml(day.date)}" aria-label="${day.events} events on ${escapeHtml(day.date)}" title="Show events">${arcIcon("zap")}<b>${day.events}</b></button>` : "";
+        return `<section class="arc-day"><header class="arc-day__head">${arcIcon("moon-star")}<b>${escapeHtml(label)}</b>${day.date === todayKey ? `<span class="arc-badge">${arcIcon("clock")}</span>` : ""}${evChip}</header><div class="arc-day__thumbs">${thumbs.join("")}</div></section>`;
     }).join("");
-    const events = `<section class="card day-events"><div class="day-evhead"><h3><span class="t-day">Events</span><span class="t-ev">${escapeHtml(weekDate)}${isToday ? " \u00b7 Today" : ""}</span></h3><span>${evs.length} detected</span></div>
-        ${evs.length ? `<div class="evc-grid">${cards}</div>` : `<p class="text-muted day-empty">No sky events.</p>`}</section>`;
+}
+if (dayList) dayList.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-arc-day]");
+    if (b && typeof arcShowDay === "function") arcShowDay(b.dataset.arcDay);
+});
 
-    return `<div class="day-block${first ? " sel" : ""}">${night}${events}</div>`;
+async function loadGalleryAndEvents() {
+    productsGrid.innerHTML = `<div class="ds-skeleton arc-sk"></div><div class="ds-skeleton arc-sk"></div>`;
+    try {
+        const resGal = await fetch("/api/gallery");
+        if (!resGal.ok) throw new Error(`HTTP ${resGal.status}`);
+        renderGallery(await resGal.json());
+    } catch (err) {
+        console.error("Failed to load gallery:", err);
+        productsGrid.innerHTML = arcState("triangle-alert", "Could not load products", "btn-gal-retry");
+        const r = document.getElementById("btn-gal-retry");
+        if (r) r.addEventListener("click", loadGalleryAndEvents);
+    }
+    if (typeof loadEvents === "function") await loadEvents();
+    renderDays();
+}
+if (currentPage === "tab-gallery") setTimeout(() => loadGalleryAndEvents(), 0);
+const arcRefresh = document.getElementById("btn-arc-refresh");
+if (arcRefresh) arcRefresh.addEventListener("click", () => loadGalleryAndEvents());
+
+// ---------- Timelapse builder (sheet): date range -> POST /api/timelapse/build; today only -> /api/gallery/generate ----------
+const tlBuild = document.getElementById("tl-build");
+if (tlBuild) {
+    const tlFrom = document.getElementById("tl-from"), tlTo = document.getElementById("tl-to"), tlResult = document.getElementById("tl-result");
+    tlTo.value = dayKeyOf(new Date());
+    tlFrom.value = dayKeyOf(new Date(Date.now() - 86400000));
+    tlBuild.addEventListener("click", async () => {
+        const fps = document.getElementById("tl-fps").value || "24";
+        const todayOnly = tlFrom.value === tlTo.value && tlTo.value === dayKeyOf(new Date());
+        tlBuild.disabled = true;
+        tlResult.hidden = false;
+        destroyZooms(tlZooms);
+        tlResult.innerHTML = `<div class="ds-skeleton arc-sk"></div>`;
+        try {
+            let res;
+            if (todayOnly) {
+                res = await fetch(`/api/gallery/generate?fps=${encodeURIComponent(fps)}`, { method: "POST" });
+            } else {
+                const q = new URLSearchParams({ date_from: tlFrom.value, date_to: tlTo.value, fps, width: document.getElementById("tl-res").value,
+                    overlay: document.getElementById("tl-overlay").checked ? "true" : "false" });
+                res = await fetch(`/api/timelapse/build?${q}`, { method: "POST" });
+            }
+            const d = await res.json();
+            if (!res.ok) throw new Error(d.detail || "unknown error");
+            if (todayOnly) {
+                tlResult.innerHTML = arcState("circle-check", "Done");
+                if (d.gallery) renderGallery(d.gallery); else loadGalleryAndEvents();
+            } else {
+                const url = `${d.timelapse_url}?t=${Date.now()}`;
+                tlResult.innerHTML = `<div class="arc-tl__meta"><span class="arc-badge">${arcIcon("layers")}${d.video_frames_count}</span><span class="arc-badge">${arcIcon("clock")}${d.duration_s}s</span><span class="arc-badge">${formatSize(d.size_kb)}</span>`
+                    + `<a class="ds-btn ds-btn--ghost ds-btn--icon" href="${escapeHtml(url)}" download aria-label="Download timelapse" title="Download">${arcIcon("download")}</a></div>`
+                    + `<div class="tl-zoom"><video controls loop muted playsinline src="${escapeHtml(url)}"></video></div>`;
+                zoomVideo(tlResult.querySelector("video"), tlZooms);
+            }
+        } catch (err) {
+            tlResult.innerHTML = arcState("triangle-alert", `Build failed: ${err.message}`);
+        } finally {
+            tlBuild.disabled = false;
+        }
+    });
 }
 
-// In-page image viewer for keograms / startrails (Esc, click or ✕ to close)
+// ---------- Keogram / startrails viewer (Esc or the close icon) ----------
 const viewer = document.createElement("div");
-viewer.className = "image-viewer hidden";
-viewer.innerHTML = `
-    <button class="image-viewer-close" title="Close (Esc)">✕</button>
-    <div class="iv-zoom"><img alt="" draggable="false" /></div>
-    <div class="image-viewer-caption"></div>
-`;
+viewer.className = "arc-iv";
+viewer.setAttribute("role", "dialog");
+viewer.setAttribute("aria-modal", "true");
+viewer.setAttribute("aria-label", "Image");
+viewer.innerHTML = `<button type="button" class="ds-btn ds-btn--icon arc-iv__close" aria-label="Close" title="Close (Esc)">${arcIcon("x")}</button><div class="iv-zoom"><img alt="" draggable="false" /></div>`;
 document.body.appendChild(viewer);
 const viewerImg = viewer.querySelector("img");
-// Zoom + pan the picture (zoom_pan.js); a click on the picture no longer closes the viewer, the backdrop, the X and Esc do
-const viewerZoom = window.ZenivoZoomPan ? ZenivoZoomPan.attach(viewer.querySelector(".iv-zoom"), viewerImg, { active: () => !viewer.classList.contains("hidden") }) : null;
-const viewerCaption = viewer.querySelector(".image-viewer-caption");
-
+const viewerZoom = window.ZenivoZoomPan ? ZenivoZoomPan.attach(viewer.querySelector(".iv-zoom"), viewerImg, { active: () => viewer.dataset.open === "true" }) : null;
 function closeViewer() {
     if (viewerZoom) viewerZoom.reset();
-    viewer.classList.add("hidden");
+    viewer.dataset.open = "false";
     viewerImg.removeAttribute("src");
 }
-
 document.addEventListener("click", (e) => {
     const link = e.target.closest("a[data-viewer]");
     if (link) {
-        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return; // keep open-in-new-tab
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;   // keep open-in-new-tab
         e.preventDefault();
         if (viewerZoom) viewerZoom.reset();
         viewerImg.src = link.getAttribute("href");
-        viewerCaption.textContent = link.dataset.viewer;
-        viewer.classList.remove("hidden");
-    } else if (!viewer.classList.contains("hidden") && viewer.contains(e.target) && !e.target.closest(".iv-zoom")) {
+        viewerImg.alt = link.dataset.viewer || "";
+        viewer.dataset.open = "true";
+    } else if (viewer.dataset.open === "true" && (e.target.closest(".arc-iv__close") || e.target === viewer)) {
         closeViewer();
     }
 });
-document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !viewer.classList.contains("hidden")) closeViewer();
-});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && viewer.dataset.open === "true") closeViewer(); });
 
 const EVENT_LABELS = {
     meteor: "☄️ Meteor", plane: "✈️ Aircraft", satellite: "🛰️ Satellite", clouds: "☁️ Clouds", flash: "⚡ Flash",
