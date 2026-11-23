@@ -1,0 +1,62 @@
+/* ds base: applies ONLY inside .ds-root or [data-ui="2"], so loading it on a legacy page changes nothing. */
+.ds-root,
+[data-ui="2"] {
+    background: var(--c-bg);
+    color: var(--c-text);
+    font-family: var(--font-ui);
+    font-size: var(--fs-14);
+    line-height: var(--lh-body);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+}
+.ds-root *,
+.ds-root *::before,
+.ds-root *::after,
+[data-ui="2"] .ds-root *,
+[data-ui="2"] *:where([class^="ds-"]) {
+    box-sizing: border-box;
+}
+.ds-root :focus-visible,
+[data-ui="2"] :focus-visible {
+    outline: 2px solid var(--c-focus);
+    outline-offset: 2px;
+}
+.ds-root h1,
+.ds-root h2,
+.ds-root h3,
+.ds-root p {
+    margin: 0;
+}
+.ds-num {
+    font-family: var(--font-num);
+    font-variant-numeric: tabular-nums;
+}
+.ds-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+/* Page content area: leaves room for the bottom bar (phone/tablet) or the left rail (desktop) */
+.ds-page {
+    padding: var(--s-4) var(--s-4) calc(var(--tabbar-h) + var(--s-6) + env(safe-area-inset-bottom, 0px));
+    max-width: var(--content-max);
+    margin: 0 auto;
+}
+@media (min-width: 1024px) {
+    .ds-page {
+        padding: var(--s-6) var(--s-7) var(--s-7) calc(var(--rail-w) + var(--s-7));
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ds-root *,
+    [data-ui="2"] *:where([class^="ds-"]) {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}

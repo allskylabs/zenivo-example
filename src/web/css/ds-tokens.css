@@ -1,0 +1,111 @@
+/* Zenivo design system (ds-*) tokens. Additive: every name is new (--c-*, --fs-*, --s-*, --r-*, --z-*), nothing here
+ * touches the legacy tokens.css. Hex colours are allowed ONLY in this file (the lint enforces it).
+ * Night/Red Vision: [data-theme="red"] (same attribute the site already uses) overrides every colour role. */
+:root {
+    /* Colour roles */
+    --c-bg: #0b1220;
+    --c-surface-1: #121b2d;
+    --c-surface-2: #162238;
+    --c-surface-3: #1b2842;
+    --c-border: #1f2c44;
+    --c-divider: #1b2740;
+    --c-text: #e6edf7;
+    --c-text-2: #8fa3bf;
+    --c-text-3: #64748b;
+    --c-accent: #38bdf8;
+    --c-accent-bg: rgba(56, 189, 248, 0.16);
+    --c-on-accent: #04202e;
+    --c-ok: #34d399;
+    --c-ok-bg: rgba(52, 211, 153, 0.16);
+    --c-warn: #fbbf24;
+    --c-warn-bg: rgba(251, 191, 36, 0.16);
+    --c-danger: #f87171;
+    --c-danger-bg: rgba(248, 113, 113, 0.16);
+    --c-info: #38bdf8;
+    --c-info-bg: rgba(56, 189, 248, 0.16);
+    --c-violet: #a78bfa;
+    --c-scrim: rgba(3, 7, 14, 0.62);
+    --c-focus: #7dd3fc;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 12px 32px rgba(0, 0, 0, 0.55);
+
+    /* Type scale: nothing under 12 px (11 px only for uppercase captions) */
+    --fs-11: 11px;
+    --fs-12: 12px;
+    --fs-14: 14px;
+    --fs-16: 16px;
+    --fs-18: 18px;
+    --fs-22: 22px;
+    --fs-32: 32px;
+    --lh-tight: 1.2;
+    --lh-body: 1.45;
+    --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-num: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+    /* Spacing (4-based), radius, touch target, icon sizes */
+    --s-1: 4px;
+    --s-2: 8px;
+    --s-3: 12px;
+    --s-4: 16px;
+    --s-5: 20px;
+    --s-6: 24px;
+    --s-7: 32px;
+    --s-8: 48px;
+    --r-sm: 8px;
+    --r-md: 12px;
+    --r-lg: 16px;
+    --r-xl: 20px;
+    --r-pill: 999px;
+    --tap: 44px;
+    --icon-sm: 18px;
+    --icon-md: 24px;
+    --icon-lg: 32px;
+    --icon-xl: 48px;
+
+    /* Named layers (no other z-index values are allowed) */
+    --z-nav: 40;
+    --z-fab: 50;
+    --z-sheet: 60;
+    --z-toast: 70;
+    --z-modal: 80;
+
+    /* Layout + motion */
+    --tabbar-h: 64px;
+    --rail-w: 88px;
+    --topbar-h: 56px;
+    --content-max: 1280px;
+    --ease: cubic-bezier(0.2, 0, 0, 1);
+    --dur: 180ms;
+}
+
+/* Breakpoints (documented once; CSS custom properties cannot be used in @media):
+ *   phone <= 640, tablet 641-1023, desktop >= 1024. */
+
+/* Night / Red Vision: a real palette (protects dark adaptation). Status is told apart by icon SHAPE, not hue. */
+[data-theme="red"] {
+    --c-bg: #0a0000;
+    --c-surface-1: #140404;
+    --c-surface-2: #1c0707;
+    --c-surface-3: #2a0a0a;
+    --c-border: #3a0e0e;
+    --c-divider: #2e0b0b;
+    --c-text: #ff6b6b;
+    --c-text-2: #d04a4a;
+    --c-text-3: #9a3636;
+    --c-accent: #ff4d4d;
+    --c-accent-bg: rgba(255, 77, 77, 0.18);
+    --c-on-accent: #1a0000;
+    --c-ok: #e05a5a;
+    --c-ok-bg: rgba(224, 90, 90, 0.16);
+    --c-warn: #ff7a5c;
+    --c-warn-bg: rgba(255, 122, 92, 0.16);
+    --c-danger: #ff2d2d;
+    --c-danger-bg: rgba(255, 45, 45, 0.18);
+    --c-info: #ff4d4d;
+    --c-info-bg: rgba(255, 77, 77, 0.16);
+    --c-violet: #cc4444;
+    --c-scrim: rgba(10, 0, 0, 0.75);
+    --c-focus: #ff9a9a;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.6);
+    --shadow-2: 0 12px 32px rgba(0, 0, 0, 0.8);
+}

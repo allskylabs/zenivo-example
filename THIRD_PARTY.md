@@ -65,6 +65,12 @@ repository alone (see [tools/skyview/README.md](tools/skyview/README.md)).
 The `/sky` page defaults to a fixed observer position when no `lat`/`lon` query parameters are given (a constant in
 `tools/skyview/src/main.ts`).
 
+### Icons (`src/web/icons.svg`)
+
+| Component | Licence | Source |
+|---|---|---|
+| Lucide icons v1.78.0 (about 66 icons inlined as an SVG sprite; full licence text in `src/web/icons.LICENSE.txt`) | ISC (icons derived from Feather are MIT) | https://lucide.dev, https://github.com/lucide-icons/lucide |
+
 ## 4. Browser libraries loaded from a CDN
 
 The pages load these from the hosts below; the pinned versions and the SRI hashes are in the HTML files named in
