@@ -629,21 +629,35 @@ const ovRow = (inView, tag, sub, dist, where) => `<li class="flight${inView ? " 
     `<div class="fl-sub">${sub}</div><div class="fl-dist" title="Distance from the camera">${dist}</div><div class="fl-where">${where}</div></li>`;
 
 let flightsFilter = "all";
+let flightsSort = "off"; // off -> up (climbing first) -> down (descending first)
 const FL_FILTERS = {
     all: () => true,
     view: (a) => !!a.in_view,
-    up: (a) => a.climb_m_min != null && a.climb_m_min > 60,
-    down: (a) => a.climb_m_min != null && a.climb_m_min < -60,
 };
+const FL_SORTS = {
+    off: null,
+    up: (a, b) => (b.climb_m_min ?? -1e9) - (a.climb_m_min ?? -1e9),
+    down: (a, b) => (a.climb_m_min ?? 1e9) - (b.climb_m_min ?? 1e9),
+};
+const FL_SORT_TIP = { off: "Sort: off. Tap for climbing first", up: "Sort: climbing first. Tap for descending first", down: "Sort: descending first. Tap to turn off" };
+const ovIc = (n) => `<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-${n}"></use></svg>`;
+const ovCounts = (inView, n, label, icon) => `<span class="ov-chip" title="In the camera view">${ovIc("eye")}<b>${inView}</b> in view</span><span class="ov-chip" title="${label}">${ovIc(icon)}<b>${n}</b> ${label}</span>`;
 document.getElementById("flights-chips")?.addEventListener("click", (e) => {
-    const b = e.target.closest(".zchip");
+    const b = e.target.closest(".ov-f");
     if (!b) return;
     flightsFilter = b.dataset.fl;
-    document.querySelectorAll("#flights-chips .zchip").forEach((c) => {
+    document.querySelectorAll("#flights-chips .ov-f").forEach((c) => {
         const on = c === b;
         c.classList.toggle("active", on);
         c.setAttribute("aria-pressed", String(on));
     });
+    if (flightsLast) renderFlights(flightsLast);
+});
+document.getElementById("flights-sort")?.addEventListener("click", (e) => {
+    const b = e.currentTarget;
+    flightsSort = { off: "up", up: "down", down: "off" }[flightsSort];
+    b.dataset.sort = flightsSort;
+    b.title = b.ariaLabel = FL_SORT_TIP[flightsSort];
     if (flightsLast) renderFlights(flightsLast);
 });
 
@@ -653,13 +667,14 @@ function renderFlights(d) {
     flightsCard.hidden = false;
     const all = d.aircraft || [];
     const list = all.filter(FL_FILTERS[flightsFilter] || FL_FILTERS.all);
-    flightsCount.textContent = `${d.in_view || 0} in view · ${d.total || 0} heard`;
+    if (FL_SORTS[flightsSort]) list.sort(FL_SORTS[flightsSort]);
+    flightsCount.innerHTML = ovCounts(d.in_view || 0, d.total || 0, "heard", "radio");
     if (d.source_in_use === "public" && d.public_provider) {
         // adsb.fi / adsb.lol terms: credit the source with a link
         const pp = d.public_provider;
-        flightsStatus.innerHTML = `Live from the public network: <a class="ds-link" href="${escapeHtml(pp.link)}" target="_blank" rel="noopener" aria-label="${escapeHtml(pp.name)} (opens in a new tab)">${escapeHtml(pp.name)}<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-arrow-up-right"></use></svg></a>`;
+        flightsStatus.innerHTML = `Source: <a class="ds-link" href="${escapeHtml(pp.link)}" target="_blank" rel="noopener" aria-label="${escapeHtml(pp.name)} (opens in a new tab)">${escapeHtml(pp.name)}<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-arrow-up-right"></use></svg></a>`;
     } else {
-        flightsStatus.textContent = d.connected ? "Live from the ADS-B receiver" : "Receiver not connected";
+        flightsStatus.textContent = d.connected ? "Source: ADS-B receiver" : "Receiver not connected";
     }
     if (!list.length) {
         flightsList.innerHTML = `<li class="live-events-empty">${all.length ? "No aircraft match this filter." : "No aircraft heard right now."}</li>`;
@@ -699,8 +714,8 @@ function renderSondes(d) {
     sondesOff = false;
     if (!d || (!list.length && d.error)) { sondesCard.hidden = true; return; }
     sondesCard.hidden = false;
-    document.getElementById("sondes-count").textContent = `${d.in_view || 0} in view · ${d.total || 0} heard`;
-    document.getElementById("sondes-status").textContent = "Live from SondeHub (within 350 km)";
+    document.getElementById("sondes-count").innerHTML = ovCounts(d.in_view || 0, d.total || 0, "heard", "radio");
+    document.getElementById("sondes-status").textContent = "Source: SondeHub, within 350 km";
     const ul = document.getElementById("sondes-list");
     if (!list.length) { ul.innerHTML = `<li class="live-events-empty">No radiosonde flying nearby right now.</li>`; return; }
     ul.innerHTML = list.slice(0, OV_ROWS).map((a) => {
@@ -718,11 +733,11 @@ function renderSats(d) {
     const all = ((d && d.satellites) || []).filter((s) => s.above_horizon !== false);
     satsCard.hidden = false;
     const inView = all.filter((s) => s.in_view).length;
-    document.getElementById("sats-count").textContent = `${inView} in view · ${all.length} up`;
+    document.getElementById("sats-count").innerHTML = ovCounts(inView, all.length, "up", "satellite");
     const sun = d && d.sun_alt_deg;
     if (typeof sun === "number") window.ALLSKY_SUN_ALT = { v: sun, t: Date.now() };
-    document.getElementById("sats-status").textContent = sun == null ? "Large satellites above the horizon"
-        : sun > -6 ? "Daylight: positions only, not visible to the eye" : "Bright = sunlit under a dark sky";
+    const _ss = document.getElementById("sats-status"); _ss.textContent = sun == null ? "Large satellites above the horizon"
+        : sun > -6 ? "Daylight: positions only, not visible to the eye" : "Bright = sunlit under a dark sky"; _ss.title = _ss.textContent;
     const ul = document.getElementById("sats-list");
     if (!all.length) { ul.innerHTML = `<li class="live-events-empty">No large satellite above the horizon right now.</li>`; return; }
     const list = all.slice().sort((a, b) => (b.in_view - a.in_view) || (b.visible - a.visible) || (b.alt_deg - a.alt_deg)).slice(0, OV_ROWS);

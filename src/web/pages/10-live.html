@@ -195,23 +195,24 @@
                             <button type="button" role="tab" class="ov-tab" id="ov-tab-sondes" data-ov="sondes-card" aria-selected="false" title="Sondes" aria-label="Sondes"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-balloon"></use></svg><span class="ov-t">Sondes</span><span class="ov-n" id="ov-n-sondes">0</span></button>
                         </div>
                         <div class="ov-panel flights-card" id="flights-card" role="tabpanel" hidden>
-                            <div class="ov-meta"><span class="badge" id="flights-count">--</span><span class="flights-status" id="flights-status">Loading…</span></div>
-                            <div class="zchips" id="flights-chips" role="group" aria-label="Filter aircraft">
-                                <button type="button" class="zchip active" data-fl="all" aria-pressed="true">All</button>
-                                <button type="button" class="zchip" data-fl="view" aria-pressed="false">In view</button>
-                                <button type="button" class="zchip" data-fl="up" aria-pressed="false" title="Climbing" aria-label="Climbing">&uarr;</button>
-                                <button type="button" class="zchip" data-fl="down" aria-pressed="false" title="Descending" aria-label="Descending">&darr;</button>
+                            <div class="ov-r1"><div class="ov-counts" id="flights-count">--</div><span class="ov-src" id="flights-status">Loading…</span></div>
+                            <div class="ov-r2">
+                                <div class="ov-fseg" id="flights-chips" role="group" aria-label="Filter aircraft">
+                                    <button type="button" class="ov-f active" data-fl="all" aria-pressed="true">All</button>
+                                    <button type="button" class="ov-f" data-fl="view" aria-pressed="false">In view</button>
+                                </div>
+                                <button type="button" class="ov-sort" id="flights-sort" data-sort="off" title="Sort: off. Tap for climbing first" aria-label="Sort: off. Tap for climbing first"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-up"></use></svg><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></button>
                             </div>
                             <ul class="flights-list" id="flights-list"></ul>
                             <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
                         </div>
                         <div class="ov-panel flights-card" id="sats-card" role="tabpanel" hidden>
-                            <div class="ov-meta"><span class="badge" id="sats-count">--</span><span class="flights-status" id="sats-status">Loading…</span></div>
+                            <div class="ov-r1"><div class="ov-counts" id="sats-count">--</div><span class="ov-src" id="sats-status">Loading…</span></div>
                             <ul class="flights-list" id="sats-list"></ul>
                             <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
                         </div>
                         <div class="ov-panel flights-card" id="sondes-card" role="tabpanel" hidden>
-                            <div class="ov-meta"><span class="badge" id="sondes-count">--</span><span class="flights-status" id="sondes-status">Loading…</span></div>
+                            <div class="ov-r1"><div class="ov-counts" id="sondes-count">--</div><span class="ov-src" id="sondes-status">Loading…</span></div>
                             <ul class="flights-list" id="sondes-list"></ul>
                             <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
                         </div>
