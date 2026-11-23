@@ -259,6 +259,7 @@
             zoom.title = "Enlarge";
             zoom.setAttribute("aria-label", `Enlarge the preview of ${name}`);
             img.addEventListener("error", () => zoom.remove());
+            img.addEventListener("load", () => { if (img.naturalWidth && img.naturalHeight) zoom.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`; });
             img.src = src;
             zoom.appendChild(img);
             const relays = base ? [] : relaySources(card);

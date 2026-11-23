@@ -222,16 +222,21 @@ a.ds-row:hover, button.ds-row:hover { background: var(--c-surface-2); }
     right: 0;
     bottom: 0;
     max-height: 86vh;
+    max-height: min(86dvh, calc(100dvh - var(--s-6)));
+    overflow-x: hidden;
     overflow-y: auto;
-    padding: var(--s-2) var(--s-4) calc(var(--s-6) + env(safe-area-inset-bottom, 0px));
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding: 0 var(--s-4) calc(var(--s-6) + env(safe-area-inset-bottom, 0px));
     background: var(--c-surface-1);
     border: 1px solid var(--c-border);
     border-radius: var(--r-xl) var(--r-xl) 0 0;
     box-shadow: var(--shadow-2);
     animation: ds-sheet-up var(--dur) var(--ease);
 }
-.ds-sheet__grab { width: 40px; height: 4px; margin: 0 auto var(--s-2); border-radius: var(--r-pill); background: var(--c-border); }
-.ds-sheet__head { display: flex; align-items: center; gap: var(--s-3); min-height: var(--tap); margin-bottom: var(--s-2); }
+.ds-sheet__grab { width: 40px; height: 4px; margin: var(--s-2) auto var(--s-2); position: sticky; top: var(--s-2); border-radius: var(--r-pill); background: var(--c-border); }
+.ds-sheet__head { position: sticky; top: 0; display: flex; align-items: center; gap: var(--s-3); min-height: var(--tap); margin: 0 calc(var(--s-4) * -1) var(--s-2); padding: var(--s-2) var(--s-4) var(--s-1); background: var(--c-surface-1); }
+.ds-sheet__grab + .ds-sheet__head { padding-top: var(--s-1); }
 .ds-sheet__title { flex: 1; font: 600 var(--fs-18) / var(--lh-tight) var(--font-ui); }
 .ds-sheet__tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: var(--s-2); }
 .ds-tile {
