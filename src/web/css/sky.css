@@ -91,3 +91,9 @@
 
 .sk-card .oc-head .oc-btn { flex: none; width: var(--tap); padding: 0; }
 .sk-card .oc-sub { position: relative; display: flex; align-items: center; gap: var(--s-1); }
+
+/* icons first, but keep a SHORT visible caption on desktop (owner rule) */
+@media (min-width: 900px) {
+    .sk-fab[data-cap] { width: auto; padding: 0 var(--s-3); gap: var(--s-2); }
+    .sk-fab[data-cap]::after { content: attr(data-cap); font-size: var(--fs-12); color: var(--c-text-2); white-space: nowrap; }
+}
