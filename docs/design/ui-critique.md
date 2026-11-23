@@ -201,3 +201,18 @@ Screenshots: `critique/live-text-restored-1568.png`, `live-text-restored-390.jpg
 
 - Topbar: labelled chips (status+fps, mode), UTC and Local clocks, Red Vision switch; phone keeps status + local time. Shots: `critique/h-*-topbar-*.png`.
 - Overhead card header (Live): row 1 = count chips with icons (eye in view, radio/satellite heard/up) left, one-line "Source: adsb.fi ↗" right (ellipsis, never wraps); row 2 = All | In view segment left, one sort button right (off → climbing ↑ → descending ↓, tooltip states it). Both rows 36 px, pill radius, 8/12 spacing. Same markup on Sats and Sondes tabs (row 1). Shots: `critique/o-before-overhead-1568.jpg`, `o-after-overhead-1568.png`, `o-after-overhead-390.jpg`. The /overhead page has its own header (oh-*) and was not changed.
+
+### Update 10b: one function, one control per page (rule)
+
+**Rule: one function, one control per page.** A status, toggle or destination has exactly one place on a page; the topbar chip is the only online/status indicator.
+
+Removed (Live and shared chrome), `?v=20261204n`:
+- Link/Online tile in the metric strip: duplicated the topbar status chip (`src/web/pages/10-live.html` tile after Events, `src/web/app/08d-live-ui.js` ~l.166-170, strip now 5 columns in `src/web/css/live.css:71`).
+- Second sidebar collapse handle `#zs-edge` (`scripts/sync_nav.py` aside tail, `src/web/shell.js` setCollapsed/initNav); the header `#zs-toggle` (Ctrl+B) is the only one.
+- Sidebar Chat `#m-chat-btn` (`scripts/sync_nav.py` utils block, `src/web/shell.js` init): the floating chat button stays.
+- Sidebar Fullscreen `#m-fs-btn` is removed at runtime where the picture has its own `#btn-fullscreen` (`src/web/shell.js` init); kept on pages without one.
+- Overhead plot footer links to Flights 3D / Satellites 3D (`src/web/overhead.html` ~l.131-132): the sidebar owns navigation.
+
+Checked, kept: Red Vision (topbar switch only), Sky tile (single day/night indicator), Cloud (tile only), Share (sidebar only, no image share), 3x "Auto" locks (three different settings), per-aircraft ADS-B links.
+Open: Settings list row "OBS dock" duplicates the sidebar item (`/obs/dock`); Logs "Archive" chip vs sidebar Archive (decide with the PM).
+Shots: `docs/design/critique/d-before-live-1568.jpg`, `d-after-live-1568.jpg`.
