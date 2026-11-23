@@ -77,4 +77,8 @@ def resources(data_dir: str) -> Dict[str, Any]:
         out["load1"] = round(float(open("/proc/loadavg").read().split()[0]), 2)
     except (OSError, ValueError, IndexError):
         out["load1"] = None
+    try:
+        out["uptime_s"] = int(float(open("/proc/uptime").read().split()[0]))
+    except (OSError, ValueError, IndexError):
+        out["uptime_s"] = None
     return out

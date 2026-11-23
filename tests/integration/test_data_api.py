@@ -42,7 +42,7 @@ def test_system_resources_admin_only(guest_client):
     assert c.get("/api/system/resources").status_code == 401
     sign_in(c)
     d = c.get("/api/system/resources").json()
-    assert set(d) >= {"cpu_pct", "ram_pct", "disk_pct", "temp_c"} and 0 <= d["disk_pct"] <= 100
+    assert set(d) >= {"cpu_pct", "ram_pct", "disk_pct", "temp_c", "uptime_s"} and 0 <= d["disk_pct"] <= 100
 
 
 def test_sky_riseset_public_by_body_and_by_position(guest_client):
