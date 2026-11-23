@@ -218,8 +218,26 @@ def test_flash():
     det = SkyEventDetector()
     det.process(_sky(1), ALL, ts=0, exposure_s=10.0, gain_db=30)
     bright = cv2.add(_sky(2, 0.5), 80)
-    events = det.process(bright, ALL, ts=15, exposure_s=10.0, gain_db=30)
-    assert [e["type"] for e in events] == ["flash"]
+    assert det.process(bright, ALL, ts=15, exposure_s=10.0, gain_db=30) == []  # held one frame
+    assert det.process(_sky(3, 1.0), ALL, ts=30, exposure_s=10.0, gain_db=30) == []
+    events = det.process(_sky(4, 1.5), ALL, ts=45, exposure_s=10.0, gain_db=30)
+    assert [e["type"] for e in events] == ["flash"] and events[0]["exposure_s"] == 10.0
+
+
+def test_flash_gate_drops_lasting_and_repeated_jumps():
+    bright = cv2.add(_sky(2, 0.5), 80)
+    det = SkyEventDetector()  # sky stays bright: exposure / IR-cut change, not a flash
+    det.process(_sky(1), ALL, ts=0, exposure_s=10.0, gain_db=30)
+    det.process(bright, ALL, ts=15, exposure_s=10.0, gain_db=30)
+    assert det.process(cv2.add(_sky(3, 1.0), 80), ALL, ts=30, exposure_s=10.0, gain_db=30) == []
+    det = SkyEventDetector()  # repeating pulses within a minute: a lamp
+    out = []
+    for i, f in enumerate([_sky(1), bright, _sky(3, 1.0), cv2.add(_sky(4, 1.5), 80), _sky(5, 2.0), _sky(6, 2.5)]):
+        out += det.process(f, ALL, ts=15.0 * i, exposure_s=10.0, gain_db=30)
+    assert [e for e in out if e["type"] == "flash"] == []
+    old = SkyEventDetector(flash_gate=False)  # gate switched off: legacy immediate event
+    old.process(_sky(1), ALL, ts=0, exposure_s=10.0, gain_db=30)
+    assert [e["type"] for e in old.process(bright, ALL, ts=15, exposure_s=10.0, gain_db=30)] == ["flash"]
     det2 = SkyEventDetector()
     det2.process(_sky(1), {"meteor"}, ts=0, exposure_s=10.0, gain_db=30)
     assert det2.process(bright, {"meteor"}, ts=15, exposure_s=10.0, gain_db=30) == []

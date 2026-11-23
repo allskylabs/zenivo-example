@@ -110,6 +110,8 @@ def _merge_segments(segs: List[Tuple[int, int, int, int]], max_gap: float) -> Li
 class SkyEventDetector:
     """Stateful two-frame streak detector. Feed every new frame to process(); it returns finished events."""
 
+    FLASH_HOLD_S = 30.0  # a flash is released this long after it, if nothing repeated it
+
     def __init__(
         self,
         work_width: int = 640,
@@ -119,6 +121,7 @@ class SkyEventDetector:
         max_changed_frac: float = 0.02,   # skip frames where more of the sky than this changed (clouds, dawn)
         max_gap_s: float = 120.0,         # frames further apart than this are not compared
         flash_ratio: float = 1.6,         # mean sky brightness jump that counts as a flash
+        flash_gate: bool = True,          # hold a flash one frame; drop lamp / AE / IR-cut repeats and lasting jumps
     ):
         self.work_width = int(work_width)
         self.min_length_frac = min_length_frac
@@ -127,6 +130,7 @@ class SkyEventDetector:
         self.max_changed_frac = max_changed_frac
         self.max_gap_s = max_gap_s
         self.flash_ratio = flash_ratio
+        self.flash_gate = flash_gate
         self._meteor_spots: Deque[Tuple[float, float, float]] = deque(maxlen=500)  # survives reset()
         self._track_id = 0
         self.frames_seen = 0      # frames given to process() since the last reset
@@ -244,6 +248,10 @@ class SkyEventDetector:
         self._prev_gain = 0.0
         self._last_exposure_s = 0.0
         self._prev_mean = 0.0
+        self._flash_pending: Optional[Dict[str, Any]] = None  # flash waiting one frame to prove it is brief
+        self._flash_seen: Deque[float] = deque(maxlen=8)      # recent flash-candidate times
+        self._flash_quiet_until = 0.0
+        self._flash_out: List[Dict[str, Any]] = []
         self._pending: List[Dict[str, Any]] = []  # single-frame streaks waiting for the next frame
         self._tracks: List[Dict[str, Any]] = []   # moving objects seen in the previous frame
         self._points: List[Dict[str, Any]] = []   # moving dots (short exposures): seeds and tracks
@@ -319,7 +327,47 @@ class SkyEventDetector:
         return ev if ev["type"] in enabled else None
 
     # ------------------------------------------------------------------
-    def process(
+    def process(self, *args: Any, **kw: Any) -> List[Dict[str, Any]]:
+        """Analyse one frame (see _process); prepends a flash released by the one-frame-late gate."""
+        self._flash_out = []
+        out = self._process(*args, **kw)
+        if self._flash_out:
+            out = self._flash_out + out
+            self._flash_out = []
+        return out
+
+    def _resolve_flash(self, ts: float, mean_now: float) -> None:
+        """The frame after a flash candidate: a real flash (lightning, a close fireball) is over by now.
+        A sky that stays bright is an auto-exposure / IR-cut / lamp change and is dropped."""
+        fp = self._flash_pending
+        if fp is None:
+            return
+        age = ts - float(fp["ts"])
+        base = float(fp["sky_mean_before"])
+        if age > self.max_gap_s or mean_now > base * 1.3 + 5.0:
+            self._flash_pending = None  # the sky stayed bright: exposure / IR-cut change, not a flash
+            self.point_stats["flash_rejected_lasting"] = self.point_stats.get("flash_rejected_lasting", 0) + 1
+        elif age >= self.FLASH_HOLD_S:
+            self._flash_pending = None  # brief and not repeated for FLASH_HOLD_S: keep it
+            self._flash_out.append(fp)
+
+    def _flash_candidate(self, ev: Dict[str, Any], ts: float) -> Optional[Dict[str, Any]]:
+        """Gate a flash: lamps, auto-exposure and IR-cut changes repeat within seconds, lightning does not.
+        Returns the event now (gate off) or None (held one frame, or dropped)."""
+        if not self.flash_gate:
+            return ev
+        recent = [t for t in self._flash_seen if ts - t <= 120.0]  # a pending one is cancelled below
+        self._flash_seen.append(ts)
+        if recent or ts < self._flash_quiet_until:
+            self._flash_quiet_until = ts + 120.0
+            if self._flash_pending is not None:
+                self._flash_pending = None
+            self.point_stats["flash_rejected_repeat"] = self.point_stats.get("flash_rejected_repeat", 0) + 1
+            return None
+        self._flash_pending = ev
+        return None
+
+    def _process(
         self,
         frame: np.ndarray,
         enabled: set,
@@ -339,6 +387,7 @@ class SkyEventDetector:
         small, gray, scale = self._reduce(frame)
         mask = self._work_mask(gray.shape, sky_polygons)
         mean_now = float(cv2.mean(gray, mask)[0])
+        self._resolve_flash(ts, mean_now)
 
         key = (gray.shape, round(math.log(max(exposure_s, 1e-6)), 1), round(gain_db))
         prev, prev_mean = self._prev, self._prev_mean
@@ -363,11 +412,14 @@ class SkyEventDetector:
         if mean_now > prev_mean * self.flash_ratio + 8.0 and self._sky_wide(gray, prev, mask):
             events.extend(self._flush(enabled, ts))
             if "flash" in enabled:
-                events.append({
+                fl = self._flash_candidate({
                     "type": "flash", "ts": ts, "start_ts": ts, "frames": 1,
                     "sky_mean_before": round(prev_mean, 1), "sky_mean": round(mean_now, 1),
+                    "exposure_s": round(float(exposure_s), 3), "gain_db": round(float(gain_db), 1),
                     "_overview": small.copy(),
-                })
+                }, ts)
+                if fl is not None:
+                    events.append(fl)
             return events
 
         streak_types = {"meteor", "plane", "satellite"} & enabled
