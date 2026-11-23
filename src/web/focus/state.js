@@ -37,6 +37,14 @@
     const markersChk = $("focus-markers");
     const crossChk = $("focus-crosshair");
     const peakChk = $("focus-peaking");
+    // Remember the Peaking choice (default ON when nothing is stored).
+    const PEAK_KEY = "zenivo.focus.peaking";
+    if (peakChk) {
+        try { if (localStorage.getItem(PEAK_KEY) === "0") peakChk.checked = false; } catch (e) { /* storage unavailable */ }
+        peakChk.addEventListener("change", () => {
+            try { localStorage.setItem(PEAK_KEY, peakChk.checked ? "1" : "0"); } catch (e) { /* storage unavailable */ }
+        });
+    }
     const lensCard = $("focus-lens-card");
     const lensSlider = $("focus-lens-slider");
     // Flags shared by several focus files (a plain `let` cannot cross file boundaries)
