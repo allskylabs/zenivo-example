@@ -163,3 +163,15 @@ Deployed, md5 equal on repo, Pi, allsky.hoan.uk.
 - Community station dialog: image box follows the image aspect (cover, max 36dvh, no bands), tighter rows. Fits without scrolling at 1568x757 and a true 388 px iframe (scrollHeight == clientHeight).
 - Screenshots: `docs/design/critique/community-dialog-after-1568.jpg`, `community-dialog-after-390.jpg`.
 - Update 5b: station facts are now two compact chips (camera, version; lock chip only when the page is unlinked); last-seen row dropped (header has it). Dialog 348 px tall, no scroll. Screenshot: community-dialog-chips-390.jpg.
+
+## Update 6: Events grid thumbnails (owner: "why draw the lines in?")
+| # | Defect | Status |
+|---|---|---|
+| E1 | Blue track line + big dot on every thumb; dot hid the event and started outside the picture | Done: overlay removed from grid and hover preview. Track is now a viewer toggle (eye chip, default off, shown only on the sky picture of an event with a line). |
+| E2 | Letterboxed pictures, dark bands | Done: one shared `.arc-tile__img` box, 16:9, `object-fit: cover`, image absolutely filling it. |
+| E3 | Meaningless blue dot bottom-right | Done: one meaning, "New: not opened yet" (tooltip + aria-label), now left of the name in the footer. |
+| E4 | Cards much taller than image | Done: card = 16:9 image + one footer line (name, time). |
+| E5 | Badges | Kept: type icon, layers count, owner-label thumbs up/down (new), confidence. The Live Events card already used the same pattern. |
+
+Critique: density is 5 columns at 1568 px and 2 at 390 px with even gutters; rhythm is image, one mono footer line, repeat; hover/focus use the ds accent border (focus-visible too). Left: the unseen dot is the only colour accent in the footer, so scanning for new events works.
+Screenshots: `events-grid-after-1568.jpg`, `events-grid-after-390.jpg` (before = owner's screenshot).
