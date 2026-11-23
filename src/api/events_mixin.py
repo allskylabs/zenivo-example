@@ -132,6 +132,32 @@ class EventsMixin:
             "cloud_cover_pct": round(cc, 1), "_overview": overview,
         })
 
+    PLANE_GROUP_GAP_S = 300.0
+
+    def _group_plane_fragments(self, ev: Dict[str, Any]) -> None:
+        """Plane events of one flight (same ICAO within PLANE_GROUP_GAP_S of each other) share a `group_id`, the
+        first fragment's start time, so a viewer can fold them into one flight. Nothing is deleted."""
+        if ev.get("type") != "plane" or not (self.station_config.get("event_gates") or {}).get("crosscheck", True):
+            return
+        icao = (ev.get("flight") or {}).get("icao")
+        if not icao:
+            return
+        groups = self.__dict__.setdefault("_plane_groups", {})
+        t0 = float(ev.get("start_ts", ev.get("ts", 0.0)))
+        t1 = float(ev.get("end_ts", t0))
+        last = groups.get(icao)
+        if last and t0 - last[1] <= self.PLANE_GROUP_GAP_S:
+            gid = last[0]
+            ev["group_id"] = gid
+            ev["fragment"] = True
+        else:
+            gid = f"{icao}_{int(t0)}"
+            ev["group_id"] = gid
+        groups[icao] = (gid, max(t1, last[1] if last and last[0] == gid else t1))
+        if len(groups) > 200:
+            for k in [k for k, v in groups.items() if t0 - v[1] > 3600]:
+                groups.pop(k, None)
+
     def _record_sky_event(self, ev: Dict[str, Any]) -> Dict[str, Any]:
         """Save the event's images + a JSON line under events/<local day>/ and log it."""
         import json
@@ -141,6 +167,7 @@ class EventsMixin:
         except Exception:
             pass  # flight naming is a bonus; never lose the event over it
         crop, overview = ev.pop("_crop", None), ev.pop("_overview", None)
+        self._group_plane_fragments(ev)
         dt = datetime.fromtimestamp(float(ev.get("start_ts", ev["ts"]))).astimezone()
         day = dt.strftime("%Y-%m-%d")
         self._event_seq = (self._event_seq + 1) % 1000

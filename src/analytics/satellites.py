@@ -15,7 +15,7 @@ import time
 
 from src.net import urlopen as net_urlopen
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -202,6 +202,50 @@ class SatelliteTracker:
         return {"e": e, "n": n, "u": u, "rng": rng, "alt": math.degrees(math.asin(u / rng)), "sunlit": sunlit,
                 "lat": math.degrees(lat), "lon": math.degrees(math.atan2(y, x)), "h": h,
                 "az": math.degrees(math.atan2(e, n)) % 360.0}
+
+    @staticmethod
+    def _ang(a1: float, e1: float, a2: float, e2: float) -> float:
+        """Angle in degrees between two az/alt directions."""
+        r = math.radians
+        c = (math.sin(r(e1)) * math.sin(r(e2))
+             + math.cos(r(e1)) * math.cos(r(e2)) * math.cos(r(a1 - a2)))
+        return math.degrees(math.acos(max(-1.0, min(1.0, c))))
+
+    def match_pass(self, station: Dict[str, float], p0: Tuple[float, float], p1: Tuple[float, float],
+                   t0: float, t1: float, tol_deg: float = 1.0, min_alt: float = 5.0) -> Optional[Dict[str, Any]]:
+        """The sunlit satellite whose predicted path over [t0, t1] (unix s) passes within tol_deg of both ends of
+        an observed track p0 -> p1 (az, alt in degrees), or None. A single-frame streak (t1 - t0 < 2 s) is
+        matched by the satellite's position at t0 lying within tol_deg of the segment."""
+        with self._lock:
+            sats = list(self._sats)
+        if not sats:
+            return None
+        d0 = datetime.fromtimestamp(t0, timezone.utc)
+        d1 = datetime.fromtimestamp(max(t1, t0), timezone.utc)
+        c0, c1 = self._context(station, d0), self._context(station, d1)
+        if c0["sun_alt"] > -3.0:
+            return None
+        single = (t1 - t0) < 2.0
+        best: Optional[Dict[str, Any]] = None
+        for name, _group, sat in sats:
+            s0 = self._state(c0, sat)
+            if s0 is None or s0["alt"] < min_alt or not s0["sunlit"]:
+                continue
+            if single:
+                # distance of the satellite from the segment (sampled)
+                dist = min(self._ang(s0["az"], s0["alt"], p0[0] + (p1[0] - p0[0]) * f / 8.0,
+                                     p0[1] + (p1[1] - p0[1]) * f / 8.0) for f in range(9))
+            else:
+                s1 = self._state(c1, sat)
+                if s1 is None or s1["alt"] < min_alt or not s1["sunlit"]:
+                    continue
+                fwd = max(self._ang(s0["az"], s0["alt"], *p0), self._ang(s1["az"], s1["alt"], *p1))
+                rev = max(self._ang(s0["az"], s0["alt"], *p1), self._ang(s1["az"], s1["alt"], *p0))
+                dist = min(fwd, rev)
+            if dist <= tol_deg and (best is None or dist < best["match_deg"]):
+                best = {"name": name, "norad": int(sat.satnum), "match_deg": round(dist, 2),
+                        "alt_deg": round(s0["alt"], 1), "az_deg": round(s0["az"], 1), "range_km": round(s0["rng"])}
+        return best
 
     def current(self, station: Dict[str, float], solution: Optional[Dict[str, Any]] = None,
                 when: Optional[datetime] = None, track_min: float = 0.0, track_for: int = 8,

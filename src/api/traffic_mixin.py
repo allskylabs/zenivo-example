@@ -679,6 +679,24 @@ class TrafficMixin:
     def _adsb_trails_path(self) -> str:
         return os.path.join(self.output_dir, "cache", "adsb_trails.json")
 
+    def _match_satellite(self, ev: Dict[str, Any], station: Dict[str, float], t0: float, t1: float) -> None:
+        """A satellite pass (SGP4, sunlit, above 5 deg) within ~1 deg of the track names it and makes it a satellite;
+        a meteor that matches keeps `original_type`. Never raises: the lookup is a bonus."""
+        try:
+            tracker = self._sat_tracker_get()
+            sf, st = ev["sky_from"], ev["sky_to"]
+            hit = tracker.match_pass(station, (sf["az_deg"], sf["alt_deg"]), (st["az_deg"], st["alt_deg"]),
+                                     t0 - self.ADSB_FRAME_LAG_S, t1 - self.ADSB_FRAME_LAG_S)
+        except Exception:
+            return
+        if hit is None:
+            return
+        ev["satellite"] = hit
+        if ev["type"] != "satellite":
+            ev["original_type"] = ev.get("original_type") or ev["type"]
+            ev["reclassified_from"] = ev["type"]
+            ev["type"] = "satellite"
+
     def _match_flight(self, ev: Dict[str, Any]) -> None:
         """Name the flight behind a streak / dot event; a 'meteor' or 'satellite' that matches an aircraft
         becomes a plane."""
@@ -700,6 +718,9 @@ class TrafficMixin:
                    "elevation_m": float(self.station_config.get("elevation_m") or 0.0)}
         tracks = feed.tracks(t0, t1)
         flight = match_flight(ev, tracks, station, sol, lag_s=self.ADSB_FRAME_LAG_S)
+        if flight is None and ev["type"] in ("meteor", "satellite") and ev.get("sky_from") and ev.get("sky_to") \
+                and (self.station_config.get("event_gates") or {}).get("crosscheck", True):
+            self._match_satellite(ev, station, t0, t1)
         if flight is None:
             # Diagnostics: the nearest aircraft anywhere in the frame and how far off it was
             near = match_flight(ev, tracks, station, sol, lag_s=self.ADSB_FRAME_LAG_S, tol_px=5000.0, check_direction=False)
