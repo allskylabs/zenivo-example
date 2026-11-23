@@ -10,6 +10,10 @@ label.ds-row__body { cursor: text; }
 .sa-row .sa-input { min-height: 36px; margin-top: var(--s-1); }
 textarea.sa-input { resize: vertical; font-family: var(--font-num); }
 .sa-select { width: auto; margin-top: 0 !important; }
+.sa-row > .sa-select { flex: 0 1 46%; min-width: 0; max-width: 46%; text-overflow: ellipsis; }
+.sa-row > .sa-lab { flex: 1 1 40%; }
+#tab-settings .sa-row > label.ds-switch:has(> input):not(.toggle-row):not(.x) { flex: none; width: 56px; min-height: var(--tap); gap: 0; flex-direction: row; justify-content: center; }
+#tab-settings .sa-row > label.ds-switch > input[type="checkbox"] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; }
 .sa-pad { display: block; padding: var(--s-3) var(--s-4); }
 .sa-head { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3) 0 var(--s-4); }
 .sa-head .ds-card__title { flex: 1; }
