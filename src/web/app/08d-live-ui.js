@@ -131,6 +131,13 @@
     // Now strip: cloud, sky (from the Sun's altitude tile), temperature (weather when on, else the exposure), events tonight
     // ------------------------------------------------------------------
     let wxTemp = null;
+    function compactExp(t) {
+        const m = /^([\d.]+)(ms|s)?/.exec(t);
+        if (!m) return t;
+        const v = parseFloat(m[1]);
+        const sec = m[2] === "ms" ? v / 1000 : v;
+        return (sec >= 10 ? Math.round(sec) : Math.round(sec * 10) / 10) + "s";
+    }
     function tickNow() {
         const set = (id, t) => { const el = $(id); if (el && el.textContent !== t) el.textContent = t; };
         const cm = /(-?[\d.]+)/.exec(($("telem-clouds") || {}).textContent || "");
@@ -152,7 +159,7 @@
         tone("now-sky", sky === "Night" ? "ok" : sky === "--" ? "" : "warn");
         const cp = cm ? parseFloat(cm[1]) : NaN;
         tone("now-cloud", Number.isFinite(cp) ? (cp < 30 ? "ok" : cp < 70 ? "warn" : "bad") : "");
-        set("now-exp", (($("telem-exp") || {}).textContent || "--").replace(/\s+/g, "") || "--");
+        set("now-exp", compactExp((($("telem-exp") || {}).textContent || "--").replace(/\s+/g, "") || "--"));
         set("now-temp", wxTemp != null ? `${Math.round(wxTemp)}°C` : "--");
         const on = navigator.onLine !== false;
         icon("now-online-ic", on ? "wifi" : "wifi-off");

@@ -40,3 +40,8 @@
 @media (max-width: 1023.98px) { .zcw-launch { bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom, 0px)); } }
 html.embed .ds-topbar, html.embed .ds-tabbar, html.embed .ds-sheet, html.embed .zcw-launch { display: none !important; }
 html.embed .app-main { padding: 0; }
+
+/* Desktop: location already shows in the brand; the dot alone is the status. Phones: brand hidden, name shows. */
+@media (min-width: 641px) { .ds-topbar__title .zt-name { display: none; } }
+/* Phones: chat launcher lives in the Menu sheet, not over the cards. */
+@media (max-width: 640px) { .zcw-launch { display: none; } }

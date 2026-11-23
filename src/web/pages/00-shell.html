@@ -29,7 +29,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
-    <link rel="stylesheet" href="/style.css?v=20261127f">
+    <link rel="stylesheet" href="/style.css?v=20261127g">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -44,7 +44,7 @@
             <h1 class="brand-name">Zenivo</h1>
             <!-- brand:end -->
         </a>
-        <div class="ds-topbar__title"><i class="pulse-indicator" id="status-pulse" aria-hidden="true"></i><span class="zt-name" id="m-head-name">Zenivo</span></div>
+        <div class="ds-topbar__title"><i class="pulse-indicator" id="status-pulse" role="img" aria-label="Online" title="Online"></i><span class="zt-name" id="m-head-name">Zenivo</span></div>
         <span class="zt-meta" id="sensor-subtitle"></span>
         <span class="zt-meta" id="nav-camera-mode"></span>
         <span class="zt-meta" id="nav-fps"></span>
@@ -70,6 +70,7 @@
             <div class="ds-sheet__tiles zt-quick">
                 <button class="ds-tile" type="button" id="m-rv-toggle" aria-pressed="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon-star"></use></svg><span>Red vision</span></button>
                 <button class="ds-tile" type="button" id="m-fs-btn"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg><span>Fullscreen</span></button>
+                <button class="ds-tile" type="button" id="m-chat-btn"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-message-circle"></use></svg><span>Chat</span></button>
                 <button class="ds-tile" type="button" id="m-share-btn"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-share-2"></use></svg><span id="m-share-sub">Share</span></button>
             </div>
             <section class="zt-group">

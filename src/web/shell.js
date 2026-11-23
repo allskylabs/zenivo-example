@@ -106,6 +106,8 @@
         [nv, rv].forEach((b) => b && b.addEventListener("click", () => { applyRv(!rvOn(), true); if (b === rv) closeMenu(); }));
         if (fs) fs.addEventListener("click", () => { closeMenu(); fullscreen(); });
         if (sh) sh.addEventListener("click", () => { closeMenu(); share(); });
+        const ch = $("m-chat-btn");
+        if (ch) ch.addEventListener("click", () => { closeMenu(); const l = document.querySelector(".zcw-launch"); if (l) l.click(); });
         const sheet = $("m-more-sheet");
         if (sheet) sheet.addEventListener("click", (e) => { if (e.target.closest("a.ds-tile")) closeMenu(); });
         loadChat(); loadName();
