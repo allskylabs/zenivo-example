@@ -119,8 +119,9 @@
         document.documentElement.classList.toggle("zs-collapsed", on);
         const t = $("zs-toggle");
         if (t) {
-            const lab = on ? "Expand menu" : "Collapse menu";
+            const lab = (on ? "Expand menu" : "Collapse menu") + " (Ctrl+B)";
             t.setAttribute("aria-expanded", on ? "false" : "true"); t.setAttribute("aria-label", lab); t.title = lab;
+            const eg = $("zs-edge"); if (eg) eg.title = lab;
         }
         document.querySelectorAll(".zs__item").forEach((el) => {
             const tip = el.getAttribute("aria-label");
@@ -145,7 +146,15 @@
         const col = document.documentElement.classList.contains("zs-collapsed");
         setCollapsed(col, false);
         const t = $("zs-toggle");
-        if (t) t.addEventListener("click", () => setCollapsed(!document.documentElement.classList.contains("zs-collapsed"), true));
+        const flip = () => setCollapsed(!document.documentElement.classList.contains("zs-collapsed"), true);
+        if (t) t.addEventListener("click", flip);
+        const eg = $("zs-edge");
+        if (eg) eg.addEventListener("click", flip);
+        document.addEventListener("keydown", (e) => {
+            if (!DESKTOP.matches || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "b") return;
+            const a = e.target; if (a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) return;
+            e.preventDefault(); flip();
+        });
         syncRole();
         (DESKTOP.addEventListener ? DESKTOP.addEventListener("change", syncRole) : DESKTOP.addListener(syncRole));
         z.addEventListener("click", (e) => { if (e.target.closest("a.zs__item")) closeMenu(); });

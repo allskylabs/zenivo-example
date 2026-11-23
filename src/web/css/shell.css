@@ -55,6 +55,7 @@ html.zs-collapsed { --rail-w: 64px; }
 .zs__utils .zs__label { display: none; }
 .zs__meta { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); padding-left: var(--s-3); }
 .zs__ver { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-12); color: var(--c-text-3); }
+.zs__top, .zs__edge { display: none; }
 .zs__toggle { display: none; flex: 0 0 auto; width: var(--tap); height: var(--tap); align-items: center; justify-content: center; border: 0; border-radius: var(--r-md); background: none; color: var(--c-text-2); cursor: pointer; }
 .zs__toggle:hover { background: var(--c-surface-2); color: var(--c-text); }
 .zs__toggle .ds-icon { transition: transform var(--dur) var(--ease); }
@@ -75,6 +76,13 @@ html.zs-collapsed { --rail-w: 64px; }
     .zs__panel { height: 100%; border-right: 1px solid var(--c-border); }
     .zs__group { grid-template-columns: 1fr; gap: 2px; }
     .zs__toggle { display: inline-flex; }
+    .zs__top { display: flex; flex: 0 0 auto; align-items: center; padding: var(--s-1) var(--s-2); border-bottom: 1px solid var(--c-divider); }
+    .zs__toggle { width: 44px; height: 44px; }
+    .zs__edge { display: flex; position: absolute; top: 50%; right: -12px; width: 24px; height: 48px; margin-top: -24px; align-items: center; justify-content: center; border: 1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-surface-2); color: var(--c-text-2); cursor: pointer; opacity: 0; transition: opacity var(--dur) var(--ease); z-index: 1; }
+    .zs__edge::before { content: ""; position: absolute; top: -40vh; bottom: -40vh; left: -6px; width: 14px; }
+    .zs:hover .zs__edge, .zs__edge:hover { opacity: 1; }
+    .zs__edge .ds-icon { width: 16px; height: 16px; }
+    html.zs-collapsed .zs__edge .ds-icon { transform: rotate(180deg); }
     .zs__utils .zs__item { min-width: 0; }
     /* collapsed icon rail: labels live in aria-label + title, sections become hairlines */
     html.zs-collapsed .zs__label, html.zs-collapsed .zs__title, html.zs-collapsed .zs__ver { display: none; }
@@ -82,7 +90,6 @@ html.zs-collapsed { --rail-w: 64px; }
     html.zs-collapsed .zs__nav { padding: 0 var(--s-2); scrollbar-width: none; }
     html.zs-collapsed .zs__utils { flex-direction: column; }
     html.zs-collapsed .zs__meta { justify-content: center; padding-left: 0; }
-    html.zs-collapsed .zs__toggle .ds-icon { transform: rotate(180deg); }
     html.zs-collapsed .zt-badge { position: absolute; top: 4px; right: 4px; margin: 0; padding: 2px 4px; }
 }
 

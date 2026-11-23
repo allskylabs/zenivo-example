@@ -100,12 +100,12 @@ def render_head(name):
              'S="image detection station skymask integrations community admin".split(" "),t=M[h];if(h==="community")t="/community";'
              'else if(S.indexOf(h)>-1)t="/settings#"+h;if(t&&t!==p)location.replace(t)})()</script>',
              '<link rel="stylesheet" href="/static/css/ds-tokens.css?v=20261123a">',
-             '<link rel="stylesheet" href="/static/css/ds-components.css?v=20261204c">',
-             '<link rel="stylesheet" href="/static/css/shell.css?v=20261204c">',
-             '<script src="/static/auth.js?v=20261204c"></script>',
+             '<link rel="stylesheet" href="/static/css/ds-components.css?v=20261204d">',
+             '<link rel="stylesheet" href="/static/css/shell.css?v=20261204d">',
+             '<script src="/static/auth.js?v=20261204d"></script>',
              '<script src="/static/js/ds.js?v=20261123a" defer></script>',
              '<script src="/static/brand/version.js?v=4" defer></script>',
-             '<script src="/static/shell.js?v=20261204c" defer></script>', "<!-- head-brand:end -->"]
+             '<script src="/static/shell.js?v=20261204d" defer></script>', "<!-- head-brand:end -->"]
     return "\n    ".join(lines)
 
 
@@ -135,6 +135,7 @@ def render(current, is_index):
           '        <div class="ds-sheet__scrim" data-ds-close></div>', '        <div class="zs__panel">',
           '            <div class="zs__head"><div class="ds-sheet__title"><span id="m-st-name">Zenivo</span></div>'
           f'<button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" data-ds-close aria-label="Close">{ic("x")}</button></div>',
+          f'            <div class="zs__top"><button class="zs__toggle" type="button" id="zs-toggle" aria-expanded="true" aria-controls="zs-nav" aria-label="Collapse menu (Ctrl+B)" title="Collapse menu (Ctrl+B)">{ic("panel-left")}</button></div>',
           '            <nav class="zs__nav" aria-label="Sections">']
     for title, admin_grp, items in MENU:
         o.append(f'                <section class="zs__group"{" data-admin" if admin_grp else ""}>')
@@ -157,9 +158,9 @@ def render(current, is_index):
           f'                    <button class="zs__item" type="button" id="m-chat-btn" data-tip="Chat" aria-label="Chat">{ic("message-circle")}<span class="zs__label">Chat</span></button>',
           '                </div>',
           f'                <a class="zs__item" href="/login" data-auth-link data-tip="Sign in" aria-label="Sign in">{ic("log-in")}<span class="zs__label" data-auth-label>Sign in</span></a>',
-          '                <div class="zs__meta"><small class="zs__ver" id="app-version" data-app-version>Zenivo</small>'
-          f'<button class="zs__toggle" type="button" id="zs-toggle" aria-expanded="true" aria-controls="zs-nav" aria-label="Collapse menu" data-tip="Collapse menu">{ic("chevrons-left")}</button></div>',
-          '            </div>', '        </div>', '    </aside>', '    <!-- chrome:end -->']
+          '                <div class="zs__meta"><small class="zs__ver" id="app-version" data-app-version>Zenivo</small></div>',
+          '            </div>', '        </div>',
+          f'        <button class="zs__edge" type="button" id="zs-edge" tabindex="-1" aria-hidden="true" title="Collapse menu (Ctrl+B)">{ic("chevron-left")}</button>', '    </aside>', '    <!-- chrome:end -->']
     return "\n".join(o)
 
 

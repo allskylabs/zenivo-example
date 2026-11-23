@@ -20,12 +20,12 @@
     <script>try{if(localStorage.getItem("zenivo.nav")==="0")document.documentElement.classList.add("zs-collapsed")}catch(e){}</script>
     <script>(function(){var p=location.pathname.replace(/\/+$/,"")||"/";if(p!=="/"&&p!=="/live"&&p!=="/index.html")return;var h=location.hash.replace(/^#\/?/,"").toLowerCase(),M={archive:"/gallery",gallery:"/gallery",events:"/gallery",sky:"/sky",overhead:"/overhead",community:"/community",flights:"/flights3d",flights3d:"/flights3d",satellites:"/satellites3d",satellites3d:"/satellites3d",settings:"/settings",calibration:"/calibration",logs:"/logs",activity:"/logs",focus:"/focus",live:"/live"},S="image detection station skymask integrations community admin".split(" "),t=M[h];if(h==="community")t="/community";else if(S.indexOf(h)>-1)t="/settings#"+h;if(t&&t!==p)location.replace(t)})()</script>
     <link rel="stylesheet" href="/static/css/ds-tokens.css?v=20261123a">
-    <link rel="stylesheet" href="/static/css/ds-components.css?v=20261204c">
-    <link rel="stylesheet" href="/static/css/shell.css?v=20261204c">
-    <script src="/static/auth.js?v=20261204c"></script>
+    <link rel="stylesheet" href="/static/css/ds-components.css?v=20261204d">
+    <link rel="stylesheet" href="/static/css/shell.css?v=20261204d">
+    <script src="/static/auth.js?v=20261204d"></script>
     <script src="/static/js/ds.js?v=20261123a" defer></script>
     <script src="/static/brand/version.js?v=4" defer></script>
-    <script src="/static/shell.js?v=20261204c" defer></script>
+    <script src="/static/shell.js?v=20261204d" defer></script>
     <!-- head-brand:end -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -79,6 +79,7 @@
         <div class="ds-sheet__scrim" data-ds-close></div>
         <div class="zs__panel">
             <div class="zs__head"><div class="ds-sheet__title"><span id="m-st-name">Zenivo</span></div><button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" data-ds-close aria-label="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></div>
+            <div class="zs__top"><button class="zs__toggle" type="button" id="zs-toggle" aria-expanded="true" aria-controls="zs-nav" aria-label="Collapse menu (Ctrl+B)" title="Collapse menu (Ctrl+B)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-panel-left"></use></svg></button></div>
             <nav class="zs__nav" aria-label="Sections">
                 <section class="zs__group">
                     <a class="zs__item" href="/live" data-paths="/live" data-tip="Live" aria-label="Live"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg><span class="zs__label">Live</span></a>
@@ -121,9 +122,10 @@
                     <button class="zs__item" type="button" id="m-chat-btn" data-tip="Chat" aria-label="Chat"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-message-circle"></use></svg><span class="zs__label">Chat</span></button>
                 </div>
                 <a class="zs__item" href="/login" data-auth-link data-tip="Sign in" aria-label="Sign in"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-log-in"></use></svg><span class="zs__label" data-auth-label>Sign in</span></a>
-                <div class="zs__meta"><small class="zs__ver" id="app-version" data-app-version>Zenivo</small><button class="zs__toggle" type="button" id="zs-toggle" aria-expanded="true" aria-controls="zs-nav" aria-label="Collapse menu" data-tip="Collapse menu"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevrons-left"></use></svg></button></div>
+                <div class="zs__meta"><small class="zs__ver" id="app-version" data-app-version>Zenivo</small></div>
             </div>
         </div>
+        <button class="zs__edge" type="button" id="zs-edge" tabindex="-1" aria-hidden="true" title="Collapse menu (Ctrl+B)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-left"></use></svg></button>
     </aside>
     <!-- chrome:end -->
 
