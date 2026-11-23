@@ -183,3 +183,10 @@
 #tab-live .cloud-bars-cap { font-size: var(--fs-12); line-height: 1.4; }
 #tab-live .cloud-bars-cap span { font-size: var(--fs-12); }
 #tab-live .now-tile b { overflow: visible; text-overflow: clip; }
+
+/* wide screens: use the width instead of empty gutters */
+@media (min-width: 1400px) {
+  #tab-live { --live-panel: 420px; }
+  #tab-live .live-grid { max-width: 1600px; }
+}
+#tab-live #live-events-status:empty { display: none; }

@@ -92,3 +92,6 @@ textarea.sa-input { resize: vertical; font-family: var(--font-num); }
     .settings-home, #tab-settings[data-sub="home"] .settings-home { display: block; position: sticky; top: var(--s-3); max-height: calc(100vh - var(--s-6, 32px)); overflow-y: auto; }
     .settings-back { display: none !important; }
 }
+
+/* metrics tiles: 2 columns on phones (no orphan row of 3+2) */
+@media (max-width: 480px) { .sa-tiles:not(.sa-tiles--size) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

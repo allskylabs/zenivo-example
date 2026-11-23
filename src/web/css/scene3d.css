@@ -208,3 +208,6 @@ button[hidden], a[hidden], img[hidden] { display: none !important; }
 }
 #list li.sc-empty { white-space: normal; justify-content: center; color: var(--c-text-2); cursor: default; }
 #list ul { overflow-x: hidden; scrollbar-width: thin; scrollbar-color: var(--c-border) transparent; }
+
+/* LOCAL source tag becomes a colour dot (less text, less crowding) */
+#list .src-tag.local { font-size: 0; width: var(--s-2); height: var(--s-2); min-width: 0; padding: 0; border-radius: 50%; background: var(--c-ok); }
