@@ -148,3 +148,11 @@ Deployed, md5 equal on repo, Pi, allsky.hoan.uk.
 | #20 sky mask fill | OPEN with reason: the polygon is drawn inside the compiled sky engine (`src/web/sky/core-D2YY-WWc.js`); source is `tools/skyview/src` and needs a rebuild through its vite config, not edited by hand |
 | #11 arrow glyph, #12 duplicate badge, #13 row anatomy, #14 header icon, #16 sub 14px, #18 placeholder contrast, #23 chart colour, #24 map attribution, #26 satellites header | OPEN with reason: each needs markup or JS changes across several pages; deferred to avoid regressions without per-page screenshot review |
 | Before/after screenshots | only Live 1568 (red) saved; per-page 390 px screenshots were replaced by scripted overflow and 12px checks (see Update 2) |
+
+## Update 4 - Live follow-ups (PM review at 1568 px)
+| # | Defect | Status |
+|---|---|---|
+| L1 | Sky tile showed "Day" at night on first paint (local sun calc used default station position) | Done: tile is neutral (clock icon, dimmed, "--") until the server sun altitude arrives; local fallback only after 20 s. Live check: Night from the first sample, never Day. Before: Day/sun. |
+| L2 | "Live from the public network" link default blue | Done: ds link (accent colour, underline, 44px target) with arrow-up-right icon, aria-label "(opens in a new tab)", no raw URL text. |
+| L3 | Wifi tile icon only | Done: visible "Online"/"Offline" value plus title and aria-label. Other tiles show "--" only while data is loading. |
+| L4 | `/#archive` stayed on Live | Done: hash aliases (archive, gallery, events, settings, calibration, logs, activity, focus) redirect to the page URL (Archive is `/gallery`). Verified `/#archive` lands on `/gallery`, `tab-gallery`. |
