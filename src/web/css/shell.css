@@ -35,8 +35,11 @@
 
 /* Navigation: ONE list (markup from scripts/sync_nav.py). >=1024px it is the fixed sidebar below the topbar (expanded icon+label, or the
  * collapsed icon rail, html.zs-collapsed); below that the same element is the Menu sheet opened from the tab bar. */
-:root { --rail-w: 232px; }
+/* --rail-w is a typed property so ONE transition drives the sidebar width, the main padding and the toasts in sync */
+@property --rail-w { syntax: "<length>"; inherits: true; initial-value: 232px; }
+:root { --rail-w: 232px; --zs-ease: cubic-bezier(.2, .8, .2, 1); --zs-dur: 240ms; }
 html.zs-collapsed { --rail-w: 64px; }
+@media (min-width: 1024px) { :root { transition: --rail-w var(--zs-dur) var(--zs-ease); } }
 .zs__panel { display: flex; flex-direction: column; background: var(--c-surface-1); color: var(--c-text); }
 .zs__head { display: flex; align-items: center; gap: var(--s-3); min-height: var(--tap); padding: var(--s-2) var(--s-3) var(--s-2) var(--s-4); }
 .zs__nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 var(--s-2); }
@@ -56,7 +59,7 @@ html.zs-collapsed { --rail-w: 64px; }
 .zs__utils { display: flex; gap: 2px; }
 .zs__utils .zs__item { flex: 1; justify-content: center; padding: 0; }
 .zs__utils .zs__label { display: none; }
-.zs__meta { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); padding-left: var(--s-3); }
+.zs__meta { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); padding-left: 0; }
 .zs__ver { display: flex; align-items: center; gap: var(--s-2); min-width: 0; min-height: 32px; padding: 0 var(--s-3); border-radius: var(--r-md); font-size: var(--fs-12); color: var(--c-text-3); text-decoration: none; }
 .zs__ver:hover { background: var(--c-surface-2); color: var(--c-text); }
 .zs__ver:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -2px; }
@@ -92,12 +95,19 @@ html.zs-collapsed { --rail-w: 64px; }
     html.zs-collapsed .zs__edge .ds-icon { transform: rotate(180deg); }
     .zs__utils .zs__item { min-width: 0; }
     /* collapsed icon rail: labels live in aria-label + title, sections become hairlines */
-    html.zs-collapsed .zs__label, html.zs-collapsed .zs__title, html.zs-collapsed .zs__ver > span, html.zs-collapsed .zs__ver .ds-icon:last-child { display: none; }
-    html.zs-collapsed .zs__ver { justify-content: center; padding: 0; }
-    html.zs-collapsed .zs__item { justify-content: center; padding: 0; }
+    /* collapsed rail: labels fade + slide (delayed on expand, immediate on collapse) instead of popping; icons keep one fixed x */
+    .zs__panel { overflow: hidden; }
+    .zs__item { padding: 0 var(--s-3) 0 14px; overflow: hidden; white-space: nowrap; }
+    .zs__label, .zs__title, .zs__ver > span, .zs__ver .ds-icon:last-child { white-space: nowrap; transition: opacity 150ms var(--zs-ease) 90ms, transform 150ms var(--zs-ease) 90ms, visibility 0s 0s; }
+    .zs__title { overflow: hidden; max-height: 20px; transition: opacity 150ms var(--zs-ease) 90ms, max-height var(--zs-dur) var(--zs-ease), margin var(--zs-dur) var(--zs-ease); }
+    html.zs-collapsed .zs__label, html.zs-collapsed .zs__ver > span, html.zs-collapsed .zs__ver .ds-icon:last-child { opacity: 0; visibility: hidden; transform: translateX(-8px); transition: opacity 90ms linear, transform 90ms linear, visibility 0s 90ms; }
+    html.zs-collapsed .zs__title { opacity: 0; max-height: 0; margin-top: 0; margin-bottom: 0; transition: opacity 90ms linear, max-height var(--zs-dur) var(--zs-ease), margin var(--zs-dur) var(--zs-ease); }
+    .zs__utils .zs__item { padding: 0; }
+    .zs__ver { padding: 0 var(--s-3) 0 17px; }
+    .zs__edge .ds-icon, .zs__toggle .ds-icon { transition: transform var(--zs-dur) var(--zs-ease); }
+    html.zs-collapsed .zs__toggle .ds-icon { transform: scaleX(-1); }
     html.zs-collapsed .zs__nav { padding: 0 var(--s-2); scrollbar-width: none; }
     html.zs-collapsed .zs__utils { flex-direction: column; }
-    html.zs-collapsed .zs__meta { justify-content: center; padding-left: 0; }
     html.zs-collapsed .zt-badge { position: absolute; top: 4px; right: 4px; margin: 0; padding: 2px 4px; }
 }
 
@@ -142,4 +152,9 @@ html.embed { --rail-w: 0px; }
 @media (min-width: 900px) {
     .zt-cluster #btn-night-vision { width: auto; padding: 0 var(--s-3); gap: var(--s-2); }
     .zt-cluster #btn-night-vision::after { content: "Night"; font-size: var(--fs-12); color: var(--c-text-2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root { transition: none !important; }
+    .zs__label, .zs__title, .zs__ver > span, .zs__ver .ds-icon, .zs__toggle .ds-icon, .zs__edge .ds-icon { transition: none !important; }
 }

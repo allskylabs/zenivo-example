@@ -138,9 +138,13 @@
             if (on && tip) el.title = tip; else el.removeAttribute("title");
         });
         if (persist) { try { localStorage.setItem(NAV, on ? "0" : "1"); } catch (e) { /* private mode */ } }
-        // camera / map canvases size themselves from the window: tell them the content box changed
-        window.dispatchEvent(new Event("resize"));
+        // camera / map canvases size themselves from the window: one resize once the width transition ends
+        clearTimeout(rzT);
+        const still = !DESKTOP.matches || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+        rzT = setTimeout(fireResize, still ? 0 : 300);
     }
+    let rzT = 0;
+    function fireResize() { window.dispatchEvent(new Event("resize")); }
     function syncRole() {
         const z = $("zs-nav");
         if (!z) return;
