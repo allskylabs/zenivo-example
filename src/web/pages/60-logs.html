@@ -1,41 +1,40 @@
         <!-- TAB 5: Activity Log -->
         <section id="tab-logs" class="tab-content">
             <header class="page-top"><a class="page-back" href="/gallery" aria-label="Back to the archive"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></a><span class="page-top-title">Activity log</span></header>
-            <div class="card">
-                <div class="card-header">
-                    <h2>Activity Log</h2>
-                    <div class="header-actions" style="flex-wrap: wrap; gap: 0.5rem;">
-                        <select id="log-filter-level" aria-label="Minimum level">
-                            <option value="">All levels</option>
-                            <option value="success">Success only</option>
-                            <option value="warning">Warnings &amp; errors</option>
-                            <option value="error">Errors only</option>
-                        </select>
-                        <select id="log-filter-category" aria-label="Category">
-                            <option value="">Category: All</option>
-                            <option value="system">System</option>
-                            <option value="camera">Camera</option>
-                            <option value="capture">Capture</option>
-                            <option value="archive">Archive</option>
-                            <option value="timelapse">Timelapse</option>
-                            <option value="products">Keogram / Startrails</option>
-                            <option value="storage">Storage</option>
-                            <option value="sync">Sync</option>
-                            <option value="calibration">Calibration</option>
-                            <option value="station">Station</option>
-                        </select>
-                        <button class="btn btn-sm btn-outline" id="btn-storage-cleanup">Run cleanup now</button>
-                        <a class="btn btn-sm btn-outline" href="/api/logs/download">Download log</a>
-                    </div>
+            <div class="lg">
+                <div class="lg-bar">
+                    <div class="lg-summary" id="log-summary" aria-live="polite"><span class="ds-skeleton lg-sk-chip"></span></div>
+                    <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="btn-storage-cleanup" aria-label="Run cleanup now" title="Run cleanup now"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-trash-2"></use></svg></button>
+                    <a class="ds-btn ds-btn--ghost ds-btn--icon" href="/api/logs/download" aria-label="Download log" title="Download log"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-download"></use></svg></a>
                 </div>
-                <div class="zchips" id="log-level-chips" role="group" aria-label="Level">
-                    <button type="button" class="zchip active" data-level="" aria-pressed="true">All</button>
-                    <button type="button" class="zchip" data-level="success" aria-pressed="false">Success</button>
-                    <button type="button" class="zchip" data-level="warning" aria-pressed="false">Warnings</button>
-                    <button type="button" class="zchip" data-level="error" aria-pressed="false">Errors</button>
+                <div class="ds-chips lg-chips" id="log-level-chips" role="group" aria-label="Level">
+                    <button type="button" class="ds-chip ds-chip--on" data-level="" aria-pressed="true" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-list"></use></svg></button>
+                    <button type="button" class="ds-chip" data-level="success" aria-pressed="false" title="Success" aria-label="Success"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-circle-check"></use></svg></button>
+                    <button type="button" class="ds-chip" data-level="warning" aria-pressed="false" title="Warnings" aria-label="Warnings"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-triangle-alert"></use></svg></button>
+                    <button type="button" class="ds-chip" data-level="error" aria-pressed="false" title="Errors" aria-label="Errors"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-circle-x"></use></svg></button>
                 </div>
-                <div class="log-summary" id="log-summary">Loading…</div>
-                <div class="log-storage" id="log-storage"></div>
-                <ul class="log-list" id="log-list"></ul>
+                <div class="ds-chips lg-chips" id="log-cat-chips" role="group" aria-label="Category">
+                    <button type="button" class="ds-chip ds-chip--on" data-cat="" aria-pressed="true" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layout-grid"></use></svg></button>
+                    <button type="button" class="ds-chip" data-cat="system" aria-pressed="false" title="System" aria-label="System"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cpu"></use></svg></button>
+                    <button type="button" class="ds-chip" data-cat="camera" aria-pressed="false" title="Camera" aria-label="Camera"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg></button>
+                    <button type="button" class="ds-chip" data-cat="capture" aria-pressed="false" title="Capture" aria-label="Capture"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-image"></use></svg></button>
+                    <button type="button" class="ds-chip" data-cat="archive" aria-pressed="false" title="Archive" aria-label="Archive"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-archive"></use></svg></button>
+                    <button type="button" class="ds-chip" data-cat="timelapse" aria-pressed="false" title="Timelapse" aria-label="Timelapse"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-film"></use></svg></button>
+                    <button type="button" class="ds-chip" data-cat="products" aria-pressed="false" title="Keogram / Startrails" aria-label="Keogram / Startrails"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layers"></use></svg></button>
+                    <button type="button" class="ds-chip" data-cat="storage" aria-pressed="false" title="Storage" aria-label="Storage"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-hard-drive"></use></svg></button>
+                    <button type="button" class="ds-chip" data-cat="sync" aria-pressed="false" title="Sync" aria-label="Sync"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-refresh-cw"></use></svg></button>
+                    <button type="button" class="ds-chip" data-cat="calibration" aria-pressed="false" title="Calibration" aria-label="Calibration"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg></button>
+                    <button type="button" class="ds-chip" data-cat="station" aria-pressed="false" title="Station" aria-label="Station"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-map-pin"></use></svg></button>
+                </div>
+                <select id="log-filter-level" hidden aria-hidden="true" tabindex="-1"><option value=""></option><option value="success"></option><option value="warning"></option><option value="error"></option></select>
+                <select id="log-filter-category" hidden aria-hidden="true" tabindex="-1"><option value=""></option><option value="system"></option><option value="camera"></option><option value="capture"></option><option value="archive"></option><option value="timelapse"></option><option value="products"></option><option value="storage"></option><option value="sync"></option><option value="calibration"></option><option value="station"></option></select>
+                <div class="lg-storage" id="log-storage" hidden></div>
+                <section class="ds-card ds-card--flush">
+                    <ul class="ds-list lg-list" id="log-list" aria-live="off">
+                        <li class="lg-sk"><span class="ds-skeleton"></span><span class="ds-skeleton"></span></li>
+                        <li class="lg-sk"><span class="ds-skeleton"></span><span class="ds-skeleton"></span></li>
+                        <li class="lg-sk"><span class="ds-skeleton"></span><span class="ds-skeleton"></span></li>
+                    </ul>
+                </section>
             </div>
         </section>

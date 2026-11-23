@@ -11,63 +11,7 @@
     line-height: 1.4;
     text-align: center;
 }
-.log-summary, .log-storage { padding: 0.5rem 1rem; color: var(--text-muted); font-size: 0.85rem; }
-.log-list { list-style: none; margin: 0; padding: 0 0.5rem 1rem; max-height: 70vh; overflow-y: auto; }
-.log-item {
-    display: grid;
-    grid-template-columns: 9.5rem 5.5rem 6.5rem 1fr;
-    gap: 0.5rem;
-    padding: 0.45rem 0.5rem;
-    border-bottom: 1px solid var(--border-color);
-    font-size: 0.85rem;
-    align-items: baseline;
-}
-.log-time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.log-level { font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }
-.log-cat { color: var(--text-muted); }
-.log-msg { overflow-wrap: anywhere; }
-.log-repeat { color: var(--text-muted); font-size: 0.75rem; margin-left: 0.4rem; }
-.lvl-info .log-level { color: var(--accent); }
-.lvl-success .log-level { color: var(--success); }
-.lvl-warning .log-level { color: var(--warning); }
-.lvl-error .log-level { color: var(--danger); }
-.lvl-error { background: rgba(239, 68, 68, 0.06); }
-@media (max-width: 700px) {
-    .log-item { grid-template-columns: 1fr 1fr; }
-    .log-msg { grid-column: 1 / -1; }
-}
-.toast-stack {
-    position: fixed;
-    right: 1rem;
-    bottom: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    z-index: 1000;
-    max-width: min(26rem, calc(100vw - 2rem));
-}
-.toast {
-    background: var(--bg-card-sub);
-    border: 1px solid var(--border-color);
-    border-left: 4px solid var(--accent);
-    border-radius: 6px;
-    padding: 0.6rem 0.8rem;
-    font-size: 0.85rem;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
-    cursor: pointer;
-}
-.toast.lvl-success { border-left-color: var(--success); }
-.toast.lvl-warning { border-left-color: var(--warning); }
-.toast.lvl-error { border-left-color: var(--danger); }
-.toast strong { display: block; font-size: 0.75rem; text-transform: uppercase; margin-bottom: 0.15rem; }
 .log-badge[hidden] { display: none; }
-.toast span { overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-@media (max-width: 768px) {
-    /* phone: toasts sit above the tab bar, compact, at most 2 (see activity.js) */
-    .toast-stack { left: 0.5rem; right: 0.5rem; bottom: calc(4.2rem + env(safe-area-inset-bottom, 0px)); max-width: none; }
-    .toast { padding: 0.4rem 0.6rem; font-size: 0.78rem; }
-    .toast span { -webkit-line-clamp: 2; }
-}
 /* Cloud cover history chart */
 .cloud-card .card-header { flex-wrap: wrap; gap: 0.5rem; }
 .cloud-ranges { display: flex; gap: 0.35rem; flex-wrap: wrap; }

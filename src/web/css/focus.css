@@ -233,7 +233,7 @@
 .focus-lens-chart[hidden], #focus-lens-card[hidden], #focus-lens-progress-wrap[hidden] { display: none; }
 
 /* Dark, thin scrollbars matching the theme (page and inner scrolling panels) */
-html, .focus-side, .log-list {
+html, .focus-side {
     scrollbar-width: thin;
     scrollbar-color: #334155 transparent;
 }

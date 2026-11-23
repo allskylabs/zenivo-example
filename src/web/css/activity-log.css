@@ -1,0 +1,27 @@
+/* Activity log (/logs). Token-only. Icon-typed rows, chip filters, day groups. */
+.lg { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-3); max-width: var(--content-max); margin: 0 auto; color: var(--c-text); font-family: var(--font-ui); }
+.lg [hidden] { display: none !important; }
+.lg-bar { display: flex; align-items: center; gap: var(--s-2); }
+.lg-summary { display: flex; align-items: center; gap: var(--s-2); flex: 1; min-width: 0; flex-wrap: wrap; }
+.lg-summary .ds-chip b { font-family: var(--font-num); }
+.lg-zero { opacity: .5; }
+.lg-when { color: var(--c-text-3); width: var(--icon-sm); height: var(--icon-sm); }
+.lg-sk-chip { display: block; width: 160px; height: 28px; border-radius: var(--r-md); }
+.lg-chips .ds-chip { min-width: var(--tap); min-height: var(--tap); justify-content: center; }
+.lg-storage { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.lg-storage .ds-chip b { font-family: var(--font-num); }
+.lg-list { margin: 0; padding: 0; list-style: none; }
+.lg-day { padding: var(--s-2) var(--s-4); background: var(--c-surface-2); color: var(--c-text-2); font: 600 var(--fs-12) / 1 var(--font-ui); text-transform: uppercase; letter-spacing: .04em; }
+.lg-item { cursor: default; }
+.lg-item .ds-row__sub { display: flex; align-items: center; gap: var(--s-1); }
+.lg-item .ds-row__sub .ds-icon { width: var(--icon-sm); height: var(--icon-sm); }
+.lg-msg { white-space: normal; overflow-wrap: anywhere; }
+.lg-time { font-family: var(--font-num); color: var(--c-text-3); font-size: var(--fs-12); }
+.lg-success .ds-row__icon { color: var(--c-ok); }
+.lg-warning .ds-row__icon { color: var(--c-warn); }
+.lg-error .ds-row__icon { color: var(--c-danger); }
+.lg-error { background: var(--c-danger-bg); }
+.lg-info .ds-row__icon { color: var(--c-accent); }
+.lg-sk { display: flex; gap: var(--s-3); align-items: center; min-height: 56px; padding: var(--s-2) var(--s-4); border-bottom: 1px solid var(--c-divider); }
+.lg-sk .ds-skeleton:first-child { flex: none; width: 36px; height: 36px; border-radius: var(--r-sm); }
+.lg-sk .ds-skeleton:last-child { flex: 1; height: 16px; }

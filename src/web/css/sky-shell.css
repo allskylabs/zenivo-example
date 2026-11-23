@@ -23,7 +23,7 @@
     #tab-logs .header-actions { display: grid; grid-template-columns: 1fr 1fr; }
     #tab-logs .header-actions select { grid-column: 1 / -1; width: 100%; }
     #tab-logs .card-header h2 { flex: 1 1 100%; }
-    .events-table-wrapper, .log-list { max-width: 100%; overflow-x: auto; }
+    .events-table-wrapper { max-width: 100%; overflow-x: auto; }
 }
 /* ===================================================================
    Night Sky shell: page layout; chrome lives in shell.css + ds-*.css,
