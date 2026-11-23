@@ -196,3 +196,8 @@ Screenshots: `critique/live-text-restored-1568.png`, `live-text-restored-390.jpg
 - **Empty "Mon, Nov 23" tiles:** cause = the night had events but no products yet (timelapse/keogram/startrails build ~05:48 next morning), and `renderDays` padded to 3 blank tiles. Now one row with a clock icon and "Products build after the night ends" (or image-off "No products for this night" for old days); partly missing products get labelled icon tiles; unloaded thumbs show a shimmer skeleton; a failed load shows image-off + "Could not load" (`app/08-gallery-adsb.js` renderDays + listeners, `css/archive.css`).
 - **Toast:** top-right under the topbar, max 380 px, title + one-line summary, raw text behind a chevron, close button, errors sticky, info auto-dismiss 5 s, dedupe, max 4, big numbers grouped (`js/ds.js` toast/splitMsg/fmtNums, `css/ds-components.css`).
 - Screenshots: `critique/g-after-byday-toast.jpg`, `g-after-overhead-full.jpg`, `g-after-logs-full.jpg`.
+
+## Update 10: topbar restored + Overhead header
+
+- Topbar: labelled chips (status+fps, mode), UTC and Local clocks, Red Vision switch; phone keeps status + local time. Shots: `critique/h-*-topbar-*.png`.
+- Overhead card header (Live): row 1 = count chips with icons (eye in view, radio/satellite heard/up) left, one-line "Source: adsb.fi ↗" right (ellipsis, never wraps); row 2 = All | In view segment left, one sort button right (off → climbing ↑ → descending ↓, tooltip states it). Both rows 36 px, pill radius, 8/12 spacing. Same markup on Sats and Sondes tabs (row 1). Shots: `critique/o-before-overhead-1568.jpg`, `o-after-overhead-1568.png`, `o-after-overhead-390.jpg`. The /overhead page has its own header (oh-*) and was not changed.
