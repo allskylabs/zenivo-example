@@ -27,6 +27,9 @@ function drawReticle() {
 
     // Read solved station, camera sensor, optics & orientation parameters
     const st = state.station || {};
+    // Station data (sensor size, optics, orientation) not loaded yet: the hard-coded fallbacks below would draw a
+    // wrong map on first paint. Draw nothing; updateStationUI() redraws once state.station arrives.
+    if (!st.camera_sensor || !(st.optics || st.camera)) return;
     const sensor = st.camera_sensor || {};
     const optics = st.optics || st.camera || {};
     const ori = st.orientation || {};
