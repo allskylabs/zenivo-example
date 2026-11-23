@@ -6,6 +6,12 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.3.0-beta.5] - 2026-11-23
+
+### Added
+
+- Focus: Sony-style red focus peaking dots on the zoom canvas (Laplacian of luma at native pixel size), with a toggle in the focus header.
+
 ## [1.3.0-beta.4] - 2026-11-23
 
 ### Added
