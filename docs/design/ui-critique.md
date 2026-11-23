@@ -156,3 +156,9 @@ Deployed, md5 equal on repo, Pi, allsky.hoan.uk.
 | L2 | "Live from the public network" link default blue | Done: ds link (accent colour, underline, 44px target) with arrow-up-right icon, aria-label "(opens in a new tab)", no raw URL text. |
 | L3 | Wifi tile icon only | Done: visible "Online"/"Offline" value plus title and aria-label. Other tiles show "--" only while data is loading. |
 | L4 | `/#archive` stayed on Live | Done: hash aliases (archive, gallery, events, settings, calibration, logs, activity, focus) redirect to the page URL (Archive is `/gallery`). Verified `/#archive` lands on `/gallery`, `tab-gallery`. |
+
+## Update 5: dialog/sheet scrollbars and sizing (Community station dialog)
+- Global themed thin scrollbar in `ds-tokens.css` (`scrollbar-width: thin`, ds colour tokens, webkit 8px, no arrows). Covers every scroll area on every ds page (sheets, chat, archive viewer, admin, scene3d lists), so the remaining `overflow:auto` boxes inherit it; none bypasses it.
+- `.ds-sheet__panel`: dvh-bounded, `scrollbar-gutter: stable`, scrolls only the body; sticky grab + header (X stays fixed).
+- Community station dialog: image box follows the image aspect (cover, max 36dvh, no bands), tighter rows. Fits without scrolling at 1568x757 and a true 388 px iframe (scrollHeight == clientHeight).
+- Screenshots: `docs/design/critique/community-dialog-after-1568.jpg`, `community-dialog-after-390.jpg`.
