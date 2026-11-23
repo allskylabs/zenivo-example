@@ -11,340 +11,294 @@
     <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
     <meta name="description" content="Zenivo control dock for OBS Studio: stream overlays and live view settings.">
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
-    <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
+    <link rel="stylesheet" href="/static/css/ds-tokens.css?v=20261123a">
+    <link rel="stylesheet" href="/static/css/ds-base.css?v=20261123a">
+    <link rel="stylesheet" href="/static/css/ds-components.css?v=20261123a">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
+    <script src="/static/js/ds.js?v=20261123a" defer></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-        body {
-            background: var(--bg); color: var(--text);
-            font-family: var(--font-sans); font-size: 12px; line-height: 1.3;
-            padding: 8px; overflow-y: auto; overflow-x: hidden;
-        }
-        .dock { width: 100%; display: flex; flex-direction: column; gap: 8px; }
-        .mono, .val { font-family: var(--font-mono); }
-        .head { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
-        .head-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
-        .title { font-weight: 700; font-size: 13px; color: var(--text); white-space: nowrap; }
-        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); flex-shrink: 0; }
-        .dot.online { background: var(--green); }
-        .dot.offline { background: var(--red); }
-        .pill { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px;
-            border: 1px solid var(--accent); color: var(--accent); font-size: 11px; font-weight: 600; white-space: nowrap; }
-        .pill.off { border-color: var(--muted); color: var(--muted); }
-        .preview { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 220px; border-radius: 8px; overflow: hidden;
-            border: 1px solid var(--border); background: #000; }
+        .ds-chip.active { background: var(--c-accent-bg); border-color: var(--c-accent); color: var(--c-accent); }
+        .ev-zoom-btn { width: 36px; min-width: 36px; min-height: 36px; flex: none; }
+        body { user-select: none; -webkit-user-select: none; overflow-x: hidden; padding: var(--s-3); }
+        .dock { width: 100%; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--s-3); }
+        .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+        .head { display: flex; align-items: center; gap: var(--s-2); min-height: var(--tap); }
+        .head .grow { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s-2); }
+        .head h1 { font-size: var(--fs-16); font-weight: 700; white-space: nowrap; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c-warn); flex: none; }
+        .dot.online { background: var(--c-ok); }
+        .dot.offline { background: var(--c-danger); }
+        .pill.off { background: var(--c-surface-3); color: var(--c-text-2); }
+
+        .preview { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 240px; border-radius: var(--r-lg);
+            overflow: hidden; border: 1px solid var(--c-border); background: var(--c-bg); }
         .preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
-        .preview .chips { position: absolute; top: 6px; left: 6px; display: flex; gap: 6px; align-items: center; }
-        .telem-mini { font-family: var(--font-mono); font-size: 11px; color: var(--text); background: rgba(0,0,0,.6);
-            border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+        .preview .chips { position: absolute; top: var(--s-2); left: var(--s-2); display: flex; gap: var(--s-2); align-items: center; }
+        .telem-mini { font-family: var(--font-num); font-size: var(--fs-12); color: var(--c-text); background: var(--c-scrim);
+            border-radius: var(--r-pill); padding: var(--s-1) var(--s-3); white-space: nowrap; }
+        #btn-go-live { min-height: 32px; min-width: 0; padding: 0 var(--s-3); gap: var(--s-1); font-size: var(--fs-12); }
+        #btn-go-live.active { background: var(--c-danger); border-color: var(--c-danger); color: var(--c-on-accent); }
 
-        .section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px;
-            display: flex; flex-direction: column; gap: 6px; }
-        .sec-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap;
-            font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
-        .row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-        .lbl { font-size: 11px; font-weight: 600; color: var(--muted); min-width: 52px; flex-shrink: 0; }
-        .val { font-size: 11px; font-weight: 600; color: var(--accent); min-width: 40px; text-align: right; flex-shrink: 0; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 4px; }
-        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-        .seg { display: flex; flex-wrap: wrap; width: 100%; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-        .seg > button { flex: 1 1 auto; border: 0; border-radius: 0; border-right: 1px solid var(--border); min-width: 0; padding: 4px 4px; }
-        .seg > button:last-child { border-right: 0; }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-2); }
+        .stat { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+        .stat .ds-icon { color: var(--c-text-3); }
+        .stat .v { font-family: var(--font-num); font-size: var(--fs-14); font-weight: 600; white-space: nowrap; }
 
-        button {
-            background: var(--input); border: 1px solid var(--border); color: var(--text); border-radius: 6px;
-            min-height: 28px; padding: 4px 8px; font-size: 12px; line-height: 1.15; font-weight: 600; font-family: inherit; cursor: pointer;
-            transition: background .1s, border-color .1s; display: inline-flex; align-items: center;
-            justify-content: center; gap: 4px; white-space: normal; text-align: center; min-width: 0;
-        }
-        button:hover { background: var(--hover); border-color: var(--accent); }
-        button:active { transform: translateY(1px); }
-        button.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
-        button.btn-sm { padding: 0 8px; }
-        button.btn-wide { flex: 1; }
-        button.btn-live { border-color: var(--red); color: var(--red); background: transparent; }
-        button.btn-live.active { background: var(--red); color: #fff; }
-        /* Overlay toggles: outline when off, filled + dot when on */
-        button.tg { background: transparent; color: var(--muted); justify-content: flex-start; text-align: left; }
-        button.tg::before { content: ""; width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--muted); flex-shrink: 0; }
-        button.tg.active { background: var(--accent); color: var(--bg); }
-        button.tg.active::before { background: var(--bg); border-color: var(--bg); }
+        .sec { display: flex; flex-direction: column; gap: var(--s-3); }
+        .sec-head { display: flex; align-items: center; gap: var(--s-2); color: var(--c-text-2); min-height: 28px; }
+        .sec-head .grow { flex: 1; }
+        .sec-head .num { font-size: var(--fs-12); color: var(--c-text-3); }
+        .row { display: flex; align-items: center; gap: var(--s-2); }
+        .row.wrap { flex-wrap: wrap; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--s-2); }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-2); }
+        .seg { display: flex; gap: var(--s-1); padding: var(--s-1); background: var(--c-surface-2); border: 1px solid var(--c-border); border-radius: var(--r-lg); }
+        .seg > button { flex: 1 1 0; min-width: 0; border-color: transparent; background: transparent; padding: 0 var(--s-2); }
+        .lbl { font-size: var(--fs-12); font-weight: 600; color: var(--c-text-2); min-width: 44px; flex: none; }
+        .val { font-family: var(--font-num); font-size: var(--fs-12); font-weight: 600; color: var(--c-accent); min-width: 44px; text-align: right; flex: none; }
+        .ds-btn { font-size: var(--fs-12); font-weight: 600; padding: 0 var(--s-3); }
+        .ds-btn .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ds-btn.active { background: var(--c-accent-bg); border-color: var(--c-accent); color: var(--c-accent); }
+        /* icon tile: icon on top, short label below, on/off by colour */
+        button.tile { flex-direction: column; gap: var(--s-1); min-height: 64px; padding: var(--s-2); }
+        button.tile .t { font-size: var(--fs-12); max-width: 100%; }
+        button.tile:not(.active) { color: var(--c-text-2); }
+        .sw-row { display: flex; align-items: center; gap: var(--s-3); min-height: var(--tap); border-top: 1px solid var(--c-divider); }
+        .sw-row .ds-icon { color: var(--c-text-2); }
+        .sw-row span.t { flex: 1; font-size: var(--fs-14); }
+        button.sw { position: relative; width: 48px; height: 28px; min-height: 28px; min-width: 48px; padding: 0; border-radius: var(--r-pill);
+            background: var(--c-surface-3); border: 1px solid var(--c-border); cursor: pointer; flex: none; }
+        button.sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+            background: var(--c-text-2); transition: transform var(--dur) var(--ease); }
+        button.sw.active { background: var(--c-accent-bg); border-color: var(--c-accent); }
+        button.sw.active::after { transform: translateX(20px); background: var(--c-accent); }
 
-        .sw-row { display: flex; align-items: center; justify-content: space-between; min-height: 28px; border-top: 1px solid var(--divider, var(--border)); }
-        .sw-row:first-of-type { border-top: 0; }
-        .sw-row span { font-size: 12px; }
-        button.sw { width: 36px; height: 20px; padding: 0; border-radius: 10px; position: relative;
-            background: var(--input); border: 1px solid var(--border); }
-        button.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
-            border-radius: 50%; background: var(--muted); transition: left .12s; }
-        button.sw.active { background: var(--accent); border-color: var(--accent); }
-        button.sw.active::after { left: 18px; background: #fff; }
-
-        .stats { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
-        .stat { display: inline-flex; align-items: baseline; gap: 5px; }
-        .stat .k { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
-        .stat .v { font-family: var(--font-mono); font-size: 15px; font-weight: 600; color: var(--text); }
-        .stat .v small { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 2px; }
-
-        input[type="range"] { flex: 1; height: 6px; accent-color: var(--accent); cursor: pointer; min-width: 60px; }
+        input[type="range"] { flex: 1; min-width: 60px; height: var(--tap); accent-color: var(--c-accent); cursor: pointer; }
         input[type="text"], input[type="number"], select {
-            background: var(--input); border: 1px solid var(--border); color: var(--text); border-radius: 6px;
-            height: 28px; padding: 0 6px; font-size: 12px; font-family: inherit; outline: none;
-            user-select: text; -webkit-user-select: text;
-        }
-        input[type="number"] { font-family: var(--font-mono); }
-        input[type="text"]:focus, input[type="number"]:focus, select:focus { border-color: var(--accent); }
+            background: var(--c-surface-2); border: 1px solid var(--c-border); color: var(--c-text); border-radius: var(--r-md);
+            min-height: var(--tap); padding: 0 var(--s-3); font-size: var(--fs-14); font-family: inherit;
+            user-select: text; -webkit-user-select: text; min-width: 0; }
+        input[type="number"] { font-family: var(--font-num); }
+        input:focus-visible, select:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 1px; }
 
-        details.adv > summary { cursor: pointer; list-style: none; height: 24px; display: flex; align-items: center;
-            justify-content: space-between; font-size: 10px; font-weight: 700; color: var(--muted);
-            text-transform: uppercase; letter-spacing: .08em; }
+        details.adv > summary { cursor: pointer; list-style: none; min-height: var(--tap); display: flex; align-items: center; gap: var(--s-3); color: var(--c-text-2); }
         details.adv > summary::-webkit-details-marker { display: none; }
-        details.adv > summary::after { content: "+"; font-size: 14px; }
-        details.adv[open] > summary::after { content: "\2212"; }
-        details.adv .adv-body { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+        details.adv > summary .grow { flex: 1; }
+        details.adv > summary .chev { transition: transform var(--dur) var(--ease); }
+        details.adv[open] > summary .chev { transform: rotate(180deg); }
+        details.adv .adv-body { display: flex; flex-direction: column; gap: var(--s-4); padding-top: var(--s-2); }
+        .sub-head { display: flex; align-items: center; gap: var(--s-2); color: var(--c-text-2); border-top: 1px solid var(--c-divider); padding-top: var(--s-3); }
+        .sub-head .grow { flex: 1; }
 
-        .ev-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
-        .ev-item { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-bottom: 1px solid var(--border);
-            cursor: pointer; font-size: 12px; }
+        .ev-list { max-height: 220px; overflow-y: auto; border: 1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-bg); }
+        .ev-item { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3); min-height: var(--tap);
+            border-bottom: 1px solid var(--c-divider); cursor: pointer; font-size: var(--fs-12); }
         .ev-item:last-child { border-bottom: none; }
-        .ev-item:hover { background: var(--hover); }
-        .ev-item.active { background: var(--accent-bg); border-left: 3px solid var(--accent); }
-        .ev-thumb { width: 40px; height: 30px; object-fit: cover; border-radius: 4px; background: #000; flex-shrink: 0; }
+        .ev-item.active { background: var(--c-accent-bg); box-shadow: inset 3px 0 0 var(--c-accent); }
+        .ev-thumb { width: 44px; height: 33px; object-fit: cover; border-radius: var(--r-sm); background: var(--c-bg); flex: none; }
         .ev-info { flex: 1; min-width: 0; }
-        .ev-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-weight: 600;
-            font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .ev-sub { font-family: var(--font-mono); font-size: 11px; color: var(--muted); white-space: nowrap;
-            overflow: hidden; text-overflow: ellipsis; }
-        .ev-empty { padding: 12px; text-align: center; color: var(--muted); font-size: 11px; }
+        .ev-top { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ev-top .ds-icon { vertical-align: -3px; margin-right: var(--s-1); }
+        .ev-time { font-family: var(--font-num); font-weight: 700; font-size: var(--fs-12); color: var(--c-text-2); }
+        .ev-sub { font-family: var(--font-num); font-size: var(--fs-12); color: var(--c-text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ev-empty { padding: var(--s-4); text-align: center; color: var(--c-text-3); font-size: var(--fs-12); }
 
-        /* Danger zone: Stop stream needs a ~1 s press-and-hold */
-        .danger-zone { border: 1px dashed rgba(239,68,68,.45); border-radius: 8px; padding: 8px; display: flex;
-            flex-direction: column; gap: 4px; margin-top: 4px; }
-        button.btn-danger { position: relative; overflow: hidden; background: transparent; border-color: var(--red); color: var(--red); min-height: 30px; }
-        button.btn-danger:hover { background: rgba(239,68,68,.12); }
+        /* Stop stream needs a ~1 s press-and-hold */
+        .danger-zone { display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-2); }
+        button.btn-danger { position: relative; overflow: hidden; min-height: 52px; }
         button.btn-danger::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 0;
-            background: rgba(239,68,68,.35); transition: width 0s; pointer-events: none; }
+            background: var(--c-danger-bg); transition: width 0s; pointer-events: none; }
         button.btn-danger.holding::before { width: 100%; transition: width 1s linear; }
-        button.btn-danger.stopped { border-color: var(--green); color: var(--green); }
-        .hint { font-size: 10px; color: var(--muted); }
-
-        .toast { position: fixed; bottom: 8px; right: 8px; background: var(--green); color: #041f14; font-size: 11px;
-            font-weight: 600; padding: 6px 10px; border-radius: 6px; opacity: 0; pointer-events: none;
-            transition: opacity .15s; z-index: 99; }
-        .toast.show { opacity: 1; }
+        button.btn-danger > * { position: relative; }
+        button.btn-danger.stopped { border-color: var(--c-ok); color: var(--c-ok); background: var(--c-ok-bg); }
+        .hint { display: flex; align-items: center; justify-content: center; gap: var(--s-1); font-size: var(--fs-12); color: var(--c-text-3); }
     </style>
 </head>
 <body>
     <div class="dock">
         <!-- Header -->
         <div class="head">
-            <div class="head-left">
-                <span id="status-dot" class="dot" title="Connection status"></span>
-                <span class="title">Zenivo · OBS Dock</span>
-                <span id="stream-pill" class="pill">Streaming</span>
+            <div class="grow">
+                <span id="status-dot" class="dot" title="Connection status" role="img" aria-label="Connection status"></span>
+                <h1>OBS</h1>
+                <span id="stream-pill" class="ds-chip ds-chip--ok pill" title="Stream state"><svg class="ds-icon ds-icon--sm" aria-hidden="true"><use href="/static/icons.svg#i-radio"></use></svg><span class="t">Streaming</span></span>
             </div>
-            <div class="row">
-                <button id="btn-snap" class="btn-sm" title="Refresh OBS Browser Source">Reload OBS</button>
-                <button id="btn-open-obs" class="btn-sm" title="Open /obs page">Open</button>
-            </div>
+            <button id="btn-snap" class="ds-btn ds-btn--icon" aria-label="Reload OBS" title="Refresh OBS Browser Source"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-refresh-cw"></use></svg></button>
+            <button id="btn-open-obs" class="ds-btn ds-btn--icon" aria-label="Open /obs page" title="Open /obs page"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-arrow-up-right"></use></svg></button>
         </div>
 
         <!-- Preview -->
         <div class="preview">
             <img id="pv-img" alt="Live preview" src="/api/live/snapshot.jpg">
             <div class="chips">
-                <button id="btn-go-live" class="btn-live active btn-sm" style="height:20px;border-radius:999px;font-size:11px" title="Back to live camera feed">LIVE</button>
+                <button id="btn-go-live" class="ds-btn active" aria-label="Back to live camera feed" title="Back to live camera feed"><svg class="ds-icon ds-icon--sm" aria-hidden="true"><use href="/static/icons.svg#i-radio"></use></svg><span class="t">LIVE</span></button>
                 <span id="telem-summary" class="telem-mini">-- ms · -- dB</span>
             </div>
         </div>
 
         <!-- Stream stats -->
-        <div class="section">
-            <div class="stats">
-                <div class="stat"><span class="k">Uptime</span><span class="v" id="st-uptime">00:00:00</span></div>
-                <div class="stat"><span class="k">Bitrate</span><span class="v" id="st-bitrate">&mdash;</span></div>
-                <div class="stat"><span class="k">Dropped</span><span class="v" id="st-dropped">&mdash;</span></div>
-            </div>
+        <div class="ds-card stats">
+            <div class="stat" title="Uptime"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg><span class="v" id="st-uptime">00:00:00</span></div>
+            <div class="stat" title="Bitrate"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-activity"></use></svg><span class="v" id="st-bitrate">&mdash;</span></div>
+            <div class="stat" title="Dropped frames"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-triangle-alert"></use></svg><span class="v" id="st-dropped">&mdash;</span></div>
         </div>
 
         <!-- View mode -->
-        <div class="section">
-            <div class="sec-head"><span>View</span></div>
-            <div class="seg">
-                <button type="button" class="mode-btn active" data-mode="live">Live</button>
-                <button type="button" class="mode-btn" data-mode="timelapse">Timelapse</button>
-                <button type="button" class="mode-btn" data-mode="startrails">Startrails</button>
-                <button type="button" class="mode-btn" data-mode="keogram">Keogram</button>
-                <button type="button" class="mode-btn" data-mode="sky">Sky View</button>
+        <div class="ds-card sec">
+            <div class="sec-head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg><span class="grow ds-card__title">View</span></div>
+            <div class="seg" role="group" aria-label="View">
+                <button type="button" class="ds-btn mode-btn active" data-mode="live" aria-label="Live" title="Live"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-radio"></use></svg></button>
+                <button type="button" class="ds-btn mode-btn" data-mode="timelapse" aria-label="Timelapse" title="Timelapse"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-film"></use></svg></button>
+                <button type="button" class="ds-btn mode-btn" data-mode="startrails" aria-label="Startrails" title="Startrails"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg></button>
+                <button type="button" class="ds-btn mode-btn" data-mode="keogram" aria-label="Keogram" title="Keogram"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-image"></use></svg></button>
+                <button type="button" class="ds-btn mode-btn" data-mode="sky" aria-label="Sky View" title="Sky View"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg></button>
             </div>
         </div>
 
         <!-- Overlays -->
-        <div class="section">
-            <div class="sec-head"><span>Overlays</span><span id="lbl-lst" class="mono" style="text-transform:none">LST --:--:--</span></div>
-            <div class="seg">
-                <button type="button" id="pre-full" title="All overlays on">Full</button>
-                <button type="button" id="pre-clean" title="Stargazing: constellations + sun/moon only">Clean</button>
-                <button type="button" id="pre-raw" title="Raw video, no overlays">Raw</button>
+        <div class="ds-card sec">
+            <div class="sec-head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layers"></use></svg><span class="grow ds-card__title">Overlays</span><span id="lbl-lst" class="num">LST --:--:--</span></div>
+            <div class="seg" role="group" aria-label="Preset">
+                <button type="button" id="pre-full" class="ds-btn" title="All overlays on"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layers"></use></svg><span class="t">Full</span></button>
+                <button type="button" id="pre-clean" class="ds-btn" title="Stargazing: constellations + sun/moon only"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><span class="t">Clean</span></button>
+                <button type="button" id="pre-raw" class="ds-btn" title="Raw video, no overlays"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg><span class="t">Raw</span></button>
             </div>
             <div class="grid">
-                <button type="button" id="tg-sky" class="tg" title="Constellations & bright stars">Constellations</button>
-                <button type="button" id="tg-labels" class="tg" title="Constellation & star names">Star names</button>
-                <button type="button" id="tg-grid" class="tg" title="Coordinate grid & compass">Grid / Compass</button>
-                <button type="button" id="tg-adsb" class="tg" title="Live ADS-B aircraft radar">ADS-B Radar</button>
-                <button type="button" id="tg-sunmoon" class="tg" title="Sun, Moon and naked-eye planets">Solar System</button>
-                <button type="button" id="tg-dso" class="tg" title="Messier deep-sky objects">Deep-sky (DSO)</button>
-                <button type="button" id="tg-night" class="tg" title="Red tint to protect night vision">Red light</button>
+                <button type="button" id="tg-sky" class="ds-btn tile tg" title="Constellations & bright stars"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-star"></use></svg><span class="t">Constellations</span></button>
+                <button type="button" id="tg-labels" class="ds-btn tile tg" title="Constellation & star names"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-type"></use></svg><span class="t">Star names</span></button>
+                <button type="button" id="tg-grid" class="ds-btn tile tg" title="Coordinate grid & compass"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-compass"></use></svg><span class="t">Grid</span></button>
+                <button type="button" id="tg-adsb" class="ds-btn tile tg" title="Live ADS-B aircraft radar"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg><span class="t">ADS-B</span></button>
+                <button type="button" id="tg-sunmoon" class="ds-btn tile tg" title="Sun, Moon and naked-eye planets"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sun"></use></svg><span class="t">Solar system</span></button>
+                <button type="button" id="tg-dso" class="ds-btn tile tg" title="Messier deep-sky objects"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon-star"></use></svg><span class="t">Deep sky</span></button>
+                <button type="button" id="tg-night" class="ds-btn tile tg" title="Red tint to protect night vision"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg><span class="t">Red light</span></button>
             </div>
             <div>
-                <div class="sw-row"><span>Clock</span><button type="button" id="tg-badge" class="sw" title="Info badge with LST clock"></button></div>
-                <div class="sw-row"><span>Meteor counter</span><button type="button" id="tg-events" class="sw" title="Recent meteor &amp; aircraft trails"></button></div>
-                <div class="sw-row"><span>Station caption</span><button type="button" id="tg-caption" class="sw" title="Show station caption title"></button></div>
+                <div class="sw-row"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg><span class="t">Clock</span><button type="button" id="tg-badge" class="sw" aria-label="Clock" title="Info badge with LST clock"></button></div>
+                <div class="sw-row"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-zap"></use></svg><span class="t">Meteor counter</span><button type="button" id="tg-events" class="sw" aria-label="Meteor counter" title="Recent meteor &amp; aircraft trails"></button></div>
+                <div class="sw-row"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-type"></use></svg><span class="t">Caption</span><button type="button" id="tg-caption" class="sw" aria-label="Station caption" title="Show station caption title"></button></div>
             </div>
         </div>
 
         <!-- Zoom -->
-        <div class="section">
-            <div class="sec-head">
-                <span>Zoom</span>
-                <button type="button" id="btn-reset-view" class="btn-sm">Reset view</button>
-            </div>
-            <div class="row" style="flex-wrap:nowrap">
-                <button type="button" id="btn-zoom-out" class="btn-sm" title="Zoom out">&minus;</button>
-                <input type="range" id="rng-zoom" min="1.0" max="6.0" step="0.1" value="1.0">
-                <button type="button" id="btn-zoom-in" class="btn-sm" title="Zoom in">+</button>
+        <div class="ds-card sec">
+            <div class="sec-head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-search"></use></svg><span class="grow ds-card__title">Zoom</span>
+                <button type="button" id="btn-reset-view" class="ds-btn ds-btn--icon" aria-label="Reset view" title="Reset view"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></button></div>
+            <div class="row">
+                <button type="button" id="btn-zoom-out" class="ds-btn ds-btn--icon" aria-label="Zoom out" title="Zoom out"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-minus"></use></svg></button>
+                <input type="range" id="rng-zoom" min="1.0" max="6.0" step="0.1" value="1.0" aria-label="Zoom">
+                <button type="button" id="btn-zoom-in" class="ds-btn ds-btn--icon" aria-label="Zoom in" title="Zoom in"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plus"></use></svg></button>
                 <span id="val-zoom" class="val">1.0x</span>
             </div>
             <div class="grid-3">
-                <button type="button" class="btn-sm z-quick" data-z="1">1x</button>
-                <button type="button" class="btn-sm z-quick" data-z="2">2x</button>
-                <button type="button" class="btn-sm z-quick" data-z="4">4x</button>
+                <button type="button" class="ds-btn z-quick" data-z="1">1x</button>
+                <button type="button" class="ds-btn z-quick" data-z="2">2x</button>
+                <button type="button" class="ds-btn z-quick" data-z="4">4x</button>
             </div>
         </div>
 
         <!-- Advanced -->
-        <details class="adv section">
-            <summary>More controls</summary>
+        <details class="adv ds-card">
+            <summary><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg><span class="grow ds-card__title">More</span><svg class="ds-icon chev" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></summary>
             <div class="adv-body">
                 <div class="grid">
-                    <button type="button" id="btn-fit" class="btn-sm" title="Toggle 16:9 Cover / 4:3 Original">16:9 Cover</button>
-                    <button type="button" id="btn-res" class="btn-sm" title="Picture size sent to /obs: same as /live, or the full output resolution">Size: as /live</button>
-                    <button type="button" id="btn-bg" class="btn-sm" title="Toggle Black / Transparent background">Black BG</button>
+                    <button type="button" id="btn-fit" class="ds-btn" title="Toggle 16:9 Cover / 4:3 Original"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg><span class="t">16:9</span></button>
+                    <button type="button" id="btn-res" class="ds-btn" title="Picture size sent to /obs: same as /live, or the full output resolution"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-image"></use></svg><span class="t">As /live</span></button>
+                    <button type="button" id="btn-bg" class="ds-btn" title="Toggle Black / Transparent background"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon"></use></svg><span class="t">Black</span></button>
                 </div>
-                <div class="row" style="flex-wrap:nowrap">
-                    <span class="lbl">Sharpness</span>
-                    <input type="range" id="rng-opacity" min="0.1" max="1.0" step="0.05" value="1.0">
+                <div class="row">
+                    <span class="lbl">Sharp</span>
+                    <input type="range" id="rng-opacity" min="0.1" max="1.0" step="0.05" value="1.0" aria-label="Sharpness">
                     <span id="val-opacity" class="val">100%</span>
                 </div>
 
-                <div class="sec-head"><span>Pan &amp; rotate</span></div>
+                <div class="sub-head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg><span class="grow ds-card__title">Pan &amp; rotate</span></div>
+                <div class="row wrap">
+                    <button type="button" class="ds-btn ds-btn--icon pan-step" data-dx="-8" data-dy="0" aria-label="Left" title="Left"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-left"></use></svg></button>
+                    <button type="button" class="ds-btn ds-btn--icon pan-step" data-dx="0" data-dy="-8" aria-label="Up" title="Up"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-up"></use></svg></button>
+                    <button type="button" class="ds-btn ds-btn--icon pan-step" data-dx="0" data-dy="8" aria-label="Down" title="Down"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></button>
+                    <button type="button" class="ds-btn ds-btn--icon pan-step" data-dx="8" data-dy="0" aria-label="Right" title="Right"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></button>
+                    <button type="button" class="ds-btn ds-btn--icon" id="btn-pan-center" aria-label="Center" title="Center"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg></button>
+                </div>
+                <div class="row"><span class="lbl">X</span><input type="range" id="rng-panx" min="-80" max="80" step="1" value="0" aria-label="Pan horizontal" title="Pan horizontal (X)"></div>
+                <div class="row"><span class="lbl">Y</span><input type="range" id="rng-pany" min="-80" max="80" step="1" value="0" aria-label="Pan vertical" title="Pan vertical (Y)"></div>
                 <div class="row">
-                    <span class="lbl">Pan</span>
-                    <button type="button" class="btn-sm pan-step" data-dx="-8" data-dy="0" title="Left">&larr;</button>
-                    <button type="button" class="btn-sm pan-step" data-dx="0" data-dy="-8" title="Up">&uarr;</button>
-                    <button type="button" class="btn-sm pan-step" data-dx="0" data-dy="8" title="Down">&darr;</button>
-                    <button type="button" class="btn-sm pan-step" data-dx="8" data-dy="0" title="Right">&rarr;</button>
-                    <button type="button" class="btn-sm" id="btn-pan-center" title="Center">Center</button>
-                </div>
-                <div class="row" style="flex-wrap:nowrap">
-                    <span class="lbl">Pan X</span>
-                    <input type="range" id="rng-panx" min="-80" max="80" step="1" value="0" title="Pan horizontal (X)">
-                </div>
-                <div class="row" style="flex-wrap:nowrap">
-                    <span class="lbl">Pan Y</span>
-                    <input type="range" id="rng-pany" min="-80" max="80" step="1" value="0" title="Pan vertical (Y)">
-                </div>
-                <div class="row" style="flex-wrap:nowrap">
-                    <span class="lbl">Rotate</span>
-                    <input type="range" id="rng-rotate" min="-180" max="180" step="1" value="0">
+                    <span class="lbl"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></span>
+                    <input type="range" id="rng-rotate" min="-180" max="180" step="1" value="0" aria-label="Rotate">
                     <span id="val-rotate" class="val">0&deg;</span>
                 </div>
                 <div class="grid">
-                    <button type="button" class="btn-sm rot-quick" data-r="0">0&deg;</button>
-                    <button type="button" class="btn-sm rot-quick" data-r="90">90&deg;</button>
-                    <button type="button" class="btn-sm rot-quick" data-r="180">180&deg;</button>
-                    <button type="button" id="btn-fliph" class="btn-sm" title="Flip horizontal">Flip H</button>
-                    <button type="button" id="btn-flipv" class="btn-sm" title="Flip vertical">Flip V</button>
+                    <button type="button" class="ds-btn rot-quick" data-r="0">0&deg;</button>
+                    <button type="button" class="ds-btn rot-quick" data-r="90">90&deg;</button>
+                    <button type="button" class="ds-btn rot-quick" data-r="180">180&deg;</button>
+                    <button type="button" id="btn-fliph" class="ds-btn" title="Flip horizontal" aria-label="Flip horizontal">H&#8646;</button>
+                    <button type="button" id="btn-flipv" class="ds-btn" title="Flip vertical" aria-label="Flip vertical">V&#8645;</button>
                 </div>
-                <div class="row" style="flex-wrap:nowrap">
-                    <span class="lbl">Bright</span>
-                    <input type="range" id="rng-bright" min="0.5" max="2.5" step="0.05" value="1.0">
+                <div class="row">
+                    <span class="lbl"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sun"></use></svg></span>
+                    <input type="range" id="rng-bright" min="0.5" max="2.5" step="0.05" value="1.0" aria-label="Brightness">
                     <span id="val-bright" class="val">1.0</span>
                 </div>
-                <div class="row" style="flex-wrap:nowrap">
-                    <span class="lbl">Contrast</span>
-                    <input type="range" id="rng-contrast" min="0.5" max="2.5" step="0.05" value="1.0">
+                <div class="row">
+                    <span class="lbl"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg></span>
+                    <input type="range" id="rng-contrast" min="0.5" max="2.5" step="0.05" value="1.0" aria-label="Contrast">
                     <span id="val-contrast" class="val">1.0</span>
                 </div>
 
-                <div class="sec-head">
-                    <span>OBS title</span>
-                    <select id="sel-title-pos">
+                <div class="sub-head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-type"></use></svg><span class="grow ds-card__title">Title</span>
+                    <select id="sel-title-pos" aria-label="Title position">
                         <option value="bottom-left">Bottom left</option>
                         <option value="bottom-center">Bottom center</option>
                         <option value="top-left">Top left</option>
                         <option value="top-center">Top center</option>
                     </select>
                 </div>
-                <div class="row" style="flex-wrap:nowrap">
-                    <input type="text" id="inp-title" placeholder="Main title..." style="flex:1.2;min-width:0;">
-                    <input type="text" id="inp-sub" placeholder="Subtitle..." style="flex:1;min-width:0;">
+                <div class="row">
+                    <input type="text" id="inp-title" placeholder="Title" aria-label="Main title" style="flex:1.2">
+                    <input type="text" id="inp-sub" placeholder="Subtitle" aria-label="Subtitle" style="flex:1">
                 </div>
                 <div class="row">
-                    <button type="button" id="btn-title-apply" class="btn-sm active btn-wide">Show</button>
-                    <button type="button" id="btn-title-clear" class="btn-sm btn-wide">Clear</button>
+                    <button type="button" id="btn-title-apply" class="ds-btn ds-btn--primary" style="flex:1" aria-label="Show title" title="Show"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg></button>
+                    <button type="button" id="btn-title-clear" class="ds-btn" style="flex:1" aria-label="Clear title" title="Clear"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button>
                 </div>
 
-                <div class="sec-head">
-                    <span>Replay</span>
-                    <div class="row">
-                        <button type="button" id="btn-ev-prev" class="btn-sm" title="Previous event">&larr;</button>
-                        <button type="button" id="btn-ev-next" class="btn-sm" title="Next event">&rarr;</button>
-                        <button type="button" id="btn-ev-reload" class="btn-sm" title="Reload list">Reload</button>
-                    </div>
+                <div class="sub-head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-film"></use></svg><span class="grow ds-card__title">Replay</span>
+                    <button type="button" id="btn-ev-prev" class="ds-btn ds-btn--icon" aria-label="Previous event" title="Previous event"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-left"></use></svg></button>
+                    <button type="button" id="btn-ev-next" class="ds-btn ds-btn--icon" aria-label="Next event" title="Next event"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></button>
+                    <button type="button" id="btn-ev-reload" class="ds-btn ds-btn--icon" aria-label="Reload list" title="Reload list"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-refresh-cw"></use></svg></button>
                 </div>
-                <div class="grid" id="ev-tabs">
-                    <button type="button" class="ev-tab active" data-tab="all">All</button>
-                    <button type="button" class="ev-tab" data-tab="meteor">Meteors</button>
-                    <button type="button" class="ev-tab" data-tab="plane">Aircraft</button>
-                    <button type="button" class="ev-tab" data-tab="adsb">Radar live</button>
+                <div class="ds-chips" id="ev-tabs">
+                    <button type="button" class="ds-chip ev-tab active" data-tab="all">All</button>
+                    <button type="button" class="ds-chip ev-tab" data-tab="meteor">Meteors</button>
+                    <button type="button" class="ds-chip ev-tab" data-tab="plane">Aircraft</button>
+                    <button type="button" class="ds-chip ev-tab" data-tab="adsb">Radar</button>
                 </div>
-                <div id="ev-list" class="ev-list"><div class="ev-empty">Loading data...</div></div>
+                <div id="ev-list" class="ev-list"><div class="ev-empty">Loading…</div></div>
 
-                <div class="sec-head">
-                    <span>Camera &amp; exposure</span>
-                    <span id="cam-sky-info" class="mono" style="text-transform:none">--</span>
-                </div>
-                <div class="seg">
-                    <button type="button" id="cam-auto">Auto AE</button>
-                    <button type="button" id="cam-manual">Manual</button>
-                    <button type="button" id="cam-boost">Star boost</button>
+                <div class="sub-head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg><span class="grow ds-card__title">Camera</span><span id="cam-sky-info" class="num">--</span></div>
+                <div class="seg" role="group" aria-label="Exposure mode">
+                    <button type="button" id="cam-auto" class="ds-btn" title="Auto exposure"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><span class="t">Auto</span></button>
+                    <button type="button" id="cam-manual" class="ds-btn" title="Manual exposure"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg><span class="t">Manual</span></button>
+                    <button type="button" id="cam-boost" class="ds-btn" title="Star boost"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-star"></use></svg><span class="t">Boost</span></button>
                 </div>
                 <div class="row">
-                    <span class="lbl" style="min-width:36px">Exp (s)</span>
-                    <input type="number" id="inp-exp" step="any" min="0.0001" max="90" value="0.01" style="width:76px">
-                    <span class="lbl" style="min-width:28px">Gain</span>
-                    <input type="number" id="inp-gain" step="1" min="0" max="72" value="0" style="width:60px">
-                    <button type="button" id="btn-cam-set" class="btn-sm btn-wide">Apply</button>
+                    <input type="number" id="inp-exp" step="any" min="0.0001" max="90" value="0.01" style="width:96px" aria-label="Exposure seconds" title="Exposure (s)">
+                    <input type="number" id="inp-gain" step="1" min="0" max="72" value="0" style="width:72px" aria-label="Gain" title="Gain">
+                    <button type="button" id="btn-cam-set" class="ds-btn ds-btn--primary" style="flex:1" aria-label="Apply" title="Apply"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg></button>
                 </div>
             </div>
         </details>
 
-        <!-- Snapshot (normal action) -->
-        <button type="button" id="btn-take-snapshot" title="Open a full-resolution snapshot">Take snapshot</button>
+        <!-- Snapshot -->
+        <button type="button" id="btn-take-snapshot" class="ds-btn" title="Open a full-resolution snapshot" aria-label="Take snapshot"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg><span class="t">Snapshot</span></button>
 
         <!-- Danger zone -->
         <div class="danger-zone">
-            <button type="button" id="btn-stop-stream" class="btn-danger" title="Pause the dock preview and uptime">Hold to stop stream</button>
-            <span class="hint">Press and hold for 1 second.</span>
+            <button type="button" id="btn-stop-stream" class="ds-btn ds-btn--danger btn-danger" title="Pause the dock preview and uptime" aria-label="Hold to stop stream"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-power"></use></svg><span class="t">Hold to stop</span></button>
+            <span class="hint"><svg class="ds-icon ds-icon--sm" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg>1 s</span>
         </div>
     </div>
 
-    <div id="toast" class="toast">Synced</div>
+    <div class="ds-toasts" aria-live="polite"></div>
 
     <script>
         (function () {
@@ -352,7 +306,6 @@
             const statusDot = $("status-dot");
             const telemSummary = $("telem-summary");
             const lblLst = $("lbl-lst");
-            const toast = $("toast");
 
             let state = {
                 sky_overlay: false,
@@ -397,10 +350,7 @@
             let inFlight = false;
 
             function notify(msg) {
-                toast.textContent = msg;
-                toast.classList.add("show");
-                clearTimeout(toast._t);
-                toast._t = setTimeout(() => toast.classList.remove("show"), 1200);
+                if (window.DS && DS.toast) DS.toast(msg);
             }
 
             function syncUI(s, fromServer = false) {
@@ -430,11 +380,11 @@
                 $("tg-night").classList.toggle("active", !!state.night_vision);
                 $("tg-caption").classList.toggle("active", !!(state.title_text || state.title_sub));
 
-                $("btn-fit").textContent = state.fit === "contain" ? "4:3 Original" : "16:9 Cover";
+                $("btn-fit").querySelector(".t").textContent = state.fit === "contain" ? "4:3" : "16:9";
                 $("btn-fit").classList.toggle("active", state.fit === "contain");
-                $("btn-res").textContent = state.res === "full" ? "Size: full" : "Size: as /live";
+                $("btn-res").querySelector(".t").textContent = state.res === "full" ? "Full" : "As /live";
                 $("btn-res").classList.toggle("active", state.res === "full");
-                $("btn-bg").textContent = state.bg === "transparent" ? "Alpha" : "Black BG";
+                $("btn-bg").querySelector(".t").textContent = state.bg === "transparent" ? "Alpha" : "Black";
                 $("btn-bg").classList.toggle("active", state.bg === "transparent");
 
                 if (!fromServer || Date.now() - lastSliderDragTs >= 700) {
@@ -548,9 +498,9 @@
             const stopBtn = $("btn-stop-stream");
             let holdTimer = null;
             function applyStreaming() {
-                stopBtn.textContent = streaming ? "Hold to stop stream" : "Resume stream";
+                stopBtn.querySelector(".t").textContent = streaming ? "Hold to stop" : "Resume";
                 stopBtn.classList.toggle("stopped", !streaming);
-                $("stream-pill").textContent = streaming ? "Streaming" : "Stopped";
+                $("stream-pill").querySelector(".t").textContent = streaming ? "Streaming" : "Stopped";
                 $("stream-pill").classList.toggle("off", !streaming);
                 if (streaming) { streamStart = Date.now(); refreshPreview(); }
                 notify(streaming ? "Stream resumed" : "Stream stopped");
@@ -714,7 +664,7 @@
                 const ev = eventsList[idx];
                 const isMeteor = ev.type === "meteor";
                 const fl = ev.flight || ev.nearest_flight;
-                const icon = isMeteor ? "Meteor" : ev.type === "satellite" ? "🛰️ Satellite" : `✈️ ${fl ? (fl.callsign || fl.icao) : "Aircraft"}`;
+                const icon = isMeteor ? "Meteor" : ev.type === "satellite" ? `<svg class="ds-icon ds-icon--sm" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg> Satellite` : `<svg class="ds-icon ds-icon--sm" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg> ${fl ? (fl.callsign || fl.icao) : "Aircraft"}`;
                 const label = `${icon} • ${fmtTime(ev.timestamp)}${fl && fl.altitude_m ? ` • ${fl.altitude_m}m` : ""}`;
                 const skyUrl = ev.sky_url || ev.thumbnail_url || "";
                 const cropUrl = (ev.sky_url && ev.thumbnail_url && ev.thumbnail_url !== ev.sky_url) ? ev.thumbnail_url : "";
@@ -757,7 +707,7 @@
                         const pos = a.alt_deg !== undefined ? `Alt ${Math.round(a.alt_deg)}° • Az ${Math.round(a.az_deg || 0)}°` : "";
                         return `<div class="ev-item" data-adsb-idx="${i}">
                             <div class="ev-info">
-                                <div class="ev-top"><span>✈️ ${call} ${a.in_view ? "(in view)" : ""}</span><span>${alt} • ${dist}</span></div>
+                                <div class="ev-top"><span><svg class="ds-icon ds-icon--sm" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg> ${call} ${a.in_view ? "(in view)" : ""}</span><span>${alt} • ${dist}</span></div>
                                 <div class="ev-sub">${pos} ${spd ? "• " + spd : ""}</div>
                             </div>
                             <button type="button" class="btn-sm adsb-pin" data-adsb-idx="${i}" title="Enable Radar & pin aircraft title">Pin to OBS</button>
@@ -795,7 +745,7 @@
                 container.innerHTML = eventsList.map((ev, i) => {
                     const isMeteor = ev.type === "meteor";
                     const fl = ev.flight || ev.nearest_flight;
-                    const badge = isMeteor ? "Meteor" : ev.type === "satellite" ? "🛰️ Satellite" : `✈️ ${fl ? escHtml(fl.callsign || fl.icao) : "Aircraft"}`;
+                    const badge = isMeteor ? "Meteor" : ev.type === "satellite" ? `<svg class="ds-icon ds-icon--sm" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg> Satellite` : `<svg class="ds-icon ds-icon--sm" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg> ${fl ? escHtml(fl.callsign || fl.icao) : "Aircraft"}`;
                     const detail = fl
                         ? `Alt ${fl.altitude_m || "--"}m • Dist ${fl.distance_km || "--"}km`
                         : `Length ${Math.round(ev.length_px || 0)}px • ${ev.frames || 1} frames`;
@@ -804,10 +754,10 @@
                     return `<div class="ev-item ${i === selectedEventIdx ? "active" : ""}" data-idx="${i}">
                         ${thumb}
                         <div class="ev-info">
-                            <div class="ev-top"><span>${badge}</span><span style="color:#cbd5e1;font-weight:700;font-size:13px">${fmtTime(ev.timestamp)}</span></div>
+                            <div class="ev-top"><span>${badge}</span><span class="ev-time">${fmtTime(ev.timestamp)}</span></div>
                             <div class="ev-sub">${detail}</div>
                         </div>
-                        <button type="button" class="btn-sm ev-zoom-btn" data-idx="${i}" title="Play & zoom to position">🔍</button>
+                        <button type="button" class="ds-btn ds-btn--icon ev-zoom-btn" data-idx="${i}" aria-label="Play & zoom to position" title="Play & zoom to position"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-search"></use></svg></button>
                     </div>`;
                 }).join("");
 
