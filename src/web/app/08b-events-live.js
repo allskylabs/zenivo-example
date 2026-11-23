@@ -542,11 +542,10 @@ function evDayLabel(date) {
 
 function renderLiveEvents(evData) {
     const events = evData.events || [];
-    // the count matches the list: events of the last 24 hours
-    const cutoff = Date.now() - 86400000;
-    const recent = events.filter((ev) => new Date(ev.timestamp).getTime() >= cutoff).length;
-    liveEventsCount.innerHTML = `${recent}${arcIcon("clock")}`;
-    liveEventsCount.title = `${recent} in the last 24 hours`;
+    // the count is exactly what is listed below (latest detections); the last-24 h share is in the tooltip
+    const recent = events.filter((ev) => new Date(ev.timestamp).getTime() >= Date.now() - 86400000).length;
+    liveEventsCount.innerHTML = `${events.length}${arcIcon("history")}`;
+    liveEventsCount.title = `Latest ${events.length} events · ${recent} in the last 24 hours`;
     liveEventsCount.setAttribute("aria-label", liveEventsCount.title);
 
     const on = Object.entries(evData.enabled || {}).filter(([, v]) => v).map(([k]) => EVENT_LABELS[k] || k);
