@@ -301,3 +301,5 @@ a.ds-row:hover, button.ds-row:hover { background: var(--c-surface-2); }
 .ds-skeleton { display: block; height: 14px; border-radius: var(--r-sm); background: linear-gradient(90deg, var(--c-surface-2), var(--c-surface-3), var(--c-surface-2)); background-size: 200% 100%; animation: ds-shimmer 1.4s linear infinite; }
 .ds-skeleton--block { height: 96px; border-radius: var(--r-lg); }
 @keyframes ds-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+/* Scrollable chip rows: reserve an end gutter and fade it so a hidden chip is visible as such (no fade when the row fits) */
+.ds-chips:not(.lg-chips), .zchips, .arc-chips { padding-inline-end: var(--s-6); -webkit-mask-image: linear-gradient(90deg, black calc(100% - var(--s-6)), transparent); mask-image: linear-gradient(90deg, black calc(100% - var(--s-6)), transparent); }

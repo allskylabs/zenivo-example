@@ -4,7 +4,7 @@
 #cstations .nm.you { color: inherit; }
 @media (max-width: 768px) {
     .page-top { display: flex; align-items: center; gap: 14px; height: 56px; padding: 0 20px; background: var(--bg-primary, transparent); }
-    .page-back { display: inline-grid; place-items: center; width: 32px; height: 32px; margin-left: -6px; color: var(--text-primary); }
+    .page-back { display: inline-grid; place-items: center; width: var(--tap); height: var(--tap); margin-left: -10px; color: var(--text-primary); }
     .page-top-title { font-size: 17px; font-weight: 600; }
     
     body #cmap-wrap { display: flex; flex-direction: column; height: auto; min-height: 0; overflow: hidden; margin: 4px 16px 0; background: var(--bg-card); }

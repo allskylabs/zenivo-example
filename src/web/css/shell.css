@@ -34,7 +34,7 @@
 .zt-ver { color: var(--text-muted); font-size: 12px; }
 .zt-quick { margin-bottom: 12px; }
 .zt-gtitle { margin: 14px 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
-.zt-badge { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 11px; }
+.zt-badge { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 12px; }
 .zt-badge[hidden] { display: none; }
 .zt-settings { margin-top: 12px; }
 .ds-tile[aria-current="page"], .ds-tile[aria-pressed="true"] { border-color: var(--accent); }

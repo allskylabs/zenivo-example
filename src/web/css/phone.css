@@ -6,6 +6,6 @@
     #tab-live .telemetry-card .gauge-number { font-size: 16px; }
     #exposure-card > summary.card-header { min-height: 44px; }
     .chip-preset, .btn-lock, .cloud-ranges .btn-range { min-height: 36px; }
-    .btn-preset, .btn-preset-gain { min-height: 36px; }
+    .btn-preset, .btn-preset-gain { min-height: var(--tap); }
     .btn, button.btn { min-height: 36px; }
 }
