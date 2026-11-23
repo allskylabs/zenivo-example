@@ -111,7 +111,7 @@
 #tab-live .live-events-empty { list-style: none; display: flex; flex-direction: column; align-items: center; gap: var(--s-2); padding: var(--s-6) 0; text-align: center; color: var(--c-text-2); font-size: var(--fs-14); }
 #tab-live .live-events-empty .ds-icon { width: 32px; height: 32px; color: var(--c-text-3); }
 /* ---------- Recent events: 16:9 thumbnail cards, one icon per type, one-line meta ---------- */
-#tab-live .live-events-list { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--s-2); overflow-x: auto; scroll-snap-type: x proximity; }
+#tab-live .live-events-list { scrollbar-width: thin; scrollbar-color: var(--c-border) transparent; list-style: none; margin: 0; padding: 0; display: flex; gap: var(--s-2); overflow-x: auto; scroll-snap-type: x proximity; }
 #tab-live .live-events-list .live-event { --pill: var(--c-accent); grid-template-columns: none; align-items: stretch; gap: 0; padding: 0; width: auto; flex: 0 0 200px; scroll-snap-align: start; display: flex; flex-direction: column; border: 1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-surface-2); overflow: hidden; cursor: pointer; transition: border-color .15s, background .15s; }
 #tab-live .live-event:hover, #tab-live .live-event:focus-visible { border-color: var(--pill); outline: none; }
 #tab-live .live-event.fresh { border-color: var(--c-accent); }
