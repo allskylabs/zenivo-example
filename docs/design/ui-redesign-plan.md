@@ -73,7 +73,7 @@ Order of workers: S0 → S1 → (Live, Overhead, Sign-in in parallel, disjoint) 
 
 ## 4. (c) Keeping the live site working (revised 2026-11-23, owner: "rebuild cleanly if needed")
 
-Goal is a CLEAN codebase, not coexistence. No `data-ui` switch, no old/new branches living side by side.
+Owner FINAL decision (2026-11-23): full rebuild, no more patching the old UI. No new fixes to old pages beyond keeping the site usable until each is replaced; coexistence flags are optional, only where they make a cut-over cheaper. Goal is a CLEAN codebase, not coexistence. No `data-ui` switch, no old/new branches living side by side.
 - **Replace and delete per page.** The page task replaces its old markup/CSS/JS and deletes, in the same commit, everything it no longer needs: old rules and files (`redesign*.css`), hard-coded hex, dead classes, dead JS. A page is done only when `scripts/ds_lint.py --report` shows no hex and no orphan selectors for it.
 - **Rollback = one-commit `git revert`.** One page = one commit (plus its `?v=` bump). No runtime flags. Exception: risky pages (Live) may keep a `?ui=1` escape hatch to the previous layout for one release, then it is deleted.
 - **S1a first: split `index.html`.** Its six sections (Live, Gallery, Settings, Calibration, Focus, Logs) become `src/web/pages/*.html` partials assembled by `scripts/build_index.py` (`--check` for CI) into the same `index.html`, so workers stop colliding. URLs, redirects and APIs stay unchanged; three.js scenes untouched; no `main.py` change.
@@ -114,3 +114,15 @@ Mockups are mobile only. Proposal, same components, three tiers: ≤ 640 phone (
 ## 8. Per-page deliverable checklist (added)
 
 Every page task must deliver: icon-led controls from the sprite (no emoji/unicode glyphs), `aria-label` on icon-only buttons, 44 px targets, helper text moved behind an info icon, status by icon+colour, and a screenshot pair (390 and 1440, default and red mode) showing no paragraph above the fold.
+
+## 9. End-state checklist (owner final decision, 2026-11-23)
+
+The rebuild is finished only when all hold:
+- [ ] Old files deleted: `redesign*.css`, old sidebar/nav leftovers, inline styles, hard-coded hex; `scripts/ds_lint.py --report` shows zero violations.
+- [ ] One icon set (the sprite), one component set (`ds-*`), token-only styling.
+- [ ] Every page has loading, empty and error states.
+- [ ] Red mode verified on every page (phone and desktop).
+- [ ] Lighthouse-style a11y pass on every page.
+- [ ] No `data-ui` / `?ui=1` flags left.
+
+The event viewer redesign (`docs/design/events-detectors-audit.md` section 4, items 1-8) is part of the Archive page task.
