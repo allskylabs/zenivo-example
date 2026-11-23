@@ -98,7 +98,11 @@ def star_bin_boost(
     lift = s - thr
     lift -= np.maximum(d, 0.0)
     if sky_mask is not None and sky_mask.shape[:2] == (h, w):
-        lift[sky_mask == 0] = 0.0
+        # Feathered edge: a hard 0/1 cut shows the mask outline as a brightness step wherever the boost lifts
+        # cloud grain next to it (moonlit cloud around the mast). Blur the mask on a reduced grid, scale back up.
+        sw, sh = max(8, w // 8), max(8, h // 8)
+        soft = cv2.GaussianBlur(cv2.resize((sky_mask != 0).astype(np.float32), (sw, sh), interpolation=cv2.INTER_AREA), (0, 0), 3.0)
+        lift *= cv2.resize(soft, (w, h), interpolation=cv2.INTER_LINEAR)
     ys, xs = np.nonzero(lift > 0.0)
     out = frame_bgr.copy()
     if ys.size:
