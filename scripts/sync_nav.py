@@ -91,11 +91,11 @@ def render_head(name):
              f'<meta property="og:image" content="{img}">', '<meta name="twitter:card" content="summary_large_image">',
              '<link rel="stylesheet" href="/static/css/ds-tokens.css?v=20261123a">',
              '<link rel="stylesheet" href="/static/css/ds-components.css?v=20261123a">',
-             '<link rel="stylesheet" href="/static/css/shell.css?v=20261123a">',
+             '<link rel="stylesheet" href="/static/css/shell.css?v=20261123b">',
              '<script src="/static/auth.js?v=1"></script>',
              '<script src="/static/js/ds.js?v=20261123a" defer></script>',
              '<script src="/static/brand/version.js?v=4" defer></script>',
-             '<script src="/static/shell.js?v=20261123a" defer></script>', "<!-- head-brand:end -->"]
+             '<script src="/static/shell.js?v=20261123b" defer></script>', "<!-- head-brand:end -->"]
     return "\n    ".join(lines)
 
 

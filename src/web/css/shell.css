@@ -6,7 +6,7 @@
 @media (min-width: 1024px) { .app-main { padding-left: var(--rail-w); } }
 
 /* brand */
-.zt-brand { display: inline-flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; flex: 0 0 auto; }
+.zt-brand { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; flex: 0 0 auto; }
 .brand-mark { flex: 0 0 28px; display: block; }
 .brand-mark .bm-ring, .brand-mark .bm-tick { stroke: var(--accent); }
 .brand-mark .bm-inner { stroke: var(--text-primary); }
