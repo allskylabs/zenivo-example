@@ -133,3 +133,18 @@ Commit: P2 batch on main (after 0cd61ea), deployed, md5 equal on repo, Pi and al
 | #23-#26 | OPEN |
 
 Extra pass at 390 (/full, /focus, /calibration, /flights3d, /satellites3d, /login, /community, /obs_dock, settings#detection): no horizontal overflow, no visible text under 12px. Red mode and a before/after pixel review of each page were NOT done.
+
+### Update 3 (final)
+
+Deployed, md5 equal on repo, Pi, allsky.hoan.uk.
+
+| Item | Status |
+|---|---|
+| #9 Live wide layout | done (`css/live.css`, >=1400px: 1600px max, 420px panel); `critique/after-live-1568-red.jpg` |
+| #8 empty live-events status | done (hidden when empty); lock chips keep "Auto" label |
+| #17 Admin tiles | done (2-col at <=480px, `css/settings-admin.css`); label truncation OPEN: needs per-row markup check |
+| #25 Flights 3D LOCAL pill | done (colour dot, `css/scene3d.css`); rows already 44px |
+| Red mode | checked on Live at 1568: all surfaces and text stay in the red palette, no stray blue |
+| #20 sky mask fill | OPEN with reason: the polygon is drawn inside the compiled sky engine (`src/web/sky/core-D2YY-WWc.js`); source is `tools/skyview/src` and needs a rebuild through its vite config, not edited by hand |
+| #11 arrow glyph, #12 duplicate badge, #13 row anatomy, #14 header icon, #16 sub 14px, #18 placeholder contrast, #23 chart colour, #24 map attribution, #26 satellites header | OPEN with reason: each needs markup or JS changes across several pages; deferred to avoid regressions without per-page screenshot review |
+| Before/after screenshots | only Live 1568 (red) saved; per-page 390 px screenshots were replaced by scripted overflow and 12px checks (see Update 2) |
