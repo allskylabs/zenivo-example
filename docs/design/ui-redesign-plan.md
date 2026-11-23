@@ -2,6 +2,18 @@
 
 Date 2026-11-23. Mockups: `docs/design/mockups/p01…p23` (+ `design.opnai.json`). Live: https://allsky.hoan.uk. No UI code was changed in this phase.
 
+## Principles (owner design rules)
+
+1. **ICONS FIRST, LESS TEXT.** Users recognise icons faster and prefer them. Every action, tab, toggle and setting row leads with a clear icon; text is only a short label, tooltip or `aria-label` where an icon alone is ambiguous. Cut helper sentences; long explanations go behind an info icon (opens a `ds-sheet`). Status is shown by icon + colour, not words. Tab bar, rail and sheets are icon-led.
+2. **Check: no screen has a paragraph of text above the fold** (checked per page at 390x844 and 1440x900 in the acceptance step).
+3. Finish and unify the partial redesign; no big-bang; plain CSS + existing JS.
+
+**Icon set:** Lucide (ISC licence, permissive; 1 500+ icons, one 2 px stroke weight, active releases, plain SVG). Alternative Tabler Icons (MIT) only if a needed glyph is missing; never mix sets. Shipped as one inline SVG sprite `static/icons.svg` (`<use href="#i-name">`, `currentColor`, 24 px grid) plus a `.ds-icon` class; only the ~60 icons used (about 10 KB). Licence line goes in `static/icons.LICENSE` and the README. Replaces the unicode/emoji glyphs in the sidebar and ad hoc inline SVGs.
+
+**Accessibility:** icon-only controls always carry `aria-label` (and `title` on desktop); hit area >= 44 px (`--tap`); icon never the only carrier of meaning for colour (shape differs: check / alert / x); focus ring on all.
+
+**Icon list per page (starting set):** Live: eye/camera, cloud, moon, sun, plane, satellite, balloon (sondes), layers, info, expand, refresh. Archive: calendar, film/image, filter, download, trash, star. Settings: camera, image, map-pin, crosshair, sliders, plug, shield, search, chevron-right, info. Overhead: plane, satellite, balloon, compass, arrow-up-right. Sky: layers, clock, sun, moon, sparkles. Community: users, map, share, message. Admin: cpu, memory-stick, hard-drive, activity, power. Sign-in: user, key, log-in. Shared: tabs (radio/live, sky, community, archive, menu), bell, wifi/wifi-off, red-eye (Red Vision), x, check, alert-triangle.
+
 ## 0. Where the product is today (important context)
 
 A **partial mobile redesign already shipped** (`css/redesign*.css`, 1 230 lines, `m-tabbar`, bottom Menu sheet, settings home list, cards). So the job is not "start over" but "finish and unify". Findings below are from the live site (mobile = 390 px iframe of the real pages, desktop = 1568 px) and a grep of `src/web`.
@@ -30,6 +42,7 @@ Plain CSS custom properties + small vanilla JS helpers. No framework (the app is
 **Tokens**
 - Colour roles (keep current values, they match mockup `#0b1220`): `--bg`, `--surface-1/2/3`, `--border`, `--divider`, `--text`, `--text-2`, `--text-3`, `--accent`, `--accent-bg`, `--ok`, `--warn`, `--danger`, `--info`, `--violet`. Brand colours stay as source palette. Add `--overlay-scrim`, `--shadow-1/2`.
 - Night/red mode: one override block per role (exists for ~16 vars; extend to all roles above and **forbid hex in components**: a lint check, section 6). Add a `data-theme="red"` variant of map and sky canvas palettes read from CSS variables via `getComputedStyle`, so 3D/canvas pages follow it.
+- Icons: one Lucide sprite (see Principles); every component below takes an icon slot first, label second.
 - Type scale (7 steps, px, with line-height): `--fs-11` caption, `--fs-12` meta, `--fs-14` body, `--fs-16` row title, `--fs-18` section title, `--fs-22` page title, `--fs-32` hero number. Rule: nothing under 12 px except uppercase 11 px labels. Fonts: Inter (text), JetBrains Mono (numbers); drop Space Grotesk (not bundled, falls back).
 - Spacing: 4-based `--s-1…--s-8` (4,8,12,16,20,24,32,48). Radius: `--r-sm 8`, `--r-md 12`, `--r-lg 16`, `--r-xl 20`, `--r-pill`. Touch: `--tap: 44px` min height for every control.
 - Z-index named layers: `--z-nav 40`, `--z-fab 50`, `--z-sheet 60`, `--z-toast 70`, `--z-modal 80`. Breakpoints documented once: phone ≤ 640, tablet 641–1023, desktop ≥ 1024.
@@ -94,4 +107,8 @@ Mockups are mobile only. Proposal, same components, three tiers: ≤ 640 phone (
 - **Overlap with Worker-4** (event viewer, detector); sequence Archive after its merge.
 - **Scope creep from mockup features** (section 5): ship the visual system first, features as separate tasks.
 - **Testing cost**: follow the global rule, one E2E per page in CI on the `lan` runners, a lint for tokens, manual device check; no repeated local browser loops.
-- **Mockup staleness**: the opnai session expires 7 days after last use; the PNG/JSON copies in `docs/design/mockups/` are the source of truth.
+- **Mockups**: they live permanently in the owner's personal opnai account (read-only for us: never delete, rename or edit). `docs/design/mockups/` is a repo copy for reference.
+
+## 8. Per-page deliverable checklist (added)
+
+Every page task must deliver: icon-led controls from the sprite (no emoji/unicode glyphs), `aria-label` on icon-only buttons, 44 px targets, helper text moved behind an info icon, status by icon+colour, and a screenshot pair (390 and 1440, default and red mode) showing no paragraph above the fold.

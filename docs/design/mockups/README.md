@@ -2,7 +2,7 @@
 
 - Source: opnai design session `86545587a949460f86e2039ecdc29120` (https://opnai.net/design-editor?s=86545587a949460f86e2039ecdc29120), v35, canvas 390 px wide, pages of varying height.
 - Exported 2026-11-23 via the editor's "PNG zip" (2x, 780 px wide) and "Save file" (`design.opnai.json`, re-importable into the opnai editor).
-- The design is not in the connector's `list_my_designs` library; only the editor session held it (kept 7 days after last use).
+- The design is not in the connector's `list_my_designs` library; only the editor session held it (it lives in the owner's personal opnai account; read-only for us, never delete/rename/edit).
 - Companion: `../ui-redesign.html` (earlier partial export), `../ui-redesign-plan.md` (implementation plan).
 
 | File | Page |
