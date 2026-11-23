@@ -63,3 +63,6 @@
 .cal-ok { color: var(--c-ok); }
 .cal-info { color: var(--c-info); }
 .cal .ds-chip .ds-icon, .cal .ds-chip svg { width: var(--icon-sm); height: var(--icon-sm); }
+.sa-tools { flex-wrap: nowrap; gap: var(--s-2); padding-inline: var(--s-3); }
+.sa-tools .ds-btn:not(.ds-btn--icon) { padding-inline: var(--s-2); }
+.foc-togs { flex: 1; justify-content: flex-end; }
