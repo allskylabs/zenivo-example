@@ -11,14 +11,14 @@
     <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
     <meta name="description" content="Zenivo control dock for OBS Studio: stream overlays and live view settings.">
-    <link rel="stylesheet" href="/static/css/ds-tokens.css?v=20261203b">
-    <link rel="stylesheet" href="/static/css/ds-base.css?v=20261203b">
-    <link rel="stylesheet" href="/static/css/ds-components.css?v=20261203b">
+    <link rel="stylesheet" href="/static/css/ds-tokens.css?v=20261203c">
+    <link rel="stylesheet" href="/static/css/ds-base.css?v=20261203c">
+    <link rel="stylesheet" href="/static/css/ds-components.css?v=20261203c">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
-    <script src="/static/js/ds.js?v=20261203b" defer></script>
+    <script src="/static/js/ds.js?v=20261203c" defer></script>
     <style>
         .ds-chip.active { background: var(--c-accent-bg); border-color: var(--c-accent); color: var(--c-accent); }
-        .ev-zoom-btn { width: 36px; min-width: 36px; min-height: 36px; flex: none; }
+        .ev-zoom-btn { width: var(--tap); min-width: var(--tap); min-height: var(--tap); flex: none; }
         body { user-select: none; -webkit-user-select: none; overflow-x: hidden; padding: var(--s-3); }
         .dock { width: 100%; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--s-3); }
         .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
@@ -36,7 +36,7 @@
         .preview .chips { position: absolute; top: var(--s-2); left: var(--s-2); display: flex; gap: var(--s-2); align-items: center; }
         .telem-mini { font-family: var(--font-num); font-size: var(--fs-12); color: var(--c-text); background: var(--c-scrim);
             border-radius: var(--r-pill); padding: var(--s-1) var(--s-3); white-space: nowrap; }
-        #btn-go-live { min-height: 32px; min-width: 0; padding: 0 var(--s-3); gap: var(--s-1); font-size: var(--fs-12); }
+        #btn-go-live { min-height: var(--tap); min-width: 0; padding: 0 var(--s-3); gap: var(--s-1); font-size: var(--fs-12); }
         #btn-go-live.active { background: var(--c-danger); border-color: var(--c-danger); color: var(--c-on-accent); }
 
         .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-2); }
@@ -45,7 +45,7 @@
         .stat .v { font-family: var(--font-num); font-size: var(--fs-14); font-weight: 600; white-space: nowrap; }
 
         .sec { display: flex; flex-direction: column; gap: var(--s-3); }
-        .sec-head { display: flex; align-items: center; gap: var(--s-2); color: var(--c-text-2); min-height: 28px; }
+        .sec-head { display: flex; align-items: center; gap: var(--s-2); color: var(--c-text-2); min-height: var(--tap); }
         .sec-head .grow { flex: 1; }
         .sec-head .num { font-size: var(--fs-12); color: var(--c-text-3); }
         .row { display: flex; align-items: center; gap: var(--s-2); }

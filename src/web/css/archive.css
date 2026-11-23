@@ -129,3 +129,6 @@
 .arc-ev .zp-pill .zoom-btn { min-width: var(--tap); min-height: var(--tap); }
 .arc-ev .zp-pill .zoom-level { min-width: var(--tap); font-size: var(--fs-12); }
 :root { --c-ev-plane: var(--c-accent); --c-ev-meteor: var(--c-warn); --c-ev-satellite: var(--c-violet); --c-ev-clouds: var(--c-text-2); --c-ev-flash: var(--c-warn); }
+
+/* uniform thumbnails */
+.arc-thumb img { object-fit: cover; }

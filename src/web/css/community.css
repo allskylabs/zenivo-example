@@ -74,3 +74,8 @@
     .cm-mapbox { flex: 1; min-width: 0; height: calc(100dvh - var(--topbar-h) - var(--s-8)); }
     .cm-list { flex: 0 0 360px; max-height: calc(100dvh - var(--topbar-h) - var(--s-8)); overflow-y: auto; }
 }
+
+/* 44px hit area around small map markers without changing their look */
+.cm-mk { position: relative; }
+.cm-mk::after { content: ""; position: absolute; left: 50%; top: 50%; width: var(--tap); height: var(--tap); transform: translate(-50%, -50%); }
+.cm > * { min-width: 0; }

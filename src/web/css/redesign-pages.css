@@ -199,3 +199,12 @@ body.page-3d #btn-track { background: var(--accent); border-color: var(--accent)
     #tab-focus .focus-actions-row #focus-toggle { flex: 1 1 100%; }
     #tab-focus .focus-actions-row #focus-finish { flex: 1 1 100%; background: var(--bg-card-sub); }
 }
+
+/* P2 batch: settings controls reach 44px, selects keep their full value on phones */
+#tab-settings .field input[type="number"] { min-height: var(--tap); min-width: 72px; }
+#tab-settings .sat-groups label, #tab-settings .dayobj-classes label { min-height: var(--tap); min-width: var(--tap); }
+@media (max-width: 480px) {
+  #tab-settings .field:has(> select) { flex-wrap: wrap; }
+  #tab-settings .field > select { flex: 1 1 100%; width: 100%; text-align: left; text-align-last: left; min-height: var(--tap); }
+  #tab-settings .field > label:first-child:has(+ select) { flex: 1 1 100%; }
+}
