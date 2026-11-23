@@ -31,140 +31,7 @@
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
     <link rel="stylesheet" href="/style.css?v=20261122m">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; }
-        body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-sans); overflow: hidden; }
-        /* Shared shell (style.css "Night Sky shell"): fix it to the viewport; the globe fills #stage, the area beside the rail */
-        .app-shell { height: calc(100vh - var(--topbar-h)); min-height: 0; }
-        #stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
-        #globe { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: #02030a; touch-action: none; }
-        #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-        .sat-label {
-            position: absolute; transform: translate(-50%, -100%); white-space: nowrap; pointer-events: auto; cursor: pointer;
-            font: 600 12px/1.25 var(--font-mono); color: var(--text-primary); text-shadow: 0 1px 3px #000, 0 0 2px #000;
-            padding: 1px 4px; border-radius: 4px; user-select: none;
-        }
-        #me { position: absolute; width: 0; height: 0; display: none; pointer-events: none; }
-        #me i { position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%; background: #a3e635;
-            border: 2px solid #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.5), 0 0 10px #a3e635; box-sizing: border-box; }
-        #me i::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; border: 2px solid #a3e635; opacity: 0; animation: me-ping 2s ease-out infinite; }
-        #me b { position: absolute; left: 0; top: -12px; transform: translate(-50%, -100%); white-space: nowrap; font: 700 12px/1 var(--font-mono);
-            color: #d9f99d; text-shadow: 0 1px 3px #000, 0 0 2px #000; }
-        @keyframes me-ping { from { transform: scale(0.5); opacity: 0.9; } to { transform: scale(1.8); opacity: 0; } }
-        .sat-label small { display: block; font-weight: 400; color: var(--text-secondary); }
-        .sat-label.below { opacity: 0.55; }
-        .sat-label.visible { color: #22d3ee; }
-        .sat-label.in-view { color: var(--warning); }
-        .sat-label.selected { background: color-mix(in srgb, var(--accent) 30%, transparent); }
-        .panel {
-            position: absolute; background: color-mix(in srgb, var(--bg-card) 92%, transparent); border: 1px solid var(--border-color);
-            border-radius: var(--radius-md, 8px); backdrop-filter: blur(6px); font-size: 13px;
-        }
-        #left-col { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: calc(100% - 24px); }
-        #left-col .panel { position: static; }
-        #top { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
-        #top .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        #top h1 { font-size: 15px; font-weight: 600; }
-        #status, #tle { color: var(--text-secondary); font-size: 12px; }
-        #sky { font-size: 12px; font-weight: 600; }
-        #sky.dark { color: #34d399; }
-        #sky.day { color: var(--warning); }
-        .btns { display: flex; gap: 6px; flex-wrap: wrap; }
-        button {
-            background: var(--bg-card-sub); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px;
-            padding: 4px 9px; min-height: 36px; font: inherit; font-size: 12px; cursor: pointer;
-        }
-        button:hover { border-color: var(--accent); }
-        button.on { border-color: var(--accent); color: var(--accent); }
-        button[hidden] { display: none; }
-        #list { top: 12px; right: 12px; width: 350px; max-width: calc(100% - 24px); max-height: calc(100% - 24px); display: flex; flex-direction: column; }
-        #list h2 { font-size: 13px; font-weight: 600; padding: 9px 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; }
-        #list-tools { padding: 8px 12px; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 6px; }
-        #list-tools .btns button { min-height: 30px; }
-        #list-tools .row { display: flex; gap: 6px; }
-        #list-tools input, #list-tools select {
-            background: var(--bg-card-sub); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px;
-            padding: 4px 8px; min-height: 30px; font: inherit; font-size: 12px; min-width: 0;
-        }
-        #list-tools input { flex: 1; }
-        #list-tools input:focus, #list-tools select:focus { outline: none; border-color: var(--accent); }
-        #list ul { list-style: none; overflow-y: auto; }
-        #list li { padding: 6px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; flex-direction: column; gap: 2px; font-family: var(--font-mono); font-size: 12px; }
-        #list li:hover, #list li.selected { background: var(--bg-card-sub); }
-        #list li .r1, #list li .r2 { display: flex; justify-content: space-between; align-items: center; gap: 8px; white-space: nowrap; }
-        #list li .cs { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
-        #list li.visible .cs { color: #22d3ee; }
-        #list li .meta { color: var(--text-secondary); font-size: 12px; }
-        .grp { font: 600 10px var(--font-sans); text-transform: uppercase; letter-spacing: 0.04em; padding: 1px 5px; border-radius: 3px;
-            margin-left: 6px; background: var(--bg-card-sub); color: var(--text-secondary); vertical-align: 1px; }
-        .grp.stations { color: #c4b5fd; }
-        .tags { display: flex; gap: 4px; }
-        .tag { font: 600 10px var(--font-sans); padding: 1px 5px; border-radius: 3px; background: var(--bg-card-sub); color: var(--text-secondary); }
-        .tag.vis { color: #22d3ee; } .tag.sun { color: #f59e0b; } .tag.cam { color: var(--warning); }
-        #layers { padding: 10px 12px; width: 200px; display: flex; flex-direction: column; gap: 4px; }
-        #layers h2 { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
-        #layers label { display: flex; justify-content: space-between; align-items: center; min-height: 28px; font-size: 13px; cursor: pointer; }
-        #layers select { background: var(--bg-card-sub); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 2px 6px; font: inherit; font-size: 12px; }
-        #layers details { margin-top: 4px; font-size: 12px; color: var(--text-secondary); line-height: 1.45; }
-        #layers summary { cursor: pointer; color: var(--text-primary); font-weight: 600; }
-        #layers details p { margin: 6px 0 0; }
-        .tick { position: absolute; display: none; pointer-events: none; white-space: nowrap; font: 600 10px/1 var(--font-mono); color: #e2e8f0;
-            text-shadow: 0 1px 3px #000, 0 0 2px #000; transform: translate(6px, -50%); }
-        .tick::before { content: ""; position: absolute; left: -9px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: #e2e8f0; box-shadow: 0 0 0 1px #000; }
-        .tick.ground { color: #fcd34d; } .tick.ground::before { background: #fcd34d; }
-        #layers input { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
-        #cam-foot { position: absolute; left: 12px; bottom: 12px; height: 28px; padding: 0 12px; border-radius: 999px; display: none; align-items: center; gap: 8px;
-            font: 12px var(--font-mono); color: var(--text-secondary); white-space: nowrap; }
-        #cam-foot.show { display: flex; }
-        #cam-foot .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success, #10b981); }
-        #info-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
-        #info-stats div { background: var(--bg-card-sub); border-radius: 6px; padding: 6px 8px; }
-        #info-stats small { display: block; font-size: 12px; color: var(--text-secondary); }
-        #info-stats b { font: 600 15px var(--font-mono); }
-        #info-sub { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
-        #info { left: 12px; bottom: 48px; padding: 10px 12px; width: 270px; display: none; max-height: calc(100% - 330px); overflow-y: auto; }
-        #info.show { display: block; }
-        #info h3 { font: 600 15px var(--font-mono); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-        #info dl { display: grid; grid-template-columns: auto auto; gap: 2px 14px; font-size: 12px; }
-        #info dt { color: var(--text-secondary); }
-        #info dd { font-family: var(--font-mono); text-align: right; }
-        #info .links { margin-top: 8px; display: flex; gap: 6px; align-items: center; }
-        #info .info-btns { display: flex; gap: 6px; flex-shrink: 0; }
-        #info-mini { display: none; font: 400 12px var(--font-mono); color: var(--text-secondary); }
-        #info.min > :not(h3) { display: none; }
-        #info.min #info-mini { display: inline; }
-        #info.min h3 { margin-bottom: 0; }
-        #info a { color: var(--accent); font-size: 12px; }
-        #timeline { margin-top: 8px; font-size: 12px; }
-        #timeline .tl-head { color: var(--text-secondary); margin-bottom: 4px; }
-        #timeline .tl { position: relative; height: 10px; border-radius: 3px; background: var(--bg-card-sub); overflow: hidden; }
-        #timeline .tl span { position: absolute; top: 0; bottom: 0; }
-        #timeline .tl .above { background: #475569; }
-        #timeline .tl .vis { background: #22d3ee; top: 2px; bottom: 2px; }
-        #timeline .tl-axis { display: flex; justify-content: space-between; color: var(--text-secondary); font: 10px var(--font-mono); margin-top: 2px; }
-        #timeline .tl-note { color: var(--text-secondary); margin-top: 4px; }
-        .legend { display: flex; gap: 10px; font-size: 12px; color: var(--text-secondary); align-items: center; flex-wrap: wrap; }
-        .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
-        #cam-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 6px 8px 6px 12px; display: none;
-            align-items: center; gap: 10px; font-size: 12px; white-space: nowrap; }
-        #cam-badge.show { display: flex; }
-        #cam-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444; animation: blink 1.2s infinite; }
-        @keyframes blink { 50% { opacity: 0.3; } }
-        #list-toggle, #left-toggle { display: none; }
-        @media (max-width: 700px) {
-            #left-col { right: 12px; }
-            #left-toggle { display: inline-block; min-height: 28px; margin-left: auto; }
-            #left-col.collapsed #top > :not(:first-child), #left-col.collapsed #layers { display: none; }
-            #top h1 { font-size: 14px; }
-            #cam-foot { display: none !important; }
-            #list { top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 50vh; }
-            #list.collapsed ul, #list.collapsed #list-tools { display: none; }
-            #list-toggle { display: inline-block; }
-            #info { bottom: 70px; top: auto; right: 12px; width: auto; max-height: 40vh; }
-            #cam-badge { top: auto; bottom: 12px; }
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/scene3d.css?v=20261123a">
     <script type="importmap">
         { "imports": {
             "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -258,59 +125,44 @@
     <div class="app-main">
 
     <div id="stage">
-    <canvas id="globe"></canvas>
+<canvas id="globe"></canvas>
     <div id="labels"><div id="me"><i></i><b>You</b></div></div>
 
     <div id="left-col" class="collapsed">
-    <div id="top" class="panel">
-        <div class="row">
-            <h1>Satellites 3D</h1>
-            <span id="status">Loading…</span>
-            <button id="left-toggle" title="Show / hide panels">▾</button>
+        <div id="top" class="sc-panel">
+            <div class="sc-row">
+                <span class="sc-dot" aria-hidden="true"></span>
+                <span id="status">Loading…</span>
+                <button id="left-toggle" class="ds-btn ds-btn--icon ds-btn--ghost" type="button" aria-label="Show or hide controls" title="Show or hide controls"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></button>
+            </div>
+            <div class="sc-meta"><span id="sky"></span><span id="tle"></span></div>
+            <div class="sc-meta" id="locs"><span id="loc-st"></span><span id="loc-me"></span></div>
+            <div class="sc-bar">
+                <button id="btn-labels" class="ds-btn ds-btn--icon on" type="button" aria-label="Satellite name labels" title="Satellite name labels"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-type"></use></svg></button>
+                <button id="btn-home" class="ds-btn ds-btn--icon" type="button" aria-label="Back to the station" title="Back to the station"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg></button>
+                <button id="btn-me" class="ds-btn ds-btn--icon" type="button" aria-label="Your own position (browser location)" title="Your own position (browser location)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-map-pin"></use></svg></button>
+                <button id="btn-layers" class="ds-btn ds-btn--icon" type="button" data-ds-open="layers-sheet" aria-label="Layers" title="Layers"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layers"></use></svg></button>
+            </div>
+            <div class="legend">
+                <span><i class="k-vis"></i><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg></span>
+                <span><i class="k-sun"></i><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-sun"></use></svg></span>
+                <span><i class="k-shadow"></i><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-moon"></use></svg></span>
+            </div>
         </div>
-        <div class="row"><span id="sky"></span><span id="tle"></span></div>
-        <div class="row" id="locs"><span id="loc-st"></span><span id="loc-me"></span></div>
-        <div class="btns">
-            <button id="btn-labels" class="on" title="Satellite name labels">Labels</button>
-            <button id="btn-home" title="Back to the station (the default view point)">Station</button>
-            <button id="btn-me" title="Your own position, from the browser location">You</button>
-        </div>
-        <div class="legend">
-            <span><i style="background:#22d3ee"></i>Naked-eye visible</span>
-            <span><i style="background:#f59e0b"></i>Sunlit</span>
-            <span><i style="background:#6b7280"></i>Earth's shadow</span>
-        </div>
-    </div>
-
-    <div id="layers" class="panel">
-        <h2>Layers</h2>
-        <label>Satellites <input type="checkbox" id="lay-sats" checked></label>
-        <label>Tracks <input type="checkbox" id="lay-tracks" checked></label>
-        <label>Atmosphere <input type="checkbox" id="lay-atmos" checked></label>
-        <label>Coverage <input type="checkbox" id="lay-foot" checked></label>
-        <label title="Lowest elevation at which the satellite counts as seen from the ground">Seen above
-            <select id="foot-el"><option value="0">0°</option><option value="10">10°</option><option value="20">20°</option><option value="30">30°</option></select></label>
-        <label title="Earth: the path as seen from the ground (what you observe). Space: the true orbit, a fixed ellipse">Sky lines
-            <select id="frame-sel"><option value="earth">Seen from Earth</option><option value="space">In space</option></select></label>
-        <details>
-            <summary>Why are there two lines?</summary>
-            <p><b>Sky lines</b> choose how the bright line is drawn. <i>In space</i> is the true orbit: one ellipse fixed in space, each lap lying exactly on the last. <i>Seen from Earth</i> is the path an observer on the ground sees, which is what a pass looks like from here: the Earth keeps turning, so it never repeats.</p>
-            <p><b>Ground track</b> (thin, on the Earth): the Earth turns under that ellipse, 15° an hour, so one lap (~93 min for the ISS) later the satellite passes about 23° further west. Laps never overlap and the lines look as if they cross, yet nothing ever crosses its own orbit. The two lines show different moments: the dots tell how many minutes ahead each point is.</p>
-        </details>
-    </div>
     </div><!-- #left-col -->
 
-    <div id="list" class="panel collapsed">
-        <h2><span>Satellites</span><span><span id="count">--</span> <button id="list-toggle">▾</button></span></h2>
+    <div id="list" class="collapsed">
+        <div class="sc-head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg><span class="sc-count" id="count">--</span>
+            <button id="list-toggle" class="ds-btn ds-btn--icon ds-btn--ghost" type="button" aria-label="Show or hide the satellite list" title="Satellite list"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-up"></use></svg></button></div>
         <div id="list-tools">
-            <div class="btns" id="filters">
-                <button data-filter="visible" title="Above the horizon, lit by the sun and dark sky: can be seen by eye. Not the same as being in the camera frame.">Naked-eye now</button>
-                <button data-filter="above" title="Above the horizon">Above horizon</button>
-                <button data-filter="all">All</button>
+            <div class="sc-row sc-chipbar" id="filters">
+                <button class="ds-chip" type="button" data-filter="visible" aria-label="Naked-eye now" title="Above the horizon, lit by the sun and dark sky: can be seen by eye. Not the same as being in the camera frame."><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg><span>Visible</span></button>
+                <button class="ds-chip" type="button" data-filter="above" aria-label="Above horizon" title="Above the horizon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg><span>Above</span></button>
+                <button class="ds-chip" type="button" data-filter="all" aria-label="All" title="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-list"></use></svg><span>All</span></button>
             </div>
-            <div class="row">
-                <input id="search" type="search" placeholder="Search name or NORAD" autocomplete="off">
-                <select id="sort" title="Sort">
+            <div class="sc-row">
+                <input id="search" type="search" placeholder="Name or NORAD" aria-label="Search name or NORAD" autocomplete="off">
+                <select id="sort" title="Sort" aria-label="Sort">
                     <option value="alt">Elevation</option>
                     <option value="range">Range</option>
                     <option value="height">Height</option>
@@ -321,19 +173,41 @@
         <ul id="sat-list"></ul>
     </div>
 
-    <div id="cam-foot" class="panel"><span class="dot"></span><span id="cam-foot-text"></span></div>
+    <div id="cam-foot" class="sc-panel"><span class="sc-dot"></span><span id="cam-foot-text"></span></div>
 
-    <div id="cam-badge" class="panel"><span class="dot"></span><span id="cam-text"></span><button id="cam-stop" title="Stop (Esc)">Stop</button></div>
+    <div id="cam-badge" class="sc-panel"><span class="sc-dot"></span><span id="cam-text"></span><button id="cam-stop" class="ds-btn ds-btn--icon ds-btn--ghost" type="button" aria-label="Stop (Esc)" title="Stop (Esc)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></div>
 
-    <div id="info" class="panel">
-        <h3><span><span id="info-name"></span> <small id="info-mini"></small></span><span class="info-btns"><button id="info-min" title="Collapse / expand (the satellite stays selected)">▾</button><button id="info-close" title="Deselect the satellite">✕</button></span></h3>
+    <div id="info">
+        <div class="sc-grab"></div>
+        <div class="sc-title"><span><span id="info-name"></span> <small id="info-mini"></small></span><span class="info-btns"><button id="info-min" class="ds-btn ds-btn--icon ds-btn--ghost" type="button" aria-label="Collapse or expand" title="Collapse or expand (the satellite stays selected)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></button><button id="info-close" class="ds-btn ds-btn--icon ds-btn--ghost" type="button" aria-label="Deselect the satellite" title="Deselect the satellite"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></span></div>
         <div id="info-sub"></div>
         <div id="info-stats"></div>
         <dl id="info-dl"></dl>
         <div id="timeline"></div>
         <div class="links">
-            <button id="btn-track" title="Centre the view on this satellite: rotate and zoom around it from any side">Orbit</button>
-            <a id="info-link" target="_blank" rel="noopener">N2YO ↗</a>
+            <button id="btn-track" class="ds-btn ds-btn--primary" type="button" aria-label="Orbit" title="Centre the view on this satellite: rotate and zoom around it from any side"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg><span>Follow</span></button>
+            <a id="info-link" class="ds-btn ds-btn--icon" target="_blank" rel="noopener" aria-label="Open on N2YO" title="Open on N2YO"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-arrow-up-right"></use></svg></a>
+        </div>
+    </div>
+
+    <div class="ds-sheet" id="layers-sheet" role="dialog" aria-label="Layers">
+        <div class="ds-sheet__scrim" data-ds-close></div>
+        <div class="ds-sheet__panel">
+            <div class="ds-sheet__grab"></div>
+            <div class="ds-sheet__head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layers"></use></svg><span class="ds-sheet__title">Layers</span><button class="ds-btn ds-btn--icon ds-btn--ghost" type="button" data-ds-close aria-label="Close" title="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></div>
+            <label class="sc-set"><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg><span>Satellites</span><span class="ds-switch"><input type="checkbox" id="lay-sats" checked><span class="ds-switch__track"></span></span></label>
+            <label class="sc-set"><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-activity"></use></svg><span>Tracks</span><span class="ds-switch"><input type="checkbox" id="lay-tracks" checked><span class="ds-switch__track"></span></span></label>
+            <label class="sc-set"><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg><span>Atmosphere</span><span class="ds-switch"><input type="checkbox" id="lay-atmos" checked><span class="ds-switch__track"></span></span></label>
+            <label class="sc-set"><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-radio"></use></svg><span>Coverage</span><span class="ds-switch"><input type="checkbox" id="lay-foot" checked><span class="ds-switch__track"></span></span></label>
+            <label class="sc-set" title="Lowest elevation at which the satellite counts as seen from the ground"><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg><span>Seen above</span>
+                <select id="foot-el" aria-label="Seen above"><option value="0">0°</option><option value="10">10°</option><option value="20">20°</option><option value="30">30°</option></select></label>
+            <label class="sc-set" title="Earth: the path as seen from the ground (what you observe). Space: the true orbit, a fixed ellipse"><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-compass"></use></svg><span>Sky lines</span>
+                <select id="frame-sel" aria-label="Sky lines"><option value="earth">From Earth</option><option value="space">In space</option></select></label>
+            <details class="sc-note">
+                <summary><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg><span>Why two lines?</span></summary>
+                <p><b>Sky lines</b> choose how the bright line is drawn. <i>In space</i> is the true orbit: one ellipse fixed in space, each lap lying exactly on the last. <i>Seen from Earth</i> is the path an observer on the ground sees, which is what a pass looks like from here: the Earth keeps turning, so it never repeats.</p>
+                <p><b>Ground track</b> (thin, on the Earth): the Earth turns under that ellipse, 15° an hour, so one lap (~93 min for the ISS) later the satellite passes about 23° further west. Laps never overlap and the lines look as if they cross, yet nothing ever crosses its own orbit. The two lines show different moments: the dots tell how many minutes ahead each point is.</p>
+            </details>
         </div>
     </div>
     </div><!-- #stage -->
@@ -1394,7 +1268,7 @@
             const s = selected != null && sats.get(selected);
             $("info").classList.toggle("show", !!s);
             $("info").classList.toggle("min", infoMin);
-            $("info-min").textContent = infoMin ? "▴" : "▾";
+            $("info-min").setAttribute("aria-expanded", String(!infoMin));
             if (!s) return;
             const a = s.a;
             $("info-mini").textContent = `${a.alt_deg.toFixed(0)}° · ${km(a.range_km)}`;
@@ -1470,7 +1344,7 @@
         $("sort").value = sortBy;
         $("sort").onchange = (e) => { sortBy = e.target.value; setPref("sort", sortBy); renderList(); };
         $("btn-labels").classList.toggle("on", showLabels);
-        $("btn-labels").onclick = (e) => { showLabels = e.target.classList.toggle("on"); setPref("labels", showLabels ? "1" : "0"); };
+        $("btn-labels").onclick = (e) => { showLabels = e.currentTarget.classList.toggle("on"); setPref("labels", showLabels ? "1" : "0"); };
         $("btn-me").onclick = () => {
             if (!me) { $("status").textContent = "Your location is not shared by the browser"; return; }
             locMode = "me"; setPref("loc", "me"); updateLocs();
