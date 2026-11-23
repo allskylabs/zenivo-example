@@ -55,6 +55,9 @@
     };
     const healthEl = document.getElementById("community-health");
     const netEl = document.getElementById("community-net");
+    const netLbl = document.getElementById("community-net-lbl");
+    const netIcon = netEl.querySelector("use");
+    const NET_ICON = { off: "wifi-off", starting: "loader", connected: "wifi", outbound_only: "arrow-up-right", inbound_only: "inbox", isolated: "wifi-off" };
     const netNote = document.getElementById("community-net-note");
     const targetsEl = document.getElementById("community-targets");
     const checkBtn = document.getElementById("btn-community-check");
@@ -65,7 +68,8 @@
         const net = st.network || { state: "off" };
         const [label, note] = NET[net.state] || NET.off;
         netEl.dataset.state = net.state;
-        netEl.textContent = `Network: ${label}`;
+        netLbl.textContent = label;
+        netIcon.setAttribute("href", `/static/icons.svg#i-${NET_ICON[net.state] || "wifi-off"}`);
         const calls = net.inbound_1h ? ` Other stations called in ${net.inbound_1h} time(s) in the last hour.` : "";
         netNote.textContent = st.enabled ? `${note}${calls} ${st.contacts || 0} address(es) remembered for when the seeds are down.` : note;
         checkBtn.disabled = !st.enabled;
@@ -77,43 +81,56 @@
         }
         targetsEl.replaceChildren();
         for (const t of st.targets || []) {
-            const li = document.createElement("li");
-            li.className = "cm-target";
-            li.dataset.ok = t.ok ? (t.self ? "self" : "yes") : "no";
-            const head = document.createElement("div");
-            head.className = "cm-target-url";
-            head.textContent = t.url;
-            const tag = document.createElement("span");
-            tag.className = "cm-target-role";
-            tag.textContent = t.self ? "this station" : t.role === "seed" ? "seed" : "station";
-            head.appendChild(tag);
-            const info = document.createElement("div");
-            info.className = "cm-target-info";
+            const ok = t.ok ? (t.self ? "self" : "yes") : "no";
             const total = (t.total_ok || 0) + (t.total_failed || 0);
             const rate = total ? ` Answered ${t.total_ok} of ${total} rounds since start.` : "";
+            let info;
             if (t.ok) {
                 const sent = t.announced ? "our card was accepted" : `our card was not accepted${t.error ? ` (${t.error})` : ""}`;
-                info.textContent = t.self
+                info = t.self
                     ? `Answered in ${t.ms} ms. This is this station's own address, so it does not count as another station.${rate}`
                     : `Answered in ${t.ms} ms, sent ${t.cards} station card(s); ${sent}.${t.relay ? ` Large preview: ${t.relay}.` : ""}${rate}`;
             } else {
                 const last = t.last_ok ? ` Last answer ${ago(t.last_ok)}.` : " Never answered since start.";
-                info.textContent = `No answer: ${t.error || "unknown error"}. ${t.streak} failed round(s) in a row.${last}${rate}`;
+                info = `No answer: ${t.error || "unknown error"}. ${t.streak} failed round(s) in a row.${last}${rate}`;
             }
-            li.append(head, info);
-            targetsEl.appendChild(li);
+            targetsEl.appendChild(targetRow(ok, t.url, t.self ? "this station" : t.role === "seed" ? "seed" : "station", info));
         }
         if (st.enabled && !(st.targets || []).length && st.last_round && st.last_round.time) {
-            const li = document.createElement("li");
-            li.className = "cm-target";
-            li.textContent = "No address was contacted: the seed list is empty and no station is known yet.";
-            targetsEl.appendChild(li);
+            targetsEl.appendChild(targetRow("no", "No address contacted", "", "The seed list is empty and no station is known yet."));
         }
+    }
+
+    // One ds-row per contacted address: status icon, address + role, detail line (textContent only)
+    function targetRow(ok, url, role, info) {
+        const li = document.createElement("li");
+        li.className = "ds-row";
+        li.dataset.ok = ok;
+        const ic = document.createElement("span");
+        ic.className = "ds-row__icon";
+        ic.innerHTML = `<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-${ok === "no" ? "circle-x" : ok === "self" ? "circle-help" : "circle-check"}"></use></svg>`;
+        const body = document.createElement("span");
+        body.className = "ds-row__body";
+        const ti = document.createElement("span");
+        ti.className = "ds-row__title";
+        ti.textContent = url;
+        const sub = document.createElement("span");
+        sub.className = "ds-row__sub sa-wrap";
+        sub.textContent = info;
+        body.append(ti, sub);
+        li.append(ic, body);
+        if (role) {
+            const chip = document.createElement("span");
+            chip.className = "ds-chip";
+            chip.textContent = role;
+            li.appendChild(chip);
+        }
+        return li;
     }
 
     if (checkBtn) checkBtn.addEventListener("click", async () => {
         checkBtn.disabled = true;
-        checkBtn.textContent = "Checking\u2026";
+        checkBtn.classList.add("is-busy");
         try {
             await fetch("/api/community/check", { method: "POST" });
             // A round takes up to 8 s per address: poll the result a few times
@@ -122,7 +139,7 @@
                 await loadStatus();
             }
         } finally {
-            checkBtn.textContent = "Check now";
+            checkBtn.classList.remove("is-busy");
             checkBtn.disabled = false;
         }
     });
@@ -145,7 +162,7 @@
         if (isPublicName) {
             const btn = document.createElement("button");
             btn.type = "button";
-            btn.className = "btn btn-sm btn-outline";
+            btn.className = "ds-btn";
             btn.textContent = "Use " + location.origin;
             btn.addEventListener("click", () => {
                 urlEl.value = location.origin;
@@ -210,7 +227,7 @@
     }
 
     // Every change saves itself (saving with sharing on publishes the card; the server's validation errors show in the chip)
-    autosave(box.closest("fieldset"), async () => {
+    autosave(document.getElementById("community-card"), async () => {
         const data = await sendJson("/api/community/settings", {
             enabled: box.checked,
             name: nameEl.value.trim(),

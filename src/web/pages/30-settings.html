@@ -732,135 +732,179 @@
             </div>
 
             <!-- Community Card: opt-in station sharing (docs/COMMUNITY.md) -->
-            <div class="card settings-card" id="community-card" data-sgroup="community">
+            <div class="card settings-card sa" id="community-card" data-sgroup="community">
                 <div class="card-header">
                     <h2>Community</h2>
-                    <a class="btn btn-sm btn-outline" href="/community">Open community map</a>
+                    <a class="ds-btn ds-btn--ghost ds-btn--icon" href="/community" aria-label="Open community map" title="Open community map"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-map"></use></svg></a>
                 </div>
-                <div class="settings-grid">
-                    <fieldset class="settings-group">
-                        <legend>Share this station</legend>
-                        <div class="field">
-                            <label class="checkbox-label"><input type="checkbox" id="community-enabled" /> Share this station with the community</label>
+                <section class="ds-card ds-card--flush sa-group" aria-label="Share this station">
+                    <div class="ds-list">
+                        <div class="ds-row sa-row">
+                            <label class="sa-lab" for="community-enabled"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-share-2"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Share this station</span></span></label>
+                            <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-share" aria-label="About sharing" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
+                            <label class="ds-switch"><input type="checkbox" id="community-enabled" /><span class="ds-switch__track"></span></label>
                         </div>
-                        <p class="field-note">
-                            Shares the station name, an approximate location and, if enabled, a small preview image with other Zenivo stations. Anyone can see it.
-                            It is off until you turn it on. The location is rounded as set under Admin &rarr; Public location precision.
-                        </p>
-                        <div class="field-grid cm-ident">
-                            <div class="field">
-                                <label for="community-name">Station name</label>
-                                <input type="text" id="community-name" maxlength="60" placeholder="Defaults to the station location name" />
-                            </div>
-                            <div class="field">
-                                <label for="community-url">Public URL (optional, https)</label>
-                                <input type="url" id="community-url" maxlength="200" placeholder="https://sky.example.org" />
-                            </div>
+                        <p class="sa-note" id="sa-i-share" hidden>Shares the station name, an approximate location and, if enabled, a small preview image with other Zenivo stations. Anyone can see it. It is off until you turn it on. The location is rounded as set under Admin &rarr; Public location.</p>
+                        <div class="ds-row sa-row">
+                            <span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-type"></use></svg></span>
+                            <label class="ds-row__body" for="community-name"><span class="ds-row__title">Name</span><input class="sa-input" type="text" id="community-name" maxlength="60" placeholder="Station name" /></label>
                         </div>
-                        <div class="cm-options">
-                            <label class="checkbox-label"><input type="checkbox" id="community-thumb" checked /> Share a preview image</label>
-                            <label class="checkbox-label"><input type="checkbox" id="community-preview" checked /> Let visitors enlarge the preview (up to 1280 px)</label>
-                            <label class="checkbox-label"><input type="checkbox" id="community-open" checked /> Let the map link to this station's page</label>
-                            <p class="field-note cm-url-hint" id="community-url-hint" hidden></p>
-                            <p class="field-note">The last two need a public URL. Turning the link off only removes it from the community map; whoever knows the address can still open the station, as before.</p>
-                            <label class="checkbox-label"><input type="checkbox" id="community-relay" checked /> Relay previews for stations without a public address</label>
-                            <p class="field-note">On by default; turn it off here if you do not want it. This station then stores and serves large preview images sent by other stations (re-encoded JPEG, at most 1280 px, up to 100 stations and 25 MB, kept 24 hours) so they can be seen without those stations opening their network. Turning it off deletes everything held and refuses new uploads.</p>
-                            <label class="checkbox-label"><input type="checkbox" id="community-chat" /> Chat with other stations</label>
-                            <p class="field-note" id="community-chat-note">On by default while sharing is on (it does nothing while sharing is off). Messages pass through hub stations (stations with chat on and a public address): public-room messages are readable by anyone, private messages are end-to-end encrypted, but hubs can see who talks to whom and when. Turning it off stops all chat traffic and deletes what this station held for others; your own conversation history stays. The chat is on the Community page.</p>
+                        <div class="ds-row sa-row">
+                            <span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-arrow-up-right"></use></svg></span>
+                            <label class="ds-row__body" for="community-url"><span class="ds-row__title">Public URL</span><input class="sa-input" type="url" id="community-url" maxlength="200" placeholder="https://sky.example.org" /></label>
                         </div>
-                        <div class="field">
-                            <label for="community-seeds">Seed stations (one URL per line)</label>
-                            <textarea id="community-seeds" rows="3" maxlength="2000" spellcheck="false" placeholder="https://sky.example.org"></textarea>
-                            <p class="field-note">Stations asked first in every round. The built-in ones are listed here and can be removed; with an empty list this station only talks to stations it already knows. <button type="button" class="btn btn-sm btn-outline" id="btn-community-seeds-default">Restore built-in</button></p>
+                        <div class="sa-hint" id="community-url-hint" hidden></div>
+                        <div class="ds-row sa-row">
+                            <label class="sa-lab" for="community-thumb"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-image"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Preview image</span></span></label>
+                            <label class="ds-switch"><input type="checkbox" id="community-thumb" checked /><span class="ds-switch__track"></span></label>
                         </div>
-                        <p class="field-note" id="community-status" aria-live="polite">Loading&hellip;</p>
-                        <div class="cm-health" id="community-health" hidden>
-                            <div class="cm-health-head">
-                                <span class="cm-net" id="community-net" data-state="off">Network</span>
-                                <button type="button" class="btn btn-sm btn-outline" id="btn-community-check">Check now</button>
-                            </div>
-                            <p class="field-note" id="community-net-note"></p>
-                            <p class="field-note" id="community-chat-stats" hidden></p>
-                            <ul class="cm-targets" id="community-targets" aria-label="Stations contacted in the last round"></ul>
+                        <div class="ds-row sa-row">
+                            <label class="sa-lab" for="community-preview"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Enlarge preview</span></span></label>
+                            <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-url" aria-label="About the public URL" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
+                            <label class="ds-switch"><input type="checkbox" id="community-preview" checked /><span class="ds-switch__track"></span></label>
                         </div>
-                    </fieldset>
-                </div>
+                        <div class="ds-row sa-row">
+                            <label class="sa-lab" for="community-open"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-map-pin"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Link from the map</span></span></label>
+                            <label class="ds-switch"><input type="checkbox" id="community-open" checked /><span class="ds-switch__track"></span></label>
+                        </div>
+                        <p class="sa-note" id="sa-i-url" hidden>Enlarging the preview and the map link need a public URL (up to 1280 px). Turning the link off only removes it from the community map; whoever knows the address can still open the station, as before.</p>
+                        <div class="ds-row sa-row">
+                            <label class="sa-lab" for="community-relay"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-radio"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Relay previews</span></span></label>
+                            <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-relay" aria-label="About relaying" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
+                            <label class="ds-switch"><input type="checkbox" id="community-relay" checked /><span class="ds-switch__track"></span></label>
+                        </div>
+                        <p class="sa-note" id="sa-i-relay" hidden>On by default. This station then stores and serves large preview images sent by stations without a public address (re-encoded JPEG, at most 1280 px, up to 100 stations and 25 MB, kept 24 hours). Turning it off deletes everything held and refuses new uploads.</p>
+                        <div class="ds-row sa-row">
+                            <label class="sa-lab" for="community-chat"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-message-circle"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Chat</span></span></label>
+                            <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="community-chat-note" aria-label="About chat" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
+                            <label class="ds-switch"><input type="checkbox" id="community-chat" /><span class="ds-switch__track"></span></label>
+                        </div>
+                        <p class="sa-note" id="community-chat-note" hidden>Needs sharing on. Messages pass through hub stations (chat on and a public address): public-room messages are readable by anyone, private messages are end-to-end encrypted, but hubs can see who talks to whom and when. Turning it off stops all chat traffic and deletes what this station held for others; your own history stays.</p>
+                    </div>
+                </section>
+                <section class="ds-card ds-card--flush sa-group" aria-label="Seed stations">
+                    <div class="ds-card__head sa-head">
+                        <svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg>
+                        <span class="ds-card__title">Seeds</span>
+                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="btn-community-seeds-default" aria-label="Restore built-in seeds" title="Restore built-in seeds"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></button>
+                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-seeds" aria-label="About seeds" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
+                    </div>
+                    <p class="sa-note" id="sa-i-seeds" hidden>One URL per line. Stations asked first in every round. The built-in ones are listed and can be removed; with an empty list this station only talks to stations it already knows.</p>
+                    <label class="sa-pad" for="community-seeds"><span class="ds-sr-only">Seed stations</span><textarea class="sa-input" id="community-seeds" rows="3" maxlength="2000" spellcheck="false" placeholder="https://sky.example.org"></textarea></label>
+                </section>
+                <section class="ds-card ds-card--flush sa-group" id="community-health" aria-label="Network" hidden>
+                    <div class="ds-row sa-row">
+                        <span class="ds-chip" id="community-net" data-state="off"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-wifi-off"></use></svg><span id="community-net-lbl">Off</span></span>
+                        <span class="ds-row__body"></span>
+                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="community-net-note" aria-label="About the network state" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
+                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="btn-community-check" aria-label="Check now" title="Check now"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-refresh-cw"></use></svg></button>
+                    </div>
+                    <p class="sa-note" id="community-net-note" hidden></p>
+                    <p class="sa-note" id="community-chat-stats" hidden></p>
+                    <ul class="ds-list sa-targets" id="community-targets" aria-label="Stations contacted in the last round"></ul>
+                </section>
+                <p class="sa-status" id="community-status" aria-live="polite">Loading&hellip;</p>
             </div>
 
-            <!-- Admin Card: password and what guests see (docs/SECURITY.md) -->
-            <div class="card settings-card" id="admin-card" data-sgroup="admin">
+            <!-- Admin Card: system, password and what guests see (docs/SECURITY.md) -->
+            <div class="card settings-card sa" id="admin-card" data-sgroup="admin">
                 <div class="card-header">
                     <h2>Admin</h2>
                 </div>
-                <div class="settings-grid">
-                    <fieldset class="settings-group adm-sys" id="admin-system">
-                        <legend>System</legend>
-                        <div class="adm-tiles" role="group" aria-label="Host load">
-                            <div class="adm-tile" data-k="cpu"><span>CPU</span><b>--</b><i class="adm-bar"><u></u></i></div>
-                            <div class="adm-tile" data-k="ram"><span>RAM</span><b>--</b><i class="adm-bar"><u></u></i><small></small></div>
-                            <div class="adm-tile" data-k="disk"><span>Disk</span><b>--</b><i class="adm-bar"><u></u></i><small></small></div>
-                            <div class="adm-tile" data-k="temp"><span>Temp</span><b>--</b><i class="adm-bar"><u></u></i></div>
-                        </div>
-                    </fieldset>
-                    <fieldset class="settings-group">
-                        <legend>Public location precision</legend>
-                        <p class="field-note">Visitors who are not signed in, and the community card, see the station location rounded to this grid. You always see the exact location.</p>
-                        <div class="field">
-                            <label for="admin-precision">Rounded to</label>
-                            <select id="admin-precision">
-                                <option value="0">Exact (no rounding)</option>
-                                <option value="0.01">About 1 km (0.01&deg;)</option>
-                                <option value="0.1" selected>About 10 km (0.1&deg;)</option>
-                                <option value="1">About 100 km (1&deg;)</option>
+                <section class="sa-tiles" id="admin-system" role="group" aria-label="Host load">
+                    <div class="sa-tile" data-k="cpu"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cpu"></use></svg><b>--</b><i class="sa-bar"><u></u></i><small></small><span class="ds-sr-only">CPU</span></div>
+                    <div class="sa-tile" data-k="ram"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-memory-stick"></use></svg><b>--</b><i class="sa-bar"><u></u></i><small></small><span class="ds-sr-only">RAM</span></div>
+                    <div class="sa-tile" data-k="disk"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-hard-drive"></use></svg><b>--</b><i class="sa-bar"><u></u></i><small></small><span class="ds-sr-only">Disk</span></div>
+                    <div class="sa-tile" data-k="temp"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-thermometer"></use></svg><b>--</b><i class="sa-bar"><u></u></i><small></small><span class="ds-sr-only">Temperature</span></div>
+                    <div class="sa-tile" data-k="uptime"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg><b>--</b><small></small><span class="ds-sr-only">Uptime</span></div>
+                </section>
+                <section class="ds-card ds-card--flush sa-group" aria-label="Location and service">
+                    <div class="ds-list">
+                        <div class="ds-row sa-row">
+                            <span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-map-pin"></use></svg></span>
+                            <label class="ds-row__body" for="admin-precision"><span class="ds-row__title">Public location</span></label>
+                            <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-prec" aria-label="About location precision" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
+                            <select class="sa-input sa-select" id="admin-precision">
+                                <option value="0">Exact</option>
+                                <option value="0.01">~1 km</option>
+                                <option value="0.1" selected>~10 km</option>
+                                <option value="1">~100 km</option>
                             </select>
                         </div>
-                    </fieldset>
-                    <fieldset class="settings-group" id="restart-box">
-                        <legend>Service</legend>
-                        <a class="link-row" href="/logs"><span class="link-tx"><b>Activity log</b><small>Errors and events</small></span><span class="ds-chev" aria-hidden="true"></span></a>
-                        <div class="field">
-                            <button type="button" class="btn btn-sm btn-outline" id="btn-restart">Restart Zenivo</button>
+                        <p class="sa-note" id="sa-i-prec" hidden>Visitors who are not signed in, and the community card, see the station location rounded to this grid. You always see the exact location.</p>
+                        <a class="ds-row sa-row" href="/logs">
+                            <span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-activity"></use></svg></span>
+                            <span class="ds-row__body"><span class="ds-row__title">Activity log</span></span>
+                            <svg class="ds-icon ds-row__chev" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg>
+                        </a>
+                        <div class="ds-row sa-row" id="restart-box">
+                            <span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-power"></use></svg></span>
+                            <span class="ds-row__body"><span class="ds-row__title">Restart Zenivo</span><span class="ds-row__sub" id="restart-status" aria-live="polite"></span></span>
+                            <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-restart" aria-label="About restarting" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
+                            <button type="button" class="ds-btn ds-btn--icon" id="btn-restart" aria-label="Restart Zenivo" title="Restart Zenivo"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></button>
                         </div>
-                        <p class="field-note">Restarts the program (about 30 seconds offline), e.g. when the camera returns black pictures or stops answering. Capture, auto exposure and the sky mask pick up where they were.</p>
-                        <p class="field-note" id="restart-status" aria-live="polite"></p>
-                    </fieldset>
-                    <fieldset class="settings-group" id="update-box">
-                        <legend>Software update</legend>
-                        <div class="kv-row"><span>Version</span><span class="field-note" id="upd-line">Checking&hellip;</span></div>
-                        <label class="toggle-row" for="upd-auto">
-                            <span class="toggle-text"><span class="toggle-title">Check for updates automatically</span><span class="toggle-hint">Once a day, from GitHub; nothing about this station is sent</span></span>
-                            <input type="checkbox" id="upd-auto" class="switch" checked />
-                        </label>
-                        <div class="field btn-pair">
-                            <button type="button" class="btn btn-sm btn-outline" id="upd-check">Check now</button>
-                            <button type="button" class="btn btn-sm btn-primary" id="upd-apply" hidden>Update now</button>
+                        <p class="sa-note" id="sa-i-restart" hidden>Restarts the program (about 30 seconds offline), e.g. when the camera returns black pictures or stops answering. Capture, auto exposure and the sky mask pick up where they were.</p>
+                    </div>
+                </section>
+                <section class="ds-card ds-card--flush sa-group" id="update-box" aria-label="Software update">
+                    <div class="ds-list">
+                        <div class="ds-row sa-row">
+                            <span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-download"></use></svg></span>
+                            <span class="ds-row__body"><span class="ds-row__title">Software</span><span class="ds-row__sub sa-wrap" id="upd-line">Checking&hellip;</span></span>
                         </div>
-                        <div class="field"><button type="button" class="btn btn-sm btn-outline btn-textlink" id="upd-rollback" hidden>Go back to the previous version</button></div>
-                        <p class="field-note" id="upd-notes" hidden></p>
-                        <p class="field-note" id="upd-status" aria-live="polite"></p>
-                    </fieldset>
-                    <fieldset class="settings-group">
-                        <legend>Password and sessions</legend>
-                        <form id="admin-password-form" autocomplete="on">
-                            <input type="text" name="username" value="admin" autocomplete="username" hidden readonly aria-hidden="true" tabindex="-1">
-                            <div class="field-grid stack-grid">
-                                <div class="field">
-                                    <label for="admin-current">Current password</label>
-                                    <input type="password" id="admin-current" autocomplete="current-password" maxlength="256" />
-                                </div>
-                                <div class="field">
-                                    <label for="admin-new">New password (10 characters or more)</label>
-                                    <input type="password" id="admin-new" autocomplete="new-password" maxlength="256" />
-                                </div>
+                        <div class="ds-row sa-row">
+                            <label class="sa-lab" for="upd-auto"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-calendar-days"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Check daily</span></span></label>
+                            <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-upd" aria-label="About update checks" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
+                            <label class="ds-switch"><input type="checkbox" id="upd-auto" checked /><span class="ds-switch__track"></span></label>
+                        </div>
+                        <p class="sa-note" id="sa-i-upd" hidden>Once a day, from GitHub; nothing about this station is sent. Updates are installed by hand.</p>
+                        <div class="sa-actions">
+                            <button type="button" class="ds-btn" id="upd-check"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-refresh-cw"></use></svg>Check</button>
+                            <button type="button" class="ds-btn ds-btn--primary" id="upd-apply" hidden><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-download"></use></svg>Update</button>
+                            <button type="button" class="ds-btn ds-btn--ghost" id="upd-rollback" hidden><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg>Previous</button>
+                        </div>
+                        <p class="sa-status" id="upd-notes" hidden></p>
+                        <p class="sa-status" id="upd-status" aria-live="polite"></p>
+                    </div>
+                </section>
+                <section class="ds-card ds-card--flush sa-group" aria-label="Password and sessions">
+                    <form id="admin-password-form" autocomplete="on">
+                        <input type="text" name="username" value="admin" autocomplete="username" hidden readonly aria-hidden="true" tabindex="-1">
+                        <div class="ds-list">
+                            <div class="ds-row sa-row">
+                                <span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-lock"></use></svg></span>
+                                <label class="ds-row__body" for="admin-current"><span class="ds-row__title">Current password</span><input class="sa-input" type="password" id="admin-current" autocomplete="current-password" maxlength="256" /></label>
                             </div>
-                            <div class="field btn-pair">
-                                <button type="submit" class="btn btn-sm btn-primary" id="btn-admin-password">Change password</button>
-                                <button type="button" class="btn btn-sm btn-outline btn-danger-text" id="btn-admin-logout-all">Sign out everywhere</button>
+                            <div class="ds-row sa-row">
+                                <span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-key-round"></use></svg></span>
+                                <label class="ds-row__body" for="admin-new"><span class="ds-row__title">New password</span><input class="sa-input" type="password" id="admin-new" autocomplete="new-password" maxlength="256" placeholder="10+ characters" /></label>
+                                <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-pw" aria-label="About passwords" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
                             </div>
-                        </form>
-                        <p class="field-note">Changing the password signs out every other browser. Forgot it? On the station run <code>python3 run_allsky.py --reset-admin</code>.</p>
-                        <p class="field-note" id="admin-status" aria-live="polite"></p>
-                    </fieldset>
+                            <p class="sa-note" id="sa-i-pw" hidden>Changing the password signs out every other browser. Forgot it? On the station run <code>python3 run_allsky.py --reset-admin</code>.</p>
+                            <div class="sa-actions">
+                                <button type="submit" class="ds-btn ds-btn--primary" id="btn-admin-password"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg>Change</button>
+                                <button type="button" class="ds-btn ds-btn--danger" id="btn-admin-logout-all"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-power"></use></svg>Sign out everywhere</button>
+                            </div>
+                            <p class="sa-status" id="admin-status" aria-live="polite"></p>
+                        </div>
+                    </form>
+                </section>
+            </div>
+
+            <div class="ds-sheet" id="sa-confirm" role="dialog" aria-modal="true" aria-label="Confirm">
+                <div class="ds-sheet__scrim" data-ds-close></div>
+                <div class="ds-sheet__panel">
+                    <div class="ds-sheet__grab" aria-hidden="true"></div>
+                    <div class="ds-sheet__head">
+                        <span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-triangle-alert"></use></svg></span>
+                        <div class="ds-sheet__title" id="sa-confirm-title"></div>
+                        <button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" data-ds-close aria-label="Cancel"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button>
+                    </div>
+                    <p class="sa-status" id="sa-confirm-text"></p>
+                    <div class="sa-actions">
+                        <button type="button" class="ds-btn ds-btn--ghost" data-ds-close>Cancel</button>
+                        <button type="button" class="ds-btn ds-btn--danger" id="sa-confirm-ok"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg>OK</button>
+                    </div>
                 </div>
             </div>
         </section>

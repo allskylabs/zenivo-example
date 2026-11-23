@@ -1,3 +1,31 @@
+// Settings: shared helpers for the Community/Admin groups: info icons toggle their note, saConfirm() replaces confirm() with a ds-sheet
+(function () {
+    if (currentPage !== "tab-settings") return;
+    document.addEventListener("click", (ev) => {
+        const b = ev.target.closest(".sa-info");
+        if (!b) return;
+        const note = document.getElementById(b.dataset.info);
+        if (!note) return;
+        const open = note.hidden;
+        note.hidden = !open;
+        b.setAttribute("aria-expanded", String(open));
+    });
+    const sheet = document.getElementById("sa-confirm");
+    if (!sheet || !window.DS) return;
+    const ok = document.getElementById("sa-confirm-ok");
+    let resolve = null;
+    function settle(v) { if (resolve) { const r = resolve; resolve = null; r(v); } }
+    new MutationObserver(() => { if (sheet.dataset.open !== "true") settle(false); }).observe(sheet, { attributes: true, attributeFilter: ["data-open"] });
+    ok.addEventListener("click", () => { settle(true); DS.closeSheet(sheet); });
+    window.saConfirm = (title, text) => new Promise((res) => {
+        settle(false);
+        resolve = res;
+        document.getElementById("sa-confirm-title").textContent = title;
+        document.getElementById("sa-confirm-text").textContent = text;
+        DS.openSheet(sheet);
+    });
+})();
+
 // Settings → Admin: public location precision, change password, sign out everywhere (docs/SECURITY.md)
 (function () {
     const sel = document.getElementById("admin-precision");
@@ -58,7 +86,7 @@
     // System tiles: host load, refreshed every 10 s while the Admin section is on screen and the tab is visible
     const card = document.getElementById("admin-card");
     const tiles = {};
-    document.querySelectorAll("#admin-system .adm-tile").forEach((t) => { tiles[t.dataset.k] = t; });
+    document.querySelectorAll("#admin-system .sa-tile").forEach((t) => { tiles[t.dataset.k] = t; });
     function setTile(k, pct, text, sub, warnAt) {
         const t = tiles[k];
         if (!t) return;
@@ -66,7 +94,8 @@
         const small = t.querySelector("small");
         if (small) small.textContent = sub || "";
         const v = pct == null ? 0 : Math.max(0, Math.min(100, pct));
-        t.querySelector("u").style.width = `${v}%`;
+        const bar = t.querySelector("u");
+        if (bar) bar.style.width = `${v}%`;
         t.classList.toggle("warn", pct != null && pct >= warnAt && pct < 90);
         t.classList.toggle("crit", pct != null && pct >= 90);
     }
@@ -83,6 +112,12 @@
             setTile("ram", d.ram_pct, p(d.ram_pct), d.ram_total_mb ? `${d.ram_used_mb} / ${d.ram_total_mb} MB` : "", 75);
             setTile("disk", d.disk_pct, p(d.disk_pct), d.disk_free_gb != null ? `${d.disk_free_gb} GB free` : "", 75);
             // the bar runs 0-90 C; a Pi throttles from 80 C
+            if (tiles.uptime) {
+                const u = d.uptime_s;
+                const days = Math.floor(u / 86400), hrs = Math.floor((u % 86400) / 3600), mins = Math.floor((u % 3600) / 60);
+                tiles.uptime.querySelector("b").textContent = u == null ? "--" : days ? `${days} d` : hrs ? `${hrs} h` : `${mins} m`;
+                tiles.uptime.querySelector("small").textContent = u == null ? "" : days ? `${hrs} h ${mins} m` : hrs ? `${mins} m` : "";
+            }
             setTile("temp", d.temp_c == null ? null : (d.temp_c / 90) * 100, d.temp_c == null ? "--" : `${Math.round(d.temp_c)} \u00b0C`, "", (75 / 90) * 100);
         } catch (err) { /* offline: keep the last numbers */ } finally { sysBusy = false; }
     }
@@ -147,11 +182,11 @@
     });
     auto.addEventListener("change", () => call("/api/update/settings", { auto_check: auto.checked }).then(render).catch((e) => { statusEl.textContent = e.message; }));
     btnApply.addEventListener("click", async () => {
-        if (!confirm("Download and install the new version now? The station restarts and is offline for about a minute.")) return;
+        if (!(await saConfirm("Update now?", "Downloads and installs the new version. The station restarts and is offline for about a minute."))) return;
         try { render(await call("/api/update/apply", {})); if (!polling) polling = setInterval(refresh, 2500); } catch (e) { statusEl.textContent = `Could not start: ${e.message}`; }
     });
     btnBack.addEventListener("click", async () => {
-        if (!confirm("Restore the program files saved before the last update and restart?")) return;
+        if (!(await saConfirm("Go back?", "Restores the program files saved before the last update and restarts."))) return;
         try { render(await call("/api/update/rollback", {})); if (!polling) polling = setInterval(refresh, 2500); } catch (e) { statusEl.textContent = `Could not go back: ${e.message}`; }
     });
     refresh();
@@ -163,7 +198,7 @@
     if (!btn) return;
     const out = document.getElementById("restart-status");
     btn.addEventListener("click", async () => {
-        if (!confirm("Restart Zenivo now? The station is offline for about 30 seconds.")) return;
+        if (!(await saConfirm("Restart Zenivo?", "The station is offline for about 30 seconds."))) return;
         btn.disabled = true;
         out.textContent = "Restarting...";
         try {
