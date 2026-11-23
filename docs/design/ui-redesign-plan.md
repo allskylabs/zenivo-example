@@ -71,12 +71,14 @@ Then pages, each a single worker, in this order (value × risk), sizes S ≤ 0.5
 
 Order of workers: S0 → S1 → (Live, Overhead, Sign-in in parallel, disjoint) → (Archive, Sky) → Settings 3a → 3b → Community, Admin → OBS → 3D pages. Max 3 workers at once.
 
-## 4. (c) Keeping the live site working
+## 4. (c) Keeping the live site working (revised 2026-11-23, owner: "rebuild cleanly if needed")
 
-- **No big-bang.** Every page keeps its URL and its API. Server already sends `Cache-Control: no-store` for HTML (`api/main.py:142`) and CSS/JS use `?v=` strings; bump them in the same commit as the change. 
-- **Per-page switch:** each migrated page loads `ds-*.css` always (additive, class-prefixed `ds-`, cannot restyle old markup) and activates its new layout through `<body data-ui="2">`. Rollback = flip the attribute. Optional `?ui=1` query / `localStorage.ui` override for the owner to compare. Remove the old branch one release after the page is accepted. 
-- New CSS goes into new files; do not edit old `redesign*.css` except to delete rules the page no longer uses (otherwise cascade-order bugs: 18 files in order).
-- Deploy the existing way (rsync after commit), check on the real phone via the 3-tab device checklist (Live, Settings, Archive) before moving to the next page.
+Goal is a CLEAN codebase, not coexistence. No `data-ui` switch, no old/new branches living side by side.
+- **Replace and delete per page.** The page task replaces its old markup/CSS/JS and deletes, in the same commit, everything it no longer needs: old rules and files (`redesign*.css`), hard-coded hex, dead classes, dead JS. A page is done only when `scripts/ds_lint.py --report` shows no hex and no orphan selectors for it.
+- **Rollback = one-commit `git revert`.** One page = one commit (plus its `?v=` bump). No runtime flags. Exception: risky pages (Live) may keep a `?ui=1` escape hatch to the previous layout for one release, then it is deleted.
+- **S1a first: split `index.html`.** Its six sections (Live, Gallery, Settings, Calibration, Focus, Logs) become `src/web/pages/*.html` partials assembled by `scripts/build_index.py` (`--check` for CI) into the same `index.html`, so workers stop colliding. URLs, redirects and APIs stay unchanged; three.js scenes untouched; no `main.py` change.
+- Server sends `Cache-Control: no-store` for HTML and stamps `?v=` on assets (`api/main.py`); bump the hand-written `?v=` in the same commit.
+- Deploy static only (rsync after commit, md5 check, no service restart); one device check per page.
 
 ## 5. (d) Mockup features the product does not have yet
 
@@ -99,15 +101,15 @@ Mockups are mobile only. Proposal, same components, three tiers: ≤ 640 phone (
 
 ## 7. (f) Risks
 
-- **Cascade explosion**: 18 CSS files, `!important` and later files override earlier ones; mitigate with prefixed new classes and `data-ui` gate, delete old rules page by page.
-- **index.html is a 1 845-line monolith** hosting six pages; parallel workers will conflict. Mitigation: S1 first splits per-section markers; Live, Archive, Settings tasks are sequential on that file, or first extract each section into its own HTML include (M, recommended before Phase 1).
-- **WebGL/3D pages** can only be verified in real Chrome with GPU; keep them last and cheap (chrome only).
-- **Night/red mode regressions** on canvas drawing code (hard-coded colours in `app/05*`, `07-cloud.js`, 3D pages): needs variable-driven palettes and a manual red-mode screenshot pass per page.
-- **Pi performance/data**: no extra JS payload (target ≤ +15 KB gzip), no web-font additions, avoid backdrop-filter on the live viewport.
-- **Overlap with Worker-4** (event viewer, detector); sequence Archive after its merge.
-- **Scope creep from mockup features** (section 5): ship the visual system first, features as separate tasks.
-- **Testing cost**: follow the global rule, one E2E per page in CI on the `lan` runners, a lint for tokens, manual device check; no repeated local browser loops.
-- **Mockups**: they live permanently in the owner's personal opnai account (read-only for us: never delete, rename or edit). `docs/design/mockups/` is a repo copy for reference.
+- **Cascade explosion / dead CSS**: 18 old CSS files with `!important`. Mitigation: each page task deletes the old rules it replaces; `ds_lint` guards tokens; old files disappear page by page until `redesign*.css` is gone.
+- **index.html monolith** (1 845 lines, six pages): fixed by S1a partials before any page worker starts; one worker per partial.
+- **WebGL/3D pages** can only be verified in real Chrome with GPU; keep them last, scenes untouched.
+- **Night/red mode regressions** on canvas code (hard-coded colours in `app/05*`, `07-cloud.js`, 3D pages): variable-driven palettes, one red-mode screenshot pass per page.
+- **Pi performance/data**: ≤ +15 KB gzip, no new web fonts, no backdrop-filter on the live viewport.
+- **Deletion risk** (new, from replace-and-delete): a removed id/class still used by `app/*.js` or tests breaks silently. Mitigation: grep ids before deleting, `tests/integration/test_web_ui.py`, console check in Chrome, `git revert` rollback.
+- **Overlap with Worker-4** (event viewer, detector): sequence Archive after its merge.
+- **Scope creep** from mockup features (section 5): visual system first, features as separate tasks. Testing: one E2E per page in CI on the `lan` runners, no local browser loops.
+- **Mockups** live permanently in the owner's opnai account (read-only for us); `docs/design/mockups/` is a repo copy.
 
 ## 8. Per-page deliverable checklist (added)
 
