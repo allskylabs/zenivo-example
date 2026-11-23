@@ -136,6 +136,3 @@
 .focus-chart-details > summary.focus-chart-head { cursor: pointer; }
 .focus-chart-details:not([open]) { align-self: start; }
 .focus-chart-details:not([open]) .focus-chart-head { margin-bottom: 0; }
-.wx-now { font-size: 13px; color: var(--text-secondary); margin: 6px 0; }
-.wx-hours { display: flex; flex-wrap: wrap; gap: 3px; margin: 6px 0; }
-.wx-h { font: 11px var(--font-mono, monospace); padding: 4px 6px; border-radius: 4px; background: var(--accent); color: #fff; }

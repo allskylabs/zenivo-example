@@ -16,14 +16,6 @@
     cursor: crosshair;
     touch-action: manipulation;
 }
-.focus-history tr.near td { color: var(--text-muted); text-decoration: line-through; }
-.focus-history tr.near td:last-child { text-decoration: none; }
-.focus-af-start { display: flex; margin-top: 0.4rem; }
-.focus-af-start[hidden] { display: none; }
-.focus-afmf button { min-width: 3.2rem; font-weight: 700; }
-#focus-lens-card.lens-af #focus-lens-slider { opacity: 0.55; }
-#focus-lens-card.lens-af .focus-lens-nudge { opacity: 0.45; }
-.focus-lens-status { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 
 /* Flight named by ADS-B on aircraft events */
 .flight-tag {
@@ -62,10 +54,6 @@ body.no-scroll { overflow: hidden; }
 .fl-where { margin-left: auto; font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; }
 .fl-inview { color: var(--accent); font-weight: 600; }
 .fl-meta { display: flex; gap: 0.9rem; font-size: 0.75rem; color: var(--text-secondary); font-family: var(--font-mono); margin-top: 0.1rem; }
-.focus-stats-card { justify-content: center; margin-top: 0.5rem; }
-.focus-score .focus-statline { margin-top: 0.4rem; font-size: 0.75rem; text-align: center; }
-.focus-af-row[hidden] { display: none; }
-.focus-af-row select { flex: 1; min-width: 0; }
 
 /* Capture info (time / exposure / gain / brightness) shown over images instead of burned into them */
 .frame-info {

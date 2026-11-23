@@ -1,3 +1,5 @@
+const DK_ICON = (n, c) => `<svg class="ds-icon${c ? " " + c : ""}" aria-hidden="true"><use href="/static/icons.svg#i-${n}"></use></svg>`;
+function setDarkBtn(t) { const l = document.getElementById("dark-btn-label"); if (l) l.textContent = t; else btnTriggerDark.textContent = t; }
 /* Zenivo dashboard (part of the former app.js): Exposure/gain controls and master dark calibration UI.
  * Classic script: top-level declarations are shared with the other src/web/app/*.js files; load order is fixed in index.html. */
 
@@ -229,19 +231,19 @@ function updateCalibrationUI(cal) {
     if (darkStatusBadge) {
         if (st === "running") {
             darkStatusBadge.textContent = `AUTO-CAPTURING ${cal.current_frame || 0}/${cal.total_frames || 0}`;
-            darkStatusBadge.className = "badge badge-warning";
+            darkStatusBadge.className = "ds-chip ds-chip--warn";
         } else if (readyCnt >= totalCnt && totalCnt > 0) {
             darkStatusBadge.textContent = `ALL ${readyCnt}/${totalCnt} READY`;
-            darkStatusBadge.className = "badge badge-success";
+            darkStatusBadge.className = "ds-chip ds-chip--ok";
         } else if (st === "completed") {
             darkStatusBadge.textContent = `${readyCnt}/${totalCnt} READY`;
-            darkStatusBadge.className = "badge badge-success";
+            darkStatusBadge.className = "ds-chip ds-chip--ok";
         } else if (st === "error") {
             darkStatusBadge.textContent = "ERROR";
-            darkStatusBadge.className = "badge badge-danger";
+            darkStatusBadge.className = "ds-chip ds-chip--danger";
         } else {
             darkStatusBadge.textContent = `${readyCnt}/${totalCnt} READY`;
-            darkStatusBadge.className = "badge badge-accent";
+            darkStatusBadge.className = "ds-chip ds-chip--info";
         }
     }
 
@@ -259,14 +261,14 @@ function updateCalibrationUI(cal) {
     if (btnTriggerDark) {
         btnTriggerDark.disabled = isRunning;
         if (isRunning) {
-            btnTriggerDark.textContent = `Capturing Profile ${cal.current_profile || 1}/${cal.total_profiles || 7} — Frame ${cal.current_frame || 0}/${cal.total_frames || "?"} (${Math.round(pct)}%)...`;
+            setDarkBtn(`Capturing Profile ${cal.current_profile || 1}/${cal.total_profiles || 7} — Frame ${cal.current_frame || 0}/${cal.total_frames || "?"} (${Math.round(pct)}%)...`);
         } else {
             const totalProfs = Array.isArray(cal.profiles) ? cal.profiles.length : 7;
             const readyProfs = Array.isArray(cal.profiles) ? cal.profiles.filter((p) => p.ready).length : 0;
             if (readyProfs > 0 && readyProfs < totalProfs) {
-                btnTriggerDark.textContent = `Capture Missing Master Dark Profiles (${totalProfs - readyProfs}/${totalProfs} Remaining)`;
+                setDarkBtn(`Capture Missing Master Dark Profiles (${totalProfs - readyProfs}/${totalProfs} Remaining)`);
             } else {
-                btnTriggerDark.textContent = `Capture & Build All Master Dark Profiles (${totalProfs} Profiles: 0.5s – 15.0s)`;
+                setDarkBtn(`Capture & Build All Master Dark Profiles (${totalProfs} Profiles: 0.5s – 15.0s)`);
             }
         }
     }
@@ -278,40 +280,22 @@ function updateCalibrationUI(cal) {
                     isRunning &&
                     Math.abs((cal.exposure_s || 0) - p.exposure_s) < 0.05 &&
                     Math.abs((cal.gain_db || 0) - p.gain_db) < 0.5;
-                let badgeHtml = `<span class="badge">NOT CAPTURED</span>`;
-                if (isCurrent) {
-                    badgeHtml = `<span class="badge badge-warning">⏳ CAPTURING (${cal.current_frame || 0}/${cal.total_frames || p.num_frames})</span>`;
-                } else if (p.ready) {
-                    badgeHtml = `<span class="badge badge-success">✅ READY (${p.size_kb} KB)</span>`;
-                }
-                const updatedStr = p.modified_at
-                    ? `${p.raw_filename || p.filename} • ${fmtLocalIso(p.modified_at)}`
-                    : `${p.raw_filename || p.filename}`;
-                return `
-                    <tr>
-                        <td><strong>${p.label}</strong></td>
-                        <td><span class="text-accent">${p.exposure_s.toFixed(1)}s</span> @ <strong>${p.gain_db.toFixed(0)} dB</strong></td>
-                        <td>${p.num_frames} frames</td>
-                        <td>${badgeHtml}</td>
-                        <td class="text-muted">${updatedStr}</td>
-                    </tr>`;
+                let chip = `<span class="ds-chip">${DK_ICON("minus")}</span>`;
+                if (isCurrent) chip = `<span class="ds-chip ds-chip--warn">${DK_ICON("loader")}${cal.current_frame || 0}/${cal.total_frames || p.num_frames}</span>`;
+                else if (p.ready) chip = `<span class="ds-chip ds-chip--ok">${DK_ICON("check")}${p.size_kb} KB</span>`;
+                const updatedStr = p.modified_at ? `${p.raw_filename || p.filename} · ${fmtLocalIso(p.modified_at)}` : `${p.raw_filename || p.filename}`;
+                return `<div class="ds-row sa-row cal-row"><span class="ds-row__icon">${DK_ICON("moon-star")}</span><span class="ds-row__body"><span class="ds-row__title">${p.label} <b class="cal-exp">${p.exposure_s.toFixed(1)} s · ${p.gain_db.toFixed(0)} dB</b></span><span class="ds-row__sub">${p.num_frames} × · ${updatedStr}</span></span>${chip}</div>`;
             })
             .join("");
     }
 
     if (cal.library && darkLibraryBody) {
         if (cal.library.length === 0) {
-            darkLibraryBody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align:center;">No Master Dark frames generated yet.</td></tr>`;
+            darkLibraryBody.innerHTML = `<div class="ds-empty">${DK_ICON("inbox", "ds-icon--lg")}<span class="sr-only">No Master Dark frames generated yet.</span></div>`;
         } else {
             darkLibraryBody.innerHTML = cal.library
                 .map(
-                    (f) => `
-                    <tr>
-                        <td><strong class="text-accent">${f.filename}</strong></td>
-                        <td>${f.size_kb} KB</td>
-                        <td>${f.modified_at ? fmtLocalIso(f.modified_at) : "--"}</td>
-                        <td><button class="btn btn-sm" onclick="window.showDarkPreview('${f.filename}')">View</button></td>
-                    </tr>`
+                    (f) => `<div class="ds-row sa-row cal-row"><span class="ds-row__icon">${DK_ICON("hard-drive")}</span><span class="ds-row__body"><span class="ds-row__title">${f.filename}</span><span class="ds-row__sub">${f.size_kb} KB · ${f.modified_at ? fmtLocalIso(f.modified_at) : "--"}</span></span><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" title="Preview" aria-label="Preview ${f.filename}" onclick="window.showDarkPreview('${f.filename}')">${DK_ICON("eye")}</button></div>`
                 )
                 .join("");
         }
@@ -323,18 +307,18 @@ window.showDarkPreview = async function (fn) {
     if (!box) {
         box = document.createElement("div");
         box.id = "dark-preview-box";
-        box.style.cssText = "margin-top:12px;padding:12px;border:1px solid #444;border-radius:8px;";
-        document.getElementById("dark-library-body").closest(".events-table-wrapper").after(box);
+        box.className = "ds-card cal-preview";
+        document.getElementById("dark-library-body").closest(".ds-card").after(box);
     }
     box.textContent = "Loading...";
     try {
         const q = encodeURIComponent(fn);
         const st = await (await fetch(`/api/calibration/dark-preview?file=${q}&stats=1`)).json();
-        const warn = (st.warnings || []).map((w) => `<div style="color:#ff6b6b">⚠ ${w}</div>`).join("") || `<div style="color:#51cf66">OK</div>`;
-        const info = (st.info || []).map((w) => `<div style="color:#74c0fc">ℹ ${w}</div>`).join("");
+        const warn = (st.warnings || []).map((w) => `<div class="cal-warn">⚠ ${w}</div>`).join("") || `<div class="cal-ok">OK</div>`;
+        const info = (st.info || []).map((w) => `<div class="cal-info">ℹ ${w}</div>`).join("");
         box.innerHTML = `<strong>${st.filename}</strong> ${st.shape[1]}x${st.shape[0]} ${st.dtype}<br>` +
             `min ${st.min} · max ${st.max} · mean ${st.mean} · median ${st.median} · std ${st.std} · zero ${st.zero_pct}% · sat ${st.saturated_pct}% · stretch ${st.stretch[0]}–${st.stretch[1]} DN${warn}${info}` +
-            `<img src="/api/calibration/dark-preview?file=${q}" style="max-width:100%;margin-top:8px;display:block">`;
+            `<img src="/api/calibration/dark-preview?file=${q}" class="cal-preview-img">`;
     } catch (e) {
         box.textContent = "Preview failed: " + e;
     }
@@ -355,7 +339,7 @@ async function pollCalibrationStatus() {
 async function runAutoDarkLibrary(onlyMissing = false) {
     if (btnTriggerDark) {
         btnTriggerDark.disabled = true;
-        btnTriggerDark.textContent = "Capturing Master Dark Profile (0%)...";
+        setDarkBtn("Capturing Master Dark Profile (0%)...");
     }
     showAlert(
         darkAlert,
@@ -414,7 +398,7 @@ async function runAutoDarkLibrary(onlyMissing = false) {
         clearInterval(calPollTimer);
         if (btnTriggerDark) {
             btnTriggerDark.disabled = false;
-            btnTriggerDark.textContent = "Capture & Build All Master Dark Profiles (6 Profiles)";
+            setDarkBtn("Capture & Build All Master Dark Profiles (6 Profiles)");
         }
     }
 }

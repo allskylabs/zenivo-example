@@ -208,14 +208,4 @@
     flex-wrap: wrap;
     gap: 0.5rem;
 }
-/* Settings > Integrations: data source overview and satellite groups */
-.data-sources { display: grid; gap: 0.5rem; }
-.ds-row { display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.55rem 0.75rem; background: var(--bg-card-sub); border: 1px solid var(--border-color); border-radius: 8px; }
-.ds-main { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
-.ds-main small { color: var(--text-secondary); overflow-wrap: anywhere; }
-.ds-dot { flex: 0 0 auto; width: 0.7rem; height: 0.7rem; margin-top: 0.3rem; border-radius: 50%; background: var(--text-muted); }
-.ds-ok { background: var(--success); }
-.ds-waiting { background: var(--warning, #f5a524); }
-.ds-error { background: var(--danger); }
-.ds-off { background: transparent; border: 2px solid var(--text-muted); }
 .sat-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.35rem 1rem; }

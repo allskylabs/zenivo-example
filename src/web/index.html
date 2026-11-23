@@ -29,7 +29,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
-    <link rel="stylesheet" href="/style.css?v=20261130e">
+    <link rel="stylesheet" href="/style.css?v=20261201a">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -699,231 +699,131 @@
 </div></details>
 </div>
             <!-- Sky Mask Card -->
-            <div class="card settings-card" data-sgroup="skymask">
-                <div class="card-header">
-                    <h2>Sky Mask</h2>
-                </div>
-                <details class="params-summary" id="sky-mask-editor" open>
-                    <summary>Plate-solve sky mask (outline the open sky)</summary>
+            <div class="card settings-card sa" id="sa-skymask" data-sgroup="skymask">
+                <div class="card-header"><h2>Sky mask</h2></div>
+                <details class="sa-details ds-card ds-card--flush sa-group" id="sky-mask-editor" open>
+                    <summary><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layers"></use></svg><span>Outline open sky</span><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-mask" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></summary>
+                    <p class="sa-note" id="sa-i-mask" hidden>Press Auto-detect to propose the mask from the current frame (best at night), or tap the frame to outline open sky (green) and lit buildings, trees or poles to ignore (red). Nothing is stored until you press Apply, so you can fix the proposal first. The plate solver only uses stars inside the sky and outside obstructions, on top of its own automatic sky detection.</p>
                     <div class="mask-canvas-wrap">
                         <img id="mask-img" alt="Live frame for drawing the sky mask">
                         <canvas id="mask-canvas"></canvas>
                     </div>
-                    <div class="settings-actions tool-chips">
-                        <button id="mask-auto" class="btn btn-sm btn-outline" type="button" title="Detect the open sky from the current frame, then edit it">✨ Auto-detect</button>
-                        <button id="mask-new-sky" class="btn btn-sm btn-outline" type="button">＋ Sky polygon</button>
-                        <button id="mask-new-obs" class="btn btn-sm btn-outline" type="button">＋ Obstruction</button>
-                        <button id="mask-undo" class="btn btn-sm btn-outline" type="button">↶ Undo point</button>
-                        <button id="mask-clear" class="btn btn-sm btn-outline" type="button">🗑 Clear all</button>
+                    <div class="sa-actions sa-tools">
+                        <button id="mask-auto" class="ds-btn" type="button" title="Auto-detect the open sky" aria-label="Auto-detect"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><span>Auto</span></button>
+                        <button id="mask-new-sky" class="ds-btn sa-tool-sky" type="button" title="New sky polygon" aria-label="New sky polygon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plus"></use></svg><span>Sky</span></button>
+                        <button id="mask-new-obs" class="ds-btn sa-tool-obs" type="button" title="New obstruction polygon" aria-label="New obstruction polygon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plus"></use></svg><span>Block</span></button>
+                        <button id="mask-undo" class="ds-btn ds-btn--ghost ds-btn--icon" type="button" title="Undo point" aria-label="Undo point"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></button>
+                        <button id="mask-clear" class="ds-btn ds-btn--ghost ds-btn--icon" type="button" title="Clear all" aria-label="Clear all"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-trash-2"></use></svg></button>
                     </div>
-                    <div class="settings-actions apply-row">
-                        <button id="mask-save" class="btn btn-primary btn-block" type="button">✔ Apply mask</button>
-                    </div>
-                    <p class="field-note">Press Auto-detect to propose the mask from the current frame (best at night),
-                        or click on the frame to outline open sky (green) and lit buildings, trees or
-                        poles to ignore (red). Nothing is stored until you press Apply, so you can fix the proposal first. The plate solver only uses stars inside the sky and outside obstructions,
-                        on top of its own automatic sky detection.</p>
-                    <div id="mask-alert" class="alert-box hidden mt-3"></div>
+                    <div class="sa-actions"><button id="mask-save" class="ds-btn ds-btn--primary sa-solve" type="button" aria-label="Apply mask"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg><span>Apply</span></button></div>
+                    <div id="mask-alert" class="alert-box hidden"></div>
                 </details>
-                <details class="params-summary" id="star-align" open>
-                    <summary>Align by stars (when the automatic solve is wrong)</summary>
+                <details class="sa-details ds-card ds-card--flush sa-group" id="star-align" open>
+                    <summary><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-star"></use></svg><span>Align by stars</span><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-align" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></summary>
+                    <p class="sa-note" id="sa-i-align" hidden>For when the automatic solve is wrong. Tap 4 or more stars you can really see on the open sky (inside the green outline), spread over the frame, brightest first. The solver identifies them from their mutual angles, shows the result, and only stores it when you press Apply.</p>
                     <div class="mask-canvas-wrap">
                         <img id="align-img" alt="Live frame for picking stars">
                         <canvas id="align-canvas"></canvas>
                     </div>
-                    <div class="settings-actions tool-chips">
-                        <button id="align-refresh" class="btn btn-sm btn-outline" type="button">⟳ New frame</button>
-                        <button id="align-undo" class="btn btn-sm btn-outline" type="button">↶ Undo star</button>
-                        <button id="align-clear" class="btn btn-sm btn-outline" type="button">🗑 Clear</button>
-                        <button id="align-identify" class="btn btn-sm btn-outline" type="button">🔍 Identify</button>
+                    <div class="sa-actions sa-tools">
+                        <button id="align-refresh" class="ds-btn" type="button" title="New frame" aria-label="New frame"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-refresh-cw"></use></svg><span>Frame</span></button>
+                        <button id="align-identify" class="ds-btn" type="button" title="Identify the stars" aria-label="Identify"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-search"></use></svg><span>Identify</span></button>
+                        <button id="align-undo" class="ds-btn ds-btn--ghost ds-btn--icon" type="button" title="Undo star" aria-label="Undo star"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></button>
+                        <button id="align-clear" class="ds-btn ds-btn--ghost ds-btn--icon" type="button" title="Clear" aria-label="Clear"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-trash-2"></use></svg></button>
                     </div>
-                    <div class="settings-actions apply-row">
-                        <button id="align-apply" class="btn btn-primary btn-block" type="button" disabled>✔ Apply</button>
-                    </div>
-                    <p class="field-note">Click 4 or more stars you can really see on the open sky (inside the green
-                        outline), spread over the frame, brightest first. The solver identifies them from their mutual
-                        angles, shows the result, and only stores it when you press Apply.</p>
-                    <div id="align-alert" class="alert-box hidden mt-3"></div>
+                    <div class="sa-actions"><button id="align-apply" class="ds-btn ds-btn--primary sa-solve" type="button" disabled aria-label="Apply"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg><span>Apply</span></button></div>
+                    <div id="align-alert" class="alert-box hidden"></div>
                 </details>
             </div>
 
-            <!-- Integrations Card -->
-            <div class="card settings-card" id="data-sources-card" data-sgroup="integrations" data-admin>
+            <!-- Integrations: data sources overview (status rows open their settings) + weather + satellites -->
+            <div class="card settings-card sa" id="data-sources-card" data-sgroup="integrations" data-admin>
                 <div class="card-header">
                     <h2>Data sources</h2>
-                    <button type="button" class="btn btn-sm btn-outline" id="data-sources-refresh" data-no-autosave title="Check every source again">&#8635; Refresh</button>
+                    <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="data-sources-refresh" data-no-autosave title="Check every source again" aria-label="Refresh"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-refresh-cw"></use></svg></button>
                 </div>
-                <p class="description">Everything this station fetches from outside, and whether it works now. Each source can be switched off below; nothing is sent to a source that is off.</p>
-                <div id="data-sources-list" class="data-sources" aria-live="polite"><span class="field-note">Loading…</span></div>
+                <section class="ds-card ds-card--flush sa-group" aria-label="Sources">
+                    <div id="data-sources-list" class="ds-list sa-sources" aria-live="polite"><span class="sa-status">Loading…</span></div>
+                </section>
             </div>
 
-            <div class="card settings-card" id="integrations-card" data-sgroup="integrations">
-                <div class="card-header">
-                    <h2>Integrations</h2>
-                </div>
-                <div class="settings-grid">
-                    <fieldset class="settings-group">
-                        <legend>1. Your receiver (primary)</legend>
-                        <div class="field-grid adsb-grid">
-                            <div class="field">
-                                <label for="adsb-host">ADS-B receiver (SBS-1 feed)</label>
-                                <input type="text" id="adsb-host" placeholder="e.g. 192.168.1.50" maxlength="253" />
-                            </div>
-                            <div class="field">
-                                <label for="adsb-port">Port</label>
-                                <input type="number" id="adsb-port" min="1" max="65535" value="30003" />
-                            </div>
-                            <div class="field">
-                                <label class="checkbox-label"><input type="checkbox" id="adsb-enabled" /> Name the flight</label>
-                            </div>
-                        </div>
-                        <p class="field-note">
-                            With a local ADS-B receiver (dump1090, readsb or a Flightradar24 feeder: BaseStation port 30003), each aircraft event is matched
-                            to the flight whose position, projected with the star-solved camera pointing, lies on the streak. A “meteor” that matches a flight becomes an aircraft.
-                            The feed is only read at night while aircraft detection is on.
-                            <span id="adsb-status"></span>
-                        </p>
-                        <div class="field" data-admin>
-                            <label class="checkbox-label"><input type="checkbox" id="adsb-contribute" /> Share what my receiver hears with the Zenivo network</label>
-                        </div>
-                        <p class="field-note" data-admin>
-                            Off by default. When on, this station sends the aircraft positions your receiver decoded (public broadcast data) to
-                            <span id="adsb-network-host">the Zenivo network server (the origin of your remote solver URL; nothing is sent while that is empty)</span>,
-                            signed with this station's key, every 5 s while your receiver delivers. The server sees this station's IP address and can estimate
-                            where your receiver is from what it hears. Data from adsb.fi, adsb.lol or Flightradar24 is never forwarded.
-                            <span id="adsb-contribute-status" aria-live="polite"></span>
-                        </p>
-                    </fieldset>
-                    <fieldset class="settings-group" data-admin>
-                        <legend>2. Public network (fallback)</legend>
-                        <div class="field">
-                            <label class="checkbox-label"><input type="checkbox" id="adsb-public-fallback" /> Use a public ADS-B network when my receiver is not delivering</label>
-                        </div>
-                        <p class="field-note">
-                            Off by default. Used only while your receiver is missing, not connected, or silent for more than 90 s; polling stops as soon as it is back.
-                            When on, this station sends its position rounded to 0.5 degree (about 55 km), in this order: to the Zenivo network (only if a remote solver URL is set), then to
-                            <a href="https://adsb.fi" target="_blank" rel="noopener">adsb.fi</a>, and to
-                            <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a>; the next one is used when one fails or returns no aircraft for 2 minutes. The data is for personal, non-commercial use.
-                        </p>
-                        <p class="field-note" id="adsb-source-status" aria-live="polite"></p>
-                    </fieldset>
-                    <fieldset class="settings-group fr24-block" data-admin>
-                        <legend>3. Flightradar24 (optional, your own account)</legend>
-                        <div class="field">
-                            <label class="checkbox-label"><input type="checkbox" id="fr24-enabled" /> Use Flightradar24</label>
-                        </div>
-                        <div class="field-grid">
-                            <div class="field">
-                                <label for="fr24-email">Account e-mail (optional)</label>
-                                <input type="email" id="fr24-email" name="fr24-account" maxlength="254" autocomplete="off" data-no-autosave spellcheck="false" />
-                            </div>
-                            <div class="field">
-                                <label for="fr24-password">Account password (optional)</label>
-                                <input type="password" id="fr24-password" maxlength="254" autocomplete="new-password" data-no-autosave placeholder="Not shown once sent" />
-                            </div>
-                            <div class="field field-wide">
-                                <label for="fr24-token">Subscription token (optional)</label>
-                                <div class="fr24-token-row">
-                                    <input type="password" id="fr24-token" maxlength="1024" autocomplete="new-password" data-no-autosave spellcheck="false" />
-                                    <span class="text-muted" id="fr24-token-state"></span>
-                                    <button type="button" class="btn btn-sm btn-outline" id="btn-fr24-signin">Send to Flightradar24</button>
-                                    <button type="button" class="btn btn-sm btn-outline" id="btn-fr24-clear-token" hidden>Clear token</button>
-                                </div>
-                            </div>
-                        </div>
-                        <p class="field-note" id="fr24-status" aria-live="polite"></p>
-                        <p class="field-note">
-                            Off by default. When on, this station asks flightradar24.com for the aircraft positions around it; without credentials the public feed is used.
-                            Credentials are stored on this station only (token and e-mail in data/station_config.json, the password in memory only, never shown again).
-                        </p>
-                        <p class="field-note">
-                            This uses Flightradar24's web endpoints, which are not an official public API. You are responsible for using it within Flightradar24's terms; a subscription token is the supported way for account holders.
-                        </p>
-                    </fieldset>
-                    <fieldset class="settings-group sondes-block" data-admin>
-                        <legend>Weather balloons (SondeHub)</legend>
-                        <div class="field">
-                            <label class="checkbox-label"><input type="checkbox" id="sondes-enabled" checked /> Show radiosondes on the Live page</label>
-                        </div>
-                        <p class="field-note">
-                            When on, the station asks api.v2.sondehub.org for the weather balloons within 350 km, about every 20 s while a Live page is open.
-                            The position sent is rounded to 0.5° (about 55 km); the exact location never leaves this station.
-                        </p>
-                    </fieldset>
-                    <fieldset class="settings-group hs-fieldset" id="wx-block" data-admin data-hs-title="Weather &amp; forecast" data-hs-switch="wx-enabled">
-                        <legend>Weather and forecast</legend>
-                        <div class="field">
-                            <label class="checkbox-label"><input type="checkbox" id="wx-enabled" /> Show the weather and 48 h forecast around the station</label>
-                        </div>
-                        <div class="field">
-                            <label for="wx-refresh">Refresh</label>
-                            <select id="wx-refresh">
-                                <option value="15">every 15 min</option><option value="30">every 30 min</option>
-                                <option value="60">every hour</option><option value="180">every 3 hours</option>
-                            </select>
-                        </div>
-                        <div id="wx-now" class="wx-now" aria-live="polite"></div>
-                        <div class="field">
-                            <button type="button" class="btn btn-sm btn-outline btn-block" id="wx-refresh-now" data-no-autosave>&#8635; Update now</button>
-                        </div>
-                        <div id="wx-hours" class="wx-hours" aria-label="Next hours"></div>
-                        <p class="field-note">
-                            Off by default. When on, the station asks api.open-meteo.com (free, no account) for the weather at its position, rounded to 0.1° (about 11 km);
-                            no name, address or picture is sent. Same data at <code>GET /api/weather</code>.
-                        </p>
-                    </fieldset>
-                    <fieldset class="settings-group sat-block" id="sat-block" data-admin>
-                        <legend>Satellites (orbits)</legend>
-                        <div class="field">
-                            <label class="checkbox-label"><input type="checkbox" id="sat-enabled" checked /> Show satellites on the Live and Sky pages</label>
-                        </div>
-                        <div class="field">
-                            <label for="sat-source">Orbit source</label>
-                            <select id="sat-source">
-                                <option value="celestrak">CelesTrak (choose groups)</option>
-                                <option value="satnogs">SatNOGS DB (community catalogue, about 1700 satellites)</option>
-                            </select>
-                            <p class="field-note">SatNOGS (db.satnogs.org) is an open, volunteer-run satellite database. It serves one file with every satellite, about 250 KB per download, so the groups below do not apply. Only the request itself is sent, never your position.</p>
-                        </div>
-                        <div class="field" id="sat-groups-field">
-                            <label>Groups to track</label>
-                            <div class="sat-groups" id="sat-groups">
-                                <label class="checkbox-label"><input type="checkbox" data-sat-group="stations" /> Space stations (ISS, Tiangong)</label>
-                                <label class="checkbox-label"><input type="checkbox" data-sat-group="visual" /> Brightest, naked-eye</label>
-                                <label class="checkbox-label"><input type="checkbox" data-sat-group="weather" /> Weather</label>
-                                <label class="checkbox-label"><input type="checkbox" data-sat-group="noaa" /> NOAA</label>
-                                <label class="checkbox-label"><input type="checkbox" data-sat-group="gps-ops" /> GPS</label>
-                                <label class="checkbox-label"><input type="checkbox" data-sat-group="galileo" /> Galileo</label>
-                                <label class="checkbox-label"><input type="checkbox" data-sat-group="science" /> Science</label>
-                            </div>
-                        </div>
-                        <div class="field">
-                            <label for="sat-refresh">Download orbits every</label>
-                            <select id="sat-refresh">
-                                <option value="6">6 hours</option>
-                                <option value="12">12 hours</option>
-                                <option value="24">24 hours</option>
-                                <option value="72">3 days</option>
-                                <option value="168">7 days</option>
-                            </select>
-                        </div>
-                        <details class="params-summary">
-                            <summary>Advanced: another orbit source</summary>
-                            <div class="field">
-                                <label for="sat-url">TLE address (https, with {group})</label>
-                                <input type="text" id="sat-url" maxlength="300" spellcheck="false" placeholder="https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=tle" />
-                            </div>
-                            <p class="field-note">Leave empty for CelesTrak. The address must be public (https) and return three-line TLE sets for the group named by <code>{group}</code>.</p>
-                        </details>
-                        <div class="settings-actions">
-                            <button type="button" class="btn btn-sm btn-outline" id="sat-refresh-now" data-no-autosave>&#8595; Download now</button>
-                        </div>
-                        <p class="field-note" id="sat-status" aria-live="polite"></p>
-                        <p class="field-note">
-                            When on, the station asks celestrak.org for orbit data (no position is sent). Satellites are computed locally; a long list slows the live view on a small host, so keep only the groups you want to see.
-                        </p>
-                    </fieldset>
-                </div>
+            <div class="card settings-card sa" id="integrations-card" data-sgroup="integrations">
+                <div class="card-header"><h2>Integrations</h2></div>
+
+<fieldset class="sa-fs" aria-label="ADS-B receiver">
+<legend class="sr-only">ADS-B receiver</legend>
+<div class="ds-list">
+<label class="sa-fld ds-moved"><input type="checkbox" id="adsb-enabled"> Name the flight</label>
+<div class="ds-row sa-row"><label class="sa-lab" for="adsb-host"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Receiver (SBS-1)</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-adsb" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><input class="sa-input" id="adsb-host" type="text" placeholder="192.168.1.50" maxlength="253" autocomplete="off"></div>
+<p class="sa-note" id="sa-i-adsb" hidden>With a local ADS-B receiver (dump1090, readsb or a Flightradar24 feeder: BaseStation port 30003), each aircraft event is matched to the flight whose position, projected with the star-solved camera pointing, lies on the streak. A “meteor” that matches a flight becomes an aircraft. The feed is only read at night while aircraft detection is on.</p>
+<div class="ds-row sa-row"><label class="sa-lab" for="adsb-port"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plug"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Port</span></span></label><input class="sa-input sa-num" id="adsb-port" type="number" min="1" max="65535" value="30003"></div>
+<p class="sa-status" id="adsb-status"></p>
+<div class="sa-fld" data-admin><div class="ds-row sa-row"><label class="sa-lab" for="adsb-contribute"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-share-2"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Share with Zenivo network</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-contrib" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><label class="ds-switch"><input type="checkbox" id="adsb-contribute"><span class="ds-switch__track"></span></label></div></div>
+<div data-admin><p class="sa-note" id="sa-i-contrib" hidden>Off by default. When on, this station sends the aircraft positions your receiver decoded (public broadcast data) to <span id="adsb-network-host">the Zenivo network server (the origin of your remote solver URL; nothing is sent while that is empty)</span>, signed with this station’s key, every 5 s while your receiver delivers. The server sees this station’s IP address and can estimate where your receiver is from what it hears. Data from adsb.fi, adsb.lol or Flightradar24 is never forwarded.</p><p class="sa-status" id="adsb-contribute-status" aria-live="polite"></p></div>
+</div>
+</fieldset>
+<fieldset class="sa-fs" data-admin aria-label="Public ADS-B network">
+<legend class="sr-only">Public ADS-B network</legend>
+<div class="ds-list">
+<label class="sa-fld ds-moved"><input type="checkbox" id="adsb-public-fallback"> Use a public ADS-B network when my receiver is not delivering</label>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-shield"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Privacy</span></span><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-pub" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+<p class="sa-note" id="sa-i-pub" hidden>Off by default. Used only while your receiver is missing, not connected, or silent for more than 90 s; polling stops as soon as it is back. When on, this station sends its position rounded to 0.5 degree (about 55 km), in this order: to the Zenivo network (only if a remote solver URL is set), then to <a href="https://adsb.fi" target="_blank" rel="noopener">adsb.fi</a>, and to <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a>; the next one is used when one fails or returns no aircraft for 2 minutes. The data is for personal, non-commercial use.</p>
+<p class="sa-status" id="adsb-source-status" aria-live="polite"></p>
+</div>
+</fieldset>
+<fieldset class="sa-fs fr24-block" data-admin aria-label="Flightradar24">
+<legend class="sr-only">Flightradar24</legend>
+<div class="ds-list">
+<label class="sa-fld ds-moved"><input type="checkbox" id="fr24-enabled"> Use Flightradar24</label>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-user"></use></svg></span><label class="ds-row__body" for="fr24-email"><span class="ds-row__title">Account e-mail (optional)</span><input class="sa-input" id="fr24-email" type="email" name="fr24-account" maxlength="254" autocomplete="off" data-no-autosave spellcheck="false"></label></div>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-lock"></use></svg></span><label class="ds-row__body" for="fr24-password"><span class="ds-row__title">Account password (optional)</span><input class="sa-input" id="fr24-password" type="password" maxlength="254" autocomplete="new-password" data-no-autosave placeholder="Not shown once sent"></label></div>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-key-round"></use></svg></span><label class="ds-row__body" for="fr24-token"><span class="ds-row__title">Subscription token (optional)</span><input class="sa-input" id="fr24-token" type="password" maxlength="1024" autocomplete="new-password" data-no-autosave spellcheck="false"></label></div>
+<div class="sa-actions"><span class="ds-chip ds-chip--ok" id="fr24-token-state"></span><button type="button" class="ds-btn" id="btn-fr24-signin" title="Send to Flightradar24" aria-label="Send to Flightradar24"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg><span>Send</span></button><button type="button" class="ds-btn ds-btn--ghost" id="btn-fr24-clear-token" hidden title="Clear token" aria-label="Clear token"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-trash-2"></use></svg><span>Token</span></button></div>
+<p class="sa-status" id="fr24-status" aria-live="polite"></p>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-shield"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Privacy</span></span><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-fr24" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+<p class="sa-note" id="sa-i-fr24" hidden>Off by default. When on, this station asks flightradar24.com for the aircraft positions around it; without credentials the public feed is used. Credentials are stored on this station only (token and e-mail in data/station_config.json, the password in memory only, never shown again). This uses Flightradar24’s web endpoints, which are not an official public API. You are responsible for using it within Flightradar24’s terms; a subscription token is the supported way for account holders.</p>
+</div>
+</fieldset>
+<fieldset class="sa-fs sondes-block" data-admin aria-label="Weather balloons">
+<legend class="sr-only">Weather balloons (SondeHub)</legend>
+<div class="ds-list">
+<label class="sa-fld ds-moved"><input type="checkbox" id="sondes-enabled" checked> Show radiosondes on the Live page</label>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-shield"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Privacy</span></span><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-sonde" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+<p class="sa-note" id="sa-i-sonde" hidden>When on, the station asks api.v2.sondehub.org for the weather balloons within 350 km, about every 20 s while a Live page is open. The position sent is rounded to 0.5° (about 55 km); the exact location never leaves this station.</p>
+</div>
+</fieldset>
+<section class="ds-card ds-card--flush sa-group sat-block" id="sat-block" data-admin aria-label="Satellites">
+<div class="sa-head"><h3 class="ds-card__title">Satellites</h3><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-sat" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+<p class="sa-note" id="sa-i-sat" hidden>When on, the station asks celestrak.org for orbit data (no position is sent). Satellites are computed locally; a long list slows the live view on a small host, so keep only the groups you want to see.</p>
+<div class="ds-list">
+<label class="sa-fld ds-moved"><input type="checkbox" id="sat-enabled" checked> Show satellites on the Live and Sky pages</label>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-source"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Orbit source</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-src" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><select class="sa-input sa-select" id="sat-source"><option value="celestrak">CelesTrak (groups)</option><option value="satnogs">SatNOGS DB (~1700)</option></select></div>
+<p class="sa-note" id="sa-i-src" hidden>SatNOGS (db.satnogs.org) is an open, volunteer-run satellite database. It serves one file with every satellite, about 250 KB per download, so the groups below do not apply. Only the request itself is sent, never a position.</p>
+<div id="sat-groups-field"><div class="sat-groups" id="sat-groups">
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-g-stations"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rocket"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Space stations</span></span></label><label class="ds-switch"><input type="checkbox" id="sat-g-stations" data-sat-group="stations"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-g-visual"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Brightest, naked-eye</span></span></label><label class="ds-switch"><input type="checkbox" id="sat-g-visual" data-sat-group="visual"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-g-weather"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Weather</span></span></label><label class="ds-switch"><input type="checkbox" id="sat-g-weather" data-sat-group="weather"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-g-noaa"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">NOAA</span></span></label><label class="ds-switch"><input type="checkbox" id="sat-g-noaa" data-sat-group="noaa"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-g-gps-ops"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-compass"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">GPS</span></span></label><label class="ds-switch"><input type="checkbox" id="sat-g-gps-ops" data-sat-group="gps-ops"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-g-galileo"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-compass"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Galileo</span></span></label><label class="ds-switch"><input type="checkbox" id="sat-g-galileo" data-sat-group="galileo"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-g-science"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Science</span></span></label><label class="ds-switch"><input type="checkbox" id="sat-g-science" data-sat-group="science"><span class="ds-switch__track"></span></label></div>
+</div></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-refresh"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Download every</span></span></label><select class="sa-input sa-select" id="sat-refresh"><option value="6">6 hours</option><option value="12">12 hours</option><option value="24">24 hours</option><option value="72">3 days</option><option value="168">7 days</option></select></div>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-download"></use></svg></span><label class="ds-row__body" for="sat-url"><span class="ds-row__title">Other TLE address (https, with {group})</span><input class="sa-input" id="sat-url" type="text" maxlength="300" spellcheck="false" placeholder="https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&amp;FORMAT=tle"></label></div>
+<div class="sa-actions"><button type="button" class="ds-btn" id="sat-refresh-now" data-no-autosave title="Download orbits now" aria-label="Download now"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-download"></use></svg><span>Download</span></button></div>
+<p class="sa-status" id="sat-status" aria-live="polite"></p>
+</div></section>
+<section class="ds-card ds-card--flush sa-group" id="wx-block" data-admin aria-label="Weather">
+<div class="sa-head"><h3 class="ds-card__title">Weather &amp; forecast</h3><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-wx" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+<p class="sa-note" id="sa-i-wx" hidden>Off by default. When on, the station asks api.open-meteo.com (free, no account) for the weather at its position, rounded to 0.1° (about 11 km); no name, address or picture is sent. Same data at <code>GET /api/weather</code>.</p>
+<div class="ds-list">
+<div class="ds-row sa-row"><label class="sa-lab" for="wx-enabled"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Show weather and 48 h forecast</span></span></label><label class="ds-switch"><input type="checkbox" id="wx-enabled"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="wx-refresh"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Refresh</span></span></label><select class="sa-input sa-select" id="wx-refresh"><option value="15">15 min</option><option value="30">30 min</option><option value="60">1 hour</option><option value="180">3 hours</option></select></div>
+</div>
+<div id="wx-now" class="wx-now" aria-live="polite"></div>
+<div id="wx-hours" class="wx-hours" aria-label="Next hours"></div>
+<div class="sa-actions"><button type="button" class="ds-btn" id="wx-refresh-now" data-no-autosave title="Update now" aria-label="Update now"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-refresh-cw"></use></svg><span>Update</span></button></div>
+</section>
             </div>
 
             <!-- Community Card: opt-in station sharing (docs/COMMUNITY.md) -->
@@ -1107,17 +1007,15 @@
         </section>
 
         <!-- PAGE: Master Dark Calibration (/calibration) -->
-        <section id="tab-calibration" class="tab-content">
-            <a class="settings-back settings-back-sub" href="/settings">&lsaquo; Settings</a>
-            <div class="card">
-                <div class="card-header">
-                    <h2>Master Dark Calibration Routine (AC1 / AC3)</h2>
-                    <span class="badge badge-accent" id="dark-status-badge">READY</span>
+        <section id="tab-calibration" class="tab-content cal">
+            <a class="ds-btn ds-btn--ghost settings-back settings-back-sub" href="/settings" aria-label="Settings"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-left"></use></svg><span>Settings</span></a>
+            <div class="ds-card cal-card">
+                <div class="foc-head">
+                    <h2 class="ds-card__title"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon-star"></use></svg><span>Master dark</span></h2>
+                    <span class="ds-chip ds-chip--info" id="dark-status-badge">READY</span>
+                    <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="cal-i-how" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
                 </div>
-                <p class="description">
-                    Cover the camera lens/dome, then click the button below. The system will automatically capture and median-stack all
-                    <strong>7 Standard Master Dark Profiles</strong> (0.5s &ndash; 15.0s / 12 &ndash; 48 dB) in 10-bit Bayer RAW (<code>.npy</code>) and hot pixel maps into <code>data/calibration/darks/</code> without needing manual parameter selection.
-                </p>
+                <p class="sa-note" id="cal-i-how" hidden>Cover the camera lens or dome, then press Capture. The system automatically captures and median-stacks all 7 standard Master Dark profiles (0.5 s – 15.0 s, 12 – 48 dB) in 10-bit Bayer RAW (<code>.npy</code>) with hot pixel maps into <code>data/calibration/darks/</code>, without any manual parameter selection.</p>
 
                 <!-- Hidden parameter inputs retained for automated test suite compatibility -->
                 <div class="hidden" aria-hidden="true">
@@ -1126,88 +1024,47 @@
                     <input type="number" id="dark-gain" min="0" max="72" step="1" value="36" />
                 </div>
 
-                <!-- Single 1-Click Button on Web UI -->
-                <div class="btn-group" style="flex-wrap: wrap; margin-bottom: 1rem;">
-                    <button id="btn-trigger-dark" class="btn btn-primary">Capture &amp; Build All Master Dark Profiles (0.5s &ndash; 15.0s)</button>
-                </div>
+                <div class="sa-actions"><button id="btn-trigger-dark" type="button" class="ds-btn ds-btn--primary sa-solve" title="Capture and build all Master Dark profiles (lens covered)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-play"></use></svg><span id="dark-btn-label">Capture &amp; build all Master Dark profiles</span></button></div>
 
-                <!-- Live Calibration Status & Progress Bar -->
-                <div id="dark-progress-panel" class="calibration-status-panel">
-                    <div class="calibration-status-header">
-                        <span id="dark-status-text">Ready — Cover lens and click button above to capture 10-bit RAW Master Dark profiles (0.5s – 15.0s).</span>
-                        <span id="dark-progress-pct" class="mono-val">0%</span>
+                <div id="dark-progress-panel" class="cal-progress">
+                    <div class="cal-progress__head">
+                        <span id="dark-status-text">Ready: cover the lens and press Capture.</span>
+                        <span id="dark-progress-pct" class="cal-pct">0%</span>
                     </div>
-                    <div class="progress-track">
-                        <div id="dark-progress-bar" class="progress-fill" style="width: 0%;"></div>
-                    </div>
+                    <div class="focus-meter"><div id="dark-progress-bar" class="focus-meter-fill good" style="width: 0%;"></div></div>
                 </div>
-
-                <!-- Persistent Calibration Notification Banner -->
-                <div id="dark-alert" class="alert-box hidden mt-3"></div>
-
-                <!-- Standard 6-Profile Matrix -->
-                <div class="section-heading mt-4">
-                    <h2>Standard Astronomical Dark Profiles Matrix</h2>
-                </div>
-                <div class="events-table-wrapper">
-                    <table class="events-table">
-                        <thead>
-                            <tr>
-                                <th>Profile</th>
-                                <th>Exposure &amp; Gain</th>
-                                <th>Stack Frames</th>
-                                <th>Status</th>
-                                <th>File / Updated (local)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="dark-profiles-matrix-body">
-                            <tr><td colspan="5" class="text-muted" style="text-align:center;">Loading standard profile matrix...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Saved Master Dark Calibration Library Files -->
-                <div class="section-heading mt-4">
-                    <h2>Saved Master Dark Files on Disk (<code>data/calibration/darks/</code>)</h2>
-                </div>
-                <div class="events-table-wrapper">
-                    <table class="events-table">
-                        <thead>
-                            <tr>
-                                <th>Filename</th>
-                                <th>Size</th>
-                                <th>Last Updated (local)</th>
-                                <th>Preview</th>
-                            </tr>
-                        </thead>
-                        <tbody id="dark-library-body">
-                            <tr><td colspan="4" class="text-muted" style="text-align:center;">Loading calibration library...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+                <div id="dark-alert" class="alert-box hidden"></div>
             </div>
+
+            <section class="ds-card ds-card--flush sa-group" aria-label="Standard profiles">
+                <div class="sa-head"><h3 class="ds-card__title">Profiles</h3></div>
+                <div class="ds-list" id="dark-profiles-matrix-body"><div class="ds-skeleton ds-skeleton--block"></div></div>
+            </section>
+
+            <section class="ds-card ds-card--flush sa-group" aria-label="Saved files">
+                <div class="sa-head"><h3 class="ds-card__title">Files</h3><span class="foc-muted">data/calibration/darks/</span></div>
+                <div class="ds-list" id="dark-library-body"><div class="ds-skeleton ds-skeleton--block"></div></div>
+            </section>
         </section>
         <!-- TAB: Focus assistant (zoom, score and curve fit in one screen) -->
-        <section id="tab-focus" class="tab-content">
-            <a class="settings-back settings-back-sub" href="/settings">&lsaquo; Settings</a>
+        <section id="tab-focus" class="tab-content foc">
+            <a class="ds-btn ds-btn--ghost settings-back settings-back-sub" href="/settings" aria-label="Settings"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-left"></use></svg><span>Settings</span></a>
             <div class="focus-layout" id="focus-layout">
-                <div class="card focus-main">
-                    <div class="card-header">
-                        <h2>Focus Zoom <span class="text-muted" id="focus-zoom-label"></span></h2>
-                        <div class="header-actions focus-actions">
-                            <label class="checkbox-label"><input type="checkbox" id="focus-stretch" checked> Stretch</label>
-                            <label class="checkbox-label"><input type="checkbox" id="focus-markers" checked> Markers</label>
-                            <label class="checkbox-label"><input type="checkbox" id="focus-peaking" checked> Peaking</label>
-                            <label class="checkbox-label"><input type="checkbox" id="focus-crosshair"> Crosshair</label>
+                <div class="ds-card focus-main">
+                    <div class="foc-head">
+                        <h2 class="ds-card__title"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg><span class="sr-only">Focus zoom</span><span class="foc-zoom" id="focus-zoom-label"></span></h2>
+                        <div class="foc-togs" role="group" aria-label="View options">
+                            <label class="foc-tog" title="Stretch"><input type="checkbox" id="focus-stretch" checked><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg><span>Stretch</span></label><label class="foc-tog" title="Markers"><input type="checkbox" id="focus-markers" checked><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-map-pin"></use></svg><span>Markers</span></label><label class="foc-tog" title="Peaking"><input type="checkbox" id="focus-peaking" checked><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-zap"></use></svg><span>Peaking</span></label><label class="foc-tog" title="Cross"><input type="checkbox" id="focus-crosshair"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg><span>Cross</span></label>
                         </div>
                     </div>
                     <div class="focus-view-row">
                         <div class="focus-zoom-wrap" id="focus-zoom-wrap">
                             <canvas id="focus-zoom-canvas"></canvas>
-                            <div class="focus-zoom-empty" id="focus-zoom-empty"><span>Press <strong>Start focus mode</strong> (Live focus card) to stream a native-resolution crop.</span></div>
+                            <div class="focus-zoom-empty" id="focus-zoom-empty"><span><svg class="ds-icon ds-icon--xl" aria-hidden="true"><use href="/static/icons.svg#i-play"></use></svg><br>Start focus mode</span></div>
                         </div>
                         <aside class="focus-aside">
-                            <div class="focus-aside-title">Overview <span class="text-muted">click to move · arrow keys nudge</span></div>
+                            <div class="focus-aside-title"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg><span>Overview</span><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="foc-i-ov" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+                            <p class="sa-note" id="foc-i-ov" hidden>Click the frame to move the zoom region; arrow keys nudge it.</p>
                             <div class="focus-overview-wrap" id="focus-overview-wrap">
                                 <img id="focus-overview" alt="Whole frame">
                                 <div class="focus-roi-box" id="focus-roi-box"></div>
@@ -1215,195 +1072,145 @@
                         </aside>
                     </div>
                     <div class="focus-charts-grid">
-                        <!-- Chart 1: Lens V-Curve (lens position vs star size HFR / sharpness) -->
-                        <div class="focus-chart-card">
+                        <div class="ds-card ds-card--flush focus-chart-card">
                             <div class="focus-chart-head">
                                 <div class="focus-chart-title-wrap">
-                                    <strong id="focus-lens-chart-title">Lens V-Curve</strong>
+                                    <strong id="focus-lens-chart-title">Lens V-curve</strong>
                                     <span class="focus-badge" id="focus-chart-fit-badge">V-CURVE</span>
                                 </div>
-                                <div class="focus-seg" id="focus-chart-metric">
-                                    <button data-chart-metric="starsize" class="active" title="Star size: HFR / FWHM (px), smaller is sharper">Star size (HFR)</button>
-                                    <button data-chart-metric="sharpness" title="Sharpness: edge contrast, higher is sharper">Sharpness</button>
-                                </div>
-                                <div class="header-actions focus-chart-actions">
-                                    <button class="btn btn-sm btn-outline" id="focus-go-best" hidden title="Return to the sharpest lens position found on the chart">★ Best (<span id="focus-best-pos-val">—</span>)</button>
-                                    <button class="btn btn-sm btn-outline" id="focus-record-point" title="Record a measurement at the current lens position">Record point</button>
-                                    <button class="btn btn-sm btn-outline" id="focus-reset" title="Clear the chart data and start over (R)">Reset (R)</button>
+                                <div class="focus-seg" id="focus-chart-metric" role="group" aria-label="Chart metric"><button type="button" data-chart-metric="starsize" class="active" title="Star size: HFR / FWHM (px), smaller is sharper">HFR</button><button type="button" data-chart-metric="sharpness" title="Sharpness: edge contrast, higher is sharper">Edge</button></div>
+                                <div class="foc-acts">
+                                    <button type="button" class="ds-btn ds-btn--ghost" id="focus-go-best" hidden title="Return to the sharpest lens position found" aria-label="Go to best"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-star"></use></svg><span>(<span id="focus-best-pos-val">—</span>)</span></button>
+                                    <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="focus-record-point" title="Record a measurement at the current lens position" aria-label="Record point"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plus"></use></svg></button>
+                                    <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="focus-reset" title="Clear the chart and start over (R)" aria-label="Reset chart"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></button>
                                 </div>
                             </div>
                             <canvas id="focus-lens-chart" class="focus-chart"></canvas>
                             <div class="focus-chart-summary" id="focus-chart-summary">
-                                <span>Lens position: <b id="focus-curve-cur-pos">—</b></span>
-                                <span id="focus-curve-best-wrap">· Sharpest point: <b id="focus-curve-best-info" class="text-success">—</b></span>
-                                <span id="focus-curve-n-wrap">· Measured: <b id="focus-curve-points-count">0</b> positions</span>
-                                <span id="focus-curve-hint" class="text-muted">· Click the chart to pick a position</span>
+                                <span>Lens <b id="focus-curve-cur-pos">—</b></span>
+                                <span id="focus-curve-best-wrap"><svg class="ds-icon ds-icon--sm" aria-hidden="true"><use href="/static/icons.svg#i-star"></use></svg><b id="focus-curve-best-info" class="text-success">—</b></span>
+                                <span id="focus-curve-n-wrap"><svg class="ds-icon ds-icon--sm" aria-hidden="true"><use href="/static/icons.svg#i-activity"></use></svg><b id="focus-curve-points-count">0</b></span>
+                                <span id="focus-curve-hint" class="foc-muted">Click the chart to pick a position</span>
                             </div>
                         </div>
-
-                        <!-- Chart 2: Live Time History (sharpness and star size over consecutive frames) -->
-                        <details class="focus-chart-card focus-chart-details" id="focus-time-details">
+                        <details class="ds-card ds-card--flush focus-chart-card focus-chart-details" id="focus-time-details">
                             <summary class="focus-chart-head">
                                 <div class="focus-chart-title-wrap">
-                                    <strong id="focus-time-chart-title">Live Time History</strong>
-                                    <span class="focus-badge">TIME STREAM</span>
+                                    <svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-activity"></use></svg><strong id="focus-time-chart-title">Live history</strong>
+                                    <span class="focus-badge">TIME</span>
                                 </div>
-                                <div class="focus-chart-subtext text-muted">
-                                    Sharpness &amp; HFR over consecutive frames
-                                </div>
+                                <span class="foc-muted focus-chart-subtext">Sharpness &amp; HFR per frame</span>
                             </summary>
                             <canvas id="focus-time-chart" class="focus-chart"></canvas>
                             <div class="focus-chart-summary">
-                                <span>Range: <b id="focus-time-range-info">last 60 frames</b></span>
-                                <span id="focus-time-status-info" class="text-muted">· Shaded band: background noise level</span>
+                                <span><svg class="ds-icon ds-icon--sm" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg><b id="focus-time-range-info">last 60 frames</b></span>
+                                <span id="focus-time-status-info" class="foc-muted">Shaded band: noise level</span>
                             </div>
                         </details>
                     </div>
                 </div>
                 <div class="focus-side">
-                    <div class="card">
-                        <div class="card-header">
-                            <h2>Live focus</h2>
-                            <span class="focus-badge" id="focus-badge">OFF</span>
-                        </div>
+                    <div class="ds-card focus-live">
+                        <div class="foc-head"><h2 class="ds-card__title"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-play"></use></svg><span>Live focus</span></h2><span class="focus-badge" id="focus-badge">OFF</span></div>
                         <div class="focus-actions-row">
-                            <button class="btn btn-primary" id="focus-toggle" title="Start focus mode">Start focus mode</button>
-                            <button class="btn btn-outline" id="focus-finish" hidden title="Leave focus mode without saving the lens position or result">Stop without saving</button>
+                            <button type="button" class="ds-btn ds-btn--primary" id="focus-toggle" title="Start focus mode" aria-label="Start focus mode"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-play"></use></svg><span class="foc-lab">Start</span></button>
+                            <button type="button" class="ds-btn" id="focus-finish" title="Leave focus mode without saving the lens position or result" aria-label="Leave focus mode without saving the lens position or result" hidden><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg><span class="foc-lab">Stop</span></button>
                         </div>
-                        <p class="focus-hint text-muted focus-cta-hint" id="focus-toggle-hint">Streams fast native-resolution frames with a live sharpness score. Auto-exposure and archiving pause until you finish.</p>
-                        <button class="btn btn-sm btn-outline btn-block focus-keep" id="focus-keep" hidden>Still focusing — keep focus mode on</button>
+                        <p class="sa-note focus-cta-hint" id="focus-toggle-hint">Streams fast native-resolution frames with a live sharpness score. Auto-exposure and archiving pause until you finish.</p>
+                        <button type="button" class="ds-btn focus-keep" id="focus-keep" hidden><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg><span>Keep on</span></button>
                         <div class="focus-score">
                             <div class="focus-score-label" id="focus-score-label">Score</div>
                             <div class="focus-score-value" id="focus-score-value">—</div>
                             <div class="focus-score-sub" id="focus-score-sub">&nbsp;</div>
                             <div class="focus-meter" title="Bar spans 80–100 % of the best score"><div class="focus-meter-fill" id="focus-meter-fill"></div></div>
                             <div class="focus-score-sub"><span id="focus-quality">—</span> of best <span id="focus-best">—</span> <span class="focus-trend" id="focus-trend"></span></div>
-                            <details class="focus-adv focus-adv-flat">
-                                <summary>Statistics</summary>
-                            <div class="focus-stats focus-stats-card">
-                                <span>Min <b id="focus-stat-min">—</b></span>
-                                <span>Max <b id="focus-stat-max">—</b></span>
-                                <span title="Frame-to-frame score noise; changes smaller than this mean nothing">Noise <b id="focus-stat-noise">—</b></span>
-                                <span>Frames <b id="focus-stat-n">0</b></span>
-                            </div>
-                            <div class="focus-statline" id="focus-statline">—</div>
+                            <details class="sa-details focus-adv">
+                                <summary><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-list"></use></svg><span>Statistics</span></summary>
+                                <div class="focus-stats focus-stats-card">
+                                    <span>Min <b id="focus-stat-min">—</b></span>
+                                    <span>Max <b id="focus-stat-max">—</b></span>
+                                    <span title="Frame-to-frame score noise; changes smaller than this mean nothing">Noise <b id="focus-stat-noise">—</b></span>
+                                    <span>Frames <b id="focus-stat-n">0</b></span>
+                                </div>
+                                <div class="focus-statline" id="focus-statline">—</div>
                             </details>
                         </div>
-                        <details class="focus-adv">
-                            <summary>Measurement settings</summary>
-                                                <div class="focus-field">
-                            <span class="focus-field-label">Measure</span>
-                            <div class="focus-seg" id="focus-method">
-                                <button data-method="auto" class="active" title="Auto: star size (HFR/FWHM px) at night, edge contrast by day">Auto</button>
-                                <button data-method="stars" title="Measure star size HFR / FWHM (px): smaller stars are sharper">Stars (HFR)</button>
-                                <button data-method="lights" title="Measure light-spot size HFR (px): smaller is sharper">Lights</button>
-                                <button data-method="contrast" title="Measure edge contrast (daytime: buildings, trees, horizon)">Day</button>
+                        <details class="sa-details focus-adv">
+                            <summary><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg><span>Measurement</span></summary>
+                            <div class="ds-list">
+                            <div class="ds-row sa-row foc-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-star"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Measure</span></span><div class="focus-seg" id="focus-method" role="group" aria-label="Measure"><button type="button" data-method="auto" class="active" title="Auto: star size (HFR/FWHM px) at night, edge contrast by day">Auto</button><button type="button" data-method="stars" title="Measure star size HFR / FWHM (px): smaller stars are sharper">Stars</button><button type="button" data-method="lights" title="Measure light-spot size HFR (px): smaller is sharper">Lights</button><button type="button" data-method="contrast" title="Measure edge contrast (daytime: buildings, trees, horizon)">Day</button></div></div>
+                            <div class="ds-row sa-row foc-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Region</span></span><div class="focus-seg" id="focus-roi-mode" role="group" aria-label="Focus region"><button type="button" data-roi-mode="auto" class="active" title="Automatically find the brightest star (night) or the most detailed area (day)">Auto</button><button type="button" data-roi-mode="manual" title="Keep the focus box where you click on the image">Manual</button></div></div>
+                            <div class="ds-row sa-row foc-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-activity"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Smoothing</span></span><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="foc-i-smooth" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><div class="focus-seg" id="focus-smooth" role="group" aria-label="Smoothing"><button type="button" data-smooth="1" title="Every frame as measured">Off</button><button type="button" data-smooth="3" title="">3</button><button type="button" data-smooth="5" class="active" title="">5</button><button type="button" data-smooth="9" title="">9</button><button type="button" data-smooth="15" title="Steadiest, but lags ~1.5 s at 10 fps">15</button></div></div>
+                            <p class="sa-note" id="foc-i-smooth" hidden>Robust running average (min and max dropped) of the last N frames.</p>
+                            <div class="ds-row sa-row foc-row"><label class="sa-lab" for="focus-roi-size"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Zoom region</span></span></label><select class="sa-input sa-select" id="focus-roi-size"><option value="128">128 px (max)</option><option value="192">192 px</option><option value="256" selected>256 px</option><option value="384">384 px</option><option value="512">512 px</option><option value="768">768 px</option></select></div>
                             </div>
-                        </div>
-                        <div class="focus-field">
-                            <span class="focus-field-label" title="Focus region (ROI) mode: Auto picks the best star or detail, Manual keeps the spot you click">Focus position</span>
-                            <div class="focus-seg" id="focus-roi-mode">
-                                <button data-roi-mode="auto" class="active" title="Automatically find the brightest star (night) or the most detailed area (day)">Auto</button>
-                                <button data-roi-mode="manual" title="Manual: keep the focus box where you click on the image">Manual</button>
+                            <div class="sa-actions foc-btns">
+                                <button type="button" class="ds-btn" id="focus-pick-star" title="Find and lock onto the best unsaturated bright star" aria-label="Find and lock onto the best unsaturated bright star"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-star"></use></svg><span class="foc-lab">Star</span></button>
+                                <button type="button" class="ds-btn" id="focus-pick-light" title="Find and lock onto the clearest light spot" aria-label="Find and lock onto the clearest light spot"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-zap"></use></svg><span class="foc-lab">Light</span></button>
+                                <button type="button" class="ds-btn" id="focus-auto-point" title="Automatically place the focus region on a star (night) or detail (day)" aria-label="Automatically place the focus region on a star (night) or detail (day)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><span class="foc-lab">Auto</span></button>
                             </div>
-                        </div>
-                        <div class="focus-field">
-                            <span class="focus-field-label" title="Robust running average (min and max dropped) of the last N frames">Smoothing</span>
-                            <div class="focus-seg" id="focus-smooth">
-                                <button data-smooth="1" title="Every frame as measured">Off</button>
-                                <button data-smooth="3">3</button>
-                                <button data-smooth="5" class="active">5</button>
-                                <button data-smooth="9">9</button>
-                                <button data-smooth="15" title="Steadiest, but lags ~1.5 s at 10 fps">15</button>
-                            </div>
-                        </div>
-                        <div class="focus-field">
-                            <span class="focus-field-label">Zoom region</span>
-                            <select id="focus-roi-size">
-                                <option value="128">128 px (max zoom)</option>
-                                <option value="192">192 px</option>
-                                <option value="256" selected>256 px</option>
-                                <option value="384">384 px</option>
-                                <option value="512">512 px</option>
-                                <option value="768">768 px</option>
-                            </select>
-                        </div>
-                        <div class="btn-group focus-btns">
-                            <button class="btn btn-sm btn-outline" id="focus-pick-star" title="Find and lock onto the best unsaturated bright star">Find star</button>
-                            <button class="btn btn-sm btn-outline" id="focus-pick-light" title="Find and lock onto the clearest light spot">Find light</button>
-                            <button class="btn btn-sm btn-outline" id="focus-auto-point" title="Automatically place the focus region on a star (night) or detail (day)">Auto point</button>
-                        </div>
                         </details>
                     </div>
-                    <div class="card" id="focus-lens-card">
-                        <div class="card-header">
-                            <h2>Focus mode <span class="focus-badge" id="focus-lens-type-badge">MANUAL</span></h2>
-                            <div class="focus-seg focus-afmf" id="focus-lens-mode">
-                                <button data-lens-mode="auto" id="focus-lens-mode-af" title="Autofocus: the app finds focus by itself (sweep on stars, lights or detail) and keeps it (temperature, periodic checks). Click again to refocus now.">Autofocus</button>
-                                <button data-lens-mode="manual" id="focus-lens-mode-mf" title="MF: manual focus with the slider or dial; points are plotted on the curve">Manual</button>
+                    <div class="ds-card focus-lens" id="focus-lens-card">
+                        <div class="foc-head">
+                            <h2 class="ds-card__title"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg><span>Lens</span><span class="focus-badge" id="focus-lens-type-badge">MANUAL</span></h2>
+                            <div class="focus-seg focus-afmf" id="focus-lens-mode" role="group" aria-label="Focus mode">
+                                <button type="button" data-lens-mode="auto" id="focus-lens-mode-af" title="Autofocus: the app finds focus by itself and keeps it (temperature, periodic checks).">AF</button>
+                                <button type="button" data-lens-mode="manual" id="focus-lens-mode-mf" title="Manual focus with the slider or dial; points are plotted on the curve">MF</button>
                             </div>
                         </div>
-                        <div class="focus-lens-pos"><b id="focus-lens-pos">—</b> <span class="text-muted" id="focus-lens-dist"></span></div>
-                        <div class="focus-lens-step">Lens step <b id="focus-lens-step">—</b> <span class="text-muted">/ <span id="focus-lens-step-max">1023</span></span></div>
-                        <div class="btn-group focus-btns focus-lens-run">
-                            <button class="btn btn-outline" id="focus-run-af" title="Start focus mode (if it is off) and sweep the lens to find focus">Run autofocus sweep</button>
-                            <button class="btn btn-outline" id="focus-lens-cancel" hidden>Abort</button>
+                        <div class="focus-lens-pos"><b id="focus-lens-pos">—</b> <span class="foc-muted" id="focus-lens-dist"></span></div>
+                        <div class="focus-lens-step">Step <b id="focus-lens-step">—</b> <span class="foc-muted">/ <span id="focus-lens-step-max">1023</span></span></div>
+                        <div class="sa-actions foc-btns focus-lens-run">
+                            <button type="button" class="ds-btn" id="focus-run-af" title="Start focus mode (if it is off) and sweep the lens to find focus" aria-label="Start focus mode (if it is off) and sweep the lens to find focus"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-play"></use></svg><span class="foc-lab">Sweep</span></button>
+                            <button type="button" class="ds-btn" id="focus-lens-cancel" title="Abort the sweep" aria-label="Abort the sweep" hidden><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg><span class="foc-lab">Abort</span></button>
                         </div>
-                        <div class="focus-hint text-muted focus-af-hint" id="focus-run-af-hint">Starts focus mode by itself, then sweeps the lens to find the sharpest position.</div>
+                        <div class="sa-note focus-af-hint" id="focus-run-af-hint">Starts focus mode by itself, then sweeps the lens to find the sharpest position.</div>
                         <div class="focus-meter" id="focus-lens-progress-wrap" hidden><div class="focus-meter-fill good" id="focus-lens-progress"></div></div>
-                        <div class="focus-hint focus-lens-status"><span id="focus-lens-msg">&nbsp;</span></div>
+                        <div class="focus-lens-status"><span id="focus-lens-msg">&nbsp;</span></div>
                         <input type="range" id="focus-lens-slider" min="0" max="3" step="0.005" value="0" aria-label="Lens position (dioptres)">
-                        <div class="btn-group focus-btns focus-lens-nudge">
-                            <button class="btn btn-outline" data-lens-step="-10">−10</button>
-                            <button class="btn btn-outline" data-lens-step="-1">−1</button>
-                            <button class="btn btn-outline" data-lens-step="1">+1</button>
-                            <button class="btn btn-outline" data-lens-step="10">+10</button>
+                        <div class="foc-nudge focus-lens-nudge">
+                            <button type="button" class="ds-btn" data-lens-step="-10">−10</button>
+                            <button type="button" class="ds-btn" data-lens-step="-1">−1</button>
+                            <button type="button" class="ds-btn" data-lens-step="1">+1</button>
+                            <button type="button" class="ds-btn" data-lens-step="10">+10</button>
                         </div>
-                        <details class="focus-adv">
-                            <summary>Autofocus options</summary>
-                        <div class="focus-field focus-af-row" id="focus-af-row" hidden>
-                            <span class="focus-field-label">Refocus every</span>
-                            <select id="focus-refocus-every" title="AF runs a full sweep this often (when there is something to focus on)">
-                                <option value="0">Off</option>
-                                <option value="1">1 h</option>
-                                <option value="2">2 h</option>
-                                <option value="3">3 h</option>
-                                <option value="6">6 h</option>
-                                <option value="12">12 h</option>
-                            </select>
-                            <button class="btn btn-sm btn-outline" id="focus-refocus-now" title="Find focus now (enters focus mode for the sweep)">Refocus now</button>
-                        </div>
-                        <div class="focus-hint text-muted" id="focus-lens-saved">&nbsp;</div>
-                        <div class="focus-hint text-muted" id="focus-lens-comp"></div>
-                        <div class="focus-hint text-muted" id="focus-lens-track-msg"></div>
-                        <button class="btn btn-sm btn-outline" id="focus-lens-reset-learning" title="Forget the focus-vs-temperature samples, e.g. after moving or refitting the camera">Reset temperature learning</button>
+                        <details class="sa-details focus-adv">
+                            <summary><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-settings"></use></svg><span>Autofocus options</span></summary>
+                            <div class="ds-row sa-row foc-row focus-af-row" id="focus-af-row" hidden>
+                                <label class="sa-lab" for="focus-refocus-every"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Refocus every</span></span></label>
+                                <select class="sa-input sa-select" id="focus-refocus-every" title="AF runs a full sweep this often (when there is something to focus on)"><option value="0">Off</option><option value="1">1 h</option><option value="2">2 h</option><option value="3">3 h</option><option value="6">6 h</option><option value="12">12 h</option></select>
+                                <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="focus-refocus-now" title="Find focus now (enters focus mode for the sweep)" aria-label="Refocus now"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-refresh-cw"></use></svg></button>
+                            </div>
+                            <div class="sa-status" id="focus-lens-saved">&nbsp;</div>
+                            <div class="sa-status" id="focus-lens-comp"></div>
+                            <div class="sa-status" id="focus-lens-track-msg"></div>
+                            <div class="sa-actions"><button type="button" class="ds-btn" id="focus-lens-reset-learning" title="Forget the focus-vs-temperature samples, e.g. after moving or refitting the camera" aria-label="Reset temperature learning"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-thermometer"></use></svg><span>Reset learning</span></button></div>
                         </details>
                     </div>
-                    <details class="card focus-details">
-                        <summary>Exposure while focusing <span class="text-muted" id="focus-exp-summary"></span></summary>
-                        <p class="text-muted focus-hint">Auto-exposure pauses in focus mode so the score stays comparable. If the light changed, meter once. Short exposures refresh faster and blur less.</p>
-                        <div class="btn-group focus-btns">
-                            <button class="btn btn-sm btn-outline" id="focus-auto-exp" title="Meter the zoom region (brightest parts to ~80 %), then hold that exposure">Auto expose</button>
-                            <button class="btn btn-sm btn-outline focus-exp-preset" data-exp="1.0" data-gain="36">Stars 1 s · 36 dB</button>
-                            <button class="btn btn-sm btn-outline focus-exp-preset" data-exp="0.1" data-gain="24">Lights 0.1 s · 24 dB</button>
-                            <button class="btn btn-sm btn-outline focus-exp-preset" data-exp="0.005" data-gain="0">Day 5 ms</button>
+                    <details class="ds-card ds-card--flush sa-details focus-exp">
+                        <summary><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sun"></use></svg><span>Exposure</span><span class="foc-muted" id="focus-exp-summary"></span></summary>
+                        <p class="sa-note">Auto-exposure pauses in focus mode so the score stays comparable. If the light changed, meter once. Short exposures refresh faster and blur less.</p>
+                        <div class="sa-actions foc-btns">
+                            <button type="button" class="ds-btn" id="focus-auto-exp" title="Meter the zoom region (brightest parts to ~80 %), then hold that exposure" aria-label="Auto expose"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><span>Auto</span></button>
+                            <button type="button" class="ds-btn focus-exp-preset" data-exp="1.0" data-gain="36" title="Stars: 1 s, 36 dB" aria-label="Stars 1 s 36 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-star"></use></svg><span>1 s</span></button>
+                            <button type="button" class="ds-btn focus-exp-preset" data-exp="0.1" data-gain="24" title="Lights: 0.1 s, 24 dB" aria-label="Lights 0.1 s 24 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-zap"></use></svg><span>0.1 s</span></button>
+                            <button type="button" class="ds-btn focus-exp-preset" data-exp="0.005" data-gain="0" title="Day: 5 ms" aria-label="Day 5 ms"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sun"></use></svg><span>5 ms</span></button>
                         </div>
-                        <div class="focus-exp-row">
-                            <label>Exposure (s) <input type="number" id="focus-exp" min="0.00015" max="30" step="any"></label>
-                            <label>Gain (dB) <input type="number" id="focus-gain" min="0" max="72" step="0.5"></label>
-                            <button class="btn btn-sm btn-outline" id="focus-exp-apply">Apply</button>
-                        </div>
+                        <div class="ds-row sa-row foc-row"><label class="sa-lab" for="focus-exp"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Exposure (s)</span></span></label><input class="sa-input sa-num" type="number" id="focus-exp" min="0.00015" max="30" step="any"></div>
+                        <div class="ds-row sa-row foc-row"><label class="sa-lab" for="focus-gain"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-zap"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Gain (dB)</span></span></label><input class="sa-input sa-num" type="number" id="focus-gain" min="0" max="72" step="0.5"></div>
+                        <div class="sa-actions"><button type="button" class="ds-btn ds-btn--primary" id="focus-exp-apply" title="Apply exposure and gain" aria-label="Apply"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg><span>Apply</span></button></div>
                     </details>
-                    <div class="card focus-howto" id="focus-howto">
-                        <h2>How to focus</h2>
-                        <ul class="focus-hint">
-                            <li>Aim at a bright star near the centre (or a distant light by day), then press Start focus mode.</li>
-                            <li>Move the lens until the star size drops or the sharpness score rises; the Best marker shows the sharpest position.</li>
-                            <li>Press Finish &amp; save to keep the lens position and leave focus mode.</li>
+                    <div class="ds-card focus-howto" id="focus-howto">
+                        <div class="foc-head"><h2 class="ds-card__title"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-circle-help"></use></svg><span>How to focus</span></h2><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="foc-i-how" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+                        <ul class="sa-note" id="foc-i-how" hidden>
+                            <li>Aim at a bright star near the centre (or a distant light by day), then press Start.</li>
+                            <li>Move the lens until the star size drops or the score rises; the star marks the sharpest position.</li>
+                            <li>Press Finish to keep the lens position and leave focus mode.</li>
                         </ul>
                     </div>
-                    <details class="card focus-details" id="focus-history-details">
-                        <summary>Saved focus history <span class="text-muted" id="focus-history-count"></span></summary>
+                    <details class="ds-card ds-card--flush sa-details" id="focus-history-details">
+                        <summary><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-archive"></use></svg><span>History</span><span class="foc-muted" id="focus-history-count"></span></summary>
                         <div class="focus-history" id="focus-history"></div>
                     </details>
                 </div>
@@ -1492,8 +1299,8 @@
 
     <script src="/static/sky_catalog.js"></script>
     <script src="/static/activity.js?v=20261129a"></script>
-    <script src="/static/focus/core.js?v=20261115a"></script>
-    <script src="/static/focus/state.js?v=20261125b"></script>
+    <script src="/static/focus/core.js?v=20261201a"></script>
+    <script src="/static/focus/state.js?v=20261201a"></script>
     <script src="/static/focus/curve.js?v=20261115a"></script>
     <script src="/static/focus/charts.js?v=20261115a"></script>
     <script src="/static/focus/controls.js?v=20261125a"></script>
@@ -1501,7 +1308,7 @@
     <script src="/static/overlay_decode.js?v=1"></script>
     <script defer src="/static/zoom_pan.js?v=20261126a"></script>
     <script defer src="/static/app/01-core.js?v=20261124c"></script>
-    <script defer src="/static/app/02-controls-calibration.js?v=20261128a"></script>
+    <script defer src="/static/app/02-controls-calibration.js?v=20261201a"></script>
     <script defer src="/static/app/03-station-settings.js?v=20261130a"></script>
     <script defer src="/static/app/04-live-view.js?v=20261130a"></script>
     <script defer src="/static/app/05-sky-overlay.js?v=20261115a"></script>
@@ -1511,12 +1318,12 @@
     <script defer src="/static/app/07-cloud.js?v=20261126a"></script>
     <script defer src="/static/app/08-gallery-adsb.js?v=20261128c"></script>
     <script defer src="/static/app/08b-events-live.js?v=20261128c"></script>
-    <script defer src="/static/app/08c-adsb-settings.js?v=20261117a"></script>
+    <script defer src="/static/app/08c-adsb-settings.js?v=20261201a"></script>
     <script defer src="/static/app/08d-live-ui.js?v=20261127a"></script>
     <script defer src="/static/app/09-community.js?v=20261129a"></script>
-    <script defer src="/static/app/10-admin.js?v=20261130a"></script>
+    <script defer src="/static/app/10-admin.js?v=20261201a"></script>
     <script defer src="/static/settings_home.js?v=20261130a"></script>
-    <script defer src="/static/settings_layout.js?v=20261130a"></script>
+    <script defer src="/static/settings_layout.js?v=20261201a"></script>
     <script>
     // Settings sub-navigation: one section at a time, driven by the URL hash (/settings#detection)
     (function () {

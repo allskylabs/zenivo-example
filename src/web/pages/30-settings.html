@@ -221,231 +221,131 @@
 </div></details>
 </div>
             <!-- Sky Mask Card -->
-            <div class="card settings-card" data-sgroup="skymask">
-                <div class="card-header">
-                    <h2>Sky Mask</h2>
-                </div>
-                <details class="params-summary" id="sky-mask-editor" open>
-                    <summary>Plate-solve sky mask (outline the open sky)</summary>
+            <div class="card settings-card sa" id="sa-skymask" data-sgroup="skymask">
+                <div class="card-header"><h2>Sky mask</h2></div>
+                <details class="sa-details ds-card ds-card--flush sa-group" id="sky-mask-editor" open>
+                    <summary><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layers"></use></svg><span>Outline open sky</span><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-mask" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></summary>
+                    <p class="sa-note" id="sa-i-mask" hidden>Press Auto-detect to propose the mask from the current frame (best at night), or tap the frame to outline open sky (green) and lit buildings, trees or poles to ignore (red). Nothing is stored until you press Apply, so you can fix the proposal first. The plate solver only uses stars inside the sky and outside obstructions, on top of its own automatic sky detection.</p>
                     <div class="mask-canvas-wrap">
                         <img id="mask-img" alt="Live frame for drawing the sky mask">
                         <canvas id="mask-canvas"></canvas>
                     </div>
-                    <div class="settings-actions tool-chips">
-                        <button id="mask-auto" class="btn btn-sm btn-outline" type="button" title="Detect the open sky from the current frame, then edit it">✨ Auto-detect</button>
-                        <button id="mask-new-sky" class="btn btn-sm btn-outline" type="button">＋ Sky polygon</button>
-                        <button id="mask-new-obs" class="btn btn-sm btn-outline" type="button">＋ Obstruction</button>
-                        <button id="mask-undo" class="btn btn-sm btn-outline" type="button">↶ Undo point</button>
-                        <button id="mask-clear" class="btn btn-sm btn-outline" type="button">🗑 Clear all</button>
+                    <div class="sa-actions sa-tools">
+                        <button id="mask-auto" class="ds-btn" type="button" title="Auto-detect the open sky" aria-label="Auto-detect"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><span>Auto</span></button>
+                        <button id="mask-new-sky" class="ds-btn sa-tool-sky" type="button" title="New sky polygon" aria-label="New sky polygon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plus"></use></svg><span>Sky</span></button>
+                        <button id="mask-new-obs" class="ds-btn sa-tool-obs" type="button" title="New obstruction polygon" aria-label="New obstruction polygon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plus"></use></svg><span>Block</span></button>
+                        <button id="mask-undo" class="ds-btn ds-btn--ghost ds-btn--icon" type="button" title="Undo point" aria-label="Undo point"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></button>
+                        <button id="mask-clear" class="ds-btn ds-btn--ghost ds-btn--icon" type="button" title="Clear all" aria-label="Clear all"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-trash-2"></use></svg></button>
                     </div>
-                    <div class="settings-actions apply-row">
-                        <button id="mask-save" class="btn btn-primary btn-block" type="button">✔ Apply mask</button>
-                    </div>
-                    <p class="field-note">Press Auto-detect to propose the mask from the current frame (best at night),
-                        or click on the frame to outline open sky (green) and lit buildings, trees or
-                        poles to ignore (red). Nothing is stored until you press Apply, so you can fix the proposal first. The plate solver only uses stars inside the sky and outside obstructions,
-                        on top of its own automatic sky detection.</p>
-                    <div id="mask-alert" class="alert-box hidden mt-3"></div>
+                    <div class="sa-actions"><button id="mask-save" class="ds-btn ds-btn--primary sa-solve" type="button" aria-label="Apply mask"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg><span>Apply</span></button></div>
+                    <div id="mask-alert" class="alert-box hidden"></div>
                 </details>
-                <details class="params-summary" id="star-align" open>
-                    <summary>Align by stars (when the automatic solve is wrong)</summary>
+                <details class="sa-details ds-card ds-card--flush sa-group" id="star-align" open>
+                    <summary><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-star"></use></svg><span>Align by stars</span><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-align" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></summary>
+                    <p class="sa-note" id="sa-i-align" hidden>For when the automatic solve is wrong. Tap 4 or more stars you can really see on the open sky (inside the green outline), spread over the frame, brightest first. The solver identifies them from their mutual angles, shows the result, and only stores it when you press Apply.</p>
                     <div class="mask-canvas-wrap">
                         <img id="align-img" alt="Live frame for picking stars">
                         <canvas id="align-canvas"></canvas>
                     </div>
-                    <div class="settings-actions tool-chips">
-                        <button id="align-refresh" class="btn btn-sm btn-outline" type="button">⟳ New frame</button>
-                        <button id="align-undo" class="btn btn-sm btn-outline" type="button">↶ Undo star</button>
-                        <button id="align-clear" class="btn btn-sm btn-outline" type="button">🗑 Clear</button>
-                        <button id="align-identify" class="btn btn-sm btn-outline" type="button">🔍 Identify</button>
+                    <div class="sa-actions sa-tools">
+                        <button id="align-refresh" class="ds-btn" type="button" title="New frame" aria-label="New frame"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-refresh-cw"></use></svg><span>Frame</span></button>
+                        <button id="align-identify" class="ds-btn" type="button" title="Identify the stars" aria-label="Identify"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-search"></use></svg><span>Identify</span></button>
+                        <button id="align-undo" class="ds-btn ds-btn--ghost ds-btn--icon" type="button" title="Undo star" aria-label="Undo star"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></button>
+                        <button id="align-clear" class="ds-btn ds-btn--ghost ds-btn--icon" type="button" title="Clear" aria-label="Clear"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-trash-2"></use></svg></button>
                     </div>
-                    <div class="settings-actions apply-row">
-                        <button id="align-apply" class="btn btn-primary btn-block" type="button" disabled>✔ Apply</button>
-                    </div>
-                    <p class="field-note">Click 4 or more stars you can really see on the open sky (inside the green
-                        outline), spread over the frame, brightest first. The solver identifies them from their mutual
-                        angles, shows the result, and only stores it when you press Apply.</p>
-                    <div id="align-alert" class="alert-box hidden mt-3"></div>
+                    <div class="sa-actions"><button id="align-apply" class="ds-btn ds-btn--primary sa-solve" type="button" disabled aria-label="Apply"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg><span>Apply</span></button></div>
+                    <div id="align-alert" class="alert-box hidden"></div>
                 </details>
             </div>
 
-            <!-- Integrations Card -->
-            <div class="card settings-card" id="data-sources-card" data-sgroup="integrations" data-admin>
+            <!-- Integrations: data sources overview (status rows open their settings) + weather + satellites -->
+            <div class="card settings-card sa" id="data-sources-card" data-sgroup="integrations" data-admin>
                 <div class="card-header">
                     <h2>Data sources</h2>
-                    <button type="button" class="btn btn-sm btn-outline" id="data-sources-refresh" data-no-autosave title="Check every source again">&#8635; Refresh</button>
+                    <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="data-sources-refresh" data-no-autosave title="Check every source again" aria-label="Refresh"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-refresh-cw"></use></svg></button>
                 </div>
-                <p class="description">Everything this station fetches from outside, and whether it works now. Each source can be switched off below; nothing is sent to a source that is off.</p>
-                <div id="data-sources-list" class="data-sources" aria-live="polite"><span class="field-note">Loading…</span></div>
+                <section class="ds-card ds-card--flush sa-group" aria-label="Sources">
+                    <div id="data-sources-list" class="ds-list sa-sources" aria-live="polite"><span class="sa-status">Loading…</span></div>
+                </section>
             </div>
 
-            <div class="card settings-card" id="integrations-card" data-sgroup="integrations">
-                <div class="card-header">
-                    <h2>Integrations</h2>
-                </div>
-                <div class="settings-grid">
-                    <fieldset class="settings-group">
-                        <legend>1. Your receiver (primary)</legend>
-                        <div class="field-grid adsb-grid">
-                            <div class="field">
-                                <label for="adsb-host">ADS-B receiver (SBS-1 feed)</label>
-                                <input type="text" id="adsb-host" placeholder="e.g. 192.168.1.50" maxlength="253" />
-                            </div>
-                            <div class="field">
-                                <label for="adsb-port">Port</label>
-                                <input type="number" id="adsb-port" min="1" max="65535" value="30003" />
-                            </div>
-                            <div class="field">
-                                <label class="checkbox-label"><input type="checkbox" id="adsb-enabled" /> Name the flight</label>
-                            </div>
-                        </div>
-                        <p class="field-note">
-                            With a local ADS-B receiver (dump1090, readsb or a Flightradar24 feeder: BaseStation port 30003), each aircraft event is matched
-                            to the flight whose position, projected with the star-solved camera pointing, lies on the streak. A “meteor” that matches a flight becomes an aircraft.
-                            The feed is only read at night while aircraft detection is on.
-                            <span id="adsb-status"></span>
-                        </p>
-                        <div class="field" data-admin>
-                            <label class="checkbox-label"><input type="checkbox" id="adsb-contribute" /> Share what my receiver hears with the Zenivo network</label>
-                        </div>
-                        <p class="field-note" data-admin>
-                            Off by default. When on, this station sends the aircraft positions your receiver decoded (public broadcast data) to
-                            <span id="adsb-network-host">the Zenivo network server (the origin of your remote solver URL; nothing is sent while that is empty)</span>,
-                            signed with this station's key, every 5 s while your receiver delivers. The server sees this station's IP address and can estimate
-                            where your receiver is from what it hears. Data from adsb.fi, adsb.lol or Flightradar24 is never forwarded.
-                            <span id="adsb-contribute-status" aria-live="polite"></span>
-                        </p>
-                    </fieldset>
-                    <fieldset class="settings-group" data-admin>
-                        <legend>2. Public network (fallback)</legend>
-                        <div class="field">
-                            <label class="checkbox-label"><input type="checkbox" id="adsb-public-fallback" /> Use a public ADS-B network when my receiver is not delivering</label>
-                        </div>
-                        <p class="field-note">
-                            Off by default. Used only while your receiver is missing, not connected, or silent for more than 90 s; polling stops as soon as it is back.
-                            When on, this station sends its position rounded to 0.5 degree (about 55 km), in this order: to the Zenivo network (only if a remote solver URL is set), then to
-                            <a href="https://adsb.fi" target="_blank" rel="noopener">adsb.fi</a>, and to
-                            <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a>; the next one is used when one fails or returns no aircraft for 2 minutes. The data is for personal, non-commercial use.
-                        </p>
-                        <p class="field-note" id="adsb-source-status" aria-live="polite"></p>
-                    </fieldset>
-                    <fieldset class="settings-group fr24-block" data-admin>
-                        <legend>3. Flightradar24 (optional, your own account)</legend>
-                        <div class="field">
-                            <label class="checkbox-label"><input type="checkbox" id="fr24-enabled" /> Use Flightradar24</label>
-                        </div>
-                        <div class="field-grid">
-                            <div class="field">
-                                <label for="fr24-email">Account e-mail (optional)</label>
-                                <input type="email" id="fr24-email" name="fr24-account" maxlength="254" autocomplete="off" data-no-autosave spellcheck="false" />
-                            </div>
-                            <div class="field">
-                                <label for="fr24-password">Account password (optional)</label>
-                                <input type="password" id="fr24-password" maxlength="254" autocomplete="new-password" data-no-autosave placeholder="Not shown once sent" />
-                            </div>
-                            <div class="field field-wide">
-                                <label for="fr24-token">Subscription token (optional)</label>
-                                <div class="fr24-token-row">
-                                    <input type="password" id="fr24-token" maxlength="1024" autocomplete="new-password" data-no-autosave spellcheck="false" />
-                                    <span class="text-muted" id="fr24-token-state"></span>
-                                    <button type="button" class="btn btn-sm btn-outline" id="btn-fr24-signin">Send to Flightradar24</button>
-                                    <button type="button" class="btn btn-sm btn-outline" id="btn-fr24-clear-token" hidden>Clear token</button>
-                                </div>
-                            </div>
-                        </div>
-                        <p class="field-note" id="fr24-status" aria-live="polite"></p>
-                        <p class="field-note">
-                            Off by default. When on, this station asks flightradar24.com for the aircraft positions around it; without credentials the public feed is used.
-                            Credentials are stored on this station only (token and e-mail in data/station_config.json, the password in memory only, never shown again).
-                        </p>
-                        <p class="field-note">
-                            This uses Flightradar24's web endpoints, which are not an official public API. You are responsible for using it within Flightradar24's terms; a subscription token is the supported way for account holders.
-                        </p>
-                    </fieldset>
-                    <fieldset class="settings-group sondes-block" data-admin>
-                        <legend>Weather balloons (SondeHub)</legend>
-                        <div class="field">
-                            <label class="checkbox-label"><input type="checkbox" id="sondes-enabled" checked /> Show radiosondes on the Live page</label>
-                        </div>
-                        <p class="field-note">
-                            When on, the station asks api.v2.sondehub.org for the weather balloons within 350 km, about every 20 s while a Live page is open.
-                            The position sent is rounded to 0.5° (about 55 km); the exact location never leaves this station.
-                        </p>
-                    </fieldset>
-                    <fieldset class="settings-group hs-fieldset" id="wx-block" data-admin data-hs-title="Weather &amp; forecast" data-hs-switch="wx-enabled">
-                        <legend>Weather and forecast</legend>
-                        <div class="field">
-                            <label class="checkbox-label"><input type="checkbox" id="wx-enabled" /> Show the weather and 48 h forecast around the station</label>
-                        </div>
-                        <div class="field">
-                            <label for="wx-refresh">Refresh</label>
-                            <select id="wx-refresh">
-                                <option value="15">every 15 min</option><option value="30">every 30 min</option>
-                                <option value="60">every hour</option><option value="180">every 3 hours</option>
-                            </select>
-                        </div>
-                        <div id="wx-now" class="wx-now" aria-live="polite"></div>
-                        <div class="field">
-                            <button type="button" class="btn btn-sm btn-outline btn-block" id="wx-refresh-now" data-no-autosave>&#8635; Update now</button>
-                        </div>
-                        <div id="wx-hours" class="wx-hours" aria-label="Next hours"></div>
-                        <p class="field-note">
-                            Off by default. When on, the station asks api.open-meteo.com (free, no account) for the weather at its position, rounded to 0.1° (about 11 km);
-                            no name, address or picture is sent. Same data at <code>GET /api/weather</code>.
-                        </p>
-                    </fieldset>
-                    <fieldset class="settings-group sat-block" id="sat-block" data-admin>
-                        <legend>Satellites (orbits)</legend>
-                        <div class="field">
-                            <label class="checkbox-label"><input type="checkbox" id="sat-enabled" checked /> Show satellites on the Live and Sky pages</label>
-                        </div>
-                        <div class="field">
-                            <label for="sat-source">Orbit source</label>
-                            <select id="sat-source">
-                                <option value="celestrak">CelesTrak (choose groups)</option>
-                                <option value="satnogs">SatNOGS DB (community catalogue, about 1700 satellites)</option>
-                            </select>
-                            <p class="field-note">SatNOGS (db.satnogs.org) is an open, volunteer-run satellite database. It serves one file with every satellite, about 250 KB per download, so the groups below do not apply. Only the request itself is sent, never your position.</p>
-                        </div>
-                        <div class="field" id="sat-groups-field">
-                            <label>Groups to track</label>
-                            <div class="sat-groups" id="sat-groups">
-                                <label class="checkbox-label"><input type="checkbox" data-sat-group="stations" /> Space stations (ISS, Tiangong)</label>
-                                <label class="checkbox-label"><input type="checkbox" data-sat-group="visual" /> Brightest, naked-eye</label>
-                                <label class="checkbox-label"><input type="checkbox" data-sat-group="weather" /> Weather</label>
-                                <label class="checkbox-label"><input type="checkbox" data-sat-group="noaa" /> NOAA</label>
-                                <label class="checkbox-label"><input type="checkbox" data-sat-group="gps-ops" /> GPS</label>
-                                <label class="checkbox-label"><input type="checkbox" data-sat-group="galileo" /> Galileo</label>
-                                <label class="checkbox-label"><input type="checkbox" data-sat-group="science" /> Science</label>
-                            </div>
-                        </div>
-                        <div class="field">
-                            <label for="sat-refresh">Download orbits every</label>
-                            <select id="sat-refresh">
-                                <option value="6">6 hours</option>
-                                <option value="12">12 hours</option>
-                                <option value="24">24 hours</option>
-                                <option value="72">3 days</option>
-                                <option value="168">7 days</option>
-                            </select>
-                        </div>
-                        <details class="params-summary">
-                            <summary>Advanced: another orbit source</summary>
-                            <div class="field">
-                                <label for="sat-url">TLE address (https, with {group})</label>
-                                <input type="text" id="sat-url" maxlength="300" spellcheck="false" placeholder="https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=tle" />
-                            </div>
-                            <p class="field-note">Leave empty for CelesTrak. The address must be public (https) and return three-line TLE sets for the group named by <code>{group}</code>.</p>
-                        </details>
-                        <div class="settings-actions">
-                            <button type="button" class="btn btn-sm btn-outline" id="sat-refresh-now" data-no-autosave>&#8595; Download now</button>
-                        </div>
-                        <p class="field-note" id="sat-status" aria-live="polite"></p>
-                        <p class="field-note">
-                            When on, the station asks celestrak.org for orbit data (no position is sent). Satellites are computed locally; a long list slows the live view on a small host, so keep only the groups you want to see.
-                        </p>
-                    </fieldset>
-                </div>
+            <div class="card settings-card sa" id="integrations-card" data-sgroup="integrations">
+                <div class="card-header"><h2>Integrations</h2></div>
+
+<fieldset class="sa-fs" aria-label="ADS-B receiver">
+<legend class="sr-only">ADS-B receiver</legend>
+<div class="ds-list">
+<label class="sa-fld ds-moved"><input type="checkbox" id="adsb-enabled"> Name the flight</label>
+<div class="ds-row sa-row"><label class="sa-lab" for="adsb-host"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Receiver (SBS-1)</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-adsb" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><input class="sa-input" id="adsb-host" type="text" placeholder="192.168.1.50" maxlength="253" autocomplete="off"></div>
+<p class="sa-note" id="sa-i-adsb" hidden>With a local ADS-B receiver (dump1090, readsb or a Flightradar24 feeder: BaseStation port 30003), each aircraft event is matched to the flight whose position, projected with the star-solved camera pointing, lies on the streak. A “meteor” that matches a flight becomes an aircraft. The feed is only read at night while aircraft detection is on.</p>
+<div class="ds-row sa-row"><label class="sa-lab" for="adsb-port"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plug"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Port</span></span></label><input class="sa-input sa-num" id="adsb-port" type="number" min="1" max="65535" value="30003"></div>
+<p class="sa-status" id="adsb-status"></p>
+<div class="sa-fld" data-admin><div class="ds-row sa-row"><label class="sa-lab" for="adsb-contribute"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-share-2"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Share with Zenivo network</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-contrib" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><label class="ds-switch"><input type="checkbox" id="adsb-contribute"><span class="ds-switch__track"></span></label></div></div>
+<div data-admin><p class="sa-note" id="sa-i-contrib" hidden>Off by default. When on, this station sends the aircraft positions your receiver decoded (public broadcast data) to <span id="adsb-network-host">the Zenivo network server (the origin of your remote solver URL; nothing is sent while that is empty)</span>, signed with this station’s key, every 5 s while your receiver delivers. The server sees this station’s IP address and can estimate where your receiver is from what it hears. Data from adsb.fi, adsb.lol or Flightradar24 is never forwarded.</p><p class="sa-status" id="adsb-contribute-status" aria-live="polite"></p></div>
+</div>
+</fieldset>
+<fieldset class="sa-fs" data-admin aria-label="Public ADS-B network">
+<legend class="sr-only">Public ADS-B network</legend>
+<div class="ds-list">
+<label class="sa-fld ds-moved"><input type="checkbox" id="adsb-public-fallback"> Use a public ADS-B network when my receiver is not delivering</label>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-shield"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Privacy</span></span><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-pub" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+<p class="sa-note" id="sa-i-pub" hidden>Off by default. Used only while your receiver is missing, not connected, or silent for more than 90 s; polling stops as soon as it is back. When on, this station sends its position rounded to 0.5 degree (about 55 km), in this order: to the Zenivo network (only if a remote solver URL is set), then to <a href="https://adsb.fi" target="_blank" rel="noopener">adsb.fi</a>, and to <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a>; the next one is used when one fails or returns no aircraft for 2 minutes. The data is for personal, non-commercial use.</p>
+<p class="sa-status" id="adsb-source-status" aria-live="polite"></p>
+</div>
+</fieldset>
+<fieldset class="sa-fs fr24-block" data-admin aria-label="Flightradar24">
+<legend class="sr-only">Flightradar24</legend>
+<div class="ds-list">
+<label class="sa-fld ds-moved"><input type="checkbox" id="fr24-enabled"> Use Flightradar24</label>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-user"></use></svg></span><label class="ds-row__body" for="fr24-email"><span class="ds-row__title">Account e-mail (optional)</span><input class="sa-input" id="fr24-email" type="email" name="fr24-account" maxlength="254" autocomplete="off" data-no-autosave spellcheck="false"></label></div>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-lock"></use></svg></span><label class="ds-row__body" for="fr24-password"><span class="ds-row__title">Account password (optional)</span><input class="sa-input" id="fr24-password" type="password" maxlength="254" autocomplete="new-password" data-no-autosave placeholder="Not shown once sent"></label></div>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-key-round"></use></svg></span><label class="ds-row__body" for="fr24-token"><span class="ds-row__title">Subscription token (optional)</span><input class="sa-input" id="fr24-token" type="password" maxlength="1024" autocomplete="new-password" data-no-autosave spellcheck="false"></label></div>
+<div class="sa-actions"><span class="ds-chip ds-chip--ok" id="fr24-token-state"></span><button type="button" class="ds-btn" id="btn-fr24-signin" title="Send to Flightradar24" aria-label="Send to Flightradar24"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg><span>Send</span></button><button type="button" class="ds-btn ds-btn--ghost" id="btn-fr24-clear-token" hidden title="Clear token" aria-label="Clear token"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-trash-2"></use></svg><span>Token</span></button></div>
+<p class="sa-status" id="fr24-status" aria-live="polite"></p>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-shield"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Privacy</span></span><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-fr24" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+<p class="sa-note" id="sa-i-fr24" hidden>Off by default. When on, this station asks flightradar24.com for the aircraft positions around it; without credentials the public feed is used. Credentials are stored on this station only (token and e-mail in data/station_config.json, the password in memory only, never shown again). This uses Flightradar24’s web endpoints, which are not an official public API. You are responsible for using it within Flightradar24’s terms; a subscription token is the supported way for account holders.</p>
+</div>
+</fieldset>
+<fieldset class="sa-fs sondes-block" data-admin aria-label="Weather balloons">
+<legend class="sr-only">Weather balloons (SondeHub)</legend>
+<div class="ds-list">
+<label class="sa-fld ds-moved"><input type="checkbox" id="sondes-enabled" checked> Show radiosondes on the Live page</label>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-shield"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Privacy</span></span><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-sonde" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+<p class="sa-note" id="sa-i-sonde" hidden>When on, the station asks api.v2.sondehub.org for the weather balloons within 350 km, about every 20 s while a Live page is open. The position sent is rounded to 0.5° (about 55 km); the exact location never leaves this station.</p>
+</div>
+</fieldset>
+<section class="ds-card ds-card--flush sa-group sat-block" id="sat-block" data-admin aria-label="Satellites">
+<div class="sa-head"><h3 class="ds-card__title">Satellites</h3><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-sat" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+<p class="sa-note" id="sa-i-sat" hidden>When on, the station asks celestrak.org for orbit data (no position is sent). Satellites are computed locally; a long list slows the live view on a small host, so keep only the groups you want to see.</p>
+<div class="ds-list">
+<label class="sa-fld ds-moved"><input type="checkbox" id="sat-enabled" checked> Show satellites on the Live and Sky pages</label>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-source"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Orbit source</span></span></label><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-src" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button><select class="sa-input sa-select" id="sat-source"><option value="celestrak">CelesTrak (groups)</option><option value="satnogs">SatNOGS DB (~1700)</option></select></div>
+<p class="sa-note" id="sa-i-src" hidden>SatNOGS (db.satnogs.org) is an open, volunteer-run satellite database. It serves one file with every satellite, about 250 KB per download, so the groups below do not apply. Only the request itself is sent, never a position.</p>
+<div id="sat-groups-field"><div class="sat-groups" id="sat-groups">
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-g-stations"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rocket"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Space stations</span></span></label><label class="ds-switch"><input type="checkbox" id="sat-g-stations" data-sat-group="stations"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-g-visual"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Brightest, naked-eye</span></span></label><label class="ds-switch"><input type="checkbox" id="sat-g-visual" data-sat-group="visual"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-g-weather"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Weather</span></span></label><label class="ds-switch"><input type="checkbox" id="sat-g-weather" data-sat-group="weather"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-g-noaa"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">NOAA</span></span></label><label class="ds-switch"><input type="checkbox" id="sat-g-noaa" data-sat-group="noaa"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-g-gps-ops"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-compass"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">GPS</span></span></label><label class="ds-switch"><input type="checkbox" id="sat-g-gps-ops" data-sat-group="gps-ops"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-g-galileo"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-compass"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Galileo</span></span></label><label class="ds-switch"><input type="checkbox" id="sat-g-galileo" data-sat-group="galileo"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-g-science"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Science</span></span></label><label class="ds-switch"><input type="checkbox" id="sat-g-science" data-sat-group="science"><span class="ds-switch__track"></span></label></div>
+</div></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="sat-refresh"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Download every</span></span></label><select class="sa-input sa-select" id="sat-refresh"><option value="6">6 hours</option><option value="12">12 hours</option><option value="24">24 hours</option><option value="72">3 days</option><option value="168">7 days</option></select></div>
+<div class="ds-row sa-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-download"></use></svg></span><label class="ds-row__body" for="sat-url"><span class="ds-row__title">Other TLE address (https, with {group})</span><input class="sa-input" id="sat-url" type="text" maxlength="300" spellcheck="false" placeholder="https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&amp;FORMAT=tle"></label></div>
+<div class="sa-actions"><button type="button" class="ds-btn" id="sat-refresh-now" data-no-autosave title="Download orbits now" aria-label="Download now"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-download"></use></svg><span>Download</span></button></div>
+<p class="sa-status" id="sat-status" aria-live="polite"></p>
+</div></section>
+<section class="ds-card ds-card--flush sa-group" id="wx-block" data-admin aria-label="Weather">
+<div class="sa-head"><h3 class="ds-card__title">Weather &amp; forecast</h3><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-wx" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></div>
+<p class="sa-note" id="sa-i-wx" hidden>Off by default. When on, the station asks api.open-meteo.com (free, no account) for the weather at its position, rounded to 0.1° (about 11 km); no name, address or picture is sent. Same data at <code>GET /api/weather</code>.</p>
+<div class="ds-list">
+<div class="ds-row sa-row"><label class="sa-lab" for="wx-enabled"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Show weather and 48 h forecast</span></span></label><label class="ds-switch"><input type="checkbox" id="wx-enabled"><span class="ds-switch__track"></span></label></div>
+<div class="ds-row sa-row"><label class="sa-lab" for="wx-refresh"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Refresh</span></span></label><select class="sa-input sa-select" id="wx-refresh"><option value="15">15 min</option><option value="30">30 min</option><option value="60">1 hour</option><option value="180">3 hours</option></select></div>
+</div>
+<div id="wx-now" class="wx-now" aria-live="polite"></div>
+<div id="wx-hours" class="wx-hours" aria-label="Next hours"></div>
+<div class="sa-actions"><button type="button" class="ds-btn" id="wx-refresh-now" data-no-autosave title="Update now" aria-label="Update now"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-refresh-cw"></use></svg><span>Update</span></button></div>
+</section>
             </div>
 
             <!-- Community Card: opt-in station sharing (docs/COMMUNITY.md) -->

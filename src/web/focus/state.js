@@ -168,7 +168,9 @@
         if (s.exposure_s !== undefined && document.activeElement !== $("focus-exp")) $("focus-exp").value = +s.exposure_s.toPrecision(4);
         if (s.gain_db !== undefined && document.activeElement !== $("focus-gain")) $("focus-gain").value = +s.gain_db.toFixed(1);
         // One filled button: Start focus mode while off, Finish & save while on (Stop without saving is a plain pill)
-        toggleBtn.textContent = st.active ? "Finish & save" : "Start focus mode";
+        const tl = toggleBtn.querySelector(".foc-lab"), tu = toggleBtn.querySelector("use");
+        if (tl) tl.textContent = st.active ? "Finish" : "Start"; else toggleBtn.textContent = st.active ? "Finish & save" : "Start focus mode";
+        if (tu) tu.setAttribute("href", "/static/icons.svg#i-" + (st.active ? "check" : "play"));
         toggleBtn.title = st.active ? "Save the lens position and this result to Settings, then leave focus mode" : "Start focus mode";
         $("focus-finish").hidden = !st.active;
         $("focus-toggle-hint").hidden = st.active;

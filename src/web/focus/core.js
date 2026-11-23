@@ -49,7 +49,7 @@
                 <td class="num">${r.sensor_temp_c ?? "—"}${r.sensor_temp_c != null ? " °C" : ""}</td>
                 <td class="num">${fmtExp(r.exposure_s)} · ${(r.gain_db ?? 0).toFixed(0)} dB</td>
                 <td class="num">${r.roi ? `${r.roi.size}px @ ${(r.roi.cx * 100).toFixed(0)},${(r.roi.cy * 100).toFixed(0)}%` : "—"}</td>
-                <td>${near ? '<span class="text-warning">near</span>' : onUse ? `<button class="btn btn-sm btn-outline" data-use="${idx - records.length}" title="Reuse this lens position, zoom region, measure and exposure">Use</button>` : ""}</td>
+                <td>${near ? '<span class="text-warning">near</span>' : onUse ? `<button class="ds-btn" data-use="${idx - records.length}" title="Reuse this lens position, zoom region, measure and exposure">Use</button>` : ""}</td>
             </tr>`;
         }).join("");
         el.innerHTML = `<table><thead><tr><th>When</th><th>How</th><th>Measure</th><th>Score</th><th>Lens</th><th>Temp</th><th>Exposure</th><th>Zoom</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -92,7 +92,7 @@
         const bar = document.createElement("div");
         bar.className = "focus-banner";
         bar.hidden = true;
-        bar.innerHTML = 'Focus mode is on: auto-exposure and archiving are paused. <a href="/focus">Open focus</a> <button class="btn btn-sm btn-outline">Stop focus mode</button>';
+        bar.innerHTML = 'Focus mode is on: auto-exposure and archiving are paused. <a href="/focus">Open focus</a> <button class="ds-btn">Stop focus mode</button>';
         const nav = document.querySelector(".ds-topbar");
         if (nav) nav.after(bar);
         bar.querySelector("button").addEventListener("click", async () => {

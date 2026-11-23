@@ -1,9 +1,10 @@
 // Settings: shared helpers for the Community/Admin groups: info icons toggle their note, saConfirm() replaces confirm() with a ds-sheet
 (function () {
-    if (currentPage !== "tab-settings") return;
+    if (!["tab-settings", "tab-focus", "tab-calibration"].includes(currentPage)) return;
     document.addEventListener("click", (ev) => {
         const b = ev.target.closest(".sa-info");
         if (!b) return;
+        ev.preventDefault();
         const note = document.getElementById(b.dataset.info);
         if (!note) return;
         const open = note.hidden;

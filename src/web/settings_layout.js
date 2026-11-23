@@ -74,7 +74,6 @@
     }
 
     function init() {
-        segmented("wx-refresh", (o) => { const t = o.textContent.replace(/^every\s+/, ""); return t === "hour" ? "1 hour" : t; });
         document.querySelectorAll("[data-hs-switch]").forEach(headerSwitch);
         const ranges = [...document.querySelectorAll('input[type="range"]')];
         ranges.forEach((r) => { paintRange(r); r.addEventListener("input", () => paintRange(r)); });

@@ -103,7 +103,7 @@ if (adsbPublic) {
     });
 }
 if (adsbContribute) {
-    autosave(adsbContribute.closest(".field"), async () => {
+    autosave(adsbContribute.closest(".sa-fld"), async () => {
         syncAdsbUI(await sendJson("/api/adsb", { contribute: adsbContribute.checked }));
         setTimeout(loadAdsb, 3000);
     });
@@ -243,6 +243,7 @@ if (satBlock) {
 
 const dataSourcesList = document.getElementById("data-sources-list");
 const STATE_LABEL = { ok: "Working", waiting: "Waiting", error: "Problem", off: "Off" };
+const DS_ICON = { ok: "circle-check", waiting: "clock", error: "triangle-alert", off: "circle-x" };
 // Per source: the switch that already exists (it is moved into the row, so ids, handlers and autosave stay) and the settings block shown when the row is opened.
 const DS_CONTROLS = {
     adsb: ["adsb-enabled", "adsb-host"], adsb_public: ["adsb-public-fallback", "adsb-public-fallback"], fr24: ["fr24-enabled", "fr24-enabled"],
@@ -254,7 +255,7 @@ Object.entries(DS_CONTROLS).forEach(([sid, [boxId, detailId]]) => {
     if (!box) return;
     const detail = detailId ? document.getElementById(detailId) : null;
     box.setAttribute("aria-label", (box.closest("label") || box.parentElement).textContent.trim());
-    dsParts[sid] = { box, field: box.closest(".field"), detail: detail ? detail.closest("fieldset") : null };
+    dsParts[sid] = { box, field: box.closest(".sa-fld"), detail: detail ? detail.closest("fieldset") : null };
 });
 
 async function loadDataSources() {
@@ -271,22 +272,28 @@ async function loadDataSources() {
             item.className = "ds-item" + (open.has(s.id) ? " open" : "");
             item.dataset.sid = s.id;
             const row = document.createElement("div");
-            row.className = "ds-row";
+            row.className = "ds-row sa-row";
             const dot = document.createElement("span");
-            dot.className = `ds-dot ds-${s.state}`;
+            dot.className = "ds-row__icon ds-state";
+            dot.dataset.state = s.state;
             dot.title = STATE_LABEL[s.state] || s.state;
+            dot.innerHTML = `<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-${DS_ICON[s.state] || "circle-help"}"></use></svg>`;
             const main = document.createElement("div");
-            main.className = "ds-main";
-            const name = document.createElement("strong");
+            main.className = "ds-row__body";
+            const name = document.createElement("span");
+            name.className = "ds-row__title";
             name.textContent = s.name;
-            const detail = document.createElement("small");
+            const detail = document.createElement("span");
+            detail.className = "ds-row__sub";
             detail.textContent = [s.detail, s.host].filter(Boolean).join(" · ") || STATE_LABEL[s.state] || "";
             main.append(name, detail);
             row.append(dot, main);
             if (part && part.box) {
-                const sw = document.createElement("span");
-                sw.className = "ds-sw";
-                sw.append(part.box);
+                const sw = document.createElement("label");
+                sw.className = "ds-switch ds-sw";
+                const track = document.createElement("span");
+                track.className = "ds-switch__track";
+                sw.append(part.box, track);
                 if (part.field) part.field.classList.add("ds-moved");
                 row.append(sw);
             }
@@ -297,8 +304,9 @@ async function loadDataSources() {
                 row.setAttribute("role", "button");
                 row.setAttribute("aria-expanded", item.classList.contains("open") ? "true" : "false");
                 const chev = document.createElement("span");
-                chev.className = "ds-chev";
+                chev.className = "ds-row__chev ds-chev";
                 chev.setAttribute("aria-hidden", "true");
+                chev.innerHTML = '<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg>';
                 row.append(chev);
                 const body = document.createElement("div");
                 body.className = "ds-detail";
@@ -317,7 +325,7 @@ async function loadDataSources() {
     } catch (err) {
         dataSourcesList.textContent = `Could not load the data sources: ${err.message}`;
         // the switches and settings blocks stay reachable without the status list
-        Object.values(dsParts).forEach((p) => { if (p.field && p.box) p.field.append(p.box); if (p.detail) dataSourcesList.append(p.detail); });
+        Object.values(dsParts).forEach((p) => { if (p.field && p.box) { p.field.classList.remove("ds-moved"); p.field.append(p.box); } if (p.detail) dataSourcesList.append(p.detail); });
     }
 }
 const dsRefresh = document.getElementById("data-sources-refresh");
