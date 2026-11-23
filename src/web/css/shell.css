@@ -19,13 +19,16 @@
 .pulse-indicator.off { background-color: var(--text-muted); box-shadow: none; animation: none; }
 .zt-meta, .ds-topbar__clock { display: none; }
 .zt-cluster { margin-left: auto; display: flex; align-items: center; gap: var(--s-2); flex: 0 0 auto; }
-.zt-status { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-md); }
+.zt-status { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2); padding: 0 var(--s-2); border-radius: var(--r-md); }
+.zt-status-t { font-size: var(--fs-12); color: var(--c-text-2); white-space: nowrap; }
+.zt-cam { display: none; font-size: var(--fs-12); color: var(--c-text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (min-width: 900px) { .zt-cam { display: inline; } }
 .zt-clocks { min-height: 44px; display: inline-flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-2); font-family: var(--font-mono); color: var(--c-text); border-radius: var(--r-md); }
 .zt-clocks .ds-icon { color: var(--c-text-2); flex: 0 0 auto; }
 .zt-clocks .zt-local { font-size: var(--fs-16); font-weight: 600; }
 .zt-clocks .zt-utc { font-size: var(--fs-12); color: var(--c-text-2); padding-left: var(--s-2); border-left: 1px solid var(--c-divider); }
 .zt-clocks .zt-utc b { font-weight: 500; }
-.zt-clocks .zt-utc::after { content: " Z"; }
+.zt-clocks .zt-utc::before { content: "UTC "; }
 @media (max-width: 640px) { .zt-clocks .zt-utc { display: none; } }
 .zt-cluster #btn-night-vision { min-width: 44px; min-height: 44px; }
 .zt-cluster #btn-night-vision[aria-pressed="true"] { color: var(--c-danger, var(--danger)); }

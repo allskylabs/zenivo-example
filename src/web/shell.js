@@ -63,6 +63,15 @@
         const stEl = $("zt-status");
         const tip = [stT, txt("sensor-subtitle"), txt("nav-camera-mode"), txt("nav-fps").replace(/^\s*·\s*/, "")].filter(Boolean).join(" · ");
         if (stEl && stEl.title !== tip) { stEl.title = tip; stEl.setAttribute("aria-label", tip); }
+        const stT2 = $("zt-status-t");
+        if (stT2 && stT2.textContent !== stT) stT2.textContent = stT;
+        const camEl = $("zt-cam");
+        if (camEl) {
+            const sen = txt("sensor-subtitle").split("·")[0].trim() || "IMX335";
+            const ex = ((($("telem-exp") || {}).textContent) || "").replace(/\s+/g, " ").trim();
+            const ct = ex && !/^--/.test(ex) ? sen + " · " + ex : sen;
+            if (camEl.textContent !== ct) camEl.textContent = ct;
+        }
         const clEl = $("zt-clocks");
         const lab = txt("nav-local-label");
         const ctip = "UTC " + txt("nav-utc-clock") + (lab ? " · " + lab : "");

@@ -52,7 +52,7 @@
         <span class="zt-meta" id="nav-fps"></span>
         <span class="ds-sr-only" id="nav-system-status" role="status">Online</span>
         <div class="zt-cluster">
-            <span class="zt-status" id="zt-status" tabindex="0" role="img" aria-label="Online" title="Online"><i class="pulse-indicator" id="status-pulse"></i></span>
+            <span class="zt-status" id="zt-status" tabindex="0" role="img" aria-label="Online" title="Online"><i class="pulse-indicator" id="status-pulse"></i><span class="zt-status-t" id="zt-status-t">Online</span></span><span class="zt-cam" id="zt-cam"></span>
             <span class="zt-clocks" id="zt-clocks" tabindex="0" title="UTC --:--:--"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204g#i-clock"></use></svg><b class="zt-local" id="nav-local-clock">--:--</b><span class="zt-utc"><b id="nav-utc-clock">--:--:--</b></span><span class="ds-sr-only" id="nav-local-label">Local</span></span>
             <span class="ds-topbar__clock" id="m-head-clock" hidden></span>
             <button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" id="btn-night-vision" aria-pressed="false" aria-label="Red night vision" title="Red night vision"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204g#i-moon-star"></use></svg></button>
@@ -165,12 +165,12 @@
 
                     <!-- Status strip: icon + value, nothing else -->
                     <div class="now-strip" id="now-strip" role="group" aria-label="Right now">
-                        <div class="now-tile" title="Cloud cover" aria-label="Cloud cover"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg><b id="now-cloud">--</b></div>
-                        <div class="now-tile" title="Sky" aria-label="Sky"><svg class="ds-icon" id="now-sky-ic" aria-hidden="true"><use href="/static/icons.svg#i-moon"></use></svg><b id="now-sky">--</b></div>
-                        <div class="now-tile" title="Exposure" aria-label="Exposure"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg><b id="now-exp">--</b></div>
-                        <div class="now-tile" title="Temperature" aria-label="Temperature"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-thermometer"></use></svg><span class="now-l" id="now-temp-l" hidden>Temp</span><b id="now-temp">--</b></div>
-                        <div class="now-tile" title="Detected tonight" aria-label="Detected tonight"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><b id="now-events">--</b></div>
-                        <div class="now-tile now-online" id="now-online" title="Online" aria-label="Online"><svg class="ds-icon" id="now-online-ic" aria-hidden="true"><use href="/static/icons.svg#i-wifi"></use></svg><b id="now-online-t">Online</b></div>
+                        <div class="now-tile" title="Cloud cover" aria-label="Cloud cover"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg><span class="now-t"><span class="now-l">Cloud</span><b id="now-cloud">--</b></span></div>
+                        <div class="now-tile" title="Sky" aria-label="Sky"><svg class="ds-icon" id="now-sky-ic" aria-hidden="true"><use href="/static/icons.svg#i-moon"></use></svg><span class="now-t"><span class="now-l">Sky</span><b id="now-sky">--</b></span></div>
+                        <div class="now-tile" title="Exposure" aria-label="Exposure"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg><span class="now-t"><span class="now-l">Exposure</span><b id="now-exp">--</b></span></div>
+                        <div class="now-tile" title="Temperature" aria-label="Temperature"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-thermometer"></use></svg><span class="now-t"><span class="now-l">Temp</span><b id="now-temp">--</b></span></div>
+                        <div class="now-tile" title="Detected tonight" aria-label="Detected tonight"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><span class="now-t"><span class="now-l">Events</span><b id="now-events">--</b></span></div>
+                        <div class="now-tile now-online" id="now-online" title="Online" aria-label="Online"><svg class="ds-icon" id="now-online-ic" aria-hidden="true"><use href="/static/icons.svg#i-wifi"></use></svg><span class="now-t"><span class="now-l">Link</span><b id="now-online-t">Online</b></span></div>
                     </div>
 
                     <!-- Exposure: one row when closed; admin changes it, guests see it read-only -->
@@ -1306,32 +1306,32 @@
     </div>
 
     <script src="/static/sky_catalog.js"></script>
-    <script src="/static/activity.js?v=20261203k"></script>
-    <script src="/static/focus/core.js?v=20261203k"></script>
-    <script src="/static/focus/state.js?v=20261203k"></script>
-    <script src="/static/focus/curve.js?v=20261203k"></script>
-    <script src="/static/focus/charts.js?v=20261203k"></script>
-    <script src="/static/focus/controls.js?v=20261203k"></script>
-    <script src="/static/focus/lens.js?v=20261203k"></script>
+    <script src="/static/activity.js?v=20261203m"></script>
+    <script src="/static/focus/core.js?v=20261203m"></script>
+    <script src="/static/focus/state.js?v=20261203m"></script>
+    <script src="/static/focus/curve.js?v=20261203m"></script>
+    <script src="/static/focus/charts.js?v=20261203m"></script>
+    <script src="/static/focus/controls.js?v=20261203m"></script>
+    <script src="/static/focus/lens.js?v=20261203m"></script>
     <script src="/static/overlay_decode.js?v=1"></script>
-    <script defer src="/static/zoom_pan.js?v=20261203k"></script>
-    <script defer src="/static/app/01-core.js?v=20261203k"></script>
-    <script defer src="/static/app/02-controls-calibration.js?v=20261203k"></script>
-    <script defer src="/static/app/03-station-settings.js?v=20261203k"></script>
-    <script defer src="/static/app/04-live-view.js?v=20261203k"></script>
-    <script defer src="/static/app/05-sky-overlay.js?v=20261203k"></script>
-    <script defer src="/static/app/05b-sky-reticle.js?v=20261203k"></script>
-    <script defer src="/static/app/05c-aircraft-overlay.js?v=20261203k"></script>
-    <script defer src="/static/app/06-telemetry.js?v=20261203k"></script>
-    <script defer src="/static/app/07-cloud.js?v=20261203k"></script>
-    <script defer src="/static/app/08-gallery-adsb.js?v=20261203k"></script>
-    <script defer src="/static/app/08b-events-live.js?v=20261203k"></script>
-    <script defer src="/static/app/08c-adsb-settings.js?v=20261203k"></script>
-    <script defer src="/static/app/08d-live-ui.js?v=20261203k"></script>
-    <script defer src="/static/app/09-community.js?v=20261203k"></script>
-    <script defer src="/static/app/10-admin.js?v=20261203k"></script>
-    <script defer src="/static/settings_home.js?v=20261203k"></script>
-    <script defer src="/static/settings_layout.js?v=20261203k"></script>
+    <script defer src="/static/zoom_pan.js?v=20261203m"></script>
+    <script defer src="/static/app/01-core.js?v=20261203m"></script>
+    <script defer src="/static/app/02-controls-calibration.js?v=20261203m"></script>
+    <script defer src="/static/app/03-station-settings.js?v=20261203m"></script>
+    <script defer src="/static/app/04-live-view.js?v=20261203m"></script>
+    <script defer src="/static/app/05-sky-overlay.js?v=20261203m"></script>
+    <script defer src="/static/app/05b-sky-reticle.js?v=20261203m"></script>
+    <script defer src="/static/app/05c-aircraft-overlay.js?v=20261203m"></script>
+    <script defer src="/static/app/06-telemetry.js?v=20261203m"></script>
+    <script defer src="/static/app/07-cloud.js?v=20261203m"></script>
+    <script defer src="/static/app/08-gallery-adsb.js?v=20261203m"></script>
+    <script defer src="/static/app/08b-events-live.js?v=20261203m"></script>
+    <script defer src="/static/app/08c-adsb-settings.js?v=20261203m"></script>
+    <script defer src="/static/app/08d-live-ui.js?v=20261203m"></script>
+    <script defer src="/static/app/09-community.js?v=20261203m"></script>
+    <script defer src="/static/app/10-admin.js?v=20261203m"></script>
+    <script defer src="/static/settings_home.js?v=20261203m"></script>
+    <script defer src="/static/settings_layout.js?v=20261203m"></script>
     <script>
     // Settings sub-navigation: one section at a time, driven by the URL hash (/settings#detection)
     (function () {
