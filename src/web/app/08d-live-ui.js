@@ -15,7 +15,8 @@
     // ------------------------------------------------------------------
     // Layers sheet: switches drive the same hidden checkboxes the old chips used (their change handlers persist and subscribe)
     // ------------------------------------------------------------------
-    const CHK_IDS = ["chk-sky-overlay", "chk-sky-labels", "chk-grid-overlay", "chk-eq-grid", "chk-aircraft-overlay", "chk-satellite-overlay", "chk-sonde-overlay", "chk-airports-overlay", "chk-overlay-text"];
+    const CHK_IDS = ["chk-sky-overlay", "chk-sky-labels", "chk-grid-overlay", "chk-eq-grid", "chk-aircraft-overlay", "chk-satellite-overlay", "chk-sonde-overlay", "chk-overlay-text"];
+    if (typeof prefs !== "undefined" && prefs.airportsOverlay && typeof savePrefs === "function") { savePrefs({ airportsOverlay: false }); const ca = $("chk-airports-overlay"); if (ca) ca.checked = false; }
     const lay = $("layers-sheet"), layBtn = $("btn-layers");
     const layOpen = () => !!lay && lay.dataset.open === "true";
     function overheadCounts() {
@@ -142,9 +143,21 @@
             const known = la && lo && la.value !== "" && lo.value !== "" && (parseFloat(la.value) !== 0 || parseFloat(lo.value) !== 0);
             if (known) sa = parseFloat((($("telem-sun-alt") || {}).textContent || "").replace("\u2212", "-").replace("+", ""));
         }
-        set("now-sky", Number.isFinite(sa) ? (sa > -0.83 ? "Day" : sa > -18 ? "Twilight" : "Night") : "--");
-        if (wxTemp != null) { set("now-temp-l", "Temp"); set("now-temp", `${Math.round(wxTemp)}°C`); }
-        else { set("now-temp-l", "Exposure"); set("now-temp", (($("telem-exp") || {}).textContent || "--").replace(/\s+/g, "") || "--"); }
+        const tone = (id, c) => { const t = $(id) && $(id).closest(".now-tile"); if (t) { t.classList.toggle("is-ok", c === "ok"); t.classList.toggle("is-warn", c === "warn"); t.classList.toggle("is-bad", c === "bad"); } };
+        const icon = (id, name) => { const u = $(id) && $(id).querySelector("use"); const h = `/static/icons.svg#i-${name}`; if (u && u.getAttribute("href") !== h) u.setAttribute("href", h); };
+        const sky = Number.isFinite(sa) ? (sa > -0.83 ? "Day" : sa > -18 ? "Twilight" : "Night") : "--";
+        set("now-sky", sky);
+        icon("now-sky-ic", sky === "Day" ? "sun" : "moon");
+        const nsk = $("now-sky"); if (nsk) nsk.title = sky;
+        tone("now-sky", sky === "Night" ? "ok" : sky === "--" ? "" : "warn");
+        const cp = cm ? parseFloat(cm[1]) : NaN;
+        tone("now-cloud", Number.isFinite(cp) ? (cp < 30 ? "ok" : cp < 70 ? "warn" : "bad") : "");
+        set("now-exp", (($("telem-exp") || {}).textContent || "--").replace(/\s+/g, "") || "--");
+        set("now-temp", wxTemp != null ? `${Math.round(wxTemp)}°C` : "--");
+        const on = navigator.onLine !== false;
+        icon("now-online-ic", on ? "wifi" : "wifi-off");
+        set("now-online-t", on ? "Online" : "Offline");
+        tone("now-online", on ? "ok" : "bad");
         const em = /^\s*(\d+)/.exec(($("live-events-count") || {}).textContent || "");
         set("now-events", em ? em[1] : "--");
     }
@@ -204,36 +217,14 @@
     });
 
     // ------------------------------------------------------------------
-    // Cloud cover range: a compact "24h v" control on a phone (the buttons keep their ids/handlers in 07-cloud.js)
-    // ------------------------------------------------------------------
-    const ranges = document.querySelector(".cloud-ranges");
-    if (ranges) {
-        const tgl = document.createElement("button");
-        tgl.type = "button"; tgl.className = "cr-toggle"; tgl.id = "cloud-range-toggle";
-        tgl.setAttribute("aria-haspopup", "true"); tgl.setAttribute("aria-expanded", "false");
-        ranges.insertBefore(tgl, ranges.firstChild);
-        const label = () => {
-            const act = ranges.querySelector(".btn-range.active");
-            tgl.textContent = `${act ? act.textContent.trim() : "24h"} ▾`;
-        };
-        const setOpen = (o) => { ranges.classList.toggle("open", o); tgl.setAttribute("aria-expanded", o ? "true" : "false"); };
-        tgl.addEventListener("click", (e) => { e.stopPropagation(); setOpen(!ranges.classList.contains("open")); });
-        ranges.querySelectorAll(".btn-range").forEach((b) => b.addEventListener("click", () => { setOpen(false); setTimeout(label, 0); }));
-        document.addEventListener("click", (e) => { if (!ranges.contains(e.target)) setOpen(false); });
-        document.addEventListener("keydown", (e) => { if (e.key === "Escape") setOpen(false); });
-        if (window.MutationObserver) new MutationObserver(label).observe(ranges, { attributes: true, attributeFilter: ["class"], subtree: true });
-        label();
-    }
-
-    // ------------------------------------------------------------------
     // Tap for info: pick the nearest drawn/known object under the finger and show it in the card under the picture
     // ------------------------------------------------------------------
     const ring = $("sel-ring"), card = $("obj-card");
     const PICK_PX = 24;
     const KIND = {   // chip text, tone (a CSS variable name), priority (lower wins), where "more" goes
-        aircraft: ["Aircraft", "accent", 0], satellite: ["Satellite", "violet", 1], sonde: ["Radiosonde", "success", 2],
-        planet: ["Planet", "warning", 3], star: ["Star", "accent", 3], dso: ["Deep sky", "warning", 3],
-        sun: ["Sun", "warning", 3], moon: ["Moon", "text-secondary", 3], con: ["Constellation", "accent", 4],
+        aircraft: ["Aircraft", "c-accent", 0], satellite: ["Satellite", "c-violet", 1], sonde: ["Radiosonde", "c-ok", 2],
+        planet: ["Planet", "c-warn", 3], star: ["Star", "c-accent", 3], dso: ["Deep sky", "c-warn", 3],
+        sun: ["Sun", "c-warn", 3], moon: ["Moon", "c-text-2", 3], con: ["Constellation", "c-accent", 4],
     };
     let sel = null;   // { kind, key, last }
 
@@ -320,21 +311,8 @@
     // ---- Aircraft type/route and rise/set times: fetched once per selected object, kept in small caches ----
     const acCache = new Map();      // icao -> { d, t, tries, busy }
     const rsCache = new Map();      // key -> { d, t, busy }
-    let apIata = null, apLoading = false;   // ICAO -> IATA airport codes (OurAirports list, loaded only when a route needs it)
-    function codeName(code) {
-        if (code.length !== 4) return code;
-        if (!apIata && !apLoading) {
-            apLoading = true;
-            fetch("/api/map/airports").then((r) => r.json()).then((d) => {
-                apIata = {};
-                ((d && d.airports) || []).forEach((a) => { if (a.iata) apIata[a.ident] = a.iata; });
-            }).catch(() => { apIata = {}; });
-        }
-        return (apIata && apIata[code]) || code;
-    }
-    const routeTxt = (r) => (r ? String(r).split("-").filter(Boolean).map(codeName).join(" \u2192 ") : "");
     function acDetail(d) {
-        if (d.type && d.route) return d;
+        if (d.type) return d;
         const key = String(d.icao).toLowerCase();
         let e = acCache.get(key);
         if (!e) {
@@ -342,7 +320,7 @@
             acCache.set(key, e);
             if (acCache.size > 80) acCache.delete(acCache.keys().next().value);
         }
-        const done = e.d && e.d.type && e.d.route;
+        const done = e.d && e.d.type;
         if (!done && !e.busy && e.tries < 3 && Date.now() - e.t > 4000 && /^[0-9a-f]{6}$/.test(key)) {
             e.busy = true; e.tries++; e.t = Date.now();
             fetch(`/api/adsb/info/${key}${d.callsign ? `?callsign=${encodeURIComponent(d.callsign)}` : ""}`)
@@ -351,7 +329,7 @@
                 .catch(() => {})
                 .finally(() => { e.busy = false; e.t = Date.now(); });
         }
-        return Object.assign({}, e.d || {}, d.type ? { type: d.type } : {}, d.route ? { route: d.route } : {});
+        return Object.assign({}, e.d || {}, d.type ? { type: d.type } : {});
     }
     const clock = (sec) => fmtLocalIso(new Date(sec * 1000).toISOString(), true).slice(0, 5);
     // Rise/set rows for a sun/moon/planet/star/DSO; [] until the answer is in
@@ -384,7 +362,7 @@
         switch (c.kind) {
             case "aircraft": {
                 const x = acDetail(d);
-                const sub = [[x.type, routeTxt(x.route)].filter(Boolean).join(" \u00b7 "), x.airline || "", d.callsign ? `ICAO ${String(d.icao).toUpperCase()}` : "", d.heading_deg != null ? `heading ${Math.round(d.heading_deg)}°` : "",
+                const sub = [[x.type].filter(Boolean).join(" \u00b7 "), x.airline || "", d.callsign ? `ICAO ${String(d.icao).toUpperCase()}` : "", d.heading_deg != null ? `heading ${Math.round(d.heading_deg)}°` : "",
                     d.climb_m_min != null && Math.abs(d.climb_m_min) > 60 ? `${d.climb_m_min > 0 ? "climbing" : "descending"} ${num(Math.abs(d.climb_m_min))} m/min` : ""].filter(Boolean).join(" · ");
                 return { title: d.callsign || String(d.icao).toUpperCase(), sub: sub || "ADS-B", link: ["3D map", "/flights3d"],
                     stats: [["Altitude", d.altitude_m != null ? `${num(d.altitude_m)} m` : "--"], ["Speed", d.speed_kmh != null ? `${num(d.speed_kmh)} km/h` : "--"],
@@ -416,16 +394,19 @@
         }
     }
 
+    const IC = { aircraft: "plane", satellite: "satellite", sonde: "balloon", planet: "star", star: "star", dso: "telescope", sun: "sun", moon: "moon", con: "sparkles" };
+    const FIC = { Altitude: "arrow-up-right", Height: "arrow-up-right", Speed: "activity", Distance: "map-pin", Azimuth: "compass", "Alt / Az": "compass", RA: "crosshair", Dec: "crosshair", Rises: "sun", Sets: "moon", Visibility: "eye", Visible: "eye" };
+    const svg = (n) => `<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-${n}"/></svg>`;
     function renderCard(c) {
         const k = KIND[c.kind] || [c.kind, "accent"];
         const info = describe(c);
-        const stats = info.stats.map(([l, v]) => `<div><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join("");
-        const link = info.link ? `<a class="oc-btn oc-primary" href="${esc(info.link[1])}"${info.link[2] ? ' target="_blank" rel="noopener"' : ""}>${esc(info.link[0])}</a>` : "";
-        const html = `<div class="oc-head"><span class="oc-chip" style="--tone:var(--${k[1]})">${esc(k[0])}</span>
-            <button type="button" class="oc-close" id="obj-close" aria-label="Close">&times;</button></div>
+        const stats = info.stats.map(([l, v]) => `<div title="${esc(l)}" aria-label="${esc(l)}: ${esc(v)}">${svg(FIC[l] || "info")}<b>${esc(v)}</b></div>`).join("");
+        const link = info.link ? `<a class="oc-btn" href="${esc(info.link[1])}"${info.link[2] ? ' target="_blank" rel="noopener"' : ""} title="${esc(info.link[0])}" aria-label="${esc(info.link[0])}">${svg("arrow-up-right")}</a>` : "";
+        const html = `<div class="oc-head"><span class="oc-chip" style="--tone:var(--${k[1]})" title="${esc(k[0])}">${svg(IC[c.kind] || "info")}</span>
+            <button type="button" class="oc-close" id="obj-close" aria-label="Close" title="Close">${svg("x")}</button></div>
             <h3 class="oc-title">${esc(info.title)}</h3><p class="oc-sub">${esc(info.sub)}</p>
             <div class="oc-stats">${stats}</div>
-            <div class="oc-actions">${link}<button type="button" class="oc-btn" id="obj-zoom">Zoom here</button></div>`;
+            <div class="oc-actions">${link}<button type="button" class="oc-btn" id="obj-zoom" aria-label="Zoom here" title="Zoom here">${svg("plus")}</button></div>`;
         if (card.dataset.html !== html) { card.innerHTML = html; card.dataset.html = html; }
         card.style.setProperty("--tone", `var(--${k[1]})`);
         card.hidden = false;

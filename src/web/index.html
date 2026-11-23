@@ -29,7 +29,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
-    <link rel="stylesheet" href="/style.css?v=20261122m">
+    <link rel="stylesheet" href="/style.css?v=20261127a">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -118,11 +118,10 @@
     <main class="container">
         <!-- TAB 1: Live Observatory -->
         <section id="tab-live" class="tab-content">
-            <div class="dashboard-grid">
-                <!-- Left Column: Live View, object info, Now strip, cloud cover + histogram -->
+            <div class="dashboard-grid live-grid">
                 <div class="main-viewport-col">
-                    <!-- Live View Card -->
-                    <div class="card viewport-card">
+                    <!-- Live picture: full width up to its aspect ratio; controls are icon buttons -->
+                    <div class="viewport-card live-view">
                         <div class="viewport-wrapper" id="viewport-container">
                             <div class="zoom-stage" id="zoom-stage">
                                 <img id="live-stream-img" alt="Live all-sky stream" draggable="false" />
@@ -131,28 +130,23 @@
                                 <canvas id="aircraft-canvas"></canvas>
                             </div>
                             <div class="vp-status">
-                                <span class="vp-pill vp-live"><i class="vp-dot"></i>LIVE</span>
+                                <span class="vp-pill vp-live" title="Live"><i class="vp-dot"></i>LIVE</span>
                                 <span class="vp-pill vp-warn hidden" id="vp-warn" role="status"></span>
                                 <span class="vp-pill vp-exp" id="vp-exp-gain" title="Current exposure and gain">-- ms · -- dB</span>
                             </div>
-                            <div class="vp-meta" title="Resolution, stream transport and hardware frame delta">
-                                <span id="hud-resolution">2592 × 1944</span> · <span id="hud-stream-mode">Binary WebSocket</span> · <span id="hud-hw-delta">--</span>
+                            <div class="vp-meta" hidden>
+                                <span id="hud-resolution">2592 × 1944</span><span id="hud-stream-mode">Binary WebSocket</span><span id="hud-hw-delta">--</span>
                             </div>
                             <div class="sel-ring" id="sel-ring" hidden aria-hidden="true"></div>
                             <div class="vp-bar">
-                                <div class="zoom-controls" aria-label="Zoom">
-                                    <button type="button" id="btn-zoom-out" class="zoom-btn" title="Zoom out (-)" aria-label="Zoom out">−</button>
-                                    <button type="button" id="btn-zoom-reset" class="zoom-btn zoom-level" title="Fit to view (0)">100%</button>
-                                    <button type="button" id="btn-zoom-in" class="zoom-btn" title="Zoom in (+)" aria-label="Zoom in">+</button>
+                                <div class="zoom-controls" role="group" aria-label="Zoom">
+                                    <button type="button" id="btn-zoom-out" class="zoom-btn" title="Zoom out" aria-label="Zoom out"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-minus"></use></svg></button>
+                                    <button type="button" id="btn-zoom-reset" class="zoom-btn zoom-level" title="Fit to view" aria-label="Fit to view">100%</button>
+                                    <button type="button" id="btn-zoom-in" class="zoom-btn" title="Zoom in" aria-label="Zoom in"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plus"></use></svg></button>
                                 </div>
-                                <span class="vp-hint" id="vp-hint">tap an object for info</span>
-                                <button type="button" id="btn-layers" class="vp-btn vp-layers" aria-haspopup="dialog" aria-controls="layers-sheet" title="Choose the layers drawn on the picture">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                                    <b id="layers-count">0 on</b>
-                                </button>
-                                <button type="button" id="btn-fullscreen" class="vp-btn vp-fs" title="Fullscreen view" aria-label="Fullscreen view">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-                                </button>
+                                <span class="vp-hint" id="vp-hint" hidden></span>
+                                <button type="button" id="btn-layers" class="vp-btn vp-layers" aria-haspopup="dialog" aria-controls="layers-sheet" title="Layers" aria-label="Layers"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layers"></use></svg><b id="layers-count">0</b></button>
+                                <button type="button" id="btn-fullscreen" class="vp-btn vp-fs" title="Fullscreen" aria-label="Fullscreen"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg></button>
                             </div>
                         </div>
                     </div>
@@ -160,17 +154,27 @@
                     <!-- Info card for the object tapped on the picture (filled by app/08d-live-ui.js) -->
                     <div class="obj-card" id="obj-card" role="dialog" aria-modal="false" aria-label="Selected object" aria-live="polite" hidden></div>
 
-                    <!-- Exposure: collapsed to one row (values live), admin changes it, guests see it read-only -->
-                    <details class="card control-card collapsible-card" id="exposure-card">
-                    <summary class="card-header"><h2>Exposure</h2><span class="exp-summary mono" id="exp-summary"><span id="telem-exp">--</span> &middot; <span id="telem-gain">--</span> &middot; <span id="telem-lock">Auto</span></span><span class="badge badge-accent" id="active-profile-badge">AUTO EPHEMERIS</span></summary>
+                    <!-- Status strip: icon + value, nothing else -->
+                    <div class="now-strip" id="now-strip" role="group" aria-label="Right now">
+                        <div class="now-tile" title="Cloud cover" aria-label="Cloud cover"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg><b id="now-cloud">--</b></div>
+                        <div class="now-tile" title="Sky" aria-label="Sky"><svg class="ds-icon" id="now-sky-ic" aria-hidden="true"><use href="/static/icons.svg#i-moon"></use></svg><b id="now-sky">--</b></div>
+                        <div class="now-tile" title="Exposure" aria-label="Exposure"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg><b id="now-exp">--</b></div>
+                        <div class="now-tile" title="Temperature" aria-label="Temperature"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-thermometer"></use></svg><span class="now-l" id="now-temp-l" hidden>Temp</span><b id="now-temp">--</b></div>
+                        <div class="now-tile" title="Detected tonight" aria-label="Detected tonight"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><b id="now-events">--</b></div>
+                        <div class="now-tile now-online" id="now-online" title="Online" aria-label="Online"><svg class="ds-icon" id="now-online-ic" aria-hidden="true"><use href="/static/icons.svg#i-wifi"></use></svg><b id="now-online-t" class="sr-only">online</b></div>
+                    </div>
 
-                    <p class="exp-signin" id="exp-signin" role="note"><a href="/login?next=%2Flive" id="exp-signin-link">Sign in as admin to change exposure</a></p>
+                    <!-- Exposure: one row when closed; admin changes it, guests see it read-only -->
+                    <details class="ds-card live-exp" id="exposure-card">
+                    <summary class="live-exp__sum"><span class="live-exp__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg></span><span class="exp-summary mono" id="exp-summary"><span id="telem-exp">--</span> &middot; <span id="telem-gain">--</span> &middot; <span id="telem-lock">Auto</span></span><span class="badge badge-accent" id="active-profile-badge" hidden>AUTO EPHEMERIS</span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></span></summary>
+
+                    <p class="exp-signin" id="exp-signin" role="note"><a href="/login?next=%2Flive" id="exp-signin-link" title="Sign in as admin to change exposure" aria-label="Sign in as admin to change exposure"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-log-in"></use></svg><span>Sign in</span></a></p>
 
                     <div class="exp-preset-chips" role="group" aria-label="Exposure presets">
-                    <button type="button" class="chip-preset" data-preset="moonless" data-exp="15" data-gain="36" title="15 s, 36 dB">Moonless</button>
-                    <button type="button" class="chip-preset" data-preset="twilight" data-exp="2" data-gain="18" title="2 s, 18 dB">Twilight</button>
-                    <button type="button" class="chip-preset" data-preset="fullmoon" data-exp="0.5" data-gain="0" title="0.5 s, 0 dB">Full moon</button>
-                    <button type="button" class="chip-preset active" data-preset="custom" title="Keep the sliders as they are">Custom</button>
+                    <button type="button" class="chip-preset" data-preset="moonless" data-exp="15" data-gain="36" title="Moonless: 15 s, 36 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon-star"></use></svg>Moonless</button>
+                    <button type="button" class="chip-preset" data-preset="twilight" data-exp="2" data-gain="18" title="Twilight: 2 s, 18 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sun"></use></svg>Twilight</button>
+                    <button type="button" class="chip-preset" data-preset="fullmoon" data-exp="0.5" data-gain="0" title="Full moon: 0.5 s, 0 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon"></use></svg>Full moon</button>
+                    <button type="button" class="chip-preset active" data-preset="custom" title="Keep the sliders as they are"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg>Custom</button>
                     </div>
 
                     <!-- Shutter Slider -->
@@ -223,26 +227,16 @@
                     <input type="range" id="range-target" min="5" max="250" step="1" value="85" />
                     </div>
 
-                    <p class="field-note">Touching a slider locks it at the chosen value; press Locked to hand it back to Auto. Nothing locked: the system computes both shutter and gain from the sky.
-                    Lock one and it computes only the other.
-                    Shutter goes up to 60 s. Both locked holds the values fixed.</p>
+                    <span class="live-info" tabindex="0" role="note" aria-label="Touching a slider locks it; press Locked to hand it back to Auto. Nothing locked: Auto computes shutter and gain. Lock one and Auto computes only the other. Both locked holds the values." title="Touching a slider locks it; press Locked to hand it back to Auto. Nothing locked: Auto computes shutter and gain. Lock one and Auto computes only the other. Both locked holds the values."><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></span>
                     <div id="control-alert" class="alert-box hidden"></div>
-                        </details>
+                    </details>
                     <script>try{if(localStorage.getItem("zenivo.expOpen")==="1")document.getElementById("exposure-card").open=true}catch(e){}</script>
 
-                    <!-- Now strip -->
-                    <div class="now-strip" id="now-strip" role="group" aria-label="Right now">
-                        <div class="now-tile"><span class="now-l">Cloud</span><b id="now-cloud">--</b></div>
-                        <div class="now-tile"><span class="now-l">Sky</span><b id="now-sky">--</b></div>
-                        <div class="now-tile"><span class="now-l" id="now-temp-l">Temp</span><b id="now-temp">--</b></div>
-                        <div class="now-tile" title="Detected tonight"><span class="now-l">Events</span><b id="now-events">--</b></div>
-                    </div>
-
-                <!-- Cloud cover + histogram, side by side under the viewport on a wide screen -->
                 <div class="live-pair">
-                <div class="card cloud-card">
-                    <div class="card-header">
-                        <h2>Cloud cover</h2>
+                <div class="ds-card cloud-card">
+                    <div class="live-head">
+                        <span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg></span>
+                        <span class="cloud-big" id="cloud-big"><b id="cloud-big-n">--</b><span id="cloud-big-t">mean</span></span>
                         <div class="cloud-ranges" role="group" aria-label="Time range">
                             <button class="btn-range" data-hours="6">6h</button>
                             <button class="btn-range active" data-hours="24">24h</button>
@@ -251,22 +245,21 @@
                             <button class="btn-range" data-hours="720">30d</button>
                         </div>
                     </div>
-                    <div class="cloud-big" id="cloud-big"><b id="cloud-big-n">--</b><span id="cloud-big-t">mean</span></div>
-                    <div class="cloud-summary" id="cloud-summary">
+                    <div class="cloud-summary" id="cloud-summary" hidden>
                         <span>Mean <strong id="cloud-mean">--</strong></span>
                         <span>Clear time <strong id="cloud-clear">--</strong></span>
                         <span>Range <strong id="cloud-range">--</strong></span>
                         <span>Samples <strong id="cloud-samples">--</strong></span>
-                        <span class="cloud-legend"><i class="lg-night"></i>Night <i class="lg-low"></i>Low confidence <i class="lg-ev ev-meteor"></i>Meteor <i class="lg-ev ev-plane"></i>Aircraft <i class="lg-ev ev-satellite"></i>Satellite <i class="lg-ev ev-flash"></i>Flash</span>
                     </div>
-                    <div class="cloud-chart-wrap" id="cloud-chart-wrap">
+                    <div class="cloud-chart-wrap" id="cloud-chart-wrap" hidden>
                         <svg id="cloud-chart" role="img" aria-label="Cloud cover percentage over time"></svg>
                         <div class="cloud-tooltip hidden" id="cloud-tooltip"></div>
                     </div>
-                    <div class="cloud-empty hidden" id="cloud-empty">No cloud samples in this range yet. One is taken every analysis interval (Settings → Performance).</div>
+                    <div class="ds-empty cloud-empty hidden" id="cloud-empty"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg><span class="ds-empty__title">No samples</span></div>
                     <div class="cloud-bars" id="cloud-bars" role="img" aria-label="Cloud cover per time bin"></div>
                     <div class="cloud-bars-cap" id="cloud-bars-cap"><span id="cloud-cap-l"></span><span id="cloud-cap-r">now</span></div>
-                    <div class="card-foot cloud-caption" id="cloud-caption">Now <strong id="cloud-now">--</strong> / Avg <span id="cloud-avg-label">24h</span> <strong id="cloud-avg">--</strong></div>
+                    <div class="cloud-caption" id="cloud-caption" hidden>Now <strong id="cloud-now">--</strong> / Avg <span id="cloud-avg-label">24h</span> <strong id="cloud-avg">--</strong></div>
+
                     <div class="frame-viewer hidden" id="frame-viewer" role="dialog" aria-modal="true" aria-label="Archived frame">
                         <div class="fv-box">
                             <div class="fv-head">
@@ -292,10 +285,9 @@
                     </div>
                 </div>
 
-                <details class="card histogram-card acc" id="histogram-card">
-                    <summary class="card-header">
-                        <h2>Histogram</h2>
-                    </summary>
+                <details class="ds-card histogram-card acc" id="histogram-card">
+                    <summary class="live-sum"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-activity"></use></svg></span><span class="live-sum__t" title="Histogram" aria-label="Histogram">Histogram</span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></span></summary>
+
                     <div class="histogram-wrapper">
                         <canvas id="histogram-canvas" width="600" height="160"></canvas>
                     </div>
@@ -309,70 +301,63 @@
                 </div>
                 </div>
 
-                <!-- Right rail: Overhead now, events, weather, telemetry and exposure -->
+                <!-- Right panel (desktop) / below the picture (phone): Overhead now, events, weather, telemetry -->
                 <div class="controls-col">
-                    <!-- Overhead now: one card, one list at a time. The three lists keep their ids and render functions (app/08b-events-live.js);
+                    <!-- Overhead now: one card, icon tabs. The three lists keep their ids and render functions (app/08b-events-live.js);
                          the websocket subscription (OVERLAY_CARDS in app/05c-aircraft-overlay.js) still keys off these panels. -->
-                    <div class="card overhead-card" id="overhead-card" hidden>
-                        <div class="card-header"><h2>Overhead now</h2><span class="ov-live" id="ov-live">live</span></div>
+                    <div class="ds-card overhead-card" id="overhead-card" hidden>
+                        <div class="live-head"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg></span><h2 class="live-head__t">Overhead now</h2><span class="ov-live" id="ov-live">live</span></div>
                         <div class="ov-seg" role="tablist" aria-label="Overhead lists">
-                            <button type="button" role="tab" class="ov-tab" id="ov-tab-flights" data-ov="flights-card" aria-selected="false">Flights <span class="ov-n" id="ov-n-flights">0</span></button>
-                            <button type="button" role="tab" class="ov-tab" id="ov-tab-sats" data-ov="sats-card" aria-selected="false">Satellites <span class="ov-n" id="ov-n-sats">0</span></button>
-                            <button type="button" role="tab" class="ov-tab" id="ov-tab-sondes" data-ov="sondes-card" aria-selected="false">Sondes <span class="ov-n" id="ov-n-sondes">0</span></button>
+                            <button type="button" role="tab" class="ov-tab" id="ov-tab-flights" data-ov="flights-card" aria-selected="false" title="Flights" aria-label="Flights"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg><span class="ov-n" id="ov-n-flights">0</span></button>
+                            <button type="button" role="tab" class="ov-tab" id="ov-tab-sats" data-ov="sats-card" aria-selected="false" title="Satellites" aria-label="Satellites"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg><span class="ov-n" id="ov-n-sats">0</span></button>
+                            <button type="button" role="tab" class="ov-tab" id="ov-tab-sondes" data-ov="sondes-card" aria-selected="false" title="Sondes" aria-label="Sondes"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-balloon"></use></svg><span class="ov-n" id="ov-n-sondes">0</span></button>
                         </div>
-                        <!-- Aircraft heard by the ADS-B receiver -->
                         <div class="ov-panel flights-card" id="flights-card" role="tabpanel" hidden>
                             <div class="ov-meta"><span class="badge" id="flights-count">--</span><span class="flights-status" id="flights-status">Loading…</span></div>
                             <div class="zchips" id="flights-chips" role="group" aria-label="Filter aircraft">
                                 <button type="button" class="zchip active" data-fl="all" aria-pressed="true">All</button>
                                 <button type="button" class="zchip" data-fl="view" aria-pressed="false">In view</button>
-                                <button type="button" class="zchip" data-fl="up" aria-pressed="false">Climbing</button>
-                                <button type="button" class="zchip" data-fl="down" aria-pressed="false">Descending</button>
+                                <button type="button" class="zchip" data-fl="up" aria-pressed="false" title="Climbing" aria-label="Climbing">&uarr;</button>
+                                <button type="button" class="zchip" data-fl="down" aria-pressed="false" title="Descending" aria-label="Descending">&darr;</button>
                             </div>
                             <ul class="flights-list" id="flights-list"></ul>
-                            <a class="live-events-more" href="/overhead">All &rsaquo;</a>
+                            <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
                         </div>
-                        <!-- Satellites above the horizon (same data as the overlay) -->
                         <div class="ov-panel flights-card" id="sats-card" role="tabpanel" hidden>
                             <div class="ov-meta"><span class="badge" id="sats-count">--</span><span class="flights-status" id="sats-status">Loading…</span></div>
                             <ul class="flights-list" id="sats-list"></ul>
-                            <a class="live-events-more" href="/overhead">All &rsaquo;</a>
+                            <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
                         </div>
-                        <!-- Radiosondes (weather balloons) near the station, from SondeHub -->
                         <div class="ov-panel flights-card" id="sondes-card" role="tabpanel" hidden>
                             <div class="ov-meta"><span class="badge" id="sondes-count">--</span><span class="flights-status" id="sondes-status">Loading…</span></div>
                             <ul class="flights-list" id="sondes-list"></ul>
-                            <a class="live-events-more" href="/overhead">All &rsaquo;</a>
+                            <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
                         </div>
                     </div>
 
-                    <!-- Live feed of sky events (a thumbnail strip on a phone) -->
-                    <div class="card live-events-card">
-                        <div class="card-header">
-                            <h2>Recent events</h2>
-                            <span class="badge" id="live-events-count">0 tonight</span>
+                    <!-- Recent events (thumbnail strip on a phone) -->
+                    <div class="ds-card live-events-card">
+                        <div class="live-head">
+                            <span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg></span><h2 class="live-head__t">Events</h2>
+                            <span class="badge" id="live-events-count">0</span>
                             <span class="live-events-status" id="live-events-status" role="status">Loading…</span>
-                            <a class="live-events-more" href="/gallery">All &rsaquo;</a>
+                            <a class="live-more" href="/gallery" title="All events" aria-label="All events"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
                         </div>
                         <ul class="live-events-list" id="live-events-list"></ul>
-                                    </div>
+                    </div>
 
                     <!-- Weather, next 48 h (shown only when the weather source is on) -->
-                    <details class="card acc" id="weather-acc" hidden>
-                        <summary class="card-header"><h2>Weather &middot; next 48 h</h2><span class="acc-sub" id="lwx-sum"></span></summary>
+                    <details class="ds-card acc" id="weather-acc" hidden>
+                        <summary class="live-sum"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg></span><span class="live-sum__t" title="Weather, next 48 h" aria-label="Weather, next 48 h">48 h</span><span class="acc-sub" id="lwx-sum"></span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></span></summary>
                         <div class="wx-now" id="lwx-now"></div>
                         <div class="lwx-hours" id="lwx-hours" aria-label="Next 48 hours"></div>
                     </details>
 
-                    <!-- Telemetry and exposure: one accordion on a phone, plain cards on a wide screen -->
-                    <details class="acc acc-bare" id="telemetry-acc">
-                        <summary class="card-header"><h2>Telemetry &amp; exposure</h2></summary>
-                        <!-- Telemetry HUD Gauges -->
-                        <div class="card telemetry-card">
-                        <div class="card-header">
-                            <h2>Telemetry</h2>
-                            <span class="text-muted" id="telemetry-timestamp">--</span>
-                        </div>
+                    <!-- Telemetry -->
+                    <details class="ds-card acc" id="telemetry-acc">
+                        <summary class="live-sum"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cpu"></use></svg></span><span class="live-sum__t" title="Telemetry" aria-label="Telemetry">Telemetry</span><span class="text-muted" id="telemetry-timestamp">--</span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></span></summary>
+                        <div class="telemetry-card">
+
                         <div class="gauge-grid">
                             <div class="gauge-box gauge-key">
                                 <span class="gauge-label">Sensor temp</span>
@@ -408,9 +393,8 @@
                             </div>
                         </div>
 
-                        <!-- Hardware Register Readout (collapsed) -->
                         <details class="registers-box" id="registers-box">
-                            <summary class="reg-title">Sony IMX335 I2C registers</summary>
+                            <summary class="reg-title" title="Sony IMX335 I2C registers">I&sup2;C</summary>
                             <div class="registers-row">
                                 <span>VMAX: <strong id="reg-vmax">--</strong></span>
                                 <span>HMAX: <strong id="reg-hmax">--</strong></span>
@@ -418,14 +402,12 @@
                                 <span>PGC: <strong id="reg-pgc">--</strong></span>
                             </div>
                         </details>
-                    </div>
-
+                        </div>
                     </details>
                 </div>
             </div>
 
         </section>
-
         <!-- TAB 2: Gallery & Events -->
         <section id="tab-gallery" class="tab-content">
             <div class="gallery-container gal-mode-products" id="gallery-container">
@@ -1745,7 +1727,6 @@
                 <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Aircraft</span><span class="ds-row__sub" id="lay-sub-aircraft">--</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-aircraft-overlay" aria-label="Aircraft"><span class="ds-switch__track"></span></label></div>
                 <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Satellites</span><span class="ds-row__sub" id="lay-sub-satellites">--</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-satellite-overlay" aria-label="Satellites"><span class="ds-switch__track"></span></label></div>
                 <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-balloon"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Radiosondes</span><span class="ds-row__sub" id="lay-sub-sondes">--</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-sonde-overlay" aria-label="Radiosondes"><span class="ds-switch__track"></span></label></div>
-                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-map-pin"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Airports</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-airports-overlay" aria-label="Airports"><span class="ds-switch__track"></span></label></div>
             </div>
             <h3 class="zt-gtitle">Picture</h3>
             <div class="ds-list">
@@ -1780,7 +1761,7 @@
     <script defer src="/static/app/08-gallery-adsb.js?v=20261126a"></script>
     <script defer src="/static/app/08b-events-live.js?v=20261126a"></script>
     <script defer src="/static/app/08c-adsb-settings.js?v=20261117a"></script>
-    <script defer src="/static/app/08d-live-ui.js?v=20261124c"></script>
+    <script defer src="/static/app/08d-live-ui.js?v=20261127a"></script>
     <script defer src="/static/app/09-community.js?v=20261114b"></script>
     <script defer src="/static/app/10-admin.js?v=20261124b"></script>
     <script defer src="/static/settings_home.js?v=1"></script>
