@@ -229,13 +229,11 @@
     }
     // Station sheet: icon-led facts, the latest frame, then Open / Message
     const sheet = document.getElementById("cm-sheet");
-    const fact = (ic, title, value) => {
-        const r = el("div", "ds-row");
-        const i = el("span", "ds-row__icon"); i.appendChild(icon(ic));
-        const b = el("span", "ds-row__body"); b.appendChild(el("span", "ds-row__title", title));
-        r.append(i, b);
-        if (value) r.appendChild(el("span", "ds-row__value", value));
-        return r;
+    const fact = (ic, text, tip) => {
+        const c = el("span", "ds-chip ds-chip--fact");
+        c.append(icon(ic), el("span", "", text));
+        if (tip) { c.title = tip; c.setAttribute("aria-label", tip); }
+        return c;
     };
     function openSheet(card, isOwn) {
         const stt = stationState(card, isOwn), name = String(card.name || "Unnamed station");
@@ -268,12 +266,11 @@
             zoom.addEventListener("click", () => openLightbox(larges.concat([src]), name, note));
             body.appendChild(zoom);
         }
-        const facts = el("div", "ds-list cm-facts");
-        if (card.camera) facts.appendChild(fact("camera", String(card.camera)));
-        if (card.software) facts.appendChild(fact("cpu", String(card.software)));
-        facts.appendChild(fact("clock", seenText(card, isOwn).replace(/^./, (c) => c.toUpperCase())));
-        if (!base) facts.appendChild(fact("lock", "No public address"));
-        else if (card.open === false) facts.appendChild(fact("lock", "Page not linked by the owner"));
+        const facts = el("div", "cm-facts");
+        if (card.camera) facts.appendChild(fact("camera", String(card.camera), "Camera"));
+        if (card.software) facts.appendChild(fact("cpu", String(card.software), "Zenivo version"));
+        if (base && card.open === false) facts.appendChild(fact("lock", "", "Page not linked by the owner"));
+        if (facts.childNodes.length)
         body.appendChild(facts);
         const acts = el("div", "cm-acts");
         if (base && card.open !== false) {
