@@ -66,7 +66,7 @@ MORE_PATHS = ",".join(sorted(({h.split("#")[0] for _, _, items in MENU for h, *_
 
 
 def ic(name):
-    return f'<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204n#i-{name}"></use></svg>'
+    return f'<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204o#i-{name}"></use></svg>'
 
 
 def render_brand():
@@ -94,12 +94,12 @@ def render_head(name):
              'S="image detection station skymask integrations community admin".split(" "),t=M[h];if(h==="community")t="/community";'
              'else if(S.indexOf(h)>-1)t="/settings#"+h;if(t&&t!==p)location.replace(t)})()</script>',
              '<link rel="stylesheet" href="/static/css/ds-tokens.css?v=20261123a">',
-             '<link rel="stylesheet" href="/static/css/ds-components.css?v=20261204n">',
-             '<link rel="stylesheet" href="/static/css/shell.css?v=20261204n">',
-             '<script src="/static/auth.js?v=20261204n"></script>',
+             '<link rel="stylesheet" href="/static/css/ds-components.css?v=20261204o">',
+             '<link rel="stylesheet" href="/static/css/shell.css?v=20261204o">',
+             '<script src="/static/auth.js?v=20261204o"></script>',
              '<script src="/static/js/ds.js?v=20261123a" defer></script>',
              '<script src="/static/brand/version.js?v=4" defer></script>',
-             '<script src="/static/shell.js?v=20261204n" defer></script>', "<!-- head-brand:end -->"]
+             '<script src="/static/shell.js?v=20261204o" defer></script>', "<!-- head-brand:end -->"]
     return "\n    ".join(lines)
 
 

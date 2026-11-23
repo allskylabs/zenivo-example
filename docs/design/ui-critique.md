@@ -216,3 +216,12 @@ Removed (Live and shared chrome), `?v=20261204n`:
 Checked, kept: Red Vision (topbar switch only), Sky tile (single day/night indicator), Cloud (tile only), Share (sidebar only, no image share), 3x "Auto" locks (three different settings), per-aircraft ADS-B links.
 Open: Settings list row "OBS dock" duplicates the sidebar item (`/obs/dock`); Logs "Archive" chip vs sidebar Archive (decide with the PM).
 Shots: `docs/design/critique/d-before-live-1568.jpg`, `d-after-live-1568.jpg`.
+
+## Update 11 - Logs filter label, width checks, open items
+| Item | Status |
+|---|---|
+| Logs "Archive" chip | stays a category filter; both chip groups now start with a funnel icon + short label (Level / Source) (`pages/60-logs.html`, `css/activity-log.css`) |
+| 900 / 1000 / 1100 px (Live, Overhead) | no horizontal overflow, topbar 56 px, nothing clipped; <1024 shows the phone layout (tab bar + Menu), 1100 shows the desktop sidebar with UTC hidden |
+| 390 px (Live, Overhead card, day tiles) | no horizontal overflow (only the events carousel scrolls by design); Overhead card tabs and rows fit; toast not triggered during the check |
+| #20 sky mask fill | OPEN: source is `tools/skyview/src`; needs a vite rebuild on a lan runner (no Node builds on the laptop), then copy the bundle into `src/web/sky/` |
+| #23 chart colour, #24 map attribution, #26 satellites header | OPEN: each needs markup/JS changes across pages and per-page screenshot review |
