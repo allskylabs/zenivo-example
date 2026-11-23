@@ -2,7 +2,7 @@
 (function () {
     "use strict";
     var PREFS_KEY = "allsky.ui.prefs.v1";
-    var ICON_URL = "/static/icons.svg";
+    var ICON_URL = "/static/icons.svg?v=20261128c";
 
     function icon(name, cls) {
         var s = document.createElementNS("http://www.w3.org/2000/svg", "svg");

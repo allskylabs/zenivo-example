@@ -3,7 +3,7 @@
 
 // Archive page: Products | By day | Events (rebuilt, icons first). The Events list and the detail viewer live in 08b-events-live.js.
 // ------------------------------------------------------------------
-const arcIcon = (n) => `<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-${n}"></use></svg>`;
+const arcIcon = (n) => `<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-${n}"></use></svg>`;
 const galleryDateEl = document.getElementById("gallery-date-t");
 const galleryFrameCountEl = document.getElementById("gallery-frame-count");
 const galleryAlert = document.getElementById("gallery-alert");

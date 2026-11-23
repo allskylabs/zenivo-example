@@ -135,3 +135,5 @@
 .arc-ev__pan > img, .arc-ev__pan > svg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .arc-ev__pan > svg { pointer-events: none; }
 .arc-ev__was { padding-top: 0; }
+.arc-ev .zp-pill .zoom-btn { min-width: var(--tap); min-height: var(--tap); }
+.arc-ev .zp-pill .zoom-level { min-width: var(--tap); font-size: var(--fs-12); }

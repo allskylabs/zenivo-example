@@ -29,7 +29,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
-    <link rel="stylesheet" href="/style.css?v=20261128b">
+    <link rel="stylesheet" href="/style.css?v=20261128c">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -51,64 +51,64 @@
         <span class="ds-sr-only" id="nav-system-status" role="status">Online</span>
         <span class="zt-clocks"><span class="zt-clock"><small>UTC</small> <b id="nav-utc-clock">--:--:--</b></span><span class="zt-clock zt-local"><small id="nav-local-label">Local</small> <b id="nav-local-clock">--:--</b></span></span>
         <span class="ds-topbar__clock" id="m-head-clock"></span>
-        <button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" id="btn-night-vision" aria-pressed="false" aria-label="Red vision" title="Red vision"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon-star"></use></svg></button>
+        <button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" id="btn-night-vision" aria-pressed="false" aria-label="Red vision" title="Red vision"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-moon-star"></use></svg></button>
     </header>
 
     <nav class="ds-tabbar" aria-label="Main navigation">
-        <a class="ds-tab" href="/live" data-paths="/live,/,/index.html"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg><span>Live</span></a>
-        <a class="ds-tab" href="/sky" data-paths="/sky"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><span>Sky</span></a>
-        <a class="ds-tab" href="/community" data-paths="/community"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-users"></use></svg><span>Community</span></a>
-        <a class="ds-tab" href="/gallery" data-paths="/gallery,/logs"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-archive"></use></svg><span>Archive</span></a>
-        <button class="ds-tab" type="button" data-ds-open="m-more-sheet" data-paths="/flights3d,/satellites3d,/overhead,/focus,/calibration,/settings,/obs" aria-haspopup="dialog"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-menu"></use></svg><span>Menu</span></button>
+        <a class="ds-tab" href="/live" data-paths="/live,/,/index.html"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-camera"></use></svg><span>Live</span></a>
+        <a class="ds-tab" href="/sky" data-paths="/sky"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-sparkles"></use></svg><span>Sky</span></a>
+        <a class="ds-tab" href="/community" data-paths="/community"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-users"></use></svg><span>Community</span></a>
+        <a class="ds-tab" href="/gallery" data-paths="/gallery,/logs"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-archive"></use></svg><span>Archive</span></a>
+        <button class="ds-tab" type="button" data-ds-open="m-more-sheet" data-paths="/flights3d,/satellites3d,/overhead,/focus,/calibration,/settings,/obs" aria-haspopup="dialog"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-menu"></use></svg><span>Menu</span></button>
     </nav>
 
     <div class="ds-sheet" id="m-more-sheet" role="dialog" aria-modal="true" aria-label="Menu">
         <div class="ds-sheet__scrim" data-ds-close></div>
         <div class="ds-sheet__panel">
             <div class="ds-sheet__grab" aria-hidden="true"></div>
-            <div class="ds-sheet__head"><div class="ds-sheet__title"><span id="m-st-name">Zenivo</span> <small class="zt-ver" id="app-version" data-app-version>Zenivo</small></div><a class="ds-btn ds-btn--ghost" href="/login" data-auth-link><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-log-in"></use></svg><span>Sign in</span></a><button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" data-ds-close aria-label="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></div>
+            <div class="ds-sheet__head"><div class="ds-sheet__title"><span id="m-st-name">Zenivo</span> <small class="zt-ver" id="app-version" data-app-version>Zenivo</small></div><a class="ds-btn ds-btn--ghost" href="/login" data-auth-link><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-log-in"></use></svg><span>Sign in</span></a><button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" data-ds-close aria-label="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-x"></use></svg></button></div>
             <div class="ds-sheet__tiles zt-quick">
-                <button class="ds-tile" type="button" id="m-rv-toggle" aria-pressed="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon-star"></use></svg><span>Red vision</span></button>
-                <button class="ds-tile" type="button" id="m-fs-btn"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg><span>Fullscreen</span></button>
-                <button class="ds-tile" type="button" id="m-chat-btn"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-message-circle"></use></svg><span>Chat</span></button>
-                <button class="ds-tile" type="button" id="m-share-btn"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-share-2"></use></svg><span id="m-share-sub">Share</span></button>
+                <button class="ds-tile" type="button" id="m-rv-toggle" aria-pressed="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-moon-star"></use></svg><span>Red vision</span></button>
+                <button class="ds-tile" type="button" id="m-fs-btn"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-maximize"></use></svg><span>Fullscreen</span></button>
+                <button class="ds-tile" type="button" id="m-chat-btn"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-message-circle"></use></svg><span>Chat</span></button>
+                <button class="ds-tile" type="button" id="m-share-btn"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-share-2"></use></svg><span id="m-share-sub">Share</span></button>
             </div>
             <section class="zt-group">
                 <h3 class="zt-gtitle">Explore</h3>
                 <div class="ds-sheet__tiles">
-                    <a class="ds-tile" href="/flights3d" data-paths="/flights3d"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg><span>Flights 3D</span></a>
-                    <a class="ds-tile" href="/satellites3d" data-paths="/satellites3d"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg><span>Satellites 3D</span></a>
-                    <a class="ds-tile" href="/overhead" data-paths="/overhead"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-radio"></use></svg><span>Overhead</span></a>
+                    <a class="ds-tile" href="/flights3d" data-paths="/flights3d"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-plane"></use></svg><span>Flights 3D</span></a>
+                    <a class="ds-tile" href="/satellites3d" data-paths="/satellites3d"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-satellite"></use></svg><span>Satellites 3D</span></a>
+                    <a class="ds-tile" href="/overhead" data-paths="/overhead"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-radio"></use></svg><span>Overhead</span></a>
                 </div>
             </section>
             <section class="zt-group" data-admin>
                 <h3 class="zt-gtitle">Camera</h3>
                 <div class="ds-sheet__tiles">
-                    <a class="ds-tile" href="/focus" data-paths="/focus"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg><span>Focus</span></a>
-                    <a class="ds-tile" href="/calibration" data-paths="/calibration"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon-star"></use></svg><span>Master dark</span></a>
-                    <a class="ds-tile" href="/settings#image"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg><span>Image output</span></a>
-                    <a class="ds-tile" href="/settings#detection"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg><span>Detection</span></a>
+                    <a class="ds-tile" href="/focus" data-paths="/focus"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-telescope"></use></svg><span>Focus</span></a>
+                    <a class="ds-tile" href="/calibration" data-paths="/calibration"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-moon-star"></use></svg><span>Master dark</span></a>
+                    <a class="ds-tile" href="/settings#image"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-sliders-horizontal"></use></svg><span>Image output</span></a>
+                    <a class="ds-tile" href="/settings#detection"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-crosshair"></use></svg><span>Detection</span></a>
                 </div>
             </section>
             <section class="zt-group" data-admin>
                 <h3 class="zt-gtitle">Station</h3>
                 <div class="ds-sheet__tiles">
-                    <a class="ds-tile" href="/settings#station"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-map-pin"></use></svg><span>Station &amp; optics</span></a>
-                    <a class="ds-tile" href="/settings#skymask"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-shield"></use></svg><span>Sky mask</span></a>
-                    <a class="ds-tile" href="/settings#integrations"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plug"></use></svg><span>Integrations</span></a>
-                    <a class="ds-tile" href="/settings#community"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-share-2"></use></svg><span>Sharing</span></a>
-                    <a class="ds-tile" href="/settings#admin"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-key-round"></use></svg><span>Admin</span></a>
-                    <a class="ds-tile" href="/logs" data-paths="/logs"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-activity"></use></svg><span>Activity log</span><b class="zt-badge" id="log-error-badge" hidden>0</b></a>
+                    <a class="ds-tile" href="/settings#station"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-map-pin"></use></svg><span>Station &amp; optics</span></a>
+                    <a class="ds-tile" href="/settings#skymask"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-shield"></use></svg><span>Sky mask</span></a>
+                    <a class="ds-tile" href="/settings#integrations"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-plug"></use></svg><span>Integrations</span></a>
+                    <a class="ds-tile" href="/settings#community"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-share-2"></use></svg><span>Sharing</span></a>
+                    <a class="ds-tile" href="/settings#admin"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-key-round"></use></svg><span>Admin</span></a>
+                    <a class="ds-tile" href="/logs" data-paths="/logs"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-activity"></use></svg><span>Activity log</span><b class="zt-badge" id="log-error-badge" hidden>0</b></a>
                 </div>
             </section>
             <section class="zt-group">
                 <h3 class="zt-gtitle">Streaming</h3>
                 <div class="ds-sheet__tiles">
-                    <a class="ds-tile" href="/obs/dock" data-paths="/obs/dock" data-admin><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-film"></use></svg><span>OBS dock</span></a>
-                    <a class="ds-tile" href="/obs" data-paths="/obs" target="_blank" rel="noopener"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-arrow-up-right"></use></svg><span>OBS preview</span></a>
+                    <a class="ds-tile" href="/obs/dock" data-paths="/obs/dock" data-admin><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-film"></use></svg><span>OBS dock</span></a>
+                    <a class="ds-tile" href="/obs" data-paths="/obs" target="_blank" rel="noopener"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-arrow-up-right"></use></svg><span>OBS preview</span></a>
                 </div>
             </section>
-            <a class="ds-tile zt-settings" href="/settings" data-admin data-paths="/settings"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-settings"></use></svg><span>Settings</span></a>
+            <a class="ds-tile zt-settings" href="/settings" data-admin data-paths="/settings"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-settings"></use></svg><span>Settings</span></a>
         </div>
     </div>
     <!-- chrome:end -->
@@ -141,13 +141,13 @@
                             <div class="sel-ring" id="sel-ring" hidden aria-hidden="true"></div>
                             <div class="vp-bar">
                                 <div class="zoom-controls" role="group" aria-label="Zoom">
-                                    <button type="button" id="btn-zoom-out" class="zoom-btn" title="Zoom out" aria-label="Zoom out"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-minus"></use></svg></button>
+                                    <button type="button" id="btn-zoom-out" class="zoom-btn" title="Zoom out" aria-label="Zoom out"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-minus"></use></svg></button>
                                     <button type="button" id="btn-zoom-reset" class="zoom-btn zoom-level" title="Fit to view" aria-label="Fit to view">100%</button>
-                                    <button type="button" id="btn-zoom-in" class="zoom-btn" title="Zoom in" aria-label="Zoom in"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plus"></use></svg></button>
+                                    <button type="button" id="btn-zoom-in" class="zoom-btn" title="Zoom in" aria-label="Zoom in"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-plus"></use></svg></button>
                                 </div>
                                 <span class="vp-hint" id="vp-hint" hidden></span>
-                                <button type="button" id="btn-layers" class="vp-btn vp-layers" aria-haspopup="dialog" aria-controls="layers-sheet" title="Layers" aria-label="Layers"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layers"></use></svg><b id="layers-count">0</b></button>
-                                <button type="button" id="btn-fullscreen" class="vp-btn vp-fs" title="Fullscreen" aria-label="Fullscreen"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg></button>
+                                <button type="button" id="btn-layers" class="vp-btn vp-layers" aria-haspopup="dialog" aria-controls="layers-sheet" title="Layers" aria-label="Layers"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-layers"></use></svg><b id="layers-count">0</b></button>
+                                <button type="button" id="btn-fullscreen" class="vp-btn vp-fs" title="Fullscreen" aria-label="Fullscreen"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-maximize"></use></svg></button>
                             </div>
                         </div>
                     </div>
@@ -157,25 +157,25 @@
 
                     <!-- Status strip: icon + value, nothing else -->
                     <div class="now-strip" id="now-strip" role="group" aria-label="Right now">
-                        <div class="now-tile" title="Cloud cover" aria-label="Cloud cover"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg><b id="now-cloud">--</b></div>
-                        <div class="now-tile" title="Sky" aria-label="Sky"><svg class="ds-icon" id="now-sky-ic" aria-hidden="true"><use href="/static/icons.svg#i-moon"></use></svg><b id="now-sky">--</b></div>
-                        <div class="now-tile" title="Exposure" aria-label="Exposure"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg><b id="now-exp">--</b></div>
-                        <div class="now-tile" title="Temperature" aria-label="Temperature"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-thermometer"></use></svg><span class="now-l" id="now-temp-l" hidden>Temp</span><b id="now-temp">--</b></div>
-                        <div class="now-tile" title="Detected tonight" aria-label="Detected tonight"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><b id="now-events">--</b></div>
-                        <div class="now-tile now-online" id="now-online" title="Online" aria-label="Online"><svg class="ds-icon" id="now-online-ic" aria-hidden="true"><use href="/static/icons.svg#i-wifi"></use></svg><b id="now-online-t" class="sr-only">online</b></div>
+                        <div class="now-tile" title="Cloud cover" aria-label="Cloud cover"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-cloud"></use></svg><b id="now-cloud">--</b></div>
+                        <div class="now-tile" title="Sky" aria-label="Sky"><svg class="ds-icon" id="now-sky-ic" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-moon"></use></svg><b id="now-sky">--</b></div>
+                        <div class="now-tile" title="Exposure" aria-label="Exposure"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-camera"></use></svg><b id="now-exp">--</b></div>
+                        <div class="now-tile" title="Temperature" aria-label="Temperature"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-thermometer"></use></svg><span class="now-l" id="now-temp-l" hidden>Temp</span><b id="now-temp">--</b></div>
+                        <div class="now-tile" title="Detected tonight" aria-label="Detected tonight"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-sparkles"></use></svg><b id="now-events">--</b></div>
+                        <div class="now-tile now-online" id="now-online" title="Online" aria-label="Online"><svg class="ds-icon" id="now-online-ic" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-wifi"></use></svg><b id="now-online-t" class="sr-only">online</b></div>
                     </div>
 
                     <!-- Exposure: one row when closed; admin changes it, guests see it read-only -->
                     <details class="ds-card live-exp" id="exposure-card">
-                    <summary class="live-exp__sum"><span class="live-exp__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg></span><span class="exp-summary mono" id="exp-summary"><span id="telem-exp">--</span> &middot; <span id="telem-gain">--</span> &middot; <span id="telem-lock">Auto</span></span><span class="badge badge-accent" id="active-profile-badge" hidden>AUTO EPHEMERIS</span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></span></summary>
+                    <summary class="live-exp__sum"><span class="live-exp__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-sliders-horizontal"></use></svg></span><span class="exp-summary mono" id="exp-summary"><span id="telem-exp">--</span> &middot; <span id="telem-gain">--</span> &middot; <span id="telem-lock">Auto</span></span><span class="badge badge-accent" id="active-profile-badge" hidden>AUTO EPHEMERIS</span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-down"></use></svg></span></summary>
 
-                    <p class="exp-signin" id="exp-signin" role="note"><a href="/login?next=%2Flive" id="exp-signin-link" title="Sign in as admin to change exposure" aria-label="Sign in as admin to change exposure"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-log-in"></use></svg><span>Sign in</span></a></p>
+                    <p class="exp-signin" id="exp-signin" role="note"><a href="/login?next=%2Flive" id="exp-signin-link" title="Sign in as admin to change exposure" aria-label="Sign in as admin to change exposure"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-log-in"></use></svg><span>Sign in</span></a></p>
 
                     <div class="exp-preset-chips" role="group" aria-label="Exposure presets">
-                    <button type="button" class="chip-preset" data-preset="moonless" data-exp="15" data-gain="36" title="Moonless: 15 s, 36 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon-star"></use></svg>Moonless</button>
-                    <button type="button" class="chip-preset" data-preset="twilight" data-exp="2" data-gain="18" title="Twilight: 2 s, 18 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sun"></use></svg>Twilight</button>
-                    <button type="button" class="chip-preset" data-preset="fullmoon" data-exp="0.5" data-gain="0" title="Full moon: 0.5 s, 0 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon"></use></svg>Full moon</button>
-                    <button type="button" class="chip-preset active" data-preset="custom" title="Keep the sliders as they are"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg>Custom</button>
+                    <button type="button" class="chip-preset" data-preset="moonless" data-exp="15" data-gain="36" title="Moonless: 15 s, 36 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-moon-star"></use></svg>Moonless</button>
+                    <button type="button" class="chip-preset" data-preset="twilight" data-exp="2" data-gain="18" title="Twilight: 2 s, 18 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-sun"></use></svg>Twilight</button>
+                    <button type="button" class="chip-preset" data-preset="fullmoon" data-exp="0.5" data-gain="0" title="Full moon: 0.5 s, 0 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-moon"></use></svg>Full moon</button>
+                    <button type="button" class="chip-preset active" data-preset="custom" title="Keep the sliders as they are"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-sliders-horizontal"></use></svg>Custom</button>
                     </div>
 
                     <!-- Shutter Slider -->
@@ -228,7 +228,7 @@
                     <input type="range" id="range-target" min="5" max="250" step="1" value="85" />
                     </div>
 
-                    <span class="live-info" tabindex="0" role="note" aria-label="Touching a slider locks it; press Locked to hand it back to Auto. Nothing locked: Auto computes shutter and gain. Lock one and Auto computes only the other. Both locked holds the values." title="Touching a slider locks it; press Locked to hand it back to Auto. Nothing locked: Auto computes shutter and gain. Lock one and Auto computes only the other. Both locked holds the values."><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></span>
+                    <span class="live-info" tabindex="0" role="note" aria-label="Touching a slider locks it; press Locked to hand it back to Auto. Nothing locked: Auto computes shutter and gain. Lock one and Auto computes only the other. Both locked holds the values." title="Touching a slider locks it; press Locked to hand it back to Auto. Nothing locked: Auto computes shutter and gain. Lock one and Auto computes only the other. Both locked holds the values."><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-info"></use></svg></span>
                     <div id="control-alert" class="alert-box hidden"></div>
                     </details>
                     <script>try{if(localStorage.getItem("zenivo.expOpen")==="1")document.getElementById("exposure-card").open=true}catch(e){}</script>
@@ -236,7 +236,7 @@
                 <div class="live-pair">
                 <div class="ds-card cloud-card">
                     <div class="live-head">
-                        <span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg></span>
+                        <span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-cloud"></use></svg></span>
                         <span class="cloud-big" id="cloud-big"><b id="cloud-big-n">--</b><span id="cloud-big-t">mean</span></span>
                         <div class="cloud-ranges" role="group" aria-label="Time range">
                             <button class="btn-range" data-hours="6">6h</button>
@@ -256,7 +256,7 @@
                         <svg id="cloud-chart" role="img" aria-label="Cloud cover percentage over time"></svg>
                         <div class="cloud-tooltip hidden" id="cloud-tooltip"></div>
                     </div>
-                    <div class="ds-empty cloud-empty hidden" id="cloud-empty"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg><span class="ds-empty__title">No samples</span></div>
+                    <div class="ds-empty cloud-empty hidden" id="cloud-empty"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-cloud"></use></svg><span class="ds-empty__title">No samples</span></div>
                     <div class="cloud-bars" id="cloud-bars" role="img" aria-label="Cloud cover per time bin"></div>
                     <div class="cloud-bars-cap" id="cloud-bars-cap"><span id="cloud-cap-l"></span><span id="cloud-cap-r">now</span></div>
                     <div class="cloud-caption" id="cloud-caption" hidden>Now <strong id="cloud-now">--</strong> / Avg <span id="cloud-avg-label">24h</span> <strong id="cloud-avg">--</strong></div>
@@ -287,7 +287,7 @@
                 </div>
 
                 <details class="ds-card histogram-card acc" id="histogram-card">
-                    <summary class="live-sum"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-activity"></use></svg></span><span class="live-sum__t" title="Histogram" aria-label="Histogram">Histogram</span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></span></summary>
+                    <summary class="live-sum"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-activity"></use></svg></span><span class="live-sum__t" title="Histogram" aria-label="Histogram">Histogram</span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-down"></use></svg></span></summary>
 
                     <div class="histogram-wrapper">
                         <canvas id="histogram-canvas" width="600" height="160"></canvas>
@@ -307,11 +307,11 @@
                     <!-- Overhead now: one card, icon tabs. The three lists keep their ids and render functions (app/08b-events-live.js);
                          the websocket subscription (OVERLAY_CARDS in app/05c-aircraft-overlay.js) still keys off these panels. -->
                     <div class="ds-card overhead-card" id="overhead-card" hidden>
-                        <div class="live-head"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg></span><h2 class="live-head__t">Overhead now</h2><span class="ov-live" id="ov-live">live</span></div>
+                        <div class="live-head"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-eye"></use></svg></span><h2 class="live-head__t">Overhead now</h2><span class="ov-live" id="ov-live">live</span></div>
                         <div class="ov-seg" role="tablist" aria-label="Overhead lists">
-                            <button type="button" role="tab" class="ov-tab" id="ov-tab-flights" data-ov="flights-card" aria-selected="false" title="Flights" aria-label="Flights"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg><span class="ov-n" id="ov-n-flights">0</span></button>
-                            <button type="button" role="tab" class="ov-tab" id="ov-tab-sats" data-ov="sats-card" aria-selected="false" title="Satellites" aria-label="Satellites"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg><span class="ov-n" id="ov-n-sats">0</span></button>
-                            <button type="button" role="tab" class="ov-tab" id="ov-tab-sondes" data-ov="sondes-card" aria-selected="false" title="Sondes" aria-label="Sondes"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-balloon"></use></svg><span class="ov-n" id="ov-n-sondes">0</span></button>
+                            <button type="button" role="tab" class="ov-tab" id="ov-tab-flights" data-ov="flights-card" aria-selected="false" title="Flights" aria-label="Flights"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-plane"></use></svg><span class="ov-n" id="ov-n-flights">0</span></button>
+                            <button type="button" role="tab" class="ov-tab" id="ov-tab-sats" data-ov="sats-card" aria-selected="false" title="Satellites" aria-label="Satellites"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-satellite"></use></svg><span class="ov-n" id="ov-n-sats">0</span></button>
+                            <button type="button" role="tab" class="ov-tab" id="ov-tab-sondes" data-ov="sondes-card" aria-selected="false" title="Sondes" aria-label="Sondes"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-balloon"></use></svg><span class="ov-n" id="ov-n-sondes">0</span></button>
                         </div>
                         <div class="ov-panel flights-card" id="flights-card" role="tabpanel" hidden>
                             <div class="ov-meta"><span class="badge" id="flights-count">--</span><span class="flights-status" id="flights-status">Loading…</span></div>
@@ -322,41 +322,41 @@
                                 <button type="button" class="zchip" data-fl="down" aria-pressed="false" title="Descending" aria-label="Descending">&darr;</button>
                             </div>
                             <ul class="flights-list" id="flights-list"></ul>
-                            <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
+                            <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-right"></use></svg></a>
                         </div>
                         <div class="ov-panel flights-card" id="sats-card" role="tabpanel" hidden>
                             <div class="ov-meta"><span class="badge" id="sats-count">--</span><span class="flights-status" id="sats-status">Loading…</span></div>
                             <ul class="flights-list" id="sats-list"></ul>
-                            <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
+                            <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-right"></use></svg></a>
                         </div>
                         <div class="ov-panel flights-card" id="sondes-card" role="tabpanel" hidden>
                             <div class="ov-meta"><span class="badge" id="sondes-count">--</span><span class="flights-status" id="sondes-status">Loading…</span></div>
                             <ul class="flights-list" id="sondes-list"></ul>
-                            <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
+                            <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-right"></use></svg></a>
                         </div>
                     </div>
 
                     <!-- Recent events (thumbnail strip on a phone) -->
                     <div class="ds-card live-events-card">
                         <div class="live-head">
-                            <span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg></span><h2 class="live-head__t">Events</h2>
+                            <span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-sparkles"></use></svg></span><h2 class="live-head__t">Events</h2>
                             <span class="badge" id="live-events-count">0</span>
                             <span class="live-events-status" id="live-events-status" role="status">Loading…</span>
-                            <a class="live-more" href="/gallery" title="All events" aria-label="All events"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
+                            <a class="live-more" href="/gallery" title="All events" aria-label="All events"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-right"></use></svg></a>
                         </div>
                         <ul class="live-events-list" id="live-events-list"></ul>
                     </div>
 
                     <!-- Weather, next 48 h (shown only when the weather source is on) -->
                     <details class="ds-card acc" id="weather-acc" hidden>
-                        <summary class="live-sum"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg></span><span class="live-sum__t" title="Weather, next 48 h" aria-label="Weather, next 48 h">48 h</span><span class="acc-sub" id="lwx-sum"></span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></span></summary>
+                        <summary class="live-sum"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-cloud"></use></svg></span><span class="live-sum__t" title="Weather, next 48 h" aria-label="Weather, next 48 h">48 h</span><span class="acc-sub" id="lwx-sum"></span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-down"></use></svg></span></summary>
                         <div class="wx-now" id="lwx-now"></div>
                         <div class="lwx-hours" id="lwx-hours" aria-label="Next 48 hours"></div>
                     </details>
 
                     <!-- Telemetry -->
                     <details class="ds-card acc" id="telemetry-acc">
-                        <summary class="live-sum"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cpu"></use></svg></span><span class="live-sum__t" title="Telemetry" aria-label="Telemetry">Telemetry</span><span class="text-muted" id="telemetry-timestamp">--</span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></span></summary>
+                        <summary class="live-sum"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-cpu"></use></svg></span><span class="live-sum__t" title="Telemetry" aria-label="Telemetry">Telemetry</span><span class="text-muted" id="telemetry-timestamp">--</span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-down"></use></svg></span></summary>
                         <div class="telemetry-card">
 
                         <div class="gauge-grid">
@@ -414,27 +414,27 @@
             <div class="arc" id="gallery-container" data-gmode="products">
                 <header class="arc-bar">
                     <div class="arc-segs" id="gallery-tabs" role="tablist" aria-label="Archive view">
-                        <button type="button" class="arc-seg" data-gmode="products" role="tab" aria-selected="true" aria-label="Products" title="Products"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layout-grid"></use></svg><span class="arc-seg__t">Products</span></button>
-                        <button type="button" class="arc-seg" data-gmode="day" role="tab" aria-selected="false" aria-label="By day" title="By day"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-calendar-days"></use></svg><span class="arc-seg__t">By day</span></button>
-                        <button type="button" class="arc-seg" data-gmode="events" role="tab" aria-selected="false" aria-label="Events" title="Events"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg><span class="arc-seg__t">Events</span></button>
+                        <button type="button" class="arc-seg" data-gmode="products" role="tab" aria-selected="true" aria-label="Products" title="Products"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-layout-grid"></use></svg><span class="arc-seg__t">Products</span></button>
+                        <button type="button" class="arc-seg" data-gmode="day" role="tab" aria-selected="false" aria-label="By day" title="By day"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-calendar-days"></use></svg><span class="arc-seg__t">By day</span></button>
+                        <button type="button" class="arc-seg" data-gmode="events" role="tab" aria-selected="false" aria-label="Events" title="Events"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-telescope"></use></svg><span class="arc-seg__t">Events</span></button>
                     </div>
                     <div class="arc-tools">
-                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="btn-arc-range" aria-label="Date range" aria-expanded="false" aria-controls="arc-range" title="Date range"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-calendar-days"></use></svg></button>
-                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="btn-arc-seen" aria-label="Mark all events seen" title="Mark all events seen"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check-check"></use></svg></button>
-                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="btn-arc-refresh" aria-label="Refresh" title="Refresh"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-refresh-cw"></use></svg></button>
-                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="btn-build-timelapse" data-admin aria-label="Build timelapse" title="Build timelapse" data-ds-open="timelapse-sheet"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-film"></use></svg></button>
+                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="btn-arc-range" aria-label="Date range" aria-expanded="false" aria-controls="arc-range" title="Date range"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-calendar-days"></use></svg></button>
+                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="btn-arc-seen" aria-label="Mark all events seen" title="Mark all events seen"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-check-check"></use></svg></button>
+                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="btn-arc-refresh" aria-label="Refresh" title="Refresh"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-refresh-cw"></use></svg></button>
+                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="btn-build-timelapse" data-admin aria-label="Build timelapse" title="Build timelapse" data-ds-open="timelapse-sheet"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-film"></use></svg></button>
                     </div>
                 </header>
                 <div class="arc-range" id="arc-range" hidden>
-                    <label class="arc-date"><span class="sr-only">From</span><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-calendar-days"></use></svg><input type="date" id="arc-from" aria-label="From date"></label>
+                    <label class="arc-date"><span class="sr-only">From</span><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-calendar-days"></use></svg><input type="date" id="arc-from" aria-label="From date"></label>
                     <span class="arc-range__sep" aria-hidden="true">&ndash;</span>
-                    <label class="arc-date"><span class="sr-only">To</span><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-calendar-days"></use></svg><input type="date" id="arc-to" aria-label="To date"></label>
-                    <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="arc-range-clear" aria-label="Clear date range" title="Clear date range"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></button>
+                    <label class="arc-date"><span class="sr-only">To</span><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-calendar-days"></use></svg><input type="date" id="arc-to" aria-label="To date"></label>
+                    <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="arc-range-clear" aria-label="Clear date range" title="Clear date range"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-rotate-ccw"></use></svg></button>
                 </div>
 
                 <!-- Products: latest timelapse / keogram / startrails -->
                 <div class="arc-pane" id="pane-products">
-                    <div class="arc-meta"><span class="ds-chip" id="gallery-date" title="Night"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon-star"></use></svg><span id="gallery-date-t">--</span></span><span class="ds-chip" title="Archived frames"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-image"></use></svg><span id="gallery-frame-count">--</span></span></div>
+                    <div class="arc-meta"><span class="ds-chip" id="gallery-date" title="Night"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-moon-star"></use></svg><span id="gallery-date-t">--</span></span><span class="ds-chip" title="Archived frames"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-image"></use></svg><span id="gallery-frame-count">--</span></span></div>
                     <div id="gallery-alert" class="arc-alert" role="status" hidden></div>
                     <div id="products-grid" class="arc-grid"></div>
                 </div>
@@ -446,14 +446,14 @@
 
                 <!-- Events: chips + two-pane list/detail -->
                 <div class="arc-pane" id="pane-events" hidden>
-                    <div class="arc-chips" id="events-filter" role="group" aria-label="Event type"><button type="button" class="ds-chip arc-chip" data-type="" aria-pressed="true" aria-label="All" title="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layers"></use></svg><b data-count="all">0</b></button><button type="button" class="ds-chip arc-chip" data-type="plane" aria-pressed="false" aria-label="Aircraft" title="Aircraft"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg><b data-count="plane">0</b></button><button type="button" class="ds-chip arc-chip" data-type="meteor" aria-pressed="false" aria-label="Meteors" title="Meteors"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><b data-count="meteor">0</b></button><button type="button" class="ds-chip arc-chip" data-type="satellite" aria-pressed="false" aria-label="Satellites" title="Satellites"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg><b data-count="satellite">0</b></button><button type="button" class="ds-chip arc-chip" data-type="clouds" aria-pressed="false" aria-label="Clouds" title="Clouds"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg><b data-count="clouds">0</b></button><button type="button" class="ds-chip arc-chip" data-type="flash" aria-pressed="false" aria-label="Flashes" title="Flashes"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-zap"></use></svg><b data-count="flash">0</b></button>
-                        <span class="arc-info" id="arc-total" title="Events shown / stored"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg><b id="day-count-badge">0</b></span>
+                    <div class="arc-chips" id="events-filter" role="group" aria-label="Event type"><button type="button" class="ds-chip arc-chip" data-type="" aria-pressed="true" aria-label="All" title="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-layers"></use></svg><b data-count="all">0</b></button><button type="button" class="ds-chip arc-chip" data-type="plane" aria-pressed="false" aria-label="Aircraft" title="Aircraft"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-plane"></use></svg><b data-count="plane">0</b></button><button type="button" class="ds-chip arc-chip" data-type="meteor" aria-pressed="false" aria-label="Meteors" title="Meteors"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-sparkles"></use></svg><b data-count="meteor">0</b></button><button type="button" class="ds-chip arc-chip" data-type="satellite" aria-pressed="false" aria-label="Satellites" title="Satellites"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-satellite"></use></svg><b data-count="satellite">0</b></button><button type="button" class="ds-chip arc-chip" data-type="clouds" aria-pressed="false" aria-label="Clouds" title="Clouds"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-cloud"></use></svg><b data-count="clouds">0</b></button><button type="button" class="ds-chip arc-chip" data-type="flash" aria-pressed="false" aria-label="Flashes" title="Flashes"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-zap"></use></svg><b data-count="flash">0</b></button>
+                        <span class="arc-info" id="arc-total" title="Events shown / stored"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-info"></use></svg><b id="day-count-badge">0</b></span>
                     </div>
                     <div class="arc-split">
                         <div class="arc-list" id="arc-list" aria-live="polite"></div>
                         <aside class="arc-dock" id="arc-dock" aria-label="Event detail"></aside>
                     </div>
-                    <div class="arc-more" id="arc-more" hidden><button type="button" class="ds-btn" id="btn-arc-more" aria-label="Load more" title="Load more"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></button></div>
+                    <div class="arc-more" id="arc-more" hidden><button type="button" class="ds-btn" id="btn-arc-more" aria-label="Load more" title="Load more"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-down"></use></svg></button></div>
                 </div>
             </div>
 
@@ -462,16 +462,16 @@
                 <div class="ds-sheet__scrim" data-ds-close></div>
                 <div class="ds-sheet__panel">
                     <div class="ds-sheet__grab" aria-hidden="true"></div>
-                    <div class="ds-sheet__head"><h2 class="ds-sheet__title" id="tl-title">Timelapse</h2><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" data-ds-close aria-label="Close" title="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></div>
+                    <div class="ds-sheet__head"><h2 class="ds-sheet__title" id="tl-title">Timelapse</h2><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" data-ds-close aria-label="Close" title="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-x"></use></svg></button></div>
                     <div class="arc-form">
-                        <label class="arc-field"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-calendar-days"></use></svg><input type="date" id="tl-from" aria-label="From date"></label>
-                        <label class="arc-field"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-calendar-days"></use></svg><input type="date" id="tl-to" aria-label="To date"></label>
-                        <label class="arc-field"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-film"></use></svg><select id="tl-fps" aria-label="Frames per second"><option value="12">12 fps</option><option value="24" selected>24 fps</option><option value="30">30 fps</option></select></label>
-                        <label class="arc-field"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg><select id="tl-res" aria-label="Resolution"><option value="0">Full</option><option value="1280">1280</option><option value="960">960</option><option value="640">640</option></select></label>
-                        <label class="arc-field arc-field--chk"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-type"></use></svg><input type="checkbox" id="tl-overlay" checked aria-label="Overlay text"></label>
+                        <label class="arc-field"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-calendar-days"></use></svg><input type="date" id="tl-from" aria-label="From date"></label>
+                        <label class="arc-field"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-calendar-days"></use></svg><input type="date" id="tl-to" aria-label="To date"></label>
+                        <label class="arc-field"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-film"></use></svg><select id="tl-fps" aria-label="Frames per second"><option value="12">12 fps</option><option value="24" selected>24 fps</option><option value="30">30 fps</option></select></label>
+                        <label class="arc-field"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-maximize"></use></svg><select id="tl-res" aria-label="Resolution"><option value="0">Full</option><option value="1280">1280</option><option value="960">960</option><option value="640">640</option></select></label>
+                        <label class="arc-field arc-field--chk"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-type"></use></svg><input type="checkbox" id="tl-overlay" checked aria-label="Overlay text"></label>
 
                     </div>
-                    <button type="button" class="ds-btn ds-btn--primary" id="tl-build" aria-label="Build timelapse" title="Build timelapse"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-play"></use></svg></button>
+                    <button type="button" class="ds-btn ds-btn--primary" id="tl-build" aria-label="Build timelapse" title="Build timelapse"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-play"></use></svg></button>
                     <div id="tl-result" class="arc-tl" hidden></div>
                 </div>
             </div>
@@ -1704,23 +1704,23 @@
         <div class="ds-sheet__scrim" data-ds-close></div>
         <div class="ds-sheet__panel">
             <div class="ds-sheet__grab" aria-hidden="true"></div>
-            <div class="ds-sheet__head"><h2 class="ds-sheet__title" id="layers-title">Layers</h2><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" data-ds-close aria-label="Close" title="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></div>
+            <div class="ds-sheet__head"><h2 class="ds-sheet__title" id="layers-title">Layers</h2><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" data-ds-close aria-label="Close" title="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-x"></use></svg></button></div>
             <h3 class="zt-gtitle">Sky</h3>
             <div class="ds-list">
-                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-star"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Stars</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-sky-overlay" aria-label="Stars"><span class="ds-switch__track"></span></label></div>
-                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Names &amp; constellations</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-sky-labels" aria-label="Names and constellations"><span class="ds-switch__track"></span></label></div>
-                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-compass"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Alt/Az grid</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-grid-overlay" aria-label="Alt/Az grid"><span class="ds-switch__track"></span></label></div>
-                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">RA/Dec grid</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-eq-grid" aria-label="RA/Dec grid"><span class="ds-switch__track"></span></label></div>
+                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-star"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Stars</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-sky-overlay" aria-label="Stars"><span class="ds-switch__track"></span></label></div>
+                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-sparkles"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Names &amp; constellations</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-sky-labels" aria-label="Names and constellations"><span class="ds-switch__track"></span></label></div>
+                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-compass"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Alt/Az grid</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-grid-overlay" aria-label="Alt/Az grid"><span class="ds-switch__track"></span></label></div>
+                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-crosshair"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">RA/Dec grid</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-eq-grid" aria-label="RA/Dec grid"><span class="ds-switch__track"></span></label></div>
             </div>
             <h3 class="zt-gtitle">Objects</h3>
             <div class="ds-list">
-                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Aircraft</span><span class="ds-row__sub" id="lay-sub-aircraft">--</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-aircraft-overlay" aria-label="Aircraft"><span class="ds-switch__track"></span></label></div>
-                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Satellites</span><span class="ds-row__sub" id="lay-sub-satellites">--</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-satellite-overlay" aria-label="Satellites"><span class="ds-switch__track"></span></label></div>
-                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-balloon"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Radiosondes</span><span class="ds-row__sub" id="lay-sub-sondes">--</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-sonde-overlay" aria-label="Radiosondes"><span class="ds-switch__track"></span></label></div>
+                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-plane"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Aircraft</span><span class="ds-row__sub" id="lay-sub-aircraft">--</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-aircraft-overlay" aria-label="Aircraft"><span class="ds-switch__track"></span></label></div>
+                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-satellite"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Satellites</span><span class="ds-row__sub" id="lay-sub-satellites">--</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-satellite-overlay" aria-label="Satellites"><span class="ds-switch__track"></span></label></div>
+                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-balloon"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Radiosondes</span><span class="ds-row__sub" id="lay-sub-sondes">--</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-sonde-overlay" aria-label="Radiosondes"><span class="ds-switch__track"></span></label></div>
             </div>
             <h3 class="zt-gtitle">Picture</h3>
             <div class="ds-list">
-                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-type"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Overlay text</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-overlay-text" aria-label="Overlay text" checked><span class="ds-switch__track"></span></label></div>
+                <div class="ds-row"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-type"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Overlay text</span></span><label class="ds-switch"><input type="checkbox" role="switch" data-chk="chk-overlay-text" aria-label="Overlay text" checked><span class="ds-switch__track"></span></label></div>
             </div>
             <div hidden>
                 <input type="checkbox" id="chk-sky-overlay"><input type="checkbox" id="chk-sky-labels"><input type="checkbox" id="chk-grid-overlay"><input type="checkbox" id="chk-eq-grid">
@@ -1748,8 +1748,8 @@
     <script defer src="/static/app/05c-aircraft-overlay.js?v=20261124b"></script>
     <script defer src="/static/app/06-telemetry.js?v=20261127a"></script>
     <script defer src="/static/app/07-cloud.js?v=20261126a"></script>
-    <script defer src="/static/app/08-gallery-adsb.js?v=20261128b"></script>
-    <script defer src="/static/app/08b-events-live.js?v=20261128b"></script>
+    <script defer src="/static/app/08-gallery-adsb.js?v=20261128c"></script>
+    <script defer src="/static/app/08b-events-live.js?v=20261128c"></script>
     <script defer src="/static/app/08c-adsb-settings.js?v=20261117a"></script>
     <script defer src="/static/app/08d-live-ui.js?v=20261127a"></script>
     <script defer src="/static/app/09-community.js?v=20261114b"></script>

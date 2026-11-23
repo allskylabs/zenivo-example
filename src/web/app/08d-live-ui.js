@@ -151,7 +151,7 @@
             if (known) sa = parseFloat((($("telem-sun-alt") || {}).textContent || "").replace("\u2212", "-").replace("+", ""));
         }
         const tone = (id, c) => { const t = $(id) && $(id).closest(".now-tile"); if (t) { t.classList.toggle("is-ok", c === "ok"); t.classList.toggle("is-warn", c === "warn"); t.classList.toggle("is-bad", c === "bad"); } };
-        const icon = (id, name) => { const u = $(id) && $(id).querySelector("use"); const h = `/static/icons.svg#i-${name}`; if (u && u.getAttribute("href") !== h) u.setAttribute("href", h); };
+        const icon = (id, name) => { const u = $(id) && $(id).querySelector("use"); const h = `/static/icons.svg?v=20261128c#i-${name}`; if (u && u.getAttribute("href") !== h) u.setAttribute("href", h); };
         const sky = Number.isFinite(sa) ? (sa > -0.83 ? "Day" : sa > -18 ? "Twilight" : "Night") : "--";
         set("now-sky", sky);
         icon("now-sky-ic", sky === "Day" ? "sun" : "moon");
@@ -403,7 +403,7 @@
 
     const IC = { aircraft: "plane", satellite: "satellite", sonde: "balloon", planet: "star", star: "star", dso: "telescope", sun: "sun", moon: "moon", con: "sparkles" };
     const FIC = { Altitude: "arrow-up-right", Height: "arrow-up-right", Speed: "activity", Distance: "map-pin", Azimuth: "compass", "Alt / Az": "compass", RA: "crosshair", Dec: "crosshair", Rises: "sun", Sets: "moon", Visibility: "eye", Visible: "eye" };
-    const svg = (n) => `<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-${n}"/></svg>`;
+    const svg = (n) => `<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-${n}"/></svg>`;
     function renderCard(c) {
         const k = KIND[c.kind] || [c.kind, "accent"];
         const info = describe(c);
