@@ -155,12 +155,11 @@ def render(current, is_index):
           '                <div class="zs__utils">',
           f'                    <button class="zs__item" type="button" id="m-fs-btn" data-tip="Fullscreen" aria-label="Fullscreen">{ic("maximize")}<span class="zs__label">Fullscreen</span></button>',
           f'                    <button class="zs__item" type="button" id="m-share-btn" data-tip="Share" aria-label="Share">{ic("share-2")}<span class="zs__label">Share</span></button>',
-          f'                    <button class="zs__item" type="button" id="m-chat-btn" data-tip="Chat" aria-label="Chat">{ic("message-circle")}<span class="zs__label">Chat</span></button>',
           '                </div>',
           f'                <a class="zs__item" href="/login" data-auth-link data-tip="Sign in" aria-label="Sign in">{ic("log-in")}<span class="zs__label" data-auth-label>Sign in</span></a>',
           f'                <a class="zs__ver" id="zs-ver" href="https://github.com/hoanb1/zenivo/releases" target="_blank" rel="noopener noreferrer" title="Release notes / GitHub" aria-label="Release notes / GitHub">{ic("tag")}<span id="app-version" data-app-version>Zenivo</span>{ic("arrow-up-right")}</a>',
           '            </div>', '        </div>',
-          f'        <button class="zs__edge" type="button" id="zs-edge" tabindex="-1" aria-hidden="true" title="Collapse menu (Ctrl+B)">{ic("chevron-left")}</button>', '    </aside>', '    <!-- chrome:end -->']
+          '    </aside>', '    <!-- chrome:end -->']
     return "\n".join(o)
 
 

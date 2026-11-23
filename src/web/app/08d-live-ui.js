@@ -163,11 +163,6 @@
         tone("now-cloud", Number.isFinite(cp) ? (cp < 30 ? "ok" : cp < 70 ? "warn" : "bad") : "");
         set("now-exp", compactExp((($("telem-exp") || {}).textContent || "--").replace(/\s+/g, "") || "--"));
         set("now-temp", wxTemp != null ? `${Math.round(wxTemp)}°C` : "--");
-        const on = navigator.onLine !== false;
-        icon("now-online-ic", on ? "wifi" : "wifi-off");
-        set("now-online-t", on ? "Online" : "Offline");
-        { const t = $("now-online"); if (t) { t.title = on ? "Online" : "Offline"; t.setAttribute("aria-label", on ? "Online" : "Offline"); } }
-        tone("now-online", on ? "ok" : "bad");
         const em = /^\s*(\d+)/.exec(($("live-events-count") || {}).textContent || "");
         set("now-events", em ? em[1] : "--");
     }

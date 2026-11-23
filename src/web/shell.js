@@ -125,7 +125,6 @@
         if (t) {
             const lab = (on ? "Expand menu" : "Collapse menu") + " (Ctrl+B)";
             t.setAttribute("aria-expanded", on ? "false" : "true"); t.setAttribute("aria-label", lab); t.title = lab;
-            const eg = $("zs-edge"); if (eg) eg.title = lab;
         }
         document.querySelectorAll(".zs__item").forEach((el) => {
             const tip = el.getAttribute("aria-label");
@@ -156,8 +155,6 @@
         const t = $("zs-toggle");
         const flip = () => setCollapsed(!document.documentElement.classList.contains("zs-collapsed"), true);
         if (t) t.addEventListener("click", flip);
-        const eg = $("zs-edge");
-        if (eg) eg.addEventListener("click", flip);
         document.addEventListener("keydown", (e) => {
             if (!DESKTOP.matches || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "b") return;
             const a = e.target; if (a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) return;
@@ -193,11 +190,11 @@
     function init() {
         markActive();
         applyRv(readPref(), false);
-        const nv = $("btn-night-vision"), fs = $("m-fs-btn"), sh = $("m-share-btn"), ch = $("m-chat-btn");
+        const nv = $("btn-night-vision"), fs = $("m-fs-btn"), sh = $("m-share-btn");
         if (nv) nv.addEventListener("click", () => applyRv(!rvOn(), true));
-        if (fs) fs.addEventListener("click", () => { closeMenu(); fullscreen(); });
+        if (fs && $("btn-fullscreen")) fs.remove(); // one function, one control: the picture has its own
+        else if (fs) fs.addEventListener("click", () => { closeMenu(); fullscreen(); });
         if (sh) sh.addEventListener("click", () => { closeMenu(); share(); });
-        if (ch) ch.addEventListener("click", () => { closeMenu(); const l = document.querySelector(".zcw-launch"); if (l) l.click(); });
         initNav();
         loadChat(); loadName();
         tickClock(); setInterval(tickClock, 1000);

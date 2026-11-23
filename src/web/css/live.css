@@ -68,7 +68,7 @@
 
 /* ---------- Status strip: icon + value tiles ---------- */
 #tab-live .now-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-2); }
-@media (min-width: 640px) { #tab-live .now-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+@media (min-width: 640px) { #tab-live .now-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 #tab-live .now-tile { display: flex; align-items: center; gap: var(--s-2); min-height: var(--tap); padding: var(--s-2); background: var(--c-surface-1); border: 1px solid var(--c-border); border-radius: var(--r-md); min-width: 0; }
 #tab-live .now-tile .ds-icon { flex: none; color: var(--c-text-2); }
 #tab-live .now-tile .now-t { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
