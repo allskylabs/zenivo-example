@@ -180,3 +180,12 @@ Screenshots: `events-grid-after-1568.jpg`, `events-grid-after-390.jpg` (before =
 Cause: `.viewport-wrapper` was `width:100%; aspect-ratio; max-height:78vh`. When the height cap bites (4:3 or square frame on a wide column) the box stays full width, so the picture is letterboxed with dark side bands and the overlays (LIVE, info, zoom, layers) sit on the bands.
 Fix: stage width = `min(100%, 78dvh * w/h)` (`--fw/--fh` set by the server in the page shell and by JS from the real frame size), centred; overlays are children of the stage, so they anchor to the image box. Same for the event viewer (`.ev-zoom`, 72dvh, `--ev-w/--ev-h`). Fisheye is never cropped (contain). Checked: 16:9 frame 840x473 unchanged; simulated 4:3 at 757 px height = 787x590 box (was 842x590). Shot: `live-frame-sim43-1568.jpg` (the 16:9 test frame inside the 4:3 box, so bands there are the simulation).
 Left as is: full.html (OBS overlay, intentional cover with a fit-contain switch), obs_dock preview (16:9 box, contain, max 240px), Community dialog (already follows the image, Update 5).
+
+## Update 8: visible text restored (Request F)
+Rule: icon + SHORT visible label wherever meaning, status or a value matters; tooltips only for secondary detail.
+- Topbar: "Online" word beside the dot (`pages/00-shell.html` `#zt-status-t`, `shell.js` tick), camera + exposure "IMX335 · 0.409 s" on desktop (`#zt-cam`, `css/shell.css` `.zt-cam`, shown >=900px), "UTC" caption on the UTC clock (`.zt-utc::before`), "Night" caption on the night-vision button (>=900px).
+- Live tiles: Cloud / Sky / Exposure / Temp / Events / Link labels above the value (`pages/10-live.html:41-46`, `css/live.css` `.now-t/.now-l`).
+- Live "Overhead now" tabs: Flights / Sats / Sondes names (`pages/10-live.html` `.ov-t`; hidden under 400px).
+- Sky toolbar: Layers / Planets / 3D / Now captions on desktop (`sky.html` `data-cap`, `css/sky.css`).
+- Overhead page tabs and Events/Archive segments already carried names (checked).
+Screenshots: `critique/live-text-restored-1568.png`, `live-text-restored-390.jpg`, `sky-captions-1568.jpg`.
