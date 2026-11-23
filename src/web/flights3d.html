@@ -32,129 +32,7 @@
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
     <link rel="stylesheet" href="/style.css?v=20261122m">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; }
-        body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-sans); overflow: hidden; }
-        /* Shared shell (style.css "Night Sky shell"): fix it to the viewport; the map fills #stage, the area beside the rail */
-        .app-shell { height: calc(100vh - var(--topbar-h)); min-height: 0; }
-        #stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
-        #map { position: absolute; inset: 0; background: var(--bg-primary); }
-        .ac-flag { width: 18px; height: 13px; object-fit: cover; border-radius: 2px; flex: 0 0 18px; vertical-align: -2px; margin-right: 6px; }
-        .ac-logo { width: 16px; height: 16px; object-fit: contain; background: #f8fafc; border-radius: 3px; flex: 0 0 16px; margin-right: 6px; }
-        #list li .id { display: flex; align-items: center; min-width: 0; }
-        #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-        .ac-label {
-            position: absolute; transform: translate(-50%, -100%); white-space: nowrap; pointer-events: auto; cursor: pointer;
-            font: 600 11px/1.2 var(--font-mono); color: var(--text-primary); text-shadow: 0 1px 2px #000;
-            background: rgba(7, 10, 18, 0.72); border: 1px solid rgba(148, 163, 184, 0.22);
-            padding: 2px 5px; border-radius: 4px; user-select: none;
-        }
-        .ac-label small { display: block; font-weight: 400; font-size: 10px; color: var(--text-secondary); }
-        .ac-label.in-view { color: var(--warning); border-color: rgba(245, 158, 11, 0.45); }
-        .ph { font-size: 11px; font-weight: 600; margin-left: 5px; }
-        .ph.to, .ph.up { color: #34d399; } .ph.ldg, .ph.down { color: #fbbf24; }
-        .ac-label.selected { background: color-mix(in srgb, var(--accent) 32%, rgba(7, 10, 18, 0.88)); border-color: var(--accent); z-index: 5; }
-        .place { font: 500 11px var(--font-sans); color: #8ea3c0; text-shadow: 0 1px 3px #000, 0 0 2px #000; white-space: nowrap; pointer-events: none; }
-        .place.airport { color: #c4b5fd; }
-        .place.ring { color: #38bdf8; opacity: 0.75; font-size: 11px; }
-        #stage.labels-off .ac-label:not(.selected), #stage.labels-off .place { display: none !important; }
-        #stage.globe-far .place { display: none !important; }
-        #stage.zoom-mid .place.city, #stage.zoom-mid .place.airport:not(.vn-airport) { display: none !important; }
-        .panel {
-            position: absolute; background: color-mix(in srgb, var(--bg-card) 92%, transparent); border: 1px solid var(--border-color);
-            border-radius: var(--radius-md, 8px); backdrop-filter: blur(6px); font-size: 13px;
-        }
-        #left-col { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: calc(100% - 24px); }
-        #left-col .panel { position: static; }
-        #top { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
-        #top .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-                #top h1 { font-size: 15px; font-weight: 600; }
-        #status { color: var(--text-secondary); font-size: 12px; }
-        .btns { display: flex; gap: 6px; flex-wrap: wrap; }
-        button {
-            background: var(--bg-card-sub); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px;
-            padding: 4px 9px; min-height: 36px; font: inherit; font-size: 12px; cursor: pointer;
-        }
-        button:hover { border-color: var(--accent); }
-        button.on { border-color: var(--accent); color: var(--accent); }
-        button[hidden] { display: none; }
-        #list { top: 12px; right: 12px; width: 370px; max-width: calc(100% - 24px); max-height: calc(100% - 24px); display: flex; flex-direction: column; }
-        #list h2 { font-size: 13px; font-weight: 600; padding: 9px 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; }
-        #list ul { list-style: none; overflow-y: auto; }
-        #list li { padding: 6px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; white-space: nowrap; font-family: var(--font-mono); font-size: 12px; }
-        #list li:hover, #list li.selected { background: var(--bg-card-sub); }
-        #list li.in-view .cs { color: var(--warning); }
-        #list li .id { display: flex; align-items: center; min-width: 0; flex: 1 1 auto; overflow: hidden; }
-        #list li .meta { color: var(--text-secondary); font-size: 12px; flex: 0 0 auto; text-align: right; }
-        #layers { padding: 10px 12px; width: 200px; display: flex; flex-direction: column; gap: 4px; }
-        #layers h2 { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
-        #layers label { display: flex; justify-content: space-between; align-items: center; min-height: 28px; font-size: 13px; cursor: pointer; }
-        #layers input { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
-        #cam-foot { position: absolute; left: 12px; bottom: 12px; height: 28px; padding: 0 12px; border-radius: 999px; display: none; align-items: center; gap: 8px;
-            font: 12px var(--font-mono); color: var(--text-secondary); white-space: nowrap; }
-        #cam-foot.show { display: flex; }
-        #cam-foot .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success, #10b981); }
-        #info-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
-        #info-stats div { background: var(--bg-card-sub); border-radius: 6px; padding: 6px 8px; }
-        #info-stats small { display: block; font-size: 12px; color: var(--text-secondary); }
-        #info-stats b { font: 600 15px var(--font-mono); }
-        #info-sub { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
-        #info { left: 12px; bottom: 48px; max-height: calc(100% - 176px); overflow-y: auto; padding: 10px 12px; width: 270px; z-index: 20; display: none; }
-        #info.show { display: block; }
-        #info h3 { font: 600 15px var(--font-mono); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-        #info-logo { display: block; max-width: 100%; max-height: 34px; margin: 2px 0 6px; background: #f8fafc; border-radius: 4px; padding: 3px 6px; }
-        #info-logo[hidden] { display: none; }
-        #info-photo { display: block; width: 100%; max-height: 120px; object-fit: cover; border-radius: 6px; margin: 0 0 4px; }
-        #info-photo[hidden] { display: none; }
-        #info-photo-credit { font-size: 10px; color: var(--text-secondary); margin: 0 0 6px; text-align: right; }
-        #info-photo-credit[hidden] { display: none; }
-        #info-model { display: block; width: 100%; height: 130px; margin: 0 0 6px; border-radius: 6px;
-            background: radial-gradient(ellipse at 50% 60%, #1b2a44 0%, #0b1220 75%); }
-        #info dl { display: grid; grid-template-columns: auto auto; gap: 2px 14px; font-size: 12px; }
-        #info dt { color: var(--text-secondary); }
-        #info dd { font-family: var(--font-mono); text-align: right; }
-        #info .links { margin-top: 8px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-        #info a { color: var(--accent); font-size: 12px; }
-        #info a[hidden] { display: none; }
-        #fr24-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 340px; max-width: calc(100% - 24px);
-            padding: 14px 16px; z-index: 40; display: none; flex-direction: column; gap: 10px; box-shadow: 0 16px 40px rgba(0,0,0,0.65); }
-        #fr24-modal.show { display: flex; }
-        #fr24-modal h3 { font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
-        #fr24-modal .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
-        #fr24-modal input[type="text"], #fr24-modal input[type="email"], #fr24-modal input[type="password"] {
-            background: var(--bg-card-sub); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px;
-            padding: 6px 8px; font: 12px var(--font-mono);
-        }
-        #fr24-modal .badge-row { display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-sub);
-            padding: 6px 8px; border-radius: 6px; font-size: 12px; }
-        #fr24-modal .tier { font-family: var(--font-mono); font-weight: 600; color: var(--accent); }
-        #fr24-msg { font-size: 12px; color: var(--text-secondary); min-height: 16px; }
-        .src-tag { font-size: 10px; padding: 1px 4px; border-radius: 3px; background: rgba(56, 189, 248, 0.16); color: #38bdf8; margin-left: 5px; }
-        .src-tag.local { background: rgba(16, 185, 129, 0.18); color: #34d399; }
-        .legend { display: flex; gap: 10px; font-size: 12px; color: var(--text-secondary); align-items: center; flex-wrap: wrap; }
-        .legend .ramp { width: 120px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #ffd166, #06d6a0, #38bdf8, #8b5cf6, #f472b6); }
-        .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
-        .station-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; box-shadow: 0 0 10px var(--accent); }
-        #cam-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 6px 8px 6px 12px; display: none;
-            align-items: center; gap: 10px; font-size: 12px; white-space: nowrap; }
-        #cam-badge.show { display: flex; }
-        #cam-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444; animation: blink 1.2s infinite; }
-        @keyframes blink { 50% { opacity: 0.3; } }
-        #list-toggle, #left-toggle { display: none; }
-        @media (max-width: 700px) {
-            #left-col { right: 12px; }
-            #left-toggle { display: inline-block; min-height: 28px; margin-left: auto; }
-            #left-col.collapsed #top > :not(:first-child), #left-col.collapsed #layers { display: none; }
-            #top h1 { font-size: 14px; }
-            #cam-foot { display: none !important; }
-            #list { top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 40vh; }
-            #list.collapsed ul { display: none; }
-            #list-toggle { display: inline-block; }
-            #info { bottom: 70px; top: auto; right: 12px; width: auto; max-height: 40vh; overflow-y: auto; }
-            #cam-badge { top: auto; bottom: 12px; }
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/scene3d.css?v=20261123a">
     <script type="importmap">
         { "imports": {
             "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -248,55 +126,47 @@
     <div class="app-main">
 
     <div id="stage">
-    <div id="map"></div>
+<div id="map"></div>
     <div id="labels"></div>
 
     <div id="left-col" class="collapsed">
-    <div id="top" class="panel">
-        <div class="row">
-            <h1>Flights 3D</h1>
-            <span id="status">Loading…</span>
-            <button id="left-toggle" title="Show / hide panels">▾</button>
+        <div id="top" class="sc-panel">
+            <div class="sc-row">
+                <span class="sc-dot" aria-hidden="true"></span>
+                <span id="status">Loading…</span>
+                <button id="left-toggle" class="ds-btn ds-btn--icon ds-btn--ghost" type="button" aria-label="Show or hide controls" title="Show or hide controls"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></button>
+            </div>
+            <div class="sc-bar">
+                <button id="btn-base-terrain" class="ds-btn ds-btn--icon on" type="button" aria-label="Dark 3D terrain" title="Dark 3D terrain"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-map"></use></svg></button>
+                <button id="btn-base-sat" class="ds-btn ds-btn--icon" type="button" aria-label="Satellite imagery" title="Satellite imagery"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-image"></use></svg></button>
+                <button id="btn-base-google" class="ds-btn ds-btn--icon" type="button" hidden aria-label="Google Maps, dark" title="Google Maps, dark"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layout-grid"></use></svg></button>
+                <button id="btn-trails" class="ds-chip on" type="button" aria-label="Flight paths: tap to change length" title="Flight paths: tap to change length"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-activity"></use></svg><span class="lbl">Trails 10 min</span></button>
+                <button id="btn-labels" class="ds-chip on" type="button" aria-label="Callsign labels" title="Callsign labels"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-type"></use></svg><span class="lbl">Labels</span></button>
+                <button id="btn-home" class="ds-btn ds-btn--icon" type="button" aria-label="Back to the station" title="Back to the station"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg></button>
+                <button id="btn-globe" class="ds-btn ds-btn--icon" type="button" aria-label="Zoom out to the 3D globe" title="Zoom out to the 3D globe"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-compass"></use></svg></button>
+                <button id="btn-fr24" class="ds-chip on" type="button" aria-label="Flightradar24 account settings" title="Flightradar24 account settings"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-radio"></use></svg><span class="lbl">FR24 Global</span></button>
+                <button id="btn-layers" class="ds-btn ds-btn--icon" type="button" data-ds-open="layers-sheet" aria-label="Layers" title="Layers"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layers"></use></svg></button>
+            </div>
+            <div class="legend">
+                <span><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg></span><span>0</span><span class="ramp"></span><span>12 km</span>
+                <span><i class="k-cam"></i><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg></span>
+            </div>
         </div>
-        <div class="btns">
-            <button id="btn-base-terrain" class="on" title="Dark 3D terrain">Terrain</button>
-            <button id="btn-base-sat" title="Satellite imagery (no labels or borders)">Satellite</button>
-            <button id="btn-base-google" hidden title="Google Maps, dark">Google</button>
-            <button id="btn-trails" class="on" title="Flight paths: click to change length">Trails 10 min</button>
-            <button id="btn-labels" class="on" title="Callsign labels">Labels</button>
-            <button id="btn-home" title="Back to the station">Station</button>
-            <button id="btn-globe" title="Zoom out to the 3D globe">Globe</button>
-            <button id="btn-fr24" class="on" title="Flightradar24 Global &amp; Enterprise account settings">FR24 Global</button>
-        </div>
-        <div class="legend">
-            <span>Altitude</span><span>0</span><span class="ramp"></span><span>12 km</span>
-            <span><i style="background:var(--warning)"></i>In camera view</span>
-        </div>
-    </div>
-
-    <div id="layers" class="panel">
-        <h2>Layers</h2>
-        <label>Aircraft <input type="checkbox" id="lay-aircraft" checked></label>
-        <label>Global (FR24) <input type="checkbox" id="lay-fr24" checked></label>
-        <label>Labels <input type="checkbox" id="lay-labels" checked></label>
-        <label>Trails <input type="checkbox" id="lay-trails" checked></label>
-        <label>Camera frustum <input type="checkbox" id="lay-frustum" checked></label>
-        <label>Airports <input type="checkbox" id="lay-airports" checked></label>
-        <label>Terrain <input type="checkbox" id="lay-terrain" checked></label>
-    </div>
     </div><!-- #left-col -->
 
-    <div id="list" class="panel collapsed">
-        <h2><span>Aircraft</span><span><span id="count">--</span> <button id="list-toggle">▾</button></span></h2>
+    <div id="list" class="collapsed">
+        <div class="sc-head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg><span class="sc-count" id="count">--</span>
+            <button id="list-toggle" class="ds-btn ds-btn--icon ds-btn--ghost" type="button" aria-label="Show or hide the aircraft list" title="Aircraft list"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-up"></use></svg></button></div>
         <ul id="ac-list"></ul>
     </div>
 
-    <div id="cam-foot" class="panel"><span class="dot"></span><span id="cam-foot-text"></span></div>
+    <div id="cam-foot" class="sc-panel"><span class="sc-dot"></span><span id="cam-foot-text"></span></div>
 
-    <div id="cam-badge" class="panel"><span class="dot"></span><span id="cam-text"></span><button id="cam-stop" title="Stop (Esc)">Stop</button></div>
+    <div id="cam-badge" class="sc-panel"><span class="sc-dot"></span><span id="cam-text"></span><button id="cam-stop" class="ds-btn ds-btn--icon ds-btn--ghost" type="button" aria-label="Stop (Esc)" title="Stop (Esc)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></div>
 
-    <div id="info" class="panel">
-        <h3><span id="info-cs"></span><button id="info-close" title="Close">✕</button></h3>
+    <div id="info">
+        <div class="sc-grab"></div>
+        <div class="sc-title"><span id="info-cs"></span><button id="info-close" class="ds-btn ds-btn--icon ds-btn--ghost" type="button" aria-label="Close" title="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></div>
         <div id="info-sub"></div>
         <div id="info-stats"></div>
         <canvas id="info-model" title="Drag to turn"></canvas>
@@ -305,39 +175,42 @@
         <img id="info-logo" alt="" hidden>
         <dl id="info-dl"></dl>
         <div class="links">
-            <button id="btn-track" title="Keep the camera on this aircraft; rotate and zoom around it">Track</button>
-            <button id="btn-chase" title="Fly behind the aircraft, turning with it">Chase</button>
-            <a id="info-fr24" target="_blank" rel="noopener" hidden>FR24 ↗</a>
-            <a id="info-link" target="_blank" rel="noopener">ADS-B Exchange ↗</a>
+            <button id="btn-track" class="ds-btn ds-btn--primary" type="button" aria-label="Track" title="Keep the camera on this aircraft; rotate and zoom around it"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg><span>Track</span></button>
+            <button id="btn-chase" class="ds-btn" type="button" aria-label="Chase" title="Fly behind the aircraft, turning with it"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg><span>Chase</span></button>
+            <a id="info-fr24" class="ds-btn ds-btn--icon" target="_blank" rel="noopener" hidden aria-label="Open in Flightradar24" title="Open in Flightradar24"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-arrow-up-right"></use></svg></a>
+            <a id="info-link" class="ds-btn ds-btn--icon" target="_blank" rel="noopener" aria-label="Open in ADS-B Exchange" title="Open in ADS-B Exchange"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-share-2"></use></svg></a>
         </div>
     </div>
 
-    <div id="fr24-modal" class="panel" role="dialog" aria-label="Flightradar24 Enterprise Account">
-        <h3><span>Flightradar24 Global &amp; Enterprise</span><button id="fr24-close" title="Close">✕</button></h3>
-        <div class="badge-row">
-            <span>Status: <b id="fr24-tier" class="tier">Global Live</b></span>
-            <span id="fr24-worldwide">-- worldwide</span>
+    <div id="fr24-modal" class="ds-card" role="dialog" aria-label="Flightradar24 account">
+        <div class="sc-title"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-radio"></use></svg><span>Flightradar24</span><button id="fr24-close" class="ds-btn ds-btn--icon ds-btn--ghost" type="button" aria-label="Close" title="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></div>
+        <div class="sc-badge">
+            <span><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-circle-check"></use></svg> <b id="fr24-tier">Global Live</b></span>
+            <span id="fr24-worldwide">--</span>
         </div>
-        <label style="display:flex;justify-content:space-between;align-items:center;font-size:13px;cursor:pointer">
-            <span>Combine FR24 Global Data</span>
-            <input type="checkbox" id="fr24-enabled" style="accent-color:var(--accent);width:16px;height:16px">
-        </label>
-        <div class="field">
-            <span>Enterprise Account Email</span>
-            <input type="email" id="fr24-email" name="fr24-account" placeholder="you@company.com" autocomplete="off">
-        </div>
-        <div class="field">
-            <span>Enterprise Password (used once to obtain token)</span>
-            <input type="password" id="fr24-password" placeholder="••••••••••••" autocomplete="new-password">
-        </div>
-        <div class="field">
-            <span>Or Subscription Key / Token (_frPl)</span>
-            <input type="text" id="fr24-token" placeholder="Optional direct FR24 token">
-        </div>
+        <label class="sc-set"><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-zap"></use></svg><span>Combine FR24 Global data</span><span class="ds-switch"><input type="checkbox" id="fr24-enabled"><span class="ds-switch__track"></span></span></label>
+        <label class="sc-field"><span>Email</span><input type="email" id="fr24-email" name="fr24-account" placeholder="you@company.com" autocomplete="off"></label>
+        <label class="sc-field"><span>Password (used once)</span><input type="password" id="fr24-password" placeholder="••••••••••••" autocomplete="new-password"></label>
+        <label class="sc-field"><span>Token (_frPl)</span><input type="text" id="fr24-token" placeholder="Optional"></label>
         <div id="fr24-msg"></div>
-        <div class="btns" style="justify-content:flex-end">
-            <button id="fr24-clear" title="Clear saved token">Clear Token</button>
-            <button id="fr24-save" class="on">Save &amp; Connect</button>
+        <div class="sc-row" style="justify-content:flex-end">
+            <button id="fr24-clear" class="ds-btn" type="button" aria-label="Clear saved token" title="Clear saved token"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-trash-2"></use></svg></button>
+            <button id="fr24-save" class="ds-btn ds-btn--primary" type="button" aria-label="Save and connect" title="Save and connect"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg><span>Save</span></button>
+        </div>
+    </div>
+
+    <div class="ds-sheet" id="layers-sheet" role="dialog" aria-label="Layers">
+        <div class="ds-sheet__scrim" data-ds-close></div>
+        <div class="ds-sheet__panel">
+            <div class="ds-sheet__grab"></div>
+            <div class="ds-sheet__head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layers"></use></svg><span class="ds-sheet__title">Layers</span><button class="ds-btn ds-btn--icon ds-btn--ghost" type="button" data-ds-close aria-label="Close" title="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></div>
+            <label class="sc-set"><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg><span>Aircraft</span><span class="ds-switch"><input type="checkbox" id="lay-aircraft" checked><span class="ds-switch__track"></span></span></label>
+            <label class="sc-set"><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-radio"></use></svg><span>Global (FR24)</span><span class="ds-switch"><input type="checkbox" id="lay-fr24" checked><span class="ds-switch__track"></span></span></label>
+            <label class="sc-set"><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-type"></use></svg><span>Labels</span><span class="ds-switch"><input type="checkbox" id="lay-labels" checked><span class="ds-switch__track"></span></span></label>
+            <label class="sc-set"><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-activity"></use></svg><span>Trails</span><span class="ds-switch"><input type="checkbox" id="lay-trails" checked><span class="ds-switch__track"></span></span></label>
+            <label class="sc-set"><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg><span>Camera frustum</span><span class="ds-switch"><input type="checkbox" id="lay-frustum" checked><span class="ds-switch__track"></span></span></label>
+            <label class="sc-set" hidden><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-map-pin"></use></svg><span>Airports</span><span class="ds-switch"><input type="checkbox" id="lay-airports" checked><span class="ds-switch__track"></span></span></label>
+            <label class="sc-set"><svg class="ds-icon sc-ico" aria-hidden="true"><use href="/static/icons.svg#i-map"></use></svg><span>Terrain</span><span class="ds-switch"><input type="checkbox" id="lay-terrain" checked><span class="ds-switch__track"></span></span></label>
         </div>
     </div>
     </div><!-- #stage -->
@@ -1643,7 +1516,7 @@
                 const tier = d.fr24.account_tier === "enterprise" ? "Enterprise" : "Global Live";
                 $("fr24-tier").textContent = tier;
                 $("fr24-worldwide").textContent = d.fr24.global_total ? `${Number(d.fr24.global_total).toLocaleString()} worldwide` : "-- worldwide";
-                $("btn-fr24").textContent = d.fr24.account_tier === "enterprise" ? "FR24 Enterprise" : "FR24 Global";
+                $("btn-fr24").querySelector(".lbl").textContent = d.fr24.account_tier === "enterprise" ? "FR24 Enterprise" : "FR24 Global";
                 $("btn-fr24").classList.toggle("on", !!layerOn.fr24 && !!d.fr24.enabled);
             }
             if (!d.enabled && !(d.fr24 && d.fr24.enabled)) { $("status").textContent = "ADS-B is turned off (Settings)"; return; }
@@ -2404,7 +2277,7 @@
         function setLabels(on) {
             showLabels = !!on;
             $("btn-labels").classList.toggle("on", showLabels);
-            $("btn-labels").textContent = showLabels ? "Labels" : "Labels off";
+            $("btn-labels").querySelector(".lbl").textContent = showLabels ? "Labels" : "Labels off";
             if ($("lay-labels")) $("lay-labels").checked = showLabels;
             $("stage").classList.toggle("labels-off", !showLabels);
             map.triggerRepaint();
@@ -2435,8 +2308,8 @@
         $("btn-trails").onclick = (e) => {
             trailIdx = (trailIdx + 1) % TRAIL_CHOICES.length;
             trailSpan = TRAIL_CHOICES[trailIdx];
-            e.target.textContent = trailSpan ? `Trails ${trailSpan / 60} min` : "Trails off";
-            e.target.classList.toggle("on", !!trailSpan);
+            e.currentTarget.querySelector(".lbl").textContent = trailSpan ? `Trails ${trailSpan / 60} min` : "Trails off";
+            e.currentTarget.classList.toggle("on", !!trailSpan);
             for (const s of aircraft.values()) buildTrail(s);
             map.triggerRepaint();
         };
