@@ -22,13 +22,13 @@
                             <div class="sel-ring" id="sel-ring" hidden aria-hidden="true"></div>
                             <div class="vp-bar">
                                 <div class="zoom-controls" role="group" aria-label="Zoom">
-                                    <button type="button" id="btn-zoom-out" class="zoom-btn" title="Zoom out" aria-label="Zoom out"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-minus"></use></svg></button>
+                                    <button type="button" id="btn-zoom-out" class="zoom-btn" title="Zoom out" aria-label="Zoom out"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-minus"></use></svg></button>
                                     <button type="button" id="btn-zoom-reset" class="zoom-btn zoom-level" title="Fit to view" aria-label="Fit to view">100%</button>
-                                    <button type="button" id="btn-zoom-in" class="zoom-btn" title="Zoom in" aria-label="Zoom in"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-plus"></use></svg></button>
+                                    <button type="button" id="btn-zoom-in" class="zoom-btn" title="Zoom in" aria-label="Zoom in"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plus"></use></svg></button>
                                 </div>
                                 <span class="vp-hint" id="vp-hint" hidden></span>
-                                <button type="button" id="btn-layers" class="vp-btn vp-layers" aria-haspopup="dialog" aria-controls="layers-sheet" title="Layers" aria-label="Layers"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-layers"></use></svg><b id="layers-count">0</b></button>
-                                <button type="button" id="btn-fullscreen" class="vp-btn vp-fs" title="Fullscreen" aria-label="Fullscreen"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-maximize"></use></svg></button>
+                                <button type="button" id="btn-layers" class="vp-btn vp-layers" aria-haspopup="dialog" aria-controls="layers-sheet" title="Layers" aria-label="Layers"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layers"></use></svg><b id="layers-count">0</b></button>
+                                <button type="button" id="btn-fullscreen" class="vp-btn vp-fs" title="Fullscreen" aria-label="Fullscreen"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg></button>
                             </div>
                         </div>
                     </div>
@@ -38,25 +38,25 @@
 
                     <!-- Status strip: icon + value, nothing else -->
                     <div class="now-strip" id="now-strip" role="group" aria-label="Right now">
-                        <div class="now-tile" title="Cloud cover" aria-label="Cloud cover"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-cloud"></use></svg><b id="now-cloud">--</b></div>
-                        <div class="now-tile" title="Sky" aria-label="Sky"><svg class="ds-icon" id="now-sky-ic" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-moon"></use></svg><b id="now-sky">--</b></div>
-                        <div class="now-tile" title="Exposure" aria-label="Exposure"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-camera"></use></svg><b id="now-exp">--</b></div>
-                        <div class="now-tile" title="Temperature" aria-label="Temperature"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-thermometer"></use></svg><span class="now-l" id="now-temp-l" hidden>Temp</span><b id="now-temp">--</b></div>
-                        <div class="now-tile" title="Detected tonight" aria-label="Detected tonight"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-sparkles"></use></svg><b id="now-events">--</b></div>
-                        <div class="now-tile now-online" id="now-online" title="Online" aria-label="Online"><svg class="ds-icon" id="now-online-ic" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-wifi"></use></svg><b id="now-online-t" class="sr-only">online</b></div>
+                        <div class="now-tile" title="Cloud cover" aria-label="Cloud cover"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg><b id="now-cloud">--</b></div>
+                        <div class="now-tile" title="Sky" aria-label="Sky"><svg class="ds-icon" id="now-sky-ic" aria-hidden="true"><use href="/static/icons.svg#i-moon"></use></svg><b id="now-sky">--</b></div>
+                        <div class="now-tile" title="Exposure" aria-label="Exposure"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg><b id="now-exp">--</b></div>
+                        <div class="now-tile" title="Temperature" aria-label="Temperature"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-thermometer"></use></svg><span class="now-l" id="now-temp-l" hidden>Temp</span><b id="now-temp">--</b></div>
+                        <div class="now-tile" title="Detected tonight" aria-label="Detected tonight"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><b id="now-events">--</b></div>
+                        <div class="now-tile now-online" id="now-online" title="Online" aria-label="Online"><svg class="ds-icon" id="now-online-ic" aria-hidden="true"><use href="/static/icons.svg#i-wifi"></use></svg><b id="now-online-t" class="sr-only">online</b></div>
                     </div>
 
                     <!-- Exposure: one row when closed; admin changes it, guests see it read-only -->
                     <details class="ds-card live-exp" id="exposure-card">
-                    <summary class="live-exp__sum"><span class="live-exp__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-sliders-horizontal"></use></svg></span><span class="exp-summary mono" id="exp-summary"><span id="telem-exp">--</span> &middot; <span id="telem-gain">--</span> &middot; <span id="telem-lock">Auto</span></span><span class="badge badge-accent" id="active-profile-badge" hidden>AUTO EPHEMERIS</span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-down"></use></svg></span></summary>
+                    <summary class="live-exp__sum"><span class="live-exp__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg></span><span class="exp-summary mono" id="exp-summary"><span id="telem-exp">--</span> &middot; <span id="telem-gain">--</span> &middot; <span id="telem-lock">Auto</span></span><span class="badge badge-accent" id="active-profile-badge" hidden>AUTO EPHEMERIS</span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></span></summary>
 
-                    <p class="exp-signin" id="exp-signin" role="note"><a href="/login?next=%2Flive" id="exp-signin-link" title="Sign in as admin to change exposure" aria-label="Sign in as admin to change exposure"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-log-in"></use></svg><span>Sign in</span></a></p>
+                    <p class="exp-signin" id="exp-signin" role="note"><a href="/login?next=%2Flive" id="exp-signin-link" title="Sign in as admin to change exposure" aria-label="Sign in as admin to change exposure"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-log-in"></use></svg><span>Sign in</span></a></p>
 
                     <div class="exp-preset-chips" role="group" aria-label="Exposure presets">
-                    <button type="button" class="chip-preset" data-preset="moonless" data-exp="15" data-gain="36" title="Moonless: 15 s, 36 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-moon-star"></use></svg>Moonless</button>
-                    <button type="button" class="chip-preset" data-preset="twilight" data-exp="2" data-gain="18" title="Twilight: 2 s, 18 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-sun"></use></svg>Twilight</button>
-                    <button type="button" class="chip-preset" data-preset="fullmoon" data-exp="0.5" data-gain="0" title="Full moon: 0.5 s, 0 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-moon"></use></svg>Full moon</button>
-                    <button type="button" class="chip-preset active" data-preset="custom" title="Keep the sliders as they are"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-sliders-horizontal"></use></svg>Custom</button>
+                    <button type="button" class="chip-preset" data-preset="moonless" data-exp="15" data-gain="36" title="Moonless: 15 s, 36 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon-star"></use></svg>Moonless</button>
+                    <button type="button" class="chip-preset" data-preset="twilight" data-exp="2" data-gain="18" title="Twilight: 2 s, 18 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sun"></use></svg>Twilight</button>
+                    <button type="button" class="chip-preset" data-preset="fullmoon" data-exp="0.5" data-gain="0" title="Full moon: 0.5 s, 0 dB"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon"></use></svg>Full moon</button>
+                    <button type="button" class="chip-preset active" data-preset="custom" title="Keep the sliders as they are"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg>Custom</button>
                     </div>
 
                     <!-- Shutter Slider -->
@@ -109,7 +109,7 @@
                     <input type="range" id="range-target" min="5" max="250" step="1" value="85" />
                     </div>
 
-                    <span class="live-info" tabindex="0" role="note" aria-label="Touching a slider locks it; press Locked to hand it back to Auto. Nothing locked: Auto computes shutter and gain. Lock one and Auto computes only the other. Both locked holds the values." title="Touching a slider locks it; press Locked to hand it back to Auto. Nothing locked: Auto computes shutter and gain. Lock one and Auto computes only the other. Both locked holds the values."><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-info"></use></svg></span>
+                    <span class="live-info" tabindex="0" role="note" aria-label="Touching a slider locks it; press Locked to hand it back to Auto. Nothing locked: Auto computes shutter and gain. Lock one and Auto computes only the other. Both locked holds the values." title="Touching a slider locks it; press Locked to hand it back to Auto. Nothing locked: Auto computes shutter and gain. Lock one and Auto computes only the other. Both locked holds the values."><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></span>
                     <div id="control-alert" class="alert-box hidden"></div>
                     </details>
                     <script>try{if(localStorage.getItem("zenivo.expOpen")==="1")document.getElementById("exposure-card").open=true}catch(e){}</script>
@@ -117,7 +117,7 @@
                 <div class="live-pair">
                 <div class="ds-card cloud-card">
                     <div class="live-head">
-                        <span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-cloud"></use></svg></span>
+                        <span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg></span>
                         <span class="cloud-big" id="cloud-big"><b id="cloud-big-n">--</b><span id="cloud-big-t">mean</span></span>
                         <div class="cloud-ranges" role="group" aria-label="Time range">
                             <button class="btn-range" data-hours="6">6h</button>
@@ -137,7 +137,7 @@
                         <svg id="cloud-chart" role="img" aria-label="Cloud cover percentage over time"></svg>
                         <div class="cloud-tooltip hidden" id="cloud-tooltip"></div>
                     </div>
-                    <div class="ds-empty cloud-empty hidden" id="cloud-empty"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-cloud"></use></svg><span class="ds-empty__title">No samples</span></div>
+                    <div class="ds-empty cloud-empty hidden" id="cloud-empty"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg><span class="ds-empty__title">No samples</span></div>
                     <div class="cloud-bars" id="cloud-bars" role="img" aria-label="Cloud cover per time bin"></div>
                     <div class="cloud-bars-cap" id="cloud-bars-cap"><span id="cloud-cap-l"></span><span id="cloud-cap-r">now</span></div>
                     <div class="cloud-caption" id="cloud-caption" hidden>Now <strong id="cloud-now">--</strong> / Avg <span id="cloud-avg-label">24h</span> <strong id="cloud-avg">--</strong></div>
@@ -168,7 +168,7 @@
                 </div>
 
                 <details class="ds-card histogram-card acc" id="histogram-card">
-                    <summary class="live-sum"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-activity"></use></svg></span><span class="live-sum__t" title="Histogram" aria-label="Histogram">Histogram</span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-down"></use></svg></span></summary>
+                    <summary class="live-sum"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-activity"></use></svg></span><span class="live-sum__t" title="Histogram" aria-label="Histogram">Histogram</span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></span></summary>
 
                     <div class="histogram-wrapper">
                         <canvas id="histogram-canvas" width="600" height="160"></canvas>
@@ -188,11 +188,11 @@
                     <!-- Overhead now: one card, icon tabs. The three lists keep their ids and render functions (app/08b-events-live.js);
                          the websocket subscription (OVERLAY_CARDS in app/05c-aircraft-overlay.js) still keys off these panels. -->
                     <div class="ds-card overhead-card" id="overhead-card" hidden>
-                        <div class="live-head"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-eye"></use></svg></span><h2 class="live-head__t">Overhead now</h2><span class="ov-live" id="ov-live">live</span></div>
+                        <div class="live-head"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg></span><h2 class="live-head__t">Overhead now</h2><span class="ov-live" id="ov-live">live</span></div>
                         <div class="ov-seg" role="tablist" aria-label="Overhead lists">
-                            <button type="button" role="tab" class="ov-tab" id="ov-tab-flights" data-ov="flights-card" aria-selected="false" title="Flights" aria-label="Flights"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-plane"></use></svg><span class="ov-n" id="ov-n-flights">0</span></button>
-                            <button type="button" role="tab" class="ov-tab" id="ov-tab-sats" data-ov="sats-card" aria-selected="false" title="Satellites" aria-label="Satellites"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-satellite"></use></svg><span class="ov-n" id="ov-n-sats">0</span></button>
-                            <button type="button" role="tab" class="ov-tab" id="ov-tab-sondes" data-ov="sondes-card" aria-selected="false" title="Sondes" aria-label="Sondes"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-balloon"></use></svg><span class="ov-n" id="ov-n-sondes">0</span></button>
+                            <button type="button" role="tab" class="ov-tab" id="ov-tab-flights" data-ov="flights-card" aria-selected="false" title="Flights" aria-label="Flights"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg><span class="ov-n" id="ov-n-flights">0</span></button>
+                            <button type="button" role="tab" class="ov-tab" id="ov-tab-sats" data-ov="sats-card" aria-selected="false" title="Satellites" aria-label="Satellites"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg><span class="ov-n" id="ov-n-sats">0</span></button>
+                            <button type="button" role="tab" class="ov-tab" id="ov-tab-sondes" data-ov="sondes-card" aria-selected="false" title="Sondes" aria-label="Sondes"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-balloon"></use></svg><span class="ov-n" id="ov-n-sondes">0</span></button>
                         </div>
                         <div class="ov-panel flights-card" id="flights-card" role="tabpanel" hidden>
                             <div class="ov-meta"><span class="badge" id="flights-count">--</span><span class="flights-status" id="flights-status">Loading…</span></div>
@@ -203,41 +203,41 @@
                                 <button type="button" class="zchip" data-fl="down" aria-pressed="false" title="Descending" aria-label="Descending">&darr;</button>
                             </div>
                             <ul class="flights-list" id="flights-list"></ul>
-                            <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-right"></use></svg></a>
+                            <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
                         </div>
                         <div class="ov-panel flights-card" id="sats-card" role="tabpanel" hidden>
                             <div class="ov-meta"><span class="badge" id="sats-count">--</span><span class="flights-status" id="sats-status">Loading…</span></div>
                             <ul class="flights-list" id="sats-list"></ul>
-                            <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-right"></use></svg></a>
+                            <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
                         </div>
                         <div class="ov-panel flights-card" id="sondes-card" role="tabpanel" hidden>
                             <div class="ov-meta"><span class="badge" id="sondes-count">--</span><span class="flights-status" id="sondes-status">Loading…</span></div>
                             <ul class="flights-list" id="sondes-list"></ul>
-                            <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-right"></use></svg></a>
+                            <a class="live-more" href="/overhead" title="All" aria-label="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
                         </div>
                     </div>
 
                     <!-- Recent events (thumbnail strip on a phone) -->
                     <div class="ds-card live-events-card">
                         <div class="live-head">
-                            <span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-sparkles"></use></svg></span><h2 class="live-head__t">Events</h2>
+                            <span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg></span><h2 class="live-head__t">Events</h2>
                             <span class="badge" id="live-events-count">0</span>
                             <span class="live-events-status" id="live-events-status" role="status">Loading…</span>
-                            <a class="live-more" href="/gallery" title="All events" aria-label="All events"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-right"></use></svg></a>
+                            <a class="live-more" href="/gallery" title="All events" aria-label="All events"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></a>
                         </div>
                         <ul class="live-events-list" id="live-events-list"></ul>
                     </div>
 
                     <!-- Weather, next 48 h (shown only when the weather source is on) -->
                     <details class="ds-card acc" id="weather-acc" hidden>
-                        <summary class="live-sum"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-cloud"></use></svg></span><span class="live-sum__t" title="Weather, next 48 h" aria-label="Weather, next 48 h">48 h</span><span class="acc-sub" id="lwx-sum"></span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-down"></use></svg></span></summary>
+                        <summary class="live-sum"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cloud"></use></svg></span><span class="live-sum__t" title="Weather, next 48 h" aria-label="Weather, next 48 h">48 h</span><span class="acc-sub" id="lwx-sum"></span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></span></summary>
                         <div class="wx-now" id="lwx-now"></div>
                         <div class="lwx-hours" id="lwx-hours" aria-label="Next 48 hours"></div>
                     </details>
 
                     <!-- Telemetry -->
                     <details class="ds-card acc" id="telemetry-acc">
-                        <summary class="live-sum"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-cpu"></use></svg></span><span class="live-sum__t" title="Telemetry" aria-label="Telemetry">Telemetry</span><span class="text-muted" id="telemetry-timestamp">--</span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261128c#i-chevron-down"></use></svg></span></summary>
+                        <summary class="live-sum"><span class="live-head__ic"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-cpu"></use></svg></span><span class="live-sum__t" title="Telemetry" aria-label="Telemetry">Telemetry</span><span class="text-muted" id="telemetry-timestamp">--</span><span class="live-exp__chev"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-down"></use></svg></span></summary>
                         <div class="telemetry-card">
 
                         <div class="gauge-grid">
