@@ -88,7 +88,7 @@
 
     // ---- station chat widget ----
     function loadChat() {
-        const v = "20261130g";
+        const v = "20261130h";
         const css = document.createElement("link");
         css.rel = "stylesheet"; css.href = "/static/css/chat.css?v=" + v;
         document.head.appendChild(css);
