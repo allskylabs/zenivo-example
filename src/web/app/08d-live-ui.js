@@ -498,6 +498,6 @@
         window.addEventListener("scroll", reflow, { passive: true });
         window.addEventListener("resize", reflow);
         setInterval(refreshSel, 500);
-        document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sel && (!lay || lay.hidden)) closeInfo(); });
+        document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sel && !layOpen()) closeInfo(); });
     }
 })();
