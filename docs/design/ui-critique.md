@@ -108,3 +108,28 @@ Commits on main: 609c22c (P1 batch), 0cd61ea (shared tier). Deployed to the Pi, 
 | P2 #7-#20 | partly covered by type floor and 44px fixes; the rest OPEN (OBS dock button heights `obs_dock.html:21,45`, community marker hit area `community.js:116,313`, `.arc-day__head`) |
 | P3 #21-#28 | OPEN |
 | Extra pass (red mode, /full, /focus, /calibration, Sign-in, 390 3D pages) | OPEN; /gallery, /live, /overhead, /settings at 390 checked: no horizontal overflow (scrollWidth 375) |
+
+### Update 2 (P2 batch + extra pass)
+
+Commit: P2 batch on main (after 0cd61ea), deployed, md5 equal on repo, Pi and allsky.hoan.uk.
+
+| Item | Status |
+|---|---|
+| #7 | done (44px) |
+| #8 | partly: 12px floor done; hide-empty-chip logic OPEN (`css/live.css`, `css/base.css:87`) |
+| #9 Live two-column | OPEN (`css/live.css`, `css/ds-tokens.css:76`) |
+| #10 | done (chip fade, 12px) |
+| #11 | partly: 12px done; arrow glyph replacement OPEN (`css/overhead.css`) |
+| #12 | done at <=480px (select full width, `css/redesign-pages.css`); duplicate 2304x1296 badge OPEN |
+| #13 row anatomy | OPEN |
+| #14, #15 | done (44px inputs and chips; header icon for #detection OPEN) |
+| #16 | done via 12px floor; sub 14px OPEN (`css/settings.css`) |
+| #17 | OPEN (`css/settings-admin.css`: label truncation, tile grid) |
+| #18 | done (OBS dock 44px go-live, zoom, sec-head); status placeholder contrast OPEN |
+| #19 | done (44px marker hit area, `min-width:0`) |
+| #20 sky mask fill | OPEN: drawn inside compiled bundle `sky/core-D2YY-WWc.js`, needs source repo change |
+| #21, #27, #28 | done (12px, 44px back button) |
+| #22 | done (cover thumbs) |
+| #23-#26 | OPEN |
+
+Extra pass at 390 (/full, /focus, /calibration, /flights3d, /satellites3d, /login, /community, /obs_dock, settings#detection): no horizontal overflow, no visible text under 12px. Red mode and a before/after pixel review of each page were NOT done.
