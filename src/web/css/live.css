@@ -152,3 +152,15 @@
 @media (prefers-reduced-motion: reduce) {
     #tab-live .live-exp__chev { transition: none; }
 }
+
+/* verification fixes: touch targets and minimum type */
+#tab-live .zchip { min-width: var(--tap); display: inline-flex; align-items: center; justify-content: center; }
+#tab-live .flight-tag { display: inline-flex; align-items: center; min-height: var(--tap); }
+#tab-live .badge, #tab-live #flights-count { font-size: var(--fs-12); }
+#tab-live input[type="range"] { min-height: var(--tap); }
+/* legacy phone.css assigns order to these; DOM order is the design */
+#tab-live .main-viewport-col > *, #tab-live .controls-col > * { order: 0; }
+/* legacy phone.css side margins on cards double the inset */
+#tab-live .live-pair, #tab-live .live-pair > *, #tab-live .live-exp, #tab-live .now-strip, #tab-live .live-view { margin-left: 0; margin-right: 0; }
+#tab-live .live-pair > * { max-width: none; width: auto; }
+#tab-live .btn-preset, #tab-live .btn-preset-gain { min-height: var(--tap); }
