@@ -26,7 +26,7 @@
     function applyRv(on, persist) {
         document.body.classList.toggle("night-mode", on);
         if (DSx.setTheme) DSx.setTheme(on, true);
-        document.querySelectorAll("#btn-night-vision").forEach((b) => b.setAttribute("aria-pressed", on ? "true" : "false"));
+        document.querySelectorAll("#btn-night-vision").forEach((b) => { b.setAttribute("aria-pressed", on ? "true" : "false"); b.setAttribute("aria-checked", on ? "true" : "false"); });
         if (persist) writePref(on);
         window.dispatchEvent(new CustomEvent("zenivo:rv", { detail: { on } }));
     }
@@ -62,20 +62,15 @@
         const stT = txt("nav-system-status") || "Online";
         const stEl = $("zt-status");
         const tip = [stT, txt("sensor-subtitle"), txt("nav-camera-mode"), txt("nav-fps").replace(/^\s*·\s*/, "")].filter(Boolean).join(" · ");
-        if (stEl && stEl.title !== tip) { stEl.title = tip; stEl.setAttribute("aria-label", tip); }
-        const stT2 = $("zt-status-t");
-        if (stT2 && stT2.textContent !== stT) stT2.textContent = stT;
+        if (stEl && stEl.title !== tip) stEl.title = tip;
         const camEl = $("zt-cam");
         if (camEl) {
             const sen = txt("sensor-subtitle").split("·")[0].trim() || "IMX335";
-            const ex = ((($("telem-exp") || {}).textContent) || "").replace(/\s+/g, " ").trim();
-            const ct = ex && !/^--/.test(ex) ? sen + " · " + ex : sen;
+            const ct = sen; // the station name already shows beside the logo
             if (camEl.textContent !== ct) camEl.textContent = ct;
         }
-        const clEl = $("zt-clocks");
-        const lab = txt("nav-local-label");
-        const ctip = "UTC " + txt("nav-utc-clock") + (lab ? " · " + lab : "");
-        if (clEl && clEl.title !== ctip) { clEl.title = ctip; clEl.setAttribute("aria-label", ctip); }
+        const mEl = $("zt-mode");
+        if (mEl) { const m = txt("nav-camera-mode"); mEl.classList.toggle("is-manual", /manual|lock/i.test(m)); }
         const utc = $("nav-utc-clock");
         // the dashboard (core.js) drives the UTC/local clocks itself; other pages get a plain UTC tick
         if (utc && typeof window.updateClock !== "function") {

@@ -18,20 +18,30 @@
 .pulse-indicator { flex: 0 0 auto; }
 .pulse-indicator.off { background-color: var(--text-muted); box-shadow: none; animation: none; }
 .zt-meta, .ds-topbar__clock { display: none; }
-.zt-cluster { margin-left: auto; display: flex; align-items: center; gap: var(--s-2); flex: 0 0 auto; }
-.zt-status { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2); padding: 0 var(--s-2); border-radius: var(--r-md); }
-.zt-status-t { font-size: var(--fs-12); color: var(--c-text-2); white-space: nowrap; }
-.zt-cam { display: none; font-size: var(--fs-12); color: var(--c-text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.zt-cam { display: none; margin-left: var(--s-2); font-size: var(--fs-12); color: var(--c-text-2); white-space: nowrap; }
 @media (min-width: 900px) { .zt-cam { display: inline; } }
-.zt-clocks { min-height: 44px; display: inline-flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-2); font-family: var(--font-mono); color: var(--c-text); border-radius: var(--r-md); }
-.zt-clocks .ds-icon { color: var(--c-text-2); flex: 0 0 auto; }
-.zt-clocks .zt-local { font-size: var(--fs-16); font-weight: 600; }
-.zt-clocks .zt-utc { font-size: var(--fs-12); color: var(--c-text-2); padding-left: var(--s-2); border-left: 1px solid var(--c-divider); }
-.zt-clocks .zt-utc b { font-weight: 500; }
-.zt-clocks .zt-utc::before { content: "UTC "; }
-@media (max-width: 640px) { .zt-clocks .zt-utc { display: none; } }
-.zt-cluster #btn-night-vision { min-width: 44px; min-height: 44px; }
-.zt-cluster #btn-night-vision[aria-pressed="true"] { color: var(--c-danger, var(--danger)); }
+.zt-cluster { margin-left: auto; display: flex; align-items: center; gap: var(--s-3); flex: 0 0 auto; }
+.zt-chip { display: inline-flex; align-items: center; gap: var(--s-2); min-height: 32px; padding: 0 var(--s-3); border-radius: var(--r-pill, 999px); border: 1px solid var(--c-border); background: var(--c-surface); font-size: var(--fs-12); font-weight: 600; color: var(--c-text); white-space: nowrap; }
+.zt-fps { font-weight: 500; color: var(--c-text-2); font-variant-numeric: tabular-nums; }
+.zt-mdot { width: 8px; height: 8px; border-radius: 50%; background: var(--c-accent); flex: 0 0 auto; }
+.zt-mode { letter-spacing: .04em; }
+.zt-mode.is-manual { color: var(--c-warn); border-color: transparent; background: var(--c-warn-bg); }
+.zt-mode.is-manual .zt-mdot { background: var(--c-warn); }
+.zt-div { width: 1px; height: 24px; background: var(--c-divider); flex: 0 0 auto; }
+.zt-clock { display: inline-flex; align-items: baseline; gap: var(--s-2); white-space: nowrap; }
+.zt-cl { font-size: var(--fs-12); color: var(--c-text-2); }
+.zt-clock b { font: 600 var(--fs-16) / 1 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--c-text); }
+.zt-rv { display: inline-flex; align-items: center; gap: var(--s-2); min-height: 44px; min-width: 44px; justify-content: center; padding: 0 var(--s-2); border: 0; background: none; color: var(--c-text-2); font: 500 var(--fs-12) / 1 var(--font-ui); cursor: pointer; border-radius: var(--r-md); }
+.zt-rv .ds-icon { flex: 0 0 auto; }
+.zt-rv-l, .zt-rv-track { display: none; }
+.zt-rv-track { width: 34px; height: 20px; border-radius: 999px; background: var(--c-surface-2); border: 1px solid var(--c-border); position: relative; flex: 0 0 auto; }
+.zt-rv-knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--c-text-2); transition: transform .15s; }
+.zt-rv[aria-checked="true"] { color: var(--c-danger, var(--danger)); }
+.zt-rv[aria-checked="true"] .zt-rv-track { background: var(--c-danger-bg); border-color: var(--c-danger, var(--danger)); }
+.zt-rv[aria-checked="true"] .zt-rv-knob { transform: translateX(14px); background: var(--c-danger, var(--danger)); }
+@media (min-width: 900px) { .zt-rv .ds-icon { display: none; } .zt-rv-l, .zt-rv-track { display: inline-block; } }
+@media (max-width: 1100px) { .zt-fps, .zt-clock--utc, .zt-clock--utc + .zt-div { display: none; } }
+@media (max-width: 899.98px) { .zt-mode, .zt-clock--utc, .zt-clock--utc + .zt-div, .zt-fps, .zt-cluster .zt-div { display: none; } .zt-cluster { gap: var(--s-2); } .zt-cl { display: none; } }
 
 /* Navigation: ONE list (markup from scripts/sync_nav.py). >=1024px it is the fixed sidebar below the topbar (expanded icon+label, or the
  * collapsed icon rail, html.zs-collapsed); below that the same element is the Menu sheet opened from the tab bar. */
@@ -149,10 +159,6 @@ html.embed { --rail-w: 0px; }
 .zs-tip { position: fixed; z-index: calc(var(--z-nav) + 5); padding: 4px 10px; border-radius: var(--r-md); background: var(--c-surface-2); color: var(--c-text); border: 1px solid var(--c-border); font: 500 var(--fs-12, 12px) / 1.3 var(--font-ui); white-space: nowrap; pointer-events: none; box-shadow: 0 4px 14px rgb(0 0 0 / .35); }
 .zs-tip[hidden] { display: none; }
 
-@media (min-width: 900px) {
-    .zt-cluster #btn-night-vision { width: auto; padding: 0 var(--s-3); gap: var(--s-2); }
-    .zt-cluster #btn-night-vision::after { content: "Night"; font-size: var(--fs-12); color: var(--c-text-2); }
-}
 
 @media (prefers-reduced-motion: reduce) {
     :root { transition: none !important; }
