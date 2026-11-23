@@ -21,6 +21,9 @@ STAR_BOOST_BINS = (2, 3, 4)
 GAMMA_RAW10 = 0.62
 GAMMA_SRGB = 1.0 / 2.2
 
+# Local noise floor = this x the measured local mean |signal| (raise to lift fewer cloud specks, lower for more stars)
+CLOUD_NOISE_SCALE = 1.5
+
 _LUT_CACHE: dict = {}
 
 
@@ -88,7 +91,7 @@ def star_bin_boost(
     # (dominated by the quiet clear sky) is far too low and every bright cloud speck would be lifted as a
     # "star" (white grain). Local mean |d| on the 16x-reduced grid, never below the global sigma.
     small_d = cv2.resize(np.abs(d), (small.shape[1], small.shape[0]), interpolation=cv2.INTER_AREA)
-    sigma_map = 1.2533 * cv2.resize(cv2.blur(small_d, (5, 5)), (w, h), interpolation=cv2.INTER_LINEAR)
+    sigma_map = 1.2533 * CLOUD_NOISE_SCALE * cv2.resize(cv2.blur(small_d, (5, 5)), (w, h), interpolation=cv2.INTER_LINEAR)
     thr = threshold_sigma * n * np.maximum(sigma_map, max(sigma, 1e-4))
 
     # Soft-threshold: only the part of the binned signal above the noise floor lifts the pixel
