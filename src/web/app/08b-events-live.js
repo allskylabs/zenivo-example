@@ -95,7 +95,7 @@ function evSetPic(which) {
     evPic = which;
     const url = which === "sky" ? ev.sky_url : (crop || ev.thumbnail_url);
     evZoomReset();
-    evImg.onload = () => { if (evImg.naturalWidth) eventViewer.style.setProperty("--ev-ar", `${evImg.naturalWidth} / ${evImg.naturalHeight}`); };
+    evImg.onload = () => { if (evImg.naturalWidth) { eventViewer.style.setProperty("--ev-ar", `${evImg.naturalWidth} / ${evImg.naturalHeight}`); eventViewer.style.setProperty("--ev-w", evImg.naturalWidth); eventViewer.style.setProperty("--ev-h", evImg.naturalHeight); } };
     if (url) evImg.src = url; else evImg.removeAttribute("src");
     evImg.alt = which === "sky" ? "Whole sky" : "Close-up";
     eventViewer.querySelectorAll(`.arc-ev__tabs .ds-chip:not([data-ev="trk"])`).forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.ev === which)); });

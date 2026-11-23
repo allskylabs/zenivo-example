@@ -313,9 +313,11 @@ function fitViewportToFrame() {
     const ratio = `${liveImg.naturalWidth} / ${liveImg.naturalHeight}`;
     // The server pre-sizes the box (data-frame-ratio); only touch it if the camera's ratio differs
     const [pw, ph] = (viewportContainer.dataset.frameRatio || "").split("/").map(Number);
-    if (pw && ph && Math.abs(pw / ph - liveImg.naturalWidth / liveImg.naturalHeight) < 0.01) return;
+    if (pw && ph && Math.abs(pw / ph - liveImg.naturalWidth / liveImg.naturalHeight) < 0.01) { viewportContainer.style.setProperty("--fw", pw); viewportContainer.style.setProperty("--fh", ph); return; }
     viewportContainer.dataset.frameRatio = ratio;
     viewportContainer.style.aspectRatio = ratio;
+    viewportContainer.style.setProperty("--fw", liveImg.naturalWidth);
+    viewportContainer.style.setProperty("--fh", liveImg.naturalHeight);
     applyView(false);
 }
 if (liveImg) liveImg.addEventListener("load", fitViewportToFrame);

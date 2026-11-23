@@ -176,7 +176,7 @@ def create_app(camera: Optional[CameraDriverInterface] = None) -> FastAPI:
                 html = html.replace(
                     viewport_tag,
                     f'<div class="viewport-wrapper" id="viewport-container" '
-                    f'style="aspect-ratio: {ratio}" data-frame-ratio="{ratio}">',
+                    f'style="aspect-ratio: {ratio}; --fw: {ratio.split("/")[0].strip()}; --fh: {ratio.split("/")[-1].strip()}" data-frame-ratio="{ratio}">',
                     1,
                 )
             return HTMLResponse(stamp(html), headers=no_cache)

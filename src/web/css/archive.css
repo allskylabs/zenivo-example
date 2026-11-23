@@ -102,7 +102,7 @@
 .arc-ev__ttl .ds-icon { flex: none; }
 .arc-ev__cnt { color: var(--c-text-3); font-size: var(--fs-12); font-family: var(--font-num); }
 .arc-ev__stage { position: relative; background: var(--c-bg); touch-action: pan-y; }
-.arc-ev__stage .ev-zoom { position: relative; width: 100%; aspect-ratio: var(--ev-ar, 4 / 3); max-height: 72vh; margin: 0 auto; overflow: hidden; background: var(--c-bg); }
+.arc-ev__stage .ev-zoom { position: relative; width: min(100%, calc(72dvh * var(--ev-w, 4) / var(--ev-h, 3))); aspect-ratio: var(--ev-ar, 4 / 3); margin: 0 auto; overflow: hidden; background: var(--c-bg); }
 .arc-ev__stage img.arc-ev__img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .arc-ev__ovr { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .arc-ev__ovr line, .arc-ev__ovr rect { vector-effect: non-scaling-stroke; }
