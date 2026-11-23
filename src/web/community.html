@@ -20,12 +20,12 @@
     <script>try{if(localStorage.getItem("zenivo.nav")==="0")document.documentElement.classList.add("zs-collapsed")}catch(e){}</script>
     <script>(function(){var p=location.pathname.replace(/\/+$/,"")||"/";if(p!=="/"&&p!=="/live"&&p!=="/index.html")return;var h=location.hash.replace(/^#\/?/,"").toLowerCase(),M={archive:"/gallery",gallery:"/gallery",events:"/gallery",sky:"/sky",overhead:"/overhead",community:"/community",flights:"/flights3d",flights3d:"/flights3d",satellites:"/satellites3d",satellites3d:"/satellites3d",settings:"/settings",calibration:"/calibration",logs:"/logs",activity:"/logs",focus:"/focus",live:"/live"},S="image detection station skymask integrations community admin".split(" "),t=M[h];if(h==="community")t="/community";else if(S.indexOf(h)>-1)t="/settings#"+h;if(t&&t!==p)location.replace(t)})()</script>
     <link rel="stylesheet" href="/static/css/ds-tokens.css?v=20261123a">
-    <link rel="stylesheet" href="/static/css/ds-components.css?v=20261204k">
-    <link rel="stylesheet" href="/static/css/shell.css?v=20261204k">
-    <script src="/static/auth.js?v=20261204k"></script>
+    <link rel="stylesheet" href="/static/css/ds-components.css?v=20261204l">
+    <link rel="stylesheet" href="/static/css/shell.css?v=20261204l">
+    <script src="/static/auth.js?v=20261204l"></script>
     <script src="/static/js/ds.js?v=20261123a" defer></script>
     <script src="/static/brand/version.js?v=4" defer></script>
-    <script src="/static/shell.js?v=20261204k" defer></script>
+    <script src="/static/shell.js?v=20261204l" defer></script>
     <!-- head-brand:end -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
@@ -51,76 +51,79 @@
         </a>
         <div class="ds-topbar__title"><span class="zt-name" id="m-head-name">Zenivo</span></div>
         <span class="zt-meta" id="sensor-subtitle"></span>
-        <span class="zt-meta" id="nav-camera-mode"></span>
-        <span class="zt-meta" id="nav-fps"></span>
-        <span class="ds-sr-only" id="nav-system-status" role="status">Online</span>
+        <span class="zt-cam" id="zt-cam"></span>
         <div class="zt-cluster">
-            <span class="zt-status" id="zt-status" tabindex="0" role="img" aria-label="Online" title="Online"><i class="pulse-indicator" id="status-pulse"></i><span class="zt-status-t" id="zt-status-t">Online</span></span><span class="zt-cam" id="zt-cam"></span>
-            <span class="zt-clocks" id="zt-clocks" tabindex="0" title="UTC --:--:--"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-clock"></use></svg><b class="zt-local" id="nav-local-clock">--:--</b><span class="zt-utc"><b id="nav-utc-clock">--:--:--</b></span><span class="ds-sr-only" id="nav-local-label">Local</span></span>
+            <span class="zt-chip zt-status" id="zt-status" tabindex="0" role="status"><i class="pulse-indicator" id="status-pulse"></i><span id="nav-system-status">Online</span><span class="zt-fps" id="nav-fps"></span></span>
+            <span class="zt-chip zt-mode" id="zt-mode" title="Camera mode"><i class="zt-mdot"></i><span id="nav-camera-mode">AUTO</span></span>
+            <span class="zt-div" aria-hidden="true"></span>
+            <span class="zt-clock zt-clock--utc" id="zt-utc"><span class="zt-cl">UTC</span><b id="nav-utc-clock">--:--:--</b></span>
+            <span class="zt-div" aria-hidden="true"></span>
+            <span class="zt-clock zt-clock--local" id="zt-local"><span class="zt-cl" id="nav-local-label">Local</span><b id="nav-local-clock">--:--</b></span>
+            <span class="zt-div" aria-hidden="true"></span>
             <span class="ds-topbar__clock" id="m-head-clock" hidden></span>
-            <button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" id="btn-night-vision" aria-pressed="false" aria-label="Red night vision" title="Red night vision"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-moon-star"></use></svg></button>
+            <button class="zt-rv" type="button" id="btn-night-vision" role="switch" aria-checked="false" aria-pressed="false" aria-label="Red Vision" title="Red Vision: preserve night adaptation (red palette)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-moon-star"></use></svg><span class="zt-rv-l">Red Vision</span><span class="zt-rv-track" aria-hidden="true"><span class="zt-rv-knob"></span></span></button>
         </div>
     </header>
 
     <nav class="ds-tabbar" aria-label="Main navigation">
-        <a class="ds-tab" href="/live" data-paths="/live,/,/index.html"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-camera"></use></svg><span>Live</span></a>
-        <a class="ds-tab" href="/sky" data-paths="/sky"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-sparkles"></use></svg><span>Sky</span></a>
-        <a class="ds-tab" href="/overhead" data-paths="/overhead"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-radio"></use></svg><span>Overhead</span></a>
-        <a class="ds-tab" href="/gallery" data-paths="/gallery"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-archive"></use></svg><span>Archive</span></a>
-        <button class="ds-tab" type="button" data-ds-open="zs-nav" data-paths="/calibration,/community,/flights3d,/focus,/logs,/obs,/obs/dock,/satellites3d,/settings" aria-haspopup="dialog"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-menu"></use></svg><span>Menu</span></button>
+        <a class="ds-tab" href="/live" data-paths="/live,/,/index.html"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-camera"></use></svg><span>Live</span></a>
+        <a class="ds-tab" href="/sky" data-paths="/sky"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-sparkles"></use></svg><span>Sky</span></a>
+        <a class="ds-tab" href="/overhead" data-paths="/overhead"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-radio"></use></svg><span>Overhead</span></a>
+        <a class="ds-tab" href="/gallery" data-paths="/gallery"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-archive"></use></svg><span>Archive</span></a>
+        <button class="ds-tab" type="button" data-ds-open="zs-nav" data-paths="/calibration,/community,/flights3d,/focus,/logs,/obs,/obs/dock,/satellites3d,/settings" aria-haspopup="dialog"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-menu"></use></svg><span>Menu</span></button>
     </nav>
 
     <aside class="ds-sheet zs" id="zs-nav" role="dialog" aria-modal="true" aria-label="Menu">
         <div class="ds-sheet__scrim" data-ds-close></div>
         <div class="zs__panel">
-            <div class="zs__head"><div class="ds-sheet__title"><span id="m-st-name">Zenivo</span></div><button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" data-ds-close aria-label="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-x"></use></svg></button></div>
-            <div class="zs__top"><button class="zs__toggle" type="button" id="zs-toggle" aria-expanded="true" aria-controls="zs-nav" aria-label="Collapse menu (Ctrl+B)" title="Collapse menu (Ctrl+B)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-panel-left"></use></svg></button></div>
+            <div class="zs__head"><div class="ds-sheet__title"><span id="m-st-name">Zenivo</span></div><button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" data-ds-close aria-label="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-x"></use></svg></button></div>
+            <div class="zs__top"><button class="zs__toggle" type="button" id="zs-toggle" aria-expanded="true" aria-controls="zs-nav" aria-label="Collapse menu (Ctrl+B)" title="Collapse menu (Ctrl+B)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-panel-left"></use></svg></button></div>
             <nav class="zs__nav" aria-label="Sections">
                 <section class="zs__group">
-                    <a class="zs__item" href="/live" data-paths="/live" data-tip="Live" aria-label="Live"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-camera"></use></svg><span class="zs__label">Live</span></a>
-                    <a class="zs__item" href="/sky" data-paths="/sky" data-tip="Sky" aria-label="Sky"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-sparkles"></use></svg><span class="zs__label">Sky</span></a>
-                    <a class="zs__item" href="/overhead" data-paths="/overhead" data-tip="Overhead" aria-label="Overhead"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-radio"></use></svg><span class="zs__label">Overhead</span></a>
-                    <a class="zs__item" href="/gallery" data-paths="/gallery" data-tip="Archive" aria-label="Archive"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-archive"></use></svg><span class="zs__label">Archive</span></a>
-                    <a class="zs__item" href="/community" data-paths="/community" data-tip="Community" aria-label="Community"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-users"></use></svg><span class="zs__label">Community</span></a>
+                    <a class="zs__item" href="/live" data-paths="/live" data-tip="Live" aria-label="Live"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-camera"></use></svg><span class="zs__label">Live</span></a>
+                    <a class="zs__item" href="/sky" data-paths="/sky" data-tip="Sky" aria-label="Sky"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-sparkles"></use></svg><span class="zs__label">Sky</span></a>
+                    <a class="zs__item" href="/overhead" data-paths="/overhead" data-tip="Overhead" aria-label="Overhead"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-radio"></use></svg><span class="zs__label">Overhead</span></a>
+                    <a class="zs__item" href="/gallery" data-paths="/gallery" data-tip="Archive" aria-label="Archive"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-archive"></use></svg><span class="zs__label">Archive</span></a>
+                    <a class="zs__item" href="/community" data-paths="/community" data-tip="Community" aria-label="Community"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-users"></use></svg><span class="zs__label">Community</span></a>
                 </section>
                 <section class="zs__group">
                     <h3 class="zs__title">Explore</h3>
-                    <a class="zs__item" href="/flights3d" data-paths="/flights3d" data-tip="Flights 3D" aria-label="Flights 3D"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-plane"></use></svg><span class="zs__label">Flights 3D</span></a>
-                    <a class="zs__item" href="/satellites3d" data-paths="/satellites3d" data-tip="Satellites 3D" aria-label="Satellites 3D"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-satellite"></use></svg><span class="zs__label">Satellites 3D</span></a>
+                    <a class="zs__item" href="/flights3d" data-paths="/flights3d" data-tip="Flights 3D" aria-label="Flights 3D"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-plane"></use></svg><span class="zs__label">Flights 3D</span></a>
+                    <a class="zs__item" href="/satellites3d" data-paths="/satellites3d" data-tip="Satellites 3D" aria-label="Satellites 3D"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-satellite"></use></svg><span class="zs__label">Satellites 3D</span></a>
                 </section>
                 <section class="zs__group" data-admin>
                     <h3 class="zs__title">Camera</h3>
-                    <a class="zs__item" href="/focus" data-paths="/focus" data-tip="Focus" aria-label="Focus"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-telescope"></use></svg><span class="zs__label">Focus</span></a>
-                    <a class="zs__item" href="/calibration" data-paths="/calibration" data-tip="Master dark" aria-label="Master dark"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-moon-star"></use></svg><span class="zs__label">Master dark</span></a>
-                    <a class="zs__item" href="/settings#image" data-paths="/settings" data-hash="image" data-tip="Image output" aria-label="Image output"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-sliders-horizontal"></use></svg><span class="zs__label">Image output</span></a>
-                    <a class="zs__item" href="/settings#detection" data-paths="/settings" data-hash="detection" data-tip="Detection" aria-label="Detection"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-crosshair"></use></svg><span class="zs__label">Detection</span></a>
+                    <a class="zs__item" href="/focus" data-paths="/focus" data-tip="Focus" aria-label="Focus"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-telescope"></use></svg><span class="zs__label">Focus</span></a>
+                    <a class="zs__item" href="/calibration" data-paths="/calibration" data-tip="Master dark" aria-label="Master dark"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-moon-star"></use></svg><span class="zs__label">Master dark</span></a>
+                    <a class="zs__item" href="/settings#image" data-paths="/settings" data-hash="image" data-tip="Image output" aria-label="Image output"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-sliders-horizontal"></use></svg><span class="zs__label">Image output</span></a>
+                    <a class="zs__item" href="/settings#detection" data-paths="/settings" data-hash="detection" data-tip="Detection" aria-label="Detection"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-crosshair"></use></svg><span class="zs__label">Detection</span></a>
                 </section>
                 <section class="zs__group" data-admin>
                     <h3 class="zs__title">Station</h3>
-                    <a class="zs__item" href="/settings#station" data-paths="/settings" data-hash="station" data-tip="Station & optics" aria-label="Station & optics"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-map-pin"></use></svg><span class="zs__label">Station &amp; optics</span></a>
-                    <a class="zs__item" href="/settings#skymask" data-paths="/settings" data-hash="skymask" data-tip="Sky mask" aria-label="Sky mask"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-shield"></use></svg><span class="zs__label">Sky mask</span></a>
-                    <a class="zs__item" href="/settings#integrations" data-paths="/settings" data-hash="integrations" data-tip="Integrations" aria-label="Integrations"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-plug"></use></svg><span class="zs__label">Integrations</span></a>
-                    <a class="zs__item" href="/settings#community" data-paths="/settings" data-hash="community" data-tip="Sharing" aria-label="Sharing"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-share-2"></use></svg><span class="zs__label">Sharing</span></a>
-                    <a class="zs__item" href="/logs" data-paths="/logs" data-tip="Activity log" aria-label="Activity log"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-activity"></use></svg><span class="zs__label">Activity log</span></a>
-                    <a class="zs__item" href="/settings#admin" data-paths="/settings" data-hash="admin" data-tip="Admin" aria-label="Admin"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-key-round"></use></svg><span class="zs__label">Admin</span></a>
+                    <a class="zs__item" href="/settings#station" data-paths="/settings" data-hash="station" data-tip="Station & optics" aria-label="Station & optics"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-map-pin"></use></svg><span class="zs__label">Station &amp; optics</span></a>
+                    <a class="zs__item" href="/settings#skymask" data-paths="/settings" data-hash="skymask" data-tip="Sky mask" aria-label="Sky mask"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-shield"></use></svg><span class="zs__label">Sky mask</span></a>
+                    <a class="zs__item" href="/settings#integrations" data-paths="/settings" data-hash="integrations" data-tip="Integrations" aria-label="Integrations"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-plug"></use></svg><span class="zs__label">Integrations</span></a>
+                    <a class="zs__item" href="/settings#community" data-paths="/settings" data-hash="community" data-tip="Sharing" aria-label="Sharing"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-share-2"></use></svg><span class="zs__label">Sharing</span></a>
+                    <a class="zs__item" href="/logs" data-paths="/logs" data-tip="Activity log" aria-label="Activity log"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-activity"></use></svg><span class="zs__label">Activity log</span></a>
+                    <a class="zs__item" href="/settings#admin" data-paths="/settings" data-hash="admin" data-tip="Admin" aria-label="Admin"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-key-round"></use></svg><span class="zs__label">Admin</span></a>
                 </section>
                 <section class="zs__group">
                     <h3 class="zs__title">Streaming</h3>
-                    <a class="zs__item" href="/obs/dock" data-paths="/obs/dock" data-admin data-tip="OBS dock" aria-label="OBS dock"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-film"></use></svg><span class="zs__label">OBS dock</span></a>
-                    <a class="zs__item" href="/obs" data-paths="/obs" target="_blank" rel="noopener" data-tip="OBS" aria-label="OBS"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-arrow-up-right"></use></svg><span class="zs__label">OBS</span></a>
+                    <a class="zs__item" href="/obs/dock" data-paths="/obs/dock" data-admin data-tip="OBS dock" aria-label="OBS dock"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-film"></use></svg><span class="zs__label">OBS dock</span></a>
+                    <a class="zs__item" href="/obs" data-paths="/obs" target="_blank" rel="noopener" data-tip="OBS" aria-label="OBS"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-arrow-up-right"></use></svg><span class="zs__label">OBS</span></a>
                 </section>
             </nav>
             <div class="zs__foot">
                 <div class="zs__utils">
-                    <button class="zs__item" type="button" id="m-fs-btn" data-tip="Fullscreen" aria-label="Fullscreen"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-maximize"></use></svg><span class="zs__label">Fullscreen</span></button>
-                    <button class="zs__item" type="button" id="m-share-btn" data-tip="Share" aria-label="Share"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-share-2"></use></svg><span class="zs__label">Share</span></button>
-                    <button class="zs__item" type="button" id="m-chat-btn" data-tip="Chat" aria-label="Chat"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-message-circle"></use></svg><span class="zs__label">Chat</span></button>
+                    <button class="zs__item" type="button" id="m-fs-btn" data-tip="Fullscreen" aria-label="Fullscreen"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-maximize"></use></svg><span class="zs__label">Fullscreen</span></button>
+                    <button class="zs__item" type="button" id="m-share-btn" data-tip="Share" aria-label="Share"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-share-2"></use></svg><span class="zs__label">Share</span></button>
+                    <button class="zs__item" type="button" id="m-chat-btn" data-tip="Chat" aria-label="Chat"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-message-circle"></use></svg><span class="zs__label">Chat</span></button>
                 </div>
-                <a class="zs__item" href="/login" data-auth-link data-tip="Sign in" aria-label="Sign in"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-log-in"></use></svg><span class="zs__label" data-auth-label>Sign in</span></a>
-                <a class="zs__ver" id="zs-ver" href="https://github.com/hoanb1/zenivo/releases" target="_blank" rel="noopener noreferrer" title="Release notes / GitHub" aria-label="Release notes / GitHub"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-tag"></use></svg><span id="app-version" data-app-version>Zenivo</span><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-arrow-up-right"></use></svg></a>
+                <a class="zs__item" href="/login" data-auth-link data-tip="Sign in" aria-label="Sign in"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-log-in"></use></svg><span class="zs__label" data-auth-label>Sign in</span></a>
+                <a class="zs__ver" id="zs-ver" href="https://github.com/hoanb1/zenivo/releases" target="_blank" rel="noopener noreferrer" title="Release notes / GitHub" aria-label="Release notes / GitHub"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-tag"></use></svg><span id="app-version" data-app-version>Zenivo</span><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-arrow-up-right"></use></svg></a>
             </div>
         </div>
-        <button class="zs__edge" type="button" id="zs-edge" tabindex="-1" aria-hidden="true" title="Collapse menu (Ctrl+B)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204k#i-chevron-left"></use></svg></button>
+        <button class="zs__edge" type="button" id="zs-edge" tabindex="-1" aria-hidden="true" title="Collapse menu (Ctrl+B)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-chevron-left"></use></svg></button>
     </aside>
     <!-- chrome:end -->
 
