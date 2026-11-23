@@ -162,3 +162,4 @@ Deployed, md5 equal on repo, Pi, allsky.hoan.uk.
 - `.ds-sheet__panel`: dvh-bounded, `scrollbar-gutter: stable`, scrolls only the body; sticky grab + header (X stays fixed).
 - Community station dialog: image box follows the image aspect (cover, max 36dvh, no bands), tighter rows. Fits without scrolling at 1568x757 and a true 388 px iframe (scrollHeight == clientHeight).
 - Screenshots: `docs/design/critique/community-dialog-after-1568.jpg`, `community-dialog-after-390.jpg`.
+- Update 5b: station facts are now two compact chips (camera, version; lock chip only when the page is unlinked); last-seen row dropped (header has it). Dialog 348 px tall, no scroll. Screenshot: community-dialog-chips-390.jpg.
