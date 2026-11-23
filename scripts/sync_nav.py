@@ -93,13 +93,19 @@ def render_head(name):
              f'<meta property="og:title" content="{title}">', f'<meta property="og:description" content="{desc}">',
              f'<meta property="og:image" content="{img}">', '<meta name="twitter:card" content="summary_large_image">',
              '<script>try{if(localStorage.getItem("zenivo.nav")==="0")document.documentElement.classList.add("zs-collapsed")}catch(e){}</script>',
+             # old hash deep links (/#archive, /#sky ...) open the page's own URL before first paint
+             '<script>(function(){var p=location.pathname.replace(/\\/+$/,"")||"/";if(p!=="/"&&p!=="/live"&&p!=="/index.html")return;'
+             'var h=location.hash.replace(/^#\\/?/,"").toLowerCase(),M={archive:"/gallery",gallery:"/gallery",events:"/gallery",sky:"/sky",overhead:"/overhead",community:"/community",'
+             'flights:"/flights3d",flights3d:"/flights3d",satellites:"/satellites3d",satellites3d:"/satellites3d",settings:"/settings",calibration:"/calibration",logs:"/logs",activity:"/logs",focus:"/focus",live:"/live"},'
+             'S="image detection station skymask integrations community admin".split(" "),t=M[h];if(h==="community")t="/community";'
+             'else if(S.indexOf(h)>-1)t="/settings#"+h;if(t&&t!==p)location.replace(t)})()</script>',
              '<link rel="stylesheet" href="/static/css/ds-tokens.css?v=20261123a">',
-             '<link rel="stylesheet" href="/static/css/ds-components.css?v=20261204b">',
-             '<link rel="stylesheet" href="/static/css/shell.css?v=20261204b">',
-             '<script src="/static/auth.js?v=20261204b"></script>',
+             '<link rel="stylesheet" href="/static/css/ds-components.css?v=20261204c">',
+             '<link rel="stylesheet" href="/static/css/shell.css?v=20261204c">',
+             '<script src="/static/auth.js?v=20261204c"></script>',
              '<script src="/static/js/ds.js?v=20261123a" defer></script>',
              '<script src="/static/brand/version.js?v=4" defer></script>',
-             '<script src="/static/shell.js?v=20261204b" defer></script>', "<!-- head-brand:end -->"]
+             '<script src="/static/shell.js?v=20261204c" defer></script>', "<!-- head-brand:end -->"]
     return "\n    ".join(lines)
 
 

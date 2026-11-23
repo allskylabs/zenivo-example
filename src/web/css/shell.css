@@ -106,3 +106,17 @@ html.embed { --rail-w: 0px; }
 
 /* admin-only nav items (pages that do not load pages.css) */
 :root:not(.is-admin) .zs [data-admin] { display: none !important; }
+
+/* desktop: 40px rows; short windows (<=860px tall) drop section headers (dividers remain) and tighten rows,
+   the list scrolls while utilities, account and version stay pinned in the footer */
+@media (min-width: 1024px) {
+    .zs__item { min-height: 40px; }
+    .zs__group { padding: var(--s-1) 0; }
+    .zs__foot { padding: var(--s-1) var(--s-2); }
+}
+@media (min-width: 1024px) and (max-height: 860px) {
+    .zs__title { display: none; }
+    .zs__item { min-height: 36px; }
+    html.zs-collapsed .zs__utils { flex-direction: row; flex-wrap: wrap; }
+    html.zs-collapsed .zs__utils .zs__item { flex: 1 0 100%; }
+}
