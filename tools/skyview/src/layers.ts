@@ -340,7 +340,7 @@ function drawCameraImage(core: SkyCore, ctx: CanvasRenderingContext2D, proj: Pro
     ctx.transform(A, B, C, D, a.x - A * sa[0]! - C * sa[1]!, a.y - B * sa[0]! - D * sa[1]!);
     ctx.drawImage(img, 0, 0); ctx.restore();
   };
-  ctx.save(); ctx.globalAlpha = 0.92;
+  ctx.save(); ctx.globalAlpha = 0.6;
   for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
     const p00 = grid[j]![i], p10 = grid[j]![i + 1], p01 = grid[j + 1]![i], p11 = grid[j + 1]![i + 1];
     if (!p00 || !p10 || !p01 || !p11) continue;

@@ -5,7 +5,7 @@
 .cm-mapbox { position: relative; isolation: isolate; height: 52dvh; min-height: 300px; border-radius: var(--r-lg); border: 1px solid var(--c-border); overflow: hidden; background: var(--c-bg); }
 #cmap { position: absolute; inset: 0; background: var(--c-bg); }
 #cmap .leaflet-container { font-family: var(--font-ui); }
-#cmap .leaflet-control-attribution { background: var(--c-surface-1); color: var(--c-text-3); font-size: var(--fs-12); }
+#cmap .leaflet-control-attribution { background: var(--c-surface-1); color: var(--c-text-3); font-size: var(--fs-12); max-width: calc(100% - 96px); white-space: normal; margin: 0 0 var(--s-2) var(--s-2); border-radius: var(--r-sm, 6px); padding: 2px var(--s-2); }
 #cmap .leaflet-bar a { width: var(--tap); height: var(--tap); line-height: var(--tap); background: var(--c-surface-1); color: var(--c-text); border-color: var(--c-border); }
 .cm-legend { position: absolute; left: var(--s-2); bottom: var(--s-6); z-index: 500; display: flex; gap: var(--s-1); }
 .cm-legend .ds-chip { background: var(--c-surface-1); }

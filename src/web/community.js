@@ -28,7 +28,7 @@
         map.setMinZoom(z);
         if (map.getZoom() < z) map.setZoom(z);
     }
-    L.control.attribution({ prefix: false }).addAttribution("Land, lakes, rivers: Natural Earth (public domain)").addTo(map);
+    L.control.attribution({ prefix: false, position: "bottomleft" }).addAttribution("Land, lakes, rivers: Natural Earth (public domain)").addTo(map);
     // The map box gets its final size after the shell lays out (and on rotation): tell Leaflet, or the map lands off-centre
     // Until the visitor moves the map themselves, every size change re-fits it to the stations: on phones the box gets
     // its size late, and a fit done before that left the map zoomed on Africa with no station in view

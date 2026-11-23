@@ -211,3 +211,7 @@ button[hidden], a[hidden], img[hidden] { display: none !important; }
 
 /* LOCAL source tag becomes a colour dot (less text, less crowding) */
 #list .src-tag.local { font-size: 0; width: var(--s-2); height: var(--s-2); min-width: 0; padding: 0; border-radius: 50%; background: var(--c-ok); }
+
+#status { display: inline-flex; gap: var(--s-3); align-items: center; }
+.sc-stat { display: inline-flex; align-items: center; gap: var(--s-1); font-variant-numeric: tabular-nums; }
+#sky, #tle { display: inline-flex; align-items: center; gap: var(--s-1); }
