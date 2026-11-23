@@ -18,7 +18,6 @@
 .tl-result { font-size: var(--font-size-min); color: var(--text-secondary); font-family: var(--font-mono); }
 .tl-result a { color: var(--accent); }
 .tl-result video { width: 100%; margin-top: var(--space-2); border-radius: var(--radius-md); }
-
 /* Station & Optics page header + solver card */
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 .page-header h2 { margin: 0; font-size: 1.1rem; }
@@ -33,7 +32,6 @@
 .solver-card h3 { margin: 0 0 0.6rem; font-size: 0.75rem; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; }
 .solver-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; }
 .solver-card .telem-value { font-family: var(--font-mono); }
-
 /* Focus page: lens steps and parameters */
 .focus-lens-step { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--text-secondary); margin: 0.2rem 0 0.5rem; }
 .focus-lens-step b { color: var(--text-primary); }
@@ -42,7 +40,6 @@
 .focus-lens-nudge .btn { min-height: 36px; border-radius: 8px; font-size: 0.8125rem; }
 .focus-afmf button { min-height: 36px; font-size: 0.8125rem; }
 .focus-params-title { margin: 0.9rem 0 0.5rem; font-size: 0.75rem; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; }
-
 /* Cloud chart: event lane + frame viewer */
 .cloud-legend .lg-ev { width: 8px; height: 8px; border-radius: 2px; margin-left: 0.5rem; }
 .ev-meteor { background: #f472b6; fill: #f472b6; }
@@ -74,11 +71,9 @@
 #fv-chart { display: block; width: 100%; height: 150px; touch-action: pan-y; }
 .fv-speed { background: var(--bg-card-sub); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.25rem 0.4rem; font-size: 0.8rem; }
 .fv-nav .btn.active { background: var(--accent); color: #fff; }
-
 .fv-boxes { position: absolute; pointer-events: none; overflow: visible; }
 .fv-boxes rect { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .fv-boxes text { font-weight: 600; font-family: var(--font-mono, monospace); paint-order: stroke; stroke: rgba(0,0,0,.75); stroke-width: 3px; }
-
 .fv-body { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 0.75rem; min-height: 0; }
 .fv-main { display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
 .fv-events { list-style: none; margin: 0; padding: 0; overflow-y: auto; max-height: 78vh; display: flex; flex-direction: column; gap: 0.35rem; }
@@ -87,17 +82,16 @@
 .fv-events li.active { outline: 1px solid var(--pill, var(--accent)); background: rgba(148, 163, 184, 0.2); }
 .fv-events .ev-type { font-weight: 600; color: var(--text-primary); }
 .fv-events .ev-time, .fv-events .ev-detail { color: var(--text-muted); font-size: 0.75rem; }
-@media (max-width: 900px) { .fv-body { grid-template-columns: 1fr; } .fv-events { max-height: 180px; } }
-
+@media (max-width: 900px) {
+    .fv-body { grid-template-columns: 1fr; }
+    .fv-events { max-height: 180px; }
+}
 /* Image Output: derived-size readout */
 .size-pipeline { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
 .size-pipeline li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 6px; background: var(--bg-elevated, rgba(255,255,255,0.03)); font-size: 0.9rem; }
 .size-pipeline strong { font-family: ui-monospace, monospace; color: var(--accent, #38bdf8); }
-
 /* ---- Admin sign-in: guests see a read-only UI (the server enforces; auth.js sets is-admin) ---- */
 :root:not(.is-admin) [data-admin] { display: none !important; }
-.side-auth { display: inline-block; margin-top: 6px; font-size: 12px; color: var(--text-secondary, inherit); text-decoration: underline; }
-.m-sheet-foot .side-auth { margin: 0 0 6px; display: block; }
 .auth-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 10000; max-width: calc(100vw - 32px);
     padding: 10px 16px; border-radius: 10px; background: var(--bg-card, #111827); color: var(--text-primary, #fff);
     border: 1px solid var(--accent, #38bdf8); box-shadow: 0 6px 24px rgba(0, 0, 0, .45); font-size: 14px; }
@@ -108,10 +102,11 @@
 .login-card .field { margin-bottom: 14px; }
 .login-card input[type="password"], .login-card input[type="text"] { width: 100%; box-sizing: border-box; min-height: 44px; }
 .login-card .btn { width: 100%; min-height: 44px; }
-
 /* Settings > Community: network state and per-address health of the last gossip round */
 .field-grid.cm-ident { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
-@media (max-width: 640px) { .field-grid.cm-ident { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+    .field-grid.cm-ident { grid-template-columns: 1fr; }
+}
 .cm-options { display: grid; gap: 0.45rem; margin: 0.75rem 0; }
 .cm-options .field-note { margin: 0; }
 .cm-options .cm-url-hint { color: var(--warning); display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
@@ -133,7 +128,6 @@
 .cm-target-url { color: var(--text-primary); font-family: var(--font-mono); font-size: 0.8rem; overflow-wrap: anywhere; }
 .cm-target-role { margin-left: 0.5rem; font-family: var(--font-sans); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }
 .cm-target-info { margin-top: 0.15rem; overflow-wrap: anywhere; }
-
 /* Settings autosave: status chip in each card header, and the line above the cards */
 .settings-autosave-note { margin: 0 0 0.75rem; font-size: 0.8rem; }
 .save-chip { margin-left: auto; margin-right: 0.75rem; font-size: 0.78rem; font-weight: 600; padding: 0.15rem 0.55rem; border-radius: 999px; border: 1px solid var(--border-color); color: var(--text-secondary); max-width: 26rem; overflow-wrap: anywhere; }
@@ -144,7 +138,6 @@
 .fr24-block .field-note + .field-note { margin-top: 0.4rem; }
 .fr24-token-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .dayobj-classes { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; }
-
 /* Focus page: advanced groups stay collapsed so the main flow (start, score, lens) is what you see */
 .focus-adv { margin: 0.75rem 0 0; border-top: 1px solid var(--border, rgba(255,255,255,0.08)); padding-top: 0.5rem; }
 .focus-adv > summary, .focus-chart-details > summary { cursor: pointer; font-size: 0.8rem; color: var(--text-secondary); list-style: none; }
@@ -156,8 +149,6 @@
 .focus-chart-details > summary.focus-chart-head { cursor: pointer; }
 .focus-chart-details:not([open]) { align-self: start; }
 .focus-chart-details:not([open]) .focus-chart-head { margin-bottom: 0; }
-.side-sub.has-update::after { content: " \25CF"; color: var(--accent, #38bdf8); font-size: 0.8em; }
-
 .wx-now { font-size: 13px; color: var(--text-secondary); margin: 6px 0; }
 .wx-hours { display: flex; flex-wrap: wrap; gap: 3px; margin: 6px 0; }
 .wx-h { font: 11px var(--font-mono, monospace); padding: 4px 6px; border-radius: 4px; background: var(--accent); color: #fff; }

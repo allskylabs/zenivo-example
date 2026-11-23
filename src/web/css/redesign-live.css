@@ -1,13 +1,19 @@
 /* Live page fidelity pass (phone mockup): number font, cloud bar card, overhead rows, one-row accordions.
  * Loaded last (style.css). Own file so it merges cleanly beside redesign.css. */
-
 /* ---------- Fonts: Space Grotesk for numbers (self-hosted, css/fonts.css), the old mono face as fallback ---------- */
 :root { --font-num: "Space Grotesk", "Inter", var(--font-mono); }
-.now-tile b, .cloud-big b, .fl-dist, .oc-stats b, .m-head-clock, .vp-bar .zoom-level, .ov-n { font-variant-numeric: tabular-nums; }
+.now-tile b,
+.cloud-big b,
+.fl-dist,
+.oc-stats b,
+.vp-bar .zoom-level,
+.ov-n { font-variant-numeric: tabular-nums; }
 .now-tile b { font-size: 20px; letter-spacing: -0.01em; }
-@media (max-width: 420px) { .now-tile { padding-left: 10px; padding-right: 6px; } .now-tile b { font-size: 17px; letter-spacing: -0.02em; text-overflow: clip; } }
+@media (max-width: 420px) {
+    .now-tile { padding-left: 10px; padding-right: 6px; }
+    .now-tile b { font-size: 17px; letter-spacing: -0.02em; text-overflow: clip; }
+}
 #live-events-count, .live-events-count { font-family: var(--font-num); }
-
 /* ---------- Overhead now rows (Live card, all widths) ---------- */
 #overhead-card .ov-panel .flights-list { max-height: none; overflow: visible; gap: 0; }
 #overhead-card .ov-panel .flight { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 12px; row-gap: 2px; align-items: baseline; padding: 12px 0; border: 0; border-bottom: 1px solid var(--divider); border-radius: 0; background: none; }
@@ -19,7 +25,6 @@
 #overhead-card .ov-panel .fl-dist { grid-column: 2; grid-row: 1; justify-self: end; min-width: 64px; text-align: right; white-space: nowrap; font-family: var(--font-num); font-size: 16px; font-weight: 700; color: var(--text-primary); }
 #overhead-card .ov-panel .flight .fl-where { grid-column: 2; grid-row: 2; justify-self: end; min-width: 64px; margin: 0; text-align: right; white-space: nowrap; overflow: visible; font-size: 13px; color: var(--text-secondary); }
 #overhead-card .ov-panel .live-events-more { display: block; margin-top: 4px; text-align: right; }
-
 /* ---------- Cloud cover card ---------- */
 /* Bars on every width (the line chart only lives in the archived-frame viewer now) */
 .cloud-card .cloud-summary, .cloud-card .cloud-chart-wrap, .cloud-card .cloud-caption { display: none; }
@@ -28,12 +33,14 @@
 .cloud-big b { font-family: var(--font-num); font-size: 28px; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; color: var(--text-primary); }
 .cloud-big span { font-size: 14px; color: var(--text-secondary); }
 .cloud-bars { align-items: flex-end; gap: 4px; height: 70px; }
-@media (min-width: 769px) { .cloud-bars { gap: 5px; height: 140px; } .live-pair .cloud-bars { height: 160px; } }
+@media (min-width: 769px) {
+    .cloud-bars { gap: 5px; height: 140px; }
+    .live-pair .cloud-bars { height: 160px; }
+}
 .cb-slot { flex: 1 1 0; min-width: 0; height: 100%; display: flex; align-items: flex-end; cursor: pointer; }
 .cb-slot i { display: block; width: 100%; border-radius: 3px; background: var(--accent); }
 .cb-slot i.cb-last { background: color-mix(in srgb, var(--accent) 60%, #fff); }
 .cloud-bars-cap { justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--text-muted); }
-
 /* ---------- Phone (<= 768 px) ---------- */
 @media (max-width: 768px) {
     /* 16 px side margins, 14 px between cards */
@@ -43,12 +50,9 @@
     #tab-live .viewport-card { margin: 0; max-width: 100%; }
     #tab-live .now-strip { gap: 8px; }
     #tab-live .overhead-card .card-header h2, #tab-live .live-events-card .card-header h2, #tab-live .cloud-card .card-header h2 { font-size: 16px; font-weight: 700; }
-
     /* Overhead: no chips, no data-source line */
     #overhead-card .zchips, #overhead-card .ov-meta { display: none; }
-
     .cloud-card .cr-toggle { min-height: 36px; padding: 0 14px; font-size: 14px; }
-
     /* Accordions: one 52 px row, title left, chevron right */
     #tab-live #weather-acc, #tab-live #histogram-card, #tab-live #telemetry-acc { padding: 0 16px; border-radius: var(--radius-card); }
     #tab-live details.acc[open] { padding-bottom: 16px; }
@@ -61,7 +65,6 @@
     #tab-live #telemetry-acc > .card:last-child { margin-bottom: 0; }
     #tab-live #hist-calc-badge { margin-right: 10px; }
 }
-
 /* ---------- Exposure card on Live: one summary row (Exposure + live values + chevron), full card when opened ---------- */
 #tab-live #exposure-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-card); padding: 0 16px; }
 #tab-live #exposure-card[open] { padding-bottom: 16px; }
@@ -85,11 +88,12 @@
     #tab-live #exposure-card .chip-preset { min-height: 40px; }
     #tab-live #exposure-card .exp-summary { font-size: 13px; }
 }
-
 /* Guests: the card shows live values, every control is disabled and one line points to the sign-in page */
 #exposure-card .exp-signin { display: none; margin: 0 0 12px; font-size: 14px; line-height: 1.4; color: var(--text-secondary); }
 #exposure-card .exp-signin a { color: var(--accent); font-weight: 600; }
 :root:not(.is-admin) #exposure-card .exp-signin { display: block; }
 #exposure-card input:disabled, #exposure-card button:disabled { cursor: default; opacity: 0.5; }
 #exposure-card .chip-preset:disabled:hover, #exposure-card .btn-preset:disabled:hover, #exposure-card .btn-preset-gain:disabled:hover { color: var(--text-secondary); border-color: var(--border-color); }
-@media (prefers-reduced-motion: reduce) { #tab-live #exposure-card > summary::after { transition: none; } }
+@media (prefers-reduced-motion: reduce) {
+    #tab-live #exposure-card > summary::after { transition: none; }
+}

@@ -1,4 +1,4 @@
-/* Fills every [data-app-version] element (sidebar footer, phone "More" sheet) with "Zenivo v<version>" from /api/version. */
+/* Fills every [data-app-version] element (Menu sheet) with "Zenivo v<version>" from /api/version. */
 (function () {
     function fill() {
         var els = document.querySelectorAll("[data-app-version]");

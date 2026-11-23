@@ -93,7 +93,7 @@
         bar.className = "focus-banner";
         bar.hidden = true;
         bar.innerHTML = 'Focus mode is on: auto-exposure and archiving are paused. <a href="/focus">Open focus</a> <button class="btn btn-sm btn-outline">Stop focus mode</button>';
-        const nav = document.querySelector(".app-main > .navbar") || document.querySelector(".tab-bar");
+        const nav = document.querySelector(".ds-topbar");
         if (nav) nav.after(bar);
         bar.querySelector("button").addEventListener("click", async () => {
             const btn = bar.querySelector("button");

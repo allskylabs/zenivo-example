@@ -4,11 +4,9 @@
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 1rem;
 }
-
 .camera-pick { display: flex; gap: 0.75rem; align-items: flex-end; }
 .camera-pick .field { flex: 1 1 auto; min-width: 0; }
 .camera-pick .btn { flex: 0 0 auto; white-space: nowrap; }
-
 .settings-group {
     background: var(--bg-card-sub);
     border: 1px solid var(--border-color);
@@ -16,7 +14,6 @@
     padding: 0.85rem 1rem 1rem;
     min-width: 0;
 }
-
 .settings-group legend {
     padding: 0 0.4rem;
     font-size: 0.8rem;
@@ -25,29 +22,24 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
-
 .field-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
     gap: 0.75rem;
 }
-
 .field {
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
     min-width: 0;
 }
-
 .field-wide { grid-column: 1 / -1; }
 .field-end { justify-content: flex-end; }
-
 .field label {
     font-size: 0.75rem;
     font-weight: 600;
     color: var(--text-secondary);
 }
-
 .field input[type="number"],
 .field input[type="text"],
 .field input[type="url"],
@@ -63,7 +55,6 @@
     font-family: var(--font-mono);
     font-size: 0.85rem;
 }
-
 .field input[type="text"],
 .field input[type="url"],
 .field input[type="email"],
@@ -73,7 +64,6 @@
 .fr24-token-row input { flex: 1 1 14rem; width: auto; }
 .field[hidden] { display: none; }
 .field textarea { resize: vertical; min-height: 4.5rem; }
-
 .field select {
     width: 100%;
     background: var(--bg-primary);
@@ -84,34 +74,24 @@
     font-size: 0.85rem;
     cursor: pointer;
 }
-
 .field select:focus {
     outline: none;
     border-color: var(--accent);
 }
-
-a.tab-btn {
-    text-decoration: none;
-    display: inline-block;
-}
-
 .field input:focus {
     outline: none;
     border-color: var(--accent);
 }
-
 .field-note {
     margin-top: 0.75rem;
     font-size: 0.75rem;
     color: var(--text-muted);
 }
-
 .toggle-list {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
 }
-
 .toggle-row {
     display: flex;
     align-items: center;
@@ -123,26 +103,21 @@ a.tab-btn {
     background: var(--bg-primary);
     cursor: pointer;
 }
-
 .toggle-row:hover { border-color: var(--accent); }
-
 .toggle-text {
     display: flex;
     flex-direction: column;
     gap: 0.1rem;
 }
-
 .toggle-title {
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--text-primary);
 }
-
 .toggle-hint {
     font-size: 0.75rem;
     color: var(--text-muted);
 }
-
 .switch {
     appearance: none;
     -webkit-appearance: none;
@@ -155,7 +130,6 @@ a.tab-btn {
     cursor: pointer;
     transition: background 0.2s;
 }
-
 .switch::after {
     content: "";
     position: absolute;
@@ -167,11 +141,9 @@ a.tab-btn {
     background: var(--text-secondary);
     transition: transform 0.2s, background 0.2s;
 }
-
 .switch:checked { background: var(--accent-hover); }
 .switch:checked::after { transform: translateX(16px); background: #fff; }
 .switch:disabled { opacity: 0.5; cursor: wait; }
-
 .orient-footer {
     display: flex;
     align-items: center;
@@ -180,34 +152,29 @@ a.tab-btn {
     margin-top: 0.75rem;
     font-size: 0.75rem;
 }
-
 .settings-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0.65rem;
     margin-top: 1rem;
 }
-
 .params-summary {
     margin-top: 1.25rem;
     border-top: 1px solid var(--border-color);
     padding-top: 0.75rem;
 }
-
 .params-summary summary {
     cursor: pointer;
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--text-secondary);
 }
-
 .params-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
     gap: 0.6rem;
     margin-top: 0.75rem;
 }
-
 .telem-box {
     display: flex;
     flex-direction: column;
@@ -217,21 +184,18 @@ a.tab-btn {
     border-radius: 6px;
     padding: 0.55rem 0.7rem;
 }
-
 .telem-label {
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     color: var(--text-muted);
 }
-
 .telem-value {
     font-family: var(--font-mono);
     font-size: 0.85rem;
     color: var(--text-primary);
     word-break: break-word;
 }
-
 /* Footer */
 .footer {
     background: var(--bg-card);
@@ -244,8 +208,6 @@ a.tab-btn {
     flex-wrap: wrap;
     gap: 0.5rem;
 }
-
-
 /* Settings > Integrations: data source overview and satellite groups */
 .data-sources { display: grid; gap: 0.5rem; }
 .ds-row { display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.55rem 0.75rem; background: var(--bg-card-sub); border: 1px solid var(--border-color); border-radius: 8px; }

@@ -45,7 +45,6 @@
     --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     --font-size-min: 12px;
     --font-size-body: 14px;
-    --sidebar-w: 240px;
 
     /* Short aliases used by obs_dock.html */
     --bg: var(--bg-primary);

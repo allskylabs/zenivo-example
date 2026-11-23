@@ -5,39 +5,9 @@
 (function () {
     "use strict";
 
-    // ---- shared shell behaviour (same as the other standalone pages): Red Vision, UTC clock, phone Menu sheet ----
-    const PREFS = "allsky.ui.prefs.v1";
     const $ = (id) => document.getElementById(id);
-    const nv = $("btn-night-vision");
-    const readPrefs = () => { try { return JSON.parse(localStorage.getItem(PREFS)) || {}; } catch (e) { return {}; } };
-    function applyNight(on) {
-        document.body.classList.toggle("night-mode", on);
-        if (on) document.documentElement.setAttribute("data-theme", "red"); else document.documentElement.removeAttribute("data-theme");
-        if (nv) nv.classList.toggle("btn-primary", on);
-    }
-    applyNight(!!readPrefs().nightVision);
-    if (nv) nv.addEventListener("click", () => {
-        const on = !document.body.classList.contains("night-mode");
-        applyNight(on);
-        try { localStorage.setItem(PREFS, JSON.stringify(Object.assign(readPrefs(), { nightVision: on }))); } catch (e) { /* not persisted */ }
-        drawRadar();
-    });
-    const clock = $("nav-utc-clock");
-    if (clock) { const tick = () => { clock.textContent = new Date().toISOString().slice(11, 19); }; tick(); setInterval(tick, 1000); }
-    const moreBtn = $("m-more-btn"), sheet = $("m-more-sheet"), backdrop = $("m-sheet-backdrop"), rv = $("m-rv-toggle");
-    const path = location.pathname.replace(/\/+$/, "") || "/";
-    document.querySelectorAll("[data-mpath]").forEach((el) => el.classList.toggle("active", el.getAttribute("data-mpath").split(",").includes(path)));
-    if (moreBtn && sheet && backdrop) {
-        const setOpen = (o) => { sheet.hidden = !o; backdrop.hidden = !o; moreBtn.setAttribute("aria-expanded", o ? "true" : "false"); };
-        moreBtn.addEventListener("click", () => setOpen(sheet.hidden));
-        backdrop.addEventListener("click", () => setOpen(false));
-        document.addEventListener("keydown", (e) => { if (e.key === "Escape") setOpen(false); });
-    }
-    if (rv && nv) rv.addEventListener("click", () => {
-        nv.click();
-        const on = nv.classList.contains("btn-primary");
-        rv.classList.toggle("btn-primary", on); rv.setAttribute("aria-checked", on ? "true" : "false");
-    });
+    // Red Vision, clock and Menu come from shell.js; redraw the radar when the theme flips
+    window.addEventListener("zenivo:rv", () => drawRadar());
 
     // ---- helpers ----
     const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

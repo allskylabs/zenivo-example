@@ -1,22 +1,38 @@
-/* Zenivo shell, shared by every page (classic script, deferred, generated into <head> by scripts/sync_nav.py).
- * Phone header (status dot, station name, clock) and the Menu sheet extras: Red vision state, Fullscreen, Share.
- * Opening/closing the sheet itself stays with each page's own handler (they all toggle `hidden` on #m-more-sheet);
- * this file only adds what the new Menu needs and never toggles the sheet except to close it after an action. */
+/* Zenivo shell, shared by every page (classic deferred script, linked from <head> by scripts/sync_nav.py).
+ * Drives the generated topbar / tab bar / Menu sheet on top of ds.js: active tab, red vision, station name,
+ * clocks, status dot, fullscreen, share and the owner chat widget. */
 (function () {
     "use strict";
     const $ = (id) => document.getElementById(id);
-    const sheet = $("m-more-sheet"), backdrop = $("m-sheet-backdrop"), moreBtn = $("m-more-btn");
+    const DSx = window.DS || {};
+    const PREFS = "allsky.ui.prefs.v1";
 
-    function closeSheet() {
-        if (sheet) sheet.hidden = true;
-        if (backdrop) backdrop.hidden = true;
-        if (moreBtn) moreBtn.setAttribute("aria-expanded", "false");
+    // ---- active tab / tile from data-paths ----
+    function norm(p) { p = p.replace(/\/index\.html$/, "/").replace(/\/+$/, ""); return p || "/"; }
+    function markActive() {
+        const here = norm(location.pathname);
+        document.querySelectorAll("[data-paths]").forEach((el) => {
+            const hit = el.dataset.paths.split(",").some((p) => norm(p.trim()) === here);
+            if (hit) el.setAttribute("aria-current", "page"); else el.removeAttribute("aria-current");
+        });
     }
 
-    // ---- station name (header + Menu) ----
-    function setName(n) {
-        ["m-head-name", "m-st-name"].forEach((id) => { const el = $(id); if (el) el.textContent = n; });
+    // ---- red vision ----
+    function readPref() { try { return !!(JSON.parse(localStorage.getItem(PREFS) || "{}").nightVision); } catch (e) { return false; } }
+    function writePref(on) {
+        try { const o = JSON.parse(localStorage.getItem(PREFS) || "{}"); o.nightVision = on; localStorage.setItem(PREFS, JSON.stringify(o)); } catch (e) { /* private mode */ }
     }
+    function applyRv(on, persist) {
+        document.body.classList.toggle("night-mode", on);
+        if (DSx.setTheme) DSx.setTheme(on, true);
+        document.querySelectorAll("#btn-night-vision, #m-rv-toggle").forEach((b) => b.setAttribute("aria-pressed", on ? "true" : "false"));
+        if (persist) writePref(on);
+        window.dispatchEvent(new CustomEvent("zenivo:rv", { detail: { on } }));
+    }
+    const rvOn = () => document.body.classList.contains("night-mode");
+
+    // ---- station name ----
+    function setName(n) { ["m-head-name", "m-st-name"].forEach((id) => { const el = $(id); if (el) el.textContent = n; }); }
     function loadName() {
         if (typeof window.zenivoStationConfig !== "function") return;
         window.zenivoStationConfig().then((c) => {
@@ -25,74 +41,52 @@
         });
     }
 
-    // ---- clock: the station's local time where the dashboard knows it, else the browser's ----
+    // ---- clocks ----
     function offsetLabel() {
         const m = -new Date().getTimezoneOffset();
         const h = Math.trunc(m / 60), r = Math.abs(m % 60);
         return "UTC" + (m < 0 ? "-" : "+") + Math.abs(h) + (r ? ":" + String(r).padStart(2, "0") : "");
     }
+    const hhmm = (d) => String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
     function tickClock() {
         const el = $("m-head-clock");
-        if (!el) return;
-        const station = $("nav-local-clock");
-        let txt;
-        if (station && /\d\d:\d\d/.test(station.textContent) && typeof tzLabel === "string") txt = station.textContent.trim().slice(0, 5) + " " + tzLabel;
-        else {
-            const d = new Date();
-            txt = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") + " " + offsetLabel();
+        if (el) {
+            const st = $("nav-local-clock");
+            const txt = st && /\d\d:\d\d/.test(st.textContent) && typeof tzLabel === "string"
+                ? st.textContent.trim().slice(0, 5) + " " + tzLabel
+                : hhmm(new Date()) + " " + offsetLabel();
+            if (el.textContent !== txt) el.textContent = txt;
         }
-        if (el.textContent !== txt) el.textContent = txt;
+        const utc = $("nav-utc-clock");
+        // the dashboard (core.js) drives the UTC/local clocks itself; other pages get a plain UTC tick
+        if (utc && typeof window.updateClock !== "function") {
+            const d = new Date();
+            utc.textContent = String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0") + ":" + String(d.getUTCSeconds()).padStart(2, "0");
+        }
     }
 
-    // ---- status dot: follows the Online/Offline text of the dashboard header when there is one ----
+    // ---- status dot ----
     function syncDot() {
-        const s = $("nav-system-status"), dot = $("m-head-dot");
+        const s = $("nav-system-status"), dot = $("status-pulse");
         if (!dot) return;
-        const online = !s || /online/i.test(s.textContent || "") || !(s.textContent || "").trim();
-        dot.classList.toggle("off", !online);
-        const mdot = document.querySelector(".m-st-dot");
-        if (mdot) mdot.classList.toggle("off", !online);
+        const t = s ? (s.textContent || "").trim() : "";
+        dot.classList.toggle("off", !!t && !/online/i.test(t));
     }
 
-    // ---- Red vision tile state follows body.night-mode, whichever page toggled it ----
-    function syncRv() {
-        const rv = $("m-rv-toggle"), st = $("m-rv-state");
-        const on = document.body.classList.contains("night-mode");
-        if (rv) { rv.classList.toggle("btn-primary", on); rv.setAttribute("aria-checked", on ? "true" : "false"); }
-        if (st) st.textContent = on ? "On" : "Off";
-    }
-
-    // ---- Fullscreen: the live picture on the Live page, the whole page elsewhere ----
+    // ---- fullscreen / share ----
     function fullscreen() {
         const target = $("viewport-container") || document.documentElement;
         if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
         if (target.requestFullscreen) target.requestFullscreen().catch(() => {});
     }
-
-    // ---- Share: native share sheet when there is one, else copy the link ----
-    function toast(msg) {
-        const el = document.createElement("div");
-        el.className = "auth-toast";
-        el.setAttribute("role", "status");
-        el.textContent = msg;
-        document.body.appendChild(el);
-        setTimeout(() => el.remove(), 3500);
-    }
     async function share() {
         const url = location.origin + (location.pathname === "/" ? "/live" : location.pathname);
-        if (navigator.share) {
-            try { await navigator.share({ title: document.title, url }); } catch (e) { /* cancelled */ }
-            return;
-        }
-        try {
-            await navigator.clipboard.writeText(url);
-            toast("Link copied");
-        } catch (e) {
-            window.prompt("Copy this link", url);
-        }
+        if (navigator.share) { try { await navigator.share({ title: document.title, url }); } catch (e) { /* cancelled */ } return; }
+        try { await navigator.clipboard.writeText(url); DSx.toast ? DSx.toast("Link copied", "ok") : null; }
+        catch (e) { window.prompt("Copy this link", url); }
     }
 
-    // ---- station chat widget (owner only; it renders nothing unless chat is on and the owner is signed in) ----
+    // ---- station chat widget ----
     function loadChat() {
         const v = "20261130g";
         const css = document.createElement("link");
@@ -103,22 +97,22 @@
         document.head.appendChild(js);
     }
 
+    function closeMenu() { const s = $("m-more-sheet"); if (s && DSx.closeSheet) DSx.closeSheet(s); }
+
     function init() {
-        loadChat();
-        loadName();
-        tickClock(); setInterval(tickClock, 5000);
+        markActive();
+        applyRv(readPref(), false);
+        const nv = $("btn-night-vision"), rv = $("m-rv-toggle"), fs = $("m-fs-btn"), sh = $("m-share-btn");
+        [nv, rv].forEach((b) => b && b.addEventListener("click", () => { applyRv(!rvOn(), true); if (b === rv) closeMenu(); }));
+        if (fs) fs.addEventListener("click", () => { closeMenu(); fullscreen(); });
+        if (sh) sh.addEventListener("click", () => { closeMenu(); share(); });
+        const sheet = $("m-more-sheet");
+        if (sheet) sheet.addEventListener("click", (e) => { if (e.target.closest("a.ds-tile")) closeMenu(); });
+        loadChat(); loadName();
+        tickClock(); setInterval(tickClock, 1000);
         syncDot();
-        const status = $("nav-system-status");
-        if (status && window.MutationObserver) new MutationObserver(syncDot).observe(status, { childList: true, characterData: true, subtree: true });
-        syncRv();
-        if (window.MutationObserver) new MutationObserver(syncRv).observe(document.body, { attributes: true, attributeFilter: ["class"] });
-        const fs = $("m-fs-btn"), sh = $("m-share-btn");
-        if (fs) fs.addEventListener("click", () => { closeSheet(); fullscreen(); });
-        if (sh) sh.addEventListener("click", () => { closeSheet(); share(); });
-        if (sheet) sheet.addEventListener("click", (e) => { if (e.target.closest("a.m-tile")) closeSheet(); });
-        // Esc and backdrop are handled by each page; make sure both exist even where a page predates them
-        document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheet && !sheet.hidden) closeSheet(); });
-        if (backdrop) backdrop.addEventListener("click", closeSheet);
+        const st = $("nav-system-status");
+        if (st && window.MutationObserver) new MutationObserver(syncDot).observe(st, { childList: true, characterData: true, subtree: true });
     }
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 })();

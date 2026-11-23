@@ -1,6 +1,5 @@
 /* Remaining pages fidelity pass (phone mockups): Overhead, Archive, Event viewer, Community, Activity log, Sign in, sheets.
  * Loaded last (style.css). Reuses tokens; colours only via variables. */
-
 /* ================= Overhead (/overhead) ================= */
 .oh-seg .ov-n { display: none; }
 .oh-radar .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
@@ -37,7 +36,6 @@
     .oh-side > .zchips .zchip { min-height: 36px; padding: 0 14px; }
     .oh-links a { min-height: 30px; }
 }
-
 /* ================= Sign in (/login) ================= */
 .login-top { display: none; }
 .login-card h2 { display: flex; align-items: center; gap: 10px; }
@@ -58,7 +56,6 @@
     .login-card .field { margin-bottom: 12px; }
     .login-card .btn-primary { min-height: 48px; margin-top: 4px; }
 }
-
 /* ================= Page top bar (Community; same as Sign in) ================= */
 .page-top { display: none; }
 body #cstations .you-pill { display: inline-block; margin-left: 10px; padding: 2px 10px; border-radius: 999px; font-style: normal; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: var(--accent); background: var(--accent-bg); vertical-align: 2px; }
@@ -68,11 +65,11 @@ body #cstations .you-pill { display: inline-block; margin-left: 10px; padding: 2
     .page-top { display: flex; align-items: center; gap: 14px; height: 56px; padding: 0 20px; background: var(--bg-primary, transparent); }
     .page-back { display: inline-grid; place-items: center; width: 32px; height: 32px; margin-left: -6px; color: var(--text-primary); }
     .page-top-title { font-size: 17px; font-weight: 600; }
-    body:has(.page-top) .navbar { display: none; }
     /* Community: map card with the legend row inside its bottom */
     body #cmap-wrap { display: flex; flex-direction: column; height: auto; min-height: 0; overflow: hidden; margin: 4px 16px 0; background: var(--bg-card); }
     body #cmap .leaflet-control-zoom { display: none; }
-    body #cmap { position: relative; inset: auto; flex: none; height: 260px; height: clamp(260px, 44dvh, 380px); }   /* tall enough for a station popup with its frame */
+    body #cmap { position: relative; inset: auto; flex: none; height: 260px; height: clamp(260px, 44dvh, 380px); }
+    /* tall enough for a station popup with its frame */
     body #clegend { position: static; flex: none; gap: 16px; padding: 12px 16px 14px; border: 0; border-radius: 0; background: none; font-size: 13px; color: var(--text-secondary); }
     body #clist { width: calc(100% - 32px); margin: 14px 16px; }
     body #cstations .nm { display: flex; align-items: center; font-size: 17px; font-weight: 700; }
@@ -81,9 +78,6 @@ body #cstations .you-pill { display: inline-block; margin-left: 10px; padding: 2
     body #cstations .st-r b { font-size: 15px; }
     body #cstations .st-r small { font-size: 13px; }
 }
-
-/* ================= Activity log (/logs, admin) ================= */
-body:has(#tab-logs.active) .navbar { display: none; }
 @media (max-width: 768px) {
     body #tab-logs > .card { display: flex; flex-direction: column; }
     body #tab-logs .card-header, body #tab-logs .header-actions { display: contents; }
@@ -115,7 +109,6 @@ body:has(#tab-logs.active) .navbar { display: none; }
     body #tab-logs .log-msg { grid-column: 1 / -1; grid-row: 2; font-size: 16px; line-height: 1.35; color: var(--text-primary); }
     body #tab-logs .log-item.lvl-error { background: var(--bg-card); }
 }
-
 /* ================= Archive: By day / Events ================= */
 .gal-pane-day .section-heading > div:first-child { display: none !important; }
 .gal-pane-day .section-heading { margin: 0; }
@@ -147,10 +140,13 @@ body:has(#tab-logs.active) .navbar { display: none; }
 .gal-mode-events .t-day { display: none; }
 .gal-mode-events .t-ev { display: inline; }
 .gal-mode-events .day-night { display: none; }
-@media (min-width: 769px) { .evc-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); } .day-night .day-products { grid-template-columns: repeat(3, minmax(0, 1fr)); } .day-tl { grid-column: auto; grid-row: span 1; aspect-ratio: 4 / 3; } }
+@media (min-width: 769px) {
+    .evc-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+    .day-night .day-products { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .day-tl { grid-column: auto; grid-row: span 1; aspect-ratio: 4 / 3; }
+}
 .day-evhead + .events-filter .zchip { min-height: 36px; padding: 0 14px; font-size: 14px; }
 .day-evhead + .events-filter { gap: 8px; }
-
 /* ================= Event viewer (phone): media card, one details card, matched card, actions (mockup r-p15) ================= */
 .ev-phone-only { display: none; }
 .ev-actions[hidden] { display: none; }
@@ -179,24 +175,6 @@ body:has(#tab-logs.active) .navbar { display: none; }
     .ev-actions { gap: 10px; }
     .ev-actions .btn:not(.ev-open-crop) { border-color: var(--border-color); background: var(--bg-card-sub); color: var(--text-primary); }
 }
-
-/* ================= Menu sheet (phone): fit labels on one line, red-vision tile tinted like the mockup ================= */
-@media (max-width: 768px) {
-    .m-tile { gap: 10px; padding: 0 12px; font-size: 14px; }
-    .m-st-name { font-size: 19px; }
-    .m-quick .m-sheet-rv { background: color-mix(in srgb, var(--danger) 14%, var(--bg-card-sub)); border-color: color-mix(in srgb, var(--danger) 45%, var(--border-color)); }
-    .m-quick .m-sheet-rv b { color: color-mix(in srgb, var(--danger) 60%, #fff); }
-    .m-quick .m-sheet-rv span { color: color-mix(in srgb, var(--danger) 55%, var(--text-secondary)); }
-    .m-quick .m-sheet-rv[aria-checked="true"] { background: color-mix(in srgb, var(--danger) 28%, var(--bg-card-sub)); border-color: var(--danger); }
-}
-
-/* ================= Layers sheet: 44 x 26 switches, 48 px rows (mockup p3) ================= */
-.zsheet .lay-row { min-height: 48px; padding: 7px 0; }
-.zsheet .lay-txt b { font-weight: 500; }
-.zsheet .sw { width: 44px; height: 26px; border-radius: 13px; }
-.zsheet .sw i { top: 3px; left: 3px; width: 20px; height: 20px; }
-.zsheet .sw[aria-checked="true"] i { transform: translateX(18px); }
-
 /* ================= Tap object card (mockup p4): accent frame whatever the kind, 4 stat columns ================= */
 .obj-card { padding: 16px 18px; border-color: color-mix(in srgb, var(--accent) 70%, var(--border-color)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent), 0 0 22px color-mix(in srgb, var(--accent) 10%, transparent); }
 .oc-title { margin-top: 12px; font-size: 26px; }
@@ -207,12 +185,10 @@ body:has(#tab-logs.active) .navbar { display: none; }
 .oc-btn { min-height: 44px; padding: 0 10px; font-size: 14px; white-space: nowrap; }
 .oc-btn.oc-primary { flex: 1.15; }
 .oc-close { color: var(--text-muted); font-weight: 300; font-size: 30px; }
-
 /* Event viewer on phones: both pictures share one 16:9 box so the captions line up */
 @media (max-width: 760px) {
     .ev-images:not(.single) .ev-fig img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: contain; background: #05080f; }
 }
-
 /* ================= Tap object card floats as a non-modal dialog (owner request 2026-11-17) =================
    Desktop: bottom-right corner of the window. Phone: bottom sheet above the tab bar. The picture stays tappable. */
 #tab-live .obj-card {
@@ -226,26 +202,27 @@ body:has(#tab-logs.active) .navbar { display: none; }
 @media (max-width: 768px) {
     #tab-live .obj-card { left: 10px; right: 10px; width: auto; max-width: 480px; margin: 0 auto; bottom: calc(66px + env(safe-area-inset-bottom, 0px)); max-height: 60vh; }
 }
-@media (prefers-reduced-motion: reduce) { #tab-live .obj-card { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+    #tab-live .obj-card { animation: none; }
+}
 /* In fullscreen the card sits inside the picture, above the bottom control bar */
 :fullscreen .obj-card { position: fixed; z-index: 60; margin: 0; right: 16px; bottom: 76px; width: min(400px, calc(100vw - 32px)); max-height: calc(100vh - 100px); overflow-y: auto; cursor: auto; text-align: left; }
-@media (max-width: 768px) { :fullscreen .obj-card { left: 10px; right: 10px; width: auto; max-width: 480px; margin: 0 auto; } }
+@media (max-width: 768px) {
+    :fullscreen .obj-card { left: 10px; right: 10px; width: auto; max-width: 480px; margin: 0 auto; }
+}
 /* The card is a popover placed next to its object by app/08d-live-ui.js (placeCard sets left/top) */
 #tab-live .obj-card, :fullscreen .obj-card { left: 0; top: 0; right: auto; bottom: auto; width: min(340px, calc(100vw - 20px)); max-width: none; margin: 0; max-height: calc(100vh - 20px); }
-
 /* ================= Live: Recent events header (title, state dot, All >) ================= */
 .live-events-card .card-header .badge { display: none; }
 .live-events-card .card-header .live-events-more { margin-left: auto; }
 #tab-live .live-events-card .live-events-status, .live-events-card .live-events-status { margin: 0; font-size: 0; line-height: 0; color: transparent; }
 .live-events-card .live-events-status .dot { width: 8px; height: 8px; margin: 0; }
-
 /* ================= Settings > Image output: JPEG slider ================= */
 #tab-settings .field:has(#perf-stream-quality) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; }
 #tab-settings .field:has(#perf-stream-quality) > label { grid-column: 1; margin: 0; }
 #tab-settings .field:has(#perf-stream-quality) > .range-value { grid-column: 2; grid-row: 1; font-family: var(--font-num); font-size: 17px; font-weight: 700; color: var(--text-primary); }
 #tab-settings .field:has(#perf-stream-quality) > input[type="range"] { grid-column: 1 / -1; width: 100%; min-height: 44px; margin: 0; }
 #tab-settings .field-sub { font-weight: 400; color: var(--text-secondary); }
-
 /* ================= Sky (/sky) and the 3D pages: shared top bar, cards, chips ================= */
 .m-3d-bar { display: none; }
 .sv-root .sv-ui, body.page-3d .panel { background: color-mix(in srgb, var(--bg-card) 94%, transparent); border: 1px solid var(--border-color); border-radius: var(--radius-card); backdrop-filter: none; }
@@ -270,8 +247,6 @@ body.page-3d .grp, body.page-3d .tag { border-radius: 999px; padding: 2px 8px; }
 body.page-3d #info .links a { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border-color); background: var(--bg-card-sub); color: var(--text-primary); text-decoration: none; font-weight: 600; font-size: 14px; }
 body.page-3d #btn-track { background: var(--accent); border-color: var(--accent); color: var(--bg-primary); min-height: 40px; padding: 0 20px; font-size: 14px; font-weight: 700; }
 @media (max-width: 700px) {
-    /* top bar: back arrow + page title (same bar as the other sub-pages), no station name / clock */
-    body.page-3d .navbar .m-head { display: none; }
     body.page-3d .m-3d-bar { display: inline-flex; align-items: center; gap: 14px; min-height: 44px; margin-left: -6px; padding: 0 6px; color: var(--text-primary); text-decoration: none; font-size: 17px; font-weight: 600; }
     body.page-3d .m-3d-bar svg { flex: none; }
     body.page-3d #top h1 { display: none; }
@@ -308,7 +283,6 @@ body.page-3d #btn-track { background: var(--accent); border-color: var(--accent)
     .sv-root button, .sv-root select, .sv-root input[type=datetime-local] { min-height: 40px; font-size: 14px; }
     .sv-root .sv-layers label { min-height: 40px; font-size: 14px; }
 }
-
 /* Red Vision: nothing but red / dark tones on these pages (the 3D labels and chips use hard-coded accent colours) */
 [data-theme="red"] .sv-root, [data-theme="red"] #globe { background: #060000; }
 [data-theme="red"] .sv-dim { color: var(--text-secondary); }
@@ -324,17 +298,16 @@ body.page-3d #btn-track { background: var(--accent); border-color: var(--accent)
 [data-theme="red"] #timeline .tl .above { background: var(--border-color); }
 [data-theme="red"] #timeline .tl .vis { background: var(--accent); }
 [data-theme="red"] #cam-badge .dot { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
-
 /* ================= Red Vision pass: white / blue / green leftovers (night-vision rule: only red and dark tones) ================= */
 [data-theme="red"] .zoom-btn, [data-theme="red"] .frame-info, [data-theme="red"] .vp-hint, [data-theme="red"] .vp-meta { color: var(--text-primary); }
 [data-theme="red"] .frame-info { background: color-mix(in srgb, var(--bg-primary) 75%, transparent); }
 [data-theme="red"] .live-event .ev-type, [data-theme="red"] .fv-events .ev-type { color: var(--text-primary) !important; }
-[data-theme="red"] .sw i, [data-theme="red"] #tab-settings input[type="checkbox"]::after, [data-theme="red"] .switch:checked::after,
-[data-theme="red"] .rv-toggle.btn-primary .rv-knob, [data-theme="red"] .m-sheet-rv.btn-primary .rv-knob { background: var(--text-primary); }
+[data-theme="red"] .sw i,
+[data-theme="red"] #tab-settings input[type="checkbox"]::after,
+[data-theme="red"] .switch:checked::after { background: var(--text-primary); }
 [data-theme="red"] #exposure-card input[type="range"]::-webkit-slider-thumb, [data-theme="red"] #tab-settings input[type="range"]::-webkit-slider-thumb { background: var(--text-primary); }
 [data-theme="red"] #exposure-card input[type="range"]::-moz-range-thumb, [data-theme="red"] #tab-settings input[type="range"]::-moz-range-thumb { background: var(--text-primary); }
 [data-theme="red"] .wx-h, [data-theme="red"] .fv-nav .btn.active, [data-theme="red"] #focus-toggle.btn-danger { color: #1a0000; }
-[data-theme="red"] .side-item.active, [data-theme="red"] .side-sub.active { color: var(--text-primary); }
 [data-theme="red"] .vp-pill { color: var(--text-primary); border-color: var(--border-color); background: color-mix(in srgb, var(--bg-primary) 80%, transparent); }
 /* WebGL / video canvases cannot take theme variables: tint them with the same monochrome-red filter the live picture uses (CSS only, the render code is untouched) */
 [data-theme="red"] body.page-3d #stage canvas, [data-theme="red"] .sv-root canvas, [data-theme="red"] .sv-root video, [data-theme="red"] #info-model { filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-50deg) brightness(0.8); }
@@ -348,10 +321,8 @@ body.page-3d #btn-track { background: var(--accent); border-color: var(--accent)
 [data-theme="red"] .ev-meteor, [data-theme="red"] .ev-plane, [data-theme="red"] .ev-satellite, [data-theme="red"] .ev-flash { background: var(--accent); fill: var(--accent); }
 [data-theme="red"] .frame-info .frame-event { color: var(--warning); }
 [data-theme="red"] .size-pipeline strong, [data-theme="red"] .auth-toast { color: var(--text-primary); }
-
 /* emoji / pictograph glyphs ignore `color`: tint them with the monochrome-red filter */
-[data-theme="red"] .live-event .ev-type, [data-theme="red"] .side-ic { filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-50deg); }
-
+[data-theme="red"] .live-event .ev-type { filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-50deg); }
 /* ================= Settings on a phone: 44 px touch targets, nothing wider than the screen ================= */
 @media (max-width: 768px) {
     #tab-settings legend { max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; }
@@ -371,12 +342,10 @@ body.page-3d #btn-track { background: var(--accent); border-color: var(--accent)
     #tab-focus button, #tab-focus select, #tab-focus input[type="number"], #tab-focus input[type="text"] { min-height: 44px; }
     #tab-focus input[type="range"] { height: 44px; }
 }
-
 /* Red Vision leftovers found on the real station: event-type colours and unstyled links */
 [data-theme="red"] .evc-dot { background-color: var(--accent) !important; border-color: var(--accent) !important; }
 [data-theme="red"] .live-event { border-left-color: var(--accent) !important; }
 [data-theme="red"] a:not([class]) { color: var(--accent); }
-
 /* Focus page: one filled button (Start focus mode / Finish & save); everything else is a dark pill */
 #tab-focus [hidden] { display: none !important; }
 #tab-focus .focus-cta-hint, #tab-focus .focus-af-hint { margin: 0.5rem 0 0; line-height: 1.4; }

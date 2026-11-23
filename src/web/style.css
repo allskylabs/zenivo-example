@@ -1,18 +1,18 @@
 /* Zenivo stylesheet: split into css/*.css parts, imported in the original cascade order (design tokens live in /static/tokens.css) */
 @import url("/static/css/fonts.css?v=20261121a");
-@import url("/static/css/base.css?v=20261124a");
+@import url("/static/css/base.css?v=20261123b");
 @import url("/static/css/viewport.css?v=20261124a");
 @import url("/static/css/zoom-pan.css?v=20261126a");
 @import url("/static/css/telemetry.css?v=20261124a");
 @import url("/static/css/gallery.css?v=20261126a");
-@import url("/static/css/settings.css?v=20261115b");
-@import url("/static/css/activity-cloud.css?v=20261124a");
+@import url("/static/css/settings.css?v=20261123b");
+@import url("/static/css/activity-cloud.css?v=20261123b");
 @import url("/static/css/focus.css?v=20261115a");
 @import url("/static/css/events.css?v=20261124a");
-@import url("/static/css/sky-shell.css?v=20261118a");
-@import url("/static/css/phone.css?v=20261115a");
-@import url("/static/css/pages.css?v=20261122a");
-@import url("/static/css/redesign.css?v=20261121g");
-@import url("/static/css/redesign-live.css?v=20261127a");
-@import url("/static/css/redesign-pages.css?v=20261122m");
+@import url("/static/css/sky-shell.css?v=20261123b");
+@import url("/static/css/phone.css?v=20261123b");
+@import url("/static/css/pages.css?v=20261123b");
+@import url("/static/css/redesign.css?v=20261123b");
+@import url("/static/css/redesign-live.css?v=20261123b");
+@import url("/static/css/redesign-pages.css?v=20261123b");
 @import url("/static/css/redesign-data.css?v=20261124c");

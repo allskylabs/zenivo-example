@@ -16,7 +16,8 @@
     // Layers sheet: switches drive the same hidden checkboxes the old chips used (their change handlers persist and subscribe)
     // ------------------------------------------------------------------
     const CHK_IDS = ["chk-sky-overlay", "chk-sky-labels", "chk-grid-overlay", "chk-eq-grid", "chk-aircraft-overlay", "chk-satellite-overlay", "chk-sonde-overlay", "chk-airports-overlay", "chk-overlay-text"];
-    const lay = $("layers-sheet"), layBd = $("layers-backdrop"), layBtn = $("btn-layers");
+    const lay = $("layers-sheet"), layBtn = $("btn-layers");
+    const layOpen = () => !!lay && lay.dataset.open === "true";
     function overheadCounts() {
         const ac = typeof aircraftList !== "undefined" ? aircraftList.filter((a) => a.above_horizon !== false && (a.distance_km == null || a.distance_km <= AIRCRAFT_MAX_KM)).length : 0;
         const sat = typeof satelliteList !== "undefined" ? satelliteList.filter((s) => s.above_horizon !== false).length : 0;
@@ -28,10 +29,10 @@
         const cnt = $("layers-count");
         if (cnt) cnt.textContent = `${on} on`;
         if (layBtn) layBtn.classList.toggle("is-on", on > 0);
-        if (!lay || lay.hidden) return;
-        lay.querySelectorAll(".sw[data-chk]").forEach((b) => {
+        if (!layOpen()) return;
+        lay.querySelectorAll("input[data-chk]").forEach((b) => {
             const c = $(b.dataset.chk);
-            b.setAttribute("aria-checked", c && c.checked ? "true" : "false");
+            b.checked = !!(c && c.checked);
         });
         const n = overheadCounts();
         const set = (id, t) => { const el = $(id); if (el) el.textContent = t; };
@@ -42,29 +43,21 @@
     function openLayers() {
         if (!lay) return;
         if (document.fullscreenElement) document.exitFullscreen().catch(() => {});   // the sheet lives outside the fullscreen picture
-        lay.hidden = false; layBd.hidden = false;
-        layBtn.setAttribute("aria-expanded", "true");
-        syncLayers();
-        const done = $("layers-done");
-        if (done) done.focus({ preventScroll: true });
-    }
-    function closeLayers() {
-        if (!lay || lay.hidden) return;
-        lay.hidden = true; layBd.hidden = true;
-        layBtn.setAttribute("aria-expanded", "false");
-        layBtn.focus({ preventScroll: true });
+        DS.openSheet(lay);
     }
     if (lay && layBtn) {
         layBtn.addEventListener("click", openLayers);
-        layBd.addEventListener("click", closeLayers);
-        $("layers-done").addEventListener("click", closeLayers);
-        document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeLayers(); });
-        lay.addEventListener("click", (e) => {
-            const sw = e.target.closest(".sw[data-chk]");
-            if (!sw) return;
-            const c = $(sw.dataset.chk);
+        // the sheet can close from the scrim, the X or Esc (ds.js): keep the button state and focus in step
+        new MutationObserver(() => {
+            const o = layOpen();
+            layBtn.setAttribute("aria-expanded", o ? "true" : "false");
+            if (o) syncLayers(); else layBtn.focus({ preventScroll: true });
+        }).observe(lay, { attributes: true, attributeFilter: ["data-open"] });
+        lay.addEventListener("change", (e) => {
+            const sw = e.target.closest("input[data-chk]");
+            const c = sw && $(sw.dataset.chk);
             if (!c) return;
-            c.checked = !c.checked;
+            c.checked = sw.checked;
             c.dispatchEvent(new Event("change", { bubbles: true }));
             syncLayers();
         });
@@ -450,7 +443,7 @@
         if (!card || card.hidden) return;
         const r = box.getBoundingClientRect(), ax = r.left + s.x, ay = r.top + s.y, gap = 30, m = 10;
         const vw = window.innerWidth, vh = window.innerHeight, W = card.offsetWidth, H = card.offsetHeight;
-        const tabbar = document.fullscreenElement ? null : document.querySelector(".m-tabbar");
+        const tabbar = document.fullscreenElement ? null : document.querySelector(".ds-tabbar");
         const floor = vh - m - (tabbar && tabbar.offsetHeight ? tabbar.offsetHeight : 0);
         const clamp = (v, lo, hi) => Math.max(lo, Math.min(v, Math.max(lo, hi)));
         let left, top, side;

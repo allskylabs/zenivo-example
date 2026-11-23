@@ -78,13 +78,13 @@ class TestWebUIStaticAssets:
     def test_community_page_has_nav(self, web_client):
         res = web_client.get("/community")
         assert res.status_code == 200
-        assert 'href="/community"' in res.text and 'aria-current="page"' in res.text
+        assert 'href="/community" data-paths="/community"' in res.text  # active state is set client-side (shell.js)
         assert web_client.get("/static/community.js").status_code == 200
 
     def test_overhead_page_is_public_and_has_nav(self, web_client):
         res = web_client.get("/overhead")
         assert res.status_code == 200
-        assert 'href="/overhead"' in res.text and 'aria-current="page"' in res.text
+        assert 'href="/overhead" data-paths="/overhead"' in res.text
         assert web_client.get("/static/overlay_decode.js").status_code == 200
 
     def test_serve_index_html_direct(self, web_client):

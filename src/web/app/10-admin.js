@@ -121,7 +121,7 @@
         else if (a.state === "done") statusEl.textContent = a.message;
         else if (!st.systemd) statusEl.textContent = "Not running under systemd: after an update, restart Zenivo yourself.";
         else statusEl.textContent = "";
-        document.querySelectorAll('a[data-sub="admin"]').forEach((el) => el.classList.toggle("has-update", !!st.available));
+        document.querySelectorAll('.mobile-subnav a[data-sub="admin"]').forEach((el) => el.classList.toggle("has-update", !!st.available));
         return a.state;
     }
     async function call(path, body) {

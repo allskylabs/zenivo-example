@@ -24,7 +24,6 @@ const state = {
     sseSource: null,
     streamPaused: false,
     prevFrameObjectUrl: null,
-    nightVision: false,
 };
 
 // DOM Elements
@@ -33,7 +32,6 @@ const navLocalClock = document.getElementById("nav-local-clock");
 const navLocalLabel = document.getElementById("nav-local-label");
 const navStatus = document.getElementById("nav-system-status");
 const navMode = document.getElementById("nav-camera-mode");
-const btnNightVision = document.getElementById("btn-night-vision");
 const hudStreamMode = document.getElementById("hud-stream-mode");
 
 // Live View Elements
@@ -313,55 +311,6 @@ function savePrefs(patch) {
     }
 }
 
-function applyNightVision(on) {
-    state.nightVision = on;
-    document.body.classList.toggle("night-mode", on);
-    if (on) document.documentElement.setAttribute("data-theme", "red");
-    else document.documentElement.removeAttribute("data-theme");
-    btnNightVision.classList.toggle("btn-primary", on);
-    btnNightVision.setAttribute("aria-checked", on ? "true" : "false");
-}
-applyNightVision(!!prefs.nightVision);
-
-btnNightVision.addEventListener("click", () => {
-    applyNightVision(!state.nightVision);
-    savePrefs({ nightVision: state.nightVision });
-});
-
-// Mobile (<=768px) 5-tab bar + More sheet
-(function initMobileNav() {
-    const bar = document.getElementById("m-tabbar");
-    const moreBtn = document.getElementById("m-more-btn");
-    const sheet = document.getElementById("m-more-sheet");
-    const backdrop = document.getElementById("m-sheet-backdrop");
-    const rvProxy = document.getElementById("m-rv-toggle");
-    if (!bar || !moreBtn || !sheet || !backdrop) return;
-    const path = window.location.pathname.replace(/\/+$/, "") || "/";
-    document.querySelectorAll("[data-mpath]").forEach((el) => {
-        const hit = el.getAttribute("data-mpath").split(",").includes(path);
-        el.classList.toggle("active", hit);
-        if (hit && el.tagName === "A") el.setAttribute("aria-current", "page");
-    });
-    const setOpen = (open) => {
-        sheet.hidden = !open;
-        backdrop.hidden = !open;
-        moreBtn.setAttribute("aria-expanded", open ? "true" : "false");
-    };
-    moreBtn.addEventListener("click", () => setOpen(sheet.hidden));
-    backdrop.addEventListener("click", () => setOpen(false));
-    sheet.querySelectorAll("a.m-sheet-item").forEach((a) => a.addEventListener("click", () => setOpen(false)));
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape") setOpen(false); });
-    if (rvProxy) {
-        const sync = () => {
-            rvProxy.classList.toggle("btn-primary", !!state.nightVision);
-            rvProxy.setAttribute("aria-checked", state.nightVision ? "true" : "false");
-        };
-        rvProxy.addEventListener("click", () => { btnNightVision.click(); sync(); });
-        btnNightVision.addEventListener("click", sync);
-        sync();
-    }
-})();
-
 // Overlays default to hidden; restore the viewer's last choice and sync with OBS/server
 [
     [chkSkyOverlay, "skyOverlay", "sky_overlay"],
@@ -457,17 +406,6 @@ const PAGE_TITLES = {
     "tab-focus": "Focus",
 };
 document.querySelectorAll(".tab-content").forEach((c) => c.classList.toggle("active", c.id === currentPage));
-document.querySelectorAll(".tab-btn").forEach((b) => {
-    const isActive = b.getAttribute("data-tab") === currentPage;
-    b.classList.toggle("active", isActive);
-    if (isActive) b.setAttribute("aria-current", "page");
-});
-// On phone widths the tab bar scrolls sideways: bring the current tab into view without scrolling the page.
-const tabBar = document.querySelector(".tab-bar");
-const activeTab = tabBar && tabBar.querySelector(".tab-btn.active");
-if (tabBar && activeTab && tabBar.scrollWidth > tabBar.clientWidth) {
-    tabBar.scrollLeft = activeTab.offsetLeft - (tabBar.clientWidth - activeTab.offsetWidth) / 2;
-}
 document.title = currentPage === "tab-live" ? "Zenivo — All-sky observatory" : `${PAGE_TITLES[currentPage]} — Zenivo`;
 
 // ------------------------------------------------------------------
