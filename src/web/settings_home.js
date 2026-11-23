@@ -28,9 +28,10 @@
             ["/obs", "", "play", "OBS preview", "obs streaming preview", false, () => ""],
         ]],
         ["Admin", [
+            ["/logs", "", "activity", "Activity log", "log errors events system", true, () => ""],
             ["/settings#admin", "admin", "lock", "Admin", "password update restart sign out version service location precision", true, () => {
                 const v = text("app-version"), a = $("upd-auto");
-                return [/\d/.test(v) ? v.replace(/^Zenivo\s*/, "v") : "", a ? (a.checked ? "auto-update" : "") : ""].filter(Boolean).join(" · ");
+                return [/\d/.test(v) ? v.replace(/^Zenivo\s*/, "") : "", a ? (a.checked ? "auto-update" : "") : ""].filter(Boolean).join(" · ");
             }],
         ]],
     ];

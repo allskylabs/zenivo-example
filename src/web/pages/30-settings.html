@@ -449,11 +449,6 @@
                             </select>
                         </div>
                         <p class="sa-note" id="sa-i-prec" hidden>Visitors who are not signed in, and the community card, see the station location rounded to this grid. You always see the exact location.</p>
-                        <a class="ds-row sa-row" href="/logs">
-                            <span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-activity"></use></svg></span>
-                            <span class="ds-row__body"><span class="ds-row__title">Activity log</span></span>
-                            <svg class="ds-icon ds-row__chev" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg>
-                        </a>
                         <div class="ds-row sa-row" id="restart-box">
                             <span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-power"></use></svg></span>
                             <span class="ds-row__body"><span class="ds-row__title">Restart Zenivo</span><span class="ds-row__sub" id="restart-status" aria-live="polite"></span></span>
@@ -500,9 +495,13 @@
                             <p class="sa-note" id="sa-i-pw" hidden>Changing the password signs out every other browser. Forgot it? On the station run <code>python3 run_allsky.py --reset-admin</code>.</p>
                             <div class="sa-actions">
                                 <button type="submit" class="ds-btn ds-btn--primary" id="btn-admin-password"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg>Change</button>
-                                <button type="button" class="ds-btn ds-btn--danger" id="btn-admin-logout-all"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-power"></use></svg>Sign out everywhere</button>
                             </div>
                             <p class="sa-status" id="admin-status" aria-live="polite"></p>
+                            <div class="ds-row sa-row">
+                                <span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-log-out"></use></svg></span>
+                                <span class="ds-row__body"><span class="ds-row__title">Sign out everywhere</span><span class="ds-row__sub sa-wrap">Ends every signed-in browser, this one too</span></span>
+                                <button type="button" class="ds-btn ds-btn--danger" id="btn-admin-logout-all"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-power"></use></svg>Sign out</button>
+                            </div>
                         </div>
                     </form>
                 </section>

@@ -43,6 +43,7 @@ HEAD = {
 
 # Admin-only destinations (hidden for guests via data-admin; the server enforces the same list)
 ADMIN_HREFS = {"/logs", "/focus", "/calibration", "/obs/dock"}
+SETTINGS_PATHS = "/settings,/focus,/calibration,/logs"
 
 # Phone tab bar (<1024px): (href, icon, label, paths that mark it current). The 5th slot opens the nav as a sheet.
 TABS = [("/live", "camera", "Live", "/live,/,/index.html"), ("/sky", "sparkles", "Sky", "/sky"),
@@ -55,24 +56,17 @@ MENU = [
                    ("/community", "users", "Community", False, False)]),
     ("Explore", False, [("/flights3d", "plane", "Flights 3D", False, False),
                         ("/satellites3d", "satellite", "Satellites 3D", False, False)]),
-    ("Camera", True, [("/focus", "telescope", "Focus", False, False),
-                      ("/calibration", "moon-star", "Master dark", False, False),
-                      ("/settings#image", "sliders-horizontal", "Image output", False, False),
-                      ("/settings#detection", "crosshair", "Detection", False, False)]),
-    ("Station", True, [("/settings#station", "map-pin", "Station &amp; optics", False, False),
-                       ("/settings#skymask", "shield", "Sky mask", False, False),
-                       ("/settings#integrations", "plug", "Integrations", False, False),
-                       ("/settings#community", "share-2", "Sharing", False, False),
-                       ("/logs", "activity", "Activity log", False, False),
-                       ("/settings#admin", "key-round", "Admin", False, False)]),
-    ("Streaming", False, [("/obs/dock", "film", "OBS dock", True, False),
-                          ("/obs", "arrow-up-right", "OBS", False, True)]),
+    ("Streaming", False, [("/obs/dock", "film", "OBS dock", True, False)]),
+    # Settings owns every Camera/Station/Integrations/Activity destination in its own two-pane list: ONE sidebar item.
+    # The standalone /focus /calibration /logs pages are Settings destinations too, so Settings stays the one active item.
+    (None, False, [("/settings", "settings", "Settings", True, False),
+                   ("/settings#admin", "key-round", "Admin", True, False)]),
 ]
-MORE_PATHS = ",".join(sorted({h.split("#")[0] for _, _, items in MENU for h, *_ in items} - {t[0] for t in TABS}))
+MORE_PATHS = ",".join(sorted(({h.split("#")[0] for _, _, items in MENU for h, *_ in items} | set(SETTINGS_PATHS.split(","))) - {t[0] for t in TABS}))
 
 
 def ic(name):
-    return f'<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204l#i-{name}"></use></svg>'
+    return f'<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg?v=20261204m#i-{name}"></use></svg>'
 
 
 def render_brand():
@@ -100,12 +94,12 @@ def render_head(name):
              'S="image detection station skymask integrations community admin".split(" "),t=M[h];if(h==="community")t="/community";'
              'else if(S.indexOf(h)>-1)t="/settings#"+h;if(t&&t!==p)location.replace(t)})()</script>',
              '<link rel="stylesheet" href="/static/css/ds-tokens.css?v=20261123a">',
-             '<link rel="stylesheet" href="/static/css/ds-components.css?v=20261204l">',
-             '<link rel="stylesheet" href="/static/css/shell.css?v=20261204l">',
-             '<script src="/static/auth.js?v=20261204l"></script>',
+             '<link rel="stylesheet" href="/static/css/ds-components.css?v=20261204m">',
+             '<link rel="stylesheet" href="/static/css/shell.css?v=20261204m">',
+             '<script src="/static/auth.js?v=20261204m"></script>',
              '<script src="/static/js/ds.js?v=20261123a" defer></script>',
              '<script src="/static/brand/version.js?v=4" defer></script>',
-             '<script src="/static/shell.js?v=20261204l" defer></script>', "<!-- head-brand:end -->"]
+             '<script src="/static/shell.js?v=20261204m" defer></script>', "<!-- head-brand:end -->"]
     return "\n    ".join(lines)
 
 
@@ -146,7 +140,10 @@ def render(current, is_index):
             o.append(f'                    <h3 class="zs__title">{title}</h3>')
         for h, i, label, adm, blank in items:
             path, _, frag = h.partition("#")
-            attrs = f' data-paths="{path}"' + (f' data-hash="{frag}"' if frag else "") + (" data-admin" if adm else "")
+            if h == "/settings#admin":
+                attrs = " data-admin"  # shortcut only: never highlighted (Settings is the one active item)
+            else:
+                attrs = f' data-paths="{SETTINGS_PATHS if h == "/settings" else path}"' + (f' data-hash="{frag}"' if frag else "") + (" data-admin" if adm else "")
             attrs += ' target="_blank" rel="noopener"' if blank else ""
             plain = label.replace("&amp;", "&")
             badge = '<b class="zt-badge" id="log-error-badge" hidden>0</b>' if h == "/logs" and is_index else ""
