@@ -61,17 +61,18 @@
 @media (min-width: 1280px) { .arc-split:not(.has-dock) .arc-tiles { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 .arc-tile { position: relative; display: block; min-height: var(--tap); padding: 0; margin: 0; overflow: hidden; background: var(--c-surface-1); border: 1px solid var(--c-border); border-radius: var(--r-md); color: var(--c-text); font: inherit; text-align: left; cursor: pointer; }
 .arc-tile[aria-current="true"] { border-color: var(--c-accent); box-shadow: 0 0 0 1px var(--c-accent); }
-.arc-tile__img { position: relative; aspect-ratio: 4 / 3; background: var(--c-bg); }
-.arc-tile__img img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.arc-tile__trk { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.arc-tile__trk line, .arc-tile__trk circle { vector-effect: non-scaling-stroke; }
+.arc-tile__img { position: relative; aspect-ratio: 16 / 9; background: var(--c-bg); overflow: hidden; }
+.arc-tile__img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.arc-tile:hover, .arc-tile:focus-visible { border-color: var(--c-border-strong, var(--c-accent)); }
 .arc-tile__tl { position: absolute; left: var(--s-1); top: var(--s-1); display: flex; gap: var(--s-1); }
 .arc-tile__tr { position: absolute; right: var(--s-1); top: var(--s-1); display: flex; gap: var(--s-1); }
 .arc-tile__foot { display: flex; align-items: center; gap: var(--s-1); padding: var(--s-1) var(--s-2); min-height: 32px; font-size: var(--fs-12); font-family: var(--font-num); color: var(--c-text-2); white-space: nowrap; overflow: hidden; }
 .arc-tile__foot b { color: var(--c-text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
 .arc-tile__foot .ds-icon { width: var(--icon-sm); height: var(--icon-sm); flex: none; }
 .arc-t-plane { color: var(--c-info); } .arc-t-meteor { color: var(--c-warn); } .arc-t-satellite { color: var(--c-violet); } .arc-t-clouds { color: var(--c-text-2); } .arc-t-flash { color: var(--c-warn); }
-.arc-unseen { position: absolute; right: var(--s-1); bottom: var(--s-1); width: 10px; height: 10px; border-radius: var(--r-pill); background: var(--c-accent); }
+.arc-unseen { flex: none; width: 8px; height: 8px; border-radius: var(--r-pill); background: var(--c-accent); }
+.arc-own--true { color: var(--c-ok); }
+.arc-own--false { color: var(--c-danger); }
 .arc-q { padding: 0 var(--s-2); }
 .arc-q--hi { color: var(--c-ok); } .arc-q--mid { color: var(--c-warn); } .arc-q--lo { color: var(--c-danger); }
 .arc-tile__pv { position: absolute; z-index: 5; display: none; width: 280px; background: var(--c-surface-2); border: 1px solid var(--c-border); border-radius: var(--r-md); box-shadow: var(--shadow-2); overflow: hidden; pointer-events: none; }

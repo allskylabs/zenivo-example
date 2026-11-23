@@ -37,6 +37,7 @@ eventViewer.innerHTML = `
     <div class="arc-ev__tabs" role="group" aria-label="Picture">
         <button type="button" class="ds-chip" data-ev="crop" aria-pressed="true" aria-label="Close-up" title="Close-up">${arcIcon("crosshair")}</button>
         <button type="button" class="ds-chip" data-ev="sky" aria-pressed="false" aria-label="Whole sky" title="Whole sky">${arcIcon("moon-star")}</button>
+        <button type="button" class="ds-chip" data-ev="trk" aria-pressed="false" aria-label="Show track" title="Show track" hidden>${arcIcon("eye")}</button>
     </div>
     <div class="arc-ev__facts"></div>
     <div class="arc-ev__flight" hidden></div>
@@ -69,10 +70,13 @@ async function evEnsureFull(ev) {
 }
 
 // line [x1,y1,x2,y2] is normalised on the whole-sky frame: draw it and a padded box only on the sky picture
+let evTrack = false;
 function evOverlay(ev) {
     evOvr.innerHTML = "";
-    const l = ev.line;
-    if (evPic !== "sky" || !Array.isArray(l) || l.length < 4) return;
+    const l = ev.line, has = evPic === "sky" && Array.isArray(l) && l.length >= 4;
+    const tb = evQ('[data-ev="trk"]');
+    if (tb) { tb.hidden = !has; if (has) evQ(".arc-ev__tabs").hidden = false; tb.setAttribute("aria-pressed", String(evTrack)); }
+    if (!has || !evTrack) return;
     const [x1, y1, x2, y2] = l.map((v) => v * 100), pad = 3;
     const bx = Math.max(0, Math.min(x1, x2) - pad), by = Math.max(0, Math.min(y1, y2) - pad);
     const bw = Math.min(100, Math.max(x1, x2) + pad) - bx, bh = Math.min(100, Math.max(y1, y2) + pad) - by;
@@ -94,7 +98,7 @@ function evSetPic(which) {
     evImg.onload = () => { if (evImg.naturalWidth) eventViewer.style.setProperty("--ev-ar", `${evImg.naturalWidth} / ${evImg.naturalHeight}`); };
     if (url) evImg.src = url; else evImg.removeAttribute("src");
     evImg.alt = which === "sky" ? "Whole sky" : "Close-up";
-    eventViewer.querySelectorAll(".arc-ev__tabs .ds-chip").forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.ev === which)); });
+    eventViewer.querySelectorAll(`.arc-ev__tabs .ds-chip:not([data-ev="trk"])`).forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.ev === which)); });
     evQ('[data-ev="crop"]').hidden = !crop;
     evQ('[data-ev="sky"]').hidden = !ev.sky_url;
     evQ(".arc-ev__tabs").hidden = !crop || !ev.sky_url;
@@ -268,6 +272,7 @@ eventViewer.addEventListener("click", (e) => {
         case "prev": showEvent(evIndex - 1); arcMarkCurrent(true); break;
         case "next": showEvent(evIndex + 1); arcMarkCurrent(true); break;
         case "crop": case "sky": evSetPic(b.dataset.ev); break;
+        case "trk": evTrack = !evTrack; evOverlay(evList[evIndex]); break;
         case "info": { const c = evQ(".arc-ev__card"); c.hidden = !c.hidden; b.setAttribute("aria-expanded", String(!c.hidden)); break; }
         case "true": case "false": evLabel(b); break;
         case "was": evToggleWas(); break;
@@ -339,23 +344,9 @@ function arcGroup(evs) {
     return tiles;
 }
 
-function arcTrack(ev) {
-    const l = ev.line;
-    if (!Array.isArray(l) || l.length < 4) return "";
-    const [x1, y1, x2, y2] = l;
-    // the thumbnail is a crop around the event: fit the line into its own box, so the shape (not the sky position) is shown
-    const minx = Math.min(x1, x2), miny = Math.min(y1, y2), span = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1), 1e-6);
-    const f = (v, m) => 15 + ((v - m) / span) * 70;
-    const col = evTypeColor(ev.type);
-    return `<svg class="arc-tile__trk" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="${f(x1, minx)}" y1="${f(y1, miny)}" x2="${f(x2, minx)}" y2="${f(y2, miny)}" stroke="${col}" stroke-width="2" stroke-linecap="round"/>`
-        + `<circle cx="${f(x2, minx)}" cy="${f(y2, miny)}" r="3" fill="${col}"/></svg>`;
-}
-
 function arcPreview(ev) {
     if (!ev.sky_url) return "";
-    const l = Array.isArray(ev.line) && ev.line.length >= 4 ? ev.line.map((v) => v * 100) : null;
-    const ovr = l ? `<svg class="arc-tile__trk" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="${l[0]}" y1="${l[1]}" x2="${l[2]}" y2="${l[3]}" stroke="var(--c-accent)" stroke-width="2" stroke-linecap="round"/></svg>` : "";
-    return `<div class="arc-tile__pv" aria-hidden="true"><div style="position:relative"><img src="${escapeHtml(ev.sky_url)}" alt="" loading="lazy" />${ovr}</div></div>`;
+    return `<div class="arc-tile__pv" aria-hidden="true"><div style="position:relative"><img src="${escapeHtml(ev.sky_url)}" alt="" loading="lazy" /></div></div>`;
 }
 
 function arcTileHtml(t, idx) {
@@ -365,14 +356,14 @@ function arcTileHtml(t, idx) {
     const q = evQuality(ev);
     const unseen = t.members.some((m) => !arcSeen.has(m.event_id));
     const img = ev.thumbnail_url || ev.sky_url;
+    const ol = ev.owner_label === "true" || ev.owner_label === true ? "true" : ev.owner_label === "false" || ev.owner_label === false ? "false" : "";
     const lab = `${EVT_NAME[ev.type] || ev.type} ${name} ${time}${n > 1 ? `, ${n} detections` : ""}`;
     return `<button type="button" class="arc-tile arc-t-${escapeHtml(ev.type)}" data-tile="${idx}" data-event-id="${escapeHtml(ev.event_id)}" aria-label="${escapeHtml(lab)}" title="${escapeHtml(lab)}">
-        <span class="arc-tile__img">${img ? `<img src="${escapeHtml(img)}" alt="" loading="lazy" decoding="async" />` : ""}${ev.type === "plane" || ev.type === "meteor" || ev.type === "satellite" ? arcTrack(ev) : ""}
+        <span class="arc-tile__img">${img ? `<img src="${escapeHtml(img)}" alt="" loading="lazy" decoding="async" />` : ""}
             <span class="arc-tile__tl"><span class="arc-badge" style="color:${evTypeColor(ev.type)}">${arcIcon(EVT_ICON[ev.type] || "zap")}</span>${n > 1 ? `<span class="arc-badge">${arcIcon("layers")}${n}</span>` : ""}</span>
-            <span class="arc-tile__tr">${q ? `<span class="arc-badge arc-q arc-q--${q}" title="Confidence ${Math.round(ev.confidence * 100)}%">${arcIcon("shield")}</span>` : ""}</span>
-            ${unseen ? `<span class="arc-unseen" title="New: not opened yet"></span>` : ""}
+            <span class="arc-tile__tr">${ol ? `<span class="arc-badge arc-own--${ol}" title="${ol === "true" ? "Confirmed real" : "Marked not real"}">${arcIcon(ol === "true" ? "thumbs-up" : "thumbs-down")}</span>` : ""}${q ? `<span class="arc-badge arc-q arc-q--${q}" title="Confidence ${Math.round(ev.confidence * 100)}%">${arcIcon("shield")}</span>` : ""}</span>
         </span>
-        <span class="arc-tile__foot"><b>${escapeHtml(name)}</b><span>${escapeHtml(time)}</span></span>${arcPreview(ev)}</button>`;
+        <span class="arc-tile__foot">${unseen ? `<i class="arc-unseen" title="New: not opened yet" role="img" aria-label="New"></i>` : ""}<b>${escapeHtml(name)}</b><span>${escapeHtml(time)}</span></span>${arcPreview(ev)}</button>`;
 }
 
 function arcCountsUpdate(counts) {
