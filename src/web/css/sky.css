@@ -1,0 +1,90 @@
+/* Sky page (/sky): icon-led chrome around the planetarium. Tokens only (ds-tokens.css); the planetarium bundle's own panels (.sv-ui) are hidden and driven from sky_ui.js. */
+.page-sky { background: var(--c-bg); color: var(--c-text); overflow: hidden; }
+.page-sky .app-shell { height: 100vh; min-height: 0; }
+.page-sky .app-main { min-height: 0; }
+.page-sky #stage { position: relative; height: 100%; min-height: 0; overflow: hidden; background: var(--c-bg); }
+.page-sky #sky-root { position: absolute; inset: 0; }
+.page-sky .sv-root .sv-ui { display: none !important; }
+
+/* red vision: the bundle draws on canvas, so it is tinted with a filter (its own colours cannot read CSS variables) */
+[data-theme="red"] .page-sky #stage, [data-theme="red"] .sv-root { background: var(--c-bg); }
+[data-theme="red"] .sv-root canvas, [data-theme="red"] .sv-root video { filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-50deg) brightness(0.8); }
+
+/* floating icon rail */
+.sk-rail { position: absolute; top: var(--s-3); inset-inline-end: var(--s-3); z-index: var(--z-nav); display: flex; flex-direction: column; gap: var(--s-2); }
+.sk-fab { display: inline-flex; align-items: center; justify-content: center; width: var(--tap); height: var(--tap); padding: 0; border: 1px solid var(--c-border); border-radius: var(--r-pill); background: var(--c-surface-1); color: var(--c-text); cursor: pointer; box-shadow: var(--shadow-1); }
+.sk-fab:hover { background: var(--c-surface-3); }
+.sk-fab[aria-pressed="true"], .sk-fab[aria-expanded="true"] { background: var(--c-accent-bg); border-color: var(--c-accent); color: var(--c-accent); }
+.sk-fab:focus-visible, .sk-tog:focus-visible, .sk-chip:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
+
+/* time bar */
+.sk-time { position: absolute; inset-inline: var(--s-3); bottom: var(--s-3); z-index: var(--z-nav); display: flex; align-items: center; gap: var(--s-1); padding: var(--s-1) var(--s-2); background: var(--c-surface-1); border: 1px solid var(--c-border); border-radius: var(--r-pill); box-shadow: var(--shadow-1); max-width: 560px; margin-inline: auto; }
+.sk-time .sk-fab { border-color: transparent; background: transparent; box-shadow: none; }
+.sk-time .sk-fab:hover { background: var(--c-surface-3); }
+.sk-time .sk-fab[aria-pressed="true"] { background: var(--c-accent-bg); }
+.sk-clock { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.sk-clock b { font-size: var(--fs-14); font-weight: 600; }
+.sk-clock small { display: inline-flex; align-items: center; gap: var(--s-1); font-size: var(--fs-12); color: var(--c-text-2); }
+.sk-clock .ds-icon { width: 14px; height: 14px; }
+.sk-live { color: var(--c-ok); }
+
+/* info card (same structure as the Live card) */
+.sk-card { --tone: var(--c-accent); position: absolute; inset-inline: var(--s-3); bottom: calc(var(--tap) + var(--s-3) * 2 + var(--s-2)); z-index: var(--z-nav); max-width: 360px; padding: var(--s-3); background: var(--c-surface-1); border: 1px solid var(--c-border); border-inline-start: 3px solid var(--tone); border-radius: var(--r-lg); box-shadow: var(--shadow-2); }
+.sk-card[hidden] { display: none; }
+.sk-card .oc-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); }
+.sk-card .oc-chip { display: inline-flex; align-items: center; justify-content: center; width: var(--tap); height: var(--tap); border-radius: var(--r-pill); background: var(--c-surface-2); color: var(--tone); flex: none; }
+.sk-card .oc-who { flex: 1; min-width: 0; }
+.sk-card .oc-title { margin: 0; font-size: var(--fs-18); font-weight: 700; line-height: var(--lh-tight); overflow-wrap: anywhere; }
+.sk-card .oc-sub { margin: 0; font-size: var(--fs-12); color: var(--c-text-2); }
+.sk-card .oc-stats { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-2); max-height: 30vh; overflow-y: auto; }
+.sk-card .oc-stats > div { display: inline-flex; align-items: center; gap: var(--s-1); min-height: 32px; padding: 0 var(--s-2); border-radius: var(--r-md); background: var(--c-surface-2); font-size: var(--fs-14); }
+.sk-card .oc-stats small { font-size: var(--fs-12); color: var(--c-text-2); }
+.sk-card .oc-stats b { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 600; }
+.sk-card .oc-actions { display: flex; gap: var(--s-2); margin-top: var(--s-2); }
+.sk-card .oc-btn { display: inline-flex; align-items: center; justify-content: center; min-width: var(--tap); min-height: var(--tap); border: 1px solid var(--c-border); border-radius: var(--r-pill); background: var(--c-surface-2); color: var(--c-text); cursor: pointer; }
+.sk-card .oc-btn:hover { border-color: var(--c-accent); color: var(--c-accent); }
+.sk-card .oc-btn:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
+.sk-note { margin: var(--s-2) 0 0; font-size: var(--fs-12); color: var(--c-text-2); }
+
+/* sheets: shared ds-sheet; desktop docks the panel on the right so the map stays usable */
+.sk-sheet .ds-sheet__panel { max-height: 78vh; }
+.sk-group { margin: var(--s-3) 0 var(--s-1); display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-12); font-weight: 600; color: var(--c-text-2); }
+.sk-group .ds-icon { width: 16px; height: 16px; }
+.sk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: var(--s-2); }
+.sk-tog { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-1); min-height: 72px; padding: var(--s-2); border: 1px solid var(--c-border); border-radius: var(--r-lg); background: var(--c-surface-2); color: var(--c-text-2); font: 600 var(--fs-12) / 1.1 var(--font-ui); text-align: center; cursor: pointer; }
+.sk-tog:hover { background: var(--c-surface-3); }
+.sk-tog[aria-pressed="true"] { background: var(--c-accent-bg); border-color: var(--c-accent); color: var(--c-accent); }
+.sk-chips { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-2); }
+.sk-chip { display: inline-flex; align-items: center; justify-content: center; min-width: var(--tap); min-height: var(--tap); padding: 0 var(--s-3); border: 1px solid var(--c-border); border-radius: var(--r-pill); background: var(--c-surface-2); color: var(--c-text); font: 600 var(--fs-14) / 1 var(--font-num); cursor: pointer; }
+.sk-chip[aria-pressed="true"] { background: var(--c-accent-bg); border-color: var(--c-accent); color: var(--c-accent); }
+.sk-date { width: 100%; min-height: var(--tap); padding: 0 var(--s-3); border: 1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-surface-2); color: var(--c-text); font: var(--fs-14) var(--font-num); color-scheme: dark; }
+.sk-date:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
+
+/* Sun & planets list */
+.sk-bodies { display: flex; flex-direction: column; gap: var(--s-2); margin: 0; padding: 0; list-style: none; }
+.sk-body { display: flex; align-items: center; gap: var(--s-3); min-height: var(--tap); padding: var(--s-2) var(--s-3); border: 1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-surface-2); }
+.sk-body .ds-icon, .sk-body .sk-moon { flex: none; color: var(--c-text-2); }
+.sk-body.is-up .ds-icon { color: var(--c-ok); }
+.sk-body__t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.sk-body__t b { font-size: var(--fs-14); }
+.sk-body__t small { font-size: var(--fs-12); color: var(--c-text-2); }
+.sk-times { display: inline-flex; align-items: center; gap: var(--s-3); font: 600 var(--fs-12) / 1 var(--font-num); color: var(--c-text); }
+.sk-times span { display: inline-flex; align-items: center; gap: var(--s-1); }
+.sk-times .ds-icon { width: 14px; height: 14px; color: var(--c-text-2); }
+.sk-moon { width: 30px; height: 30px; }
+.sk-moon .sk-moon-dark { fill: var(--c-surface-3); }
+.sk-moon .sk-moon-lit { fill: var(--c-text); }
+
+@media (min-width: 1024px) {
+    .sk-rail { inset-inline-end: auto; inset-inline-start: var(--s-3); }
+    .sk-time { margin-inline: auto; }
+    .sk-card { inset-inline-end: auto; inset-inline-start: var(--s-3); }
+    .ds-sheet.sk-sheet { inset: var(--topbar-h) 0 0 auto; width: 380px; pointer-events: none; }
+    .ds-sheet.sk-sheet .ds-sheet__scrim { display: none; }
+    .ds-sheet.sk-sheet .ds-sheet__panel { pointer-events: auto; left: 0; right: 0; top: 0; bottom: 0; width: auto; max-height: none; transform: none; border-radius: 0; border-width: 0 0 0 1px; animation: none; }
+}
+@media (prefers-reduced-motion: reduce) { .sk-fab, .sk-tog { transition: none; } }
+
+.sk-state { position: absolute; inset: 0; z-index: var(--z-nav); display: flex; align-items: center; justify-content: center; padding: var(--s-6); background: var(--c-bg); }
+.sk-state[hidden] { display: none; }
+.sk-state .ds-skeleton { width: min(320px, 80%); }

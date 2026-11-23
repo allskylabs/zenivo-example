@@ -276,13 +276,6 @@ body:has(#left-col) #info-stats div { border-radius: var(--radius-tile); }
 body:has(#left-col) #info-stats b { font-family: var(--font-num); }
 body:has(#left-col) .panel button, body:has(#left-col) #list-tools button { border-radius: 999px; padding: 0 14px; background: var(--bg-card-sub); border: 1px solid var(--border-color); }
 body:has(#left-col) .panel button.on { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: color-mix(in srgb, var(--accent) 18%, var(--bg-card-sub)); color: var(--accent); }
-.sv-root .sv-ui { border-radius: var(--radius-card); background: color-mix(in srgb, var(--bg-card) 94%, transparent); border-color: var(--border-color); }
-.sv-root button { border-radius: 999px; padding: 0 14px; min-height: 40px; background: var(--bg-card-sub); border-color: var(--border-color); }
-.sv-root button.on { background: color-mix(in srgb, var(--accent) 18%, var(--bg-card-sub)); }
-.sv-root select, .sv-root input[type=datetime-local] { min-height: 40px; border-radius: var(--radius-tile); padding: 0 10px; }
-.sv-root .sv-layers label { min-height: 40px; }
-.sv-root .sv-group summary { min-height: 40px; display: flex; align-items: center; }
-.sv-root .sv-insp dd { font-family: var(--font-num); }
 @media (max-width: 768px) {
     body:has(#left-col) .panel button, body:has(#left-col) #list-tools button { min-height: 40px; }
     body:has(#left-col) #left-toggle, body:has(#left-col) #list-toggle { min-width: 40px; }

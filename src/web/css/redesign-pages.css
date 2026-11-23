@@ -136,16 +136,10 @@ body #cstations .you-pill { display: inline-block; margin-left: 10px; padding: 2
 #tab-settings .field-sub { font-weight: 400; color: var(--text-secondary); }
 /* ================= Sky (/sky) and the 3D pages: shared top bar, cards, chips ================= */
 .m-3d-bar { display: none; }
-.sv-root .sv-ui, body.page-3d .panel { background: color-mix(in srgb, var(--bg-card) 94%, transparent); border: 1px solid var(--border-color); border-radius: var(--radius-card); backdrop-filter: none; }
-.sv-root .sv-group { border-top-color: var(--divider); }
-.sv-root .sv-group summary { color: var(--text-secondary); font-weight: 700; }
-.sv-root .sv-row h1 { font-size: 17px; font-weight: 700; }
-.sv-root .sv-insp dd { font-family: var(--font-num); }
-.sv-root button, body.page-3d button { border-radius: 999px; background: var(--bg-card-sub); border: 1px solid var(--border-color); font-weight: 600; }
-.sv-root button.on, body.page-3d button.on { background: color-mix(in srgb, var(--accent) 22%, var(--bg-card-sub)); border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent); }
-.sv-root button:hover { color: var(--text-primary); border-color: var(--accent); }
-.sv-root button.on:hover { color: var(--accent); }
-.sv-root select, .sv-root input[type=datetime-local], body.page-3d select, body.page-3d input[type="search"] { background: var(--bg-card-sub); border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-primary); }
+body.page-3d .panel { background: color-mix(in srgb, var(--bg-card) 94%, transparent); border: 1px solid var(--border-color); border-radius: var(--radius-card); backdrop-filter: none; }
+body.page-3d button { border-radius: 999px; background: var(--bg-card-sub); border: 1px solid var(--border-color); font-weight: 600; }
+body.page-3d button.on { background: color-mix(in srgb, var(--accent) 22%, var(--bg-card-sub)); border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--accent); }
+body.page-3d select, body.page-3d input[type="search"] { background: var(--bg-card-sub); border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-primary); }
 body.page-3d #list h2, body.page-3d #layers h2 { font-weight: 700; }
 body.page-3d #info h3 { font-family: var(--font-sans); font-size: 18px; font-weight: 700; }
 body.page-3d #info-stats div { background: var(--bg-card-sub); border-radius: var(--radius-tile); padding: 10px 8px; text-align: center; }
@@ -188,14 +182,9 @@ body.page-3d #btn-track { background: var(--accent); border-color: var(--accent)
     body.page-3d #info .links > * { flex: 1 1 0; }
     body.page-3d #btn-track { min-height: 48px; }
     /* Sky (planetarium): same cards */
-    .sv-root .sv-left { top: 8px; left: 16px; right: 16px; max-width: none; padding: 14px 16px; gap: 10px; }
-    .sv-root .sv-time { left: 12px; right: 12px; bottom: 12px; padding: 12px 16px; }
-    .sv-root .sv-insp { left: 12px; right: 12px; width: auto; padding: 16px; }
-    .sv-root button, .sv-root select, .sv-root input[type=datetime-local] { min-height: 40px; font-size: 14px; }
-    .sv-root .sv-layers label { min-height: 40px; font-size: 14px; }
 }
 /* Red Vision: nothing but red / dark tones on these pages (the 3D labels and chips use hard-coded accent colours) */
-[data-theme="red"] .sv-root, [data-theme="red"] #globe { background: #060000; }
+[data-theme="red"] #globe { background: #060000; }
 [data-theme="red"] .sv-dim { color: var(--text-secondary); }
 [data-theme="red"] #sky.dark { color: var(--success); }
 [data-theme="red"] .sat-label.visible, [data-theme="red"] #list li.visible .cs, [data-theme="red"] .tag.vis { color: var(--accent); }
@@ -221,7 +210,7 @@ body.page-3d #btn-track { background: var(--accent); border-color: var(--accent)
 [data-theme="red"] .wx-h, [data-theme="red"] .fv-nav .btn.active, [data-theme="red"] #focus-toggle.btn-danger { color: #1a0000; }
 [data-theme="red"] .vp-pill { color: var(--text-primary); border-color: var(--border-color); background: color-mix(in srgb, var(--bg-primary) 80%, transparent); }
 /* WebGL / video canvases cannot take theme variables: tint them with the same monochrome-red filter the live picture uses (CSS only, the render code is untouched) */
-[data-theme="red"] body.page-3d #stage canvas, [data-theme="red"] .sv-root canvas, [data-theme="red"] .sv-root video, [data-theme="red"] #info-model { filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-50deg) brightness(0.8); }
+[data-theme="red"] body.page-3d #stage canvas, [data-theme="red"] #info-model { filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-50deg) brightness(0.8); }
 [data-theme="red"] #info-model { background: var(--bg-card-sub); }
 [data-theme="red"] .legend .ramp { background: linear-gradient(90deg, var(--text-muted), var(--accent)); }
 [data-theme="red"] .legend i[style*="22d3ee"] { background: var(--accent) !important; }

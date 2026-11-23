@@ -32,23 +32,14 @@
     <link rel="stylesheet" href="/style.css?v=20261122m">
     <script>if(new URLSearchParams(location.search).get("embed")==="1")document.documentElement.classList.add("embed")</script>
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
+    <link rel="stylesheet" href="/static/css/sky.css?v=20261128a">
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; }
-        body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-sans); overflow: hidden; }
-        .app-shell { height: calc(100vh - var(--topbar-h)); min-height: 0; }
-        #stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
-        #sky-root { position: absolute; inset: 0; }
-        @media (max-width: 700px) {
-        }
-      .sv-left.sv-collapsed .sv-body{display:none!important}
       /* embed=1 (OBS Sky View iframe): sky canvas only, no page chrome or panels */
       html.embed, html.embed body{background:#000!important;overflow:hidden!important;cursor:none!important}
       html.embed *{cursor:none!important}
-      html.embed .ds-topbar, html.embed .ds-tabbar, html.embed .ds-sheet, html.embed .zcw-launch, html.embed .sv-ui{display:none!important}
+      html.embed .ds-topbar, html.embed .ds-tabbar, html.embed .ds-sheet, html.embed .zcw-launch, html.embed .sv-ui, html.embed .sk-rail, html.embed .sk-time, html.embed .sk-card, html.embed .sk-state{display:none!important}
       html.embed .app-shell, html.embed .app-main{display:block!important;width:100vw!important;height:100vh!important;margin:0!important;padding:0!important}
       html.embed #stage{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important}
-      @media (max-width:700px){.sv-left{max-height:55vh}}
     </style>
 </head>
 <body class="dark-mode page-sky">
@@ -132,14 +123,61 @@
 
     <div class="app-main">
 
-    <div id="stage"><div id="sky-root"></div></div>
+    <div id="stage">
+        <div id="sky-root"></div>
+        <div class="sk-state" id="sk-state" role="status"></div>
+        <div class="sk-rail">
+            <button class="sk-fab" type="button" id="sk-b-layers" data-ds-open="sk-layers" aria-haspopup="dialog" aria-expanded="false" aria-label="Layers" title="Layers"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-layers"></use></svg></button>
+            <button class="sk-fab" type="button" id="sk-b-bodies" data-ds-open="sk-bodies" aria-haspopup="dialog" aria-expanded="false" aria-label="Sun and planets" title="Sun and planets"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sun"></use></svg></button>
+            <button class="sk-fab" type="button" id="sk-b-mode" aria-pressed="false" aria-label="3D dome view" title="3D dome view"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-compass"></use></svg></button>
+        </div>
+        <div class="sk-card" id="sk-card" hidden aria-live="polite"></div>
+        <div class="sk-time" role="group" aria-label="Time">
+            <button class="sk-fab" type="button" id="sk-t-back" aria-label="Back 1 hour" title="Back 1 hour"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-left"></use></svg></button>
+            <button class="sk-fab" type="button" id="sk-t-play" aria-pressed="false" aria-label="Play" title="Play"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-play"></use></svg></button>
+            <button class="sk-fab" type="button" id="sk-t-fwd" aria-label="Forward 1 hour" title="Forward 1 hour"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-right"></use></svg></button>
+            <button class="sk-clock sk-fab" type="button" data-ds-open="sk-timesheet" aria-haspopup="dialog" aria-expanded="false" aria-label="Date and speed" title="Date and speed" style="width:auto;flex:1;border-radius:var(--r-md)"><b id="sk-clock-t">--:--</b><small><span id="sk-clock-d">--</span><span class="sk-live" id="sk-clock-live" hidden aria-label="Live" title="Live"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-radio"></use></svg></span></small></button>
+            <button class="sk-fab" type="button" id="sk-t-now" aria-label="Now" title="Now"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></button>
+        </div>
+    </div>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="sk-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></symbol></svg>
+
+    <div class="ds-sheet sk-sheet" id="sk-layers" role="dialog" aria-modal="true" aria-label="Layers">
+        <div class="ds-sheet__scrim" data-ds-close></div>
+        <div class="ds-sheet__panel">
+            <div class="ds-sheet__grab" aria-hidden="true"></div>
+            <div class="ds-sheet__head"><div class="ds-sheet__title">Layers</div><button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" data-ds-close aria-label="Close" title="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></div>
+            <div id="sk-layers-body"></div>
+        </div>
+    </div>
+    <div class="ds-sheet sk-sheet" id="sk-bodies" role="dialog" aria-modal="true" aria-label="Sun and planets">
+        <div class="ds-sheet__scrim" data-ds-close></div>
+        <div class="ds-sheet__panel">
+            <div class="ds-sheet__grab" aria-hidden="true"></div>
+            <div class="ds-sheet__head"><div class="ds-sheet__title">Sun &amp; planets</div><button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" data-ds-close aria-label="Close" title="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></div>
+            <div id="sk-bodies-body"></div>
+        </div>
+    </div>
+    <div class="ds-sheet sk-sheet" id="sk-timesheet" role="dialog" aria-modal="true" aria-label="Date and speed">
+        <div class="ds-sheet__scrim" data-ds-close></div>
+        <div class="ds-sheet__panel">
+            <div class="ds-sheet__grab" aria-hidden="true"></div>
+            <div class="ds-sheet__head"><div class="ds-sheet__title">Time</div><button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" data-ds-close aria-label="Close" title="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></div>
+            <input class="sk-date" id="sk-date" type="datetime-local" aria-label="Date and time">
+            <div class="sk-group"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-play"></use></svg><span>Speed</span></div>
+            <div class="sk-chips" id="sk-speeds"></div>
+            <div class="sk-group"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-clock"></use></svg><span>Step</span></div>
+            <div class="sk-chips" id="sk-steps"></div>
+        </div>
+    </div>
     </div><!-- .app-main -->
     </div><!-- .app-shell -->
 
 
 
 
-    <script src="/static/sky_lists.js?v=20261124b" defer></script>
+    <script src="/static/sky_lists.js?v=20261128a" defer></script>
+    <script src="/static/sky_ui.js?v=20261128a" defer></script>
     <script type="module" src="/static/sky/sky.js?v=20261105rect1"></script>
 </body>
 </html>
