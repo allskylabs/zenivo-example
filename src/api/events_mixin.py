@@ -61,6 +61,7 @@ class EventsMixin:
             return []
         gates = self.station_config.get("event_gates") or {}  # per-gate rollback: {"flash": false, ...}
         self.sky_events.flash_gate = bool(gates.get("flash", True))
+        self.sky_events.meteor_gate = bool(gates.get("meteor", True))
         events = self.sky_events.process(
             frame, enabled, ts=now,
             exposure_s=float(meta.get("actual_exposure_s", getattr(self.camera, "current_exposure_s", 0.0))),

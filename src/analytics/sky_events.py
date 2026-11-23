@@ -121,6 +121,7 @@ class SkyEventDetector:
         max_changed_frac: float = 0.02,   # skip frames where more of the sky than this changed (clouds, dawn)
         max_gap_s: float = 120.0,         # frames further apart than this are not compared
         flash_ratio: float = 1.6,         # mean sky brightness jump that counts as a flash
+        meteor_gate: bool = True,         # reject double lines and thick bars (aircraft landing lights) as meteors
         flash_gate: bool = True,          # hold a flash one frame; drop lamp / AE / IR-cut repeats and lasting jumps
     ):
         self.work_width = int(work_width)
@@ -131,6 +132,7 @@ class SkyEventDetector:
         self.max_gap_s = max_gap_s
         self.flash_ratio = flash_ratio
         self.flash_gate = flash_gate
+        self.meteor_gate = meteor_gate
         self._meteor_spots: Deque[Tuple[float, float, float]] = deque(maxlen=500)  # survives reset()
         self._track_id = 0
         self.frames_seen = 0      # frames given to process() since the last reset
@@ -138,6 +140,9 @@ class SkyEventDetector:
         self.reset()
 
     METEOR_MIN_ELONGATION = 5.0
+    METEOR_MAX_WIDTH_FRAC = 0.008   # a meteor is a thin line: wider than this (x frame width) is a bar (landing light)
+    DOUBLE_LINE_MAX_ANGLE = 8.0     # two near-parallel streaks this close in one frame: landing-light pair
+    DOUBLE_LINE_MAX_SEP_FRAC = 0.06
     OUTSIDE_SENSITIVITY_DIV = 4     # brightening outside the sky mask is divided by this before every test
     BRIGHT_STREAK_PEAK_DN = 90.0    # streak peak (work-size DN above the previous frame) ...
     BRIGHT_STREAK_CONTRAST = 2.5    # ... and line mean at least this many times the mean beside it: skip the "thin" test
@@ -189,6 +194,19 @@ class SkyEventDetector:
         self._track_id += 1
         return {"pts": pts, "misses": 0, "blinks": 0, "id": self._track_id}
 
+    def _has_parallel(self, ln: Tuple[float, ...], found: List[Dict[str, Any]]) -> bool:
+        """Another streak in the same frame, nearly parallel and close beside this one (an aircraft's pair of lights)."""
+        w = self._mask.shape[1] if self._mask is not None else self.work_width
+        ang = _line_geom(*ln)[0]
+        for g in found:
+            o = g["line"]
+            if o == ln or _angle_diff(ang, _line_geom(*o)[0]) > self.DOUBLE_LINE_MAX_ANGLE:
+                continue
+            sep = _perp_dist((o[0] + o[2]) / 2, (o[1] + o[3]) / 2, ln)
+            if 1.5 <= sep <= self.DOUBLE_LINE_MAX_SEP_FRAC * w and _overlap_fraction(ln, o) >= 0.4:
+                return True
+        return False
+
     def _meteor_ok(self, p: Dict[str, Any]) -> bool:
         """Final checks before a single-frame streak is called a meteor: a sharp line, and not at a spot
         where single-frame streaks already appeared (lens smudges and raindrops glint again and again)."""
@@ -215,6 +233,13 @@ class SkyEventDetector:
         if repeat:
             self.point_stats["meteors_rejected_repeat"] = self.point_stats.get("meteors_rejected_repeat", 0) + 1
             return False
+        if self.meteor_gate:
+            width = float(p.get("width_px", 0.0))
+            if p.get("double") or width > self.METEOR_MAX_WIDTH_FRAC * w:
+                key = "meteors_rejected_double" if p.get("double") else "meteors_rejected_thick"
+                self.point_stats[key] = self.point_stats.get(key, 0) + 1
+                p["reject"] = "aircraft"
+                return False
         if p.get("elong", 99.0) < self.METEOR_MIN_ELONGATION:
             self.point_stats["meteors_rejected_blob"] = self.point_stats.get("meteors_rejected_blob", 0) + 1
             p["reject"] = "blob"
@@ -228,6 +253,9 @@ class SkyEventDetector:
         if "meteor" in enabled and self._meteor_ok(p):
             return p["event"]
         ev = p["event"]
+        if "plane" in enabled and p.get("reject") == "aircraft":
+            ev["type"], ev["original_type"] = "plane", "meteor"  # double line / thick bar: aircraft lights
+            return ev
         if "plane" in enabled and int(ev.get("peak_dn", 0)) >= self.BRIGHT_STREAK_PEAK_DN:
             fuzzy = p.get("elong", 99.0) < self.METEOR_MIN_ELONGATION
             # Under cloud that only drifted along (not specks brightening everywhere) a fuzzy bright streak is still
@@ -499,7 +527,9 @@ class SkyEventDetector:
             if f["dashed"]:
                 next_tracks.append({"line": ln, "event": ev, "dashed": True})
             else:
-                next_pending.append({"line": ln, "event": ev, "elong": f.get("elong", 99.0)})
+                next_pending.append({"line": ln, "event": ev, "elong": f.get("elong", 99.0),
+                                     "width_px": f["length"] / max(f.get("elong", 99.0), 1.0),
+                                     "double": self._has_parallel(ln, found)})
 
         for i, p in enumerate(self._pending):
             if i not in used_pending:

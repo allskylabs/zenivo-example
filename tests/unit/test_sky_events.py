@@ -362,3 +362,28 @@ def test_dots_on_persistent_stars_are_recognised_as_stars():
             cv2.circle(f, (x, y), 2, (150, 150, 150), -1, cv2.LINE_AA)
     assert _fed_detector(stars)._on_stars(pts)
     assert not _fed_detector(_dots(8, path, value=100, radius=2))._on_stars(pts)
+
+
+def _streak_frame(y_offsets, width=1):
+    base = _sky(1)
+    img = _sky(2, 0.5)
+    for dy in y_offsets:
+        cv2.line(img, (300, 500 + dy), (520, 440 + dy), (200, 200, 200), width, cv2.LINE_AA)
+    return base, img
+
+
+def _meteor_types(y_offsets, width=1, **kw):
+    base, img = _streak_frame(y_offsets, width)
+    det = SkyEventDetector(**kw)
+    out = det.process(base, ALL, ts=0, exposure_s=10.0, gain_db=30)
+    out += det.process(img, ALL, ts=15, exposure_s=10.0, gain_db=30)
+    out += det.process(_sky(3, 1.0), ALL, ts=30, exposure_s=10.0, gain_db=30)
+    out += det.process(_sky(4, 1.5), ALL, ts=45, exposure_s=10.0, gain_db=30)
+    return [e["type"] for e in out]
+
+
+def test_meteor_gate_single_thin_line_kept_double_and_thick_become_plane():
+    assert _meteor_types([0]) == ["meteor"]                    # the true-meteor case must survive
+    assert set(_meteor_types([0, 25])) == {"plane"}             # landing-light pair
+    assert _meteor_types([0], width=10) == ["plane"]           # thick bar (~9 px)
+    assert "meteor" in _meteor_types([0, 25], meteor_gate=False)  # gate off = legacy
