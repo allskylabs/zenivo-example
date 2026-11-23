@@ -531,14 +531,23 @@ function timeAgo(date) {
     return date.toLocaleDateString();
 }
 
+// short relative day for the card: Today / Yesterday / local date
+function evDayLabel(date) {
+    const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+    const days = Math.round((d0 - new Date(date).setHours(0, 0, 0, 0)) / 86400000);
+    if (days <= 0) return "Today";
+    if (days === 1) return "Yesterday";
+    return date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
 function renderLiveEvents(evData) {
     const events = evData.events || [];
-    // "Tonight": since noon today, or since noon yesterday before noon
-    const since = new Date();
-    if (since.getHours() < 12) since.setDate(since.getDate() - 1);
-    since.setHours(12, 0, 0, 0);
-    const tonight = events.filter((ev) => new Date(ev.timestamp) >= since).length;
-    liveEventsCount.textContent = `${tonight} tonight`;
+    // the count matches the list: events of the last 24 hours
+    const cutoff = Date.now() - 86400000;
+    const recent = events.filter((ev) => new Date(ev.timestamp).getTime() >= cutoff).length;
+    liveEventsCount.innerHTML = `${recent}${arcIcon("clock")}`;
+    liveEventsCount.title = `${recent} in the last 24 hours`;
+    liveEventsCount.setAttribute("aria-label", liveEventsCount.title);
 
     const on = Object.entries(evData.enabled || {}).filter(([, v]) => v).map(([k]) => EVENT_LABELS[k] || k);
     const night = evData.night;
@@ -549,7 +558,7 @@ function renderLiveEvents(evData) {
     liveEventsStatus.setAttribute("aria-label", liveEventsStatus.textContent);
 
     if (!events.length) {
-        liveEventsList.innerHTML = `<li class="live-events-empty">No events yet.<br>Meteors and aircraft show up here as soon as they are detected.</li>`;
+        liveEventsList.innerHTML = `<li class="live-events-empty" title="Meteors and aircraft show up here as soon as they are detected">${arcIcon("moon-star")}<span>No events yet</span></li>`;
         return;
     }
     liveEventsList.innerHTML = "";
@@ -561,17 +570,25 @@ function renderLiveEvents(evData) {
         li.dataset.eventIdx = i;
         li.tabIndex = 0;
         li.setAttribute("role", "button");
-        li.title = "Click for details";
-        li.style.setProperty("--pill", EVENT_COLORS[ev.type] || "var(--accent)");
+        li.style.setProperty("--pill", evTypeColor(ev.type));
         liveEventsSeen.add(ev.event_id);
-        const label = EVENT_LABELS[ev.type] || ev.type;
+        const label = EVENT_LABELS[ev.type] || EVT_NAME[ev.type] || ev.type;
+        const who = evCallsign(ev) || evSat(ev);
+        const day = evDayLabel(when);
+        const conf = ev.confidence == null ? "" : Math.round(ev.confidence * 100);
+        const owner = ev.owner_label === "true" || ev.owner_label === true ? "true" : ev.owner_label === "false" || ev.owner_label === false ? "false" : "";
+        li.setAttribute("aria-label", `${label}${who ? " " + who : ""}, ${day} ${fmtLocalIso(ev.timestamp, true).slice(0, 5)}`);
+        li.title = `${label}${who ? " · " + who : ""} · ${fmtLocalIso(ev.timestamp)} ${tzLabel} · ${timeAgo(when)}`;
         const thumb = ev.thumbnail_url
-            ? `<img src="${escapeHtml(ev.thumbnail_url)}" alt="${escapeHtml(ev.type)}" loading="lazy" />`
-            : `<span class="no-thumb"></span>`;
-        li.innerHTML = `${thumb}<div>
-            <div class="ev-type">${escapeHtml(label)}</div>
-            <div class="ev-time" title="${fmtLocalIso(ev.timestamp)} ${tzLabel}">${fmtLocalIso(ev.timestamp, true)} · ${timeAgo(when)}</div>
-            <div class="ev-detail">${ev.flight ? flightHtml(ev) : eventDetails(ev)}</div></div>`;
+            ? `<img src="${escapeHtml(ev.thumbnail_url)}" alt="" loading="lazy" />`
+            : `<span class="no-thumb">${arcIcon("image-off")}</span>`;
+        li.innerHTML = `<div class="ev-thumb">${thumb}
+            <span class="ev-badge ev-badge--type" title="${escapeHtml(label)}">${arcIcon(EVT_ICON[ev.type] || "zap")}</span>
+            ${owner ? `<span class="ev-badge ev-badge--own ev-own--${owner}" title="${owner === "true" ? "Confirmed real" : "Marked not real"}">${arcIcon(owner === "true" ? "thumbs-up" : "thumbs-down")}</span>` : ""}</div>
+            <div class="ev-meta"><b class="ev-time">${escapeHtml(fmtLocalIso(ev.timestamp, true).slice(0, 5))}</b>
+            <span class="ev-day">${escapeHtml(day)}</span>
+            ${who ? `<span class="ev-who">${escapeHtml(who)}</span>` : ""}
+            ${conf !== "" ? `<span class="ev-conf" title="Confidence ${conf}%" role="img" aria-label="Confidence ${conf}%"><i style="width:${conf}%"></i></span>` : ""}</div>`;
         liveEventsList.appendChild(li);
     });
     liveEventsFirst = false;

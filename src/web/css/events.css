@@ -31,9 +31,6 @@ body.no-scroll { overflow: hidden; }
 
 @media (max-width: 760px) {
 }
-.live-event { cursor: pointer; border-left: 3px solid var(--pill, var(--accent)); transition: border-color 0.15s, background 0.15s; }
-.live-event:hover, .live-event:focus-visible { background: color-mix(in srgb, var(--pill, var(--accent)) 8%, var(--bg-card-sub)); outline: none; }
-.live-event .ev-type { color: var(--pill, var(--text-primary)); }
 
 .flights-card { display: flex; flex-direction: column; max-height: 420px; }
 .flights-card[hidden] { display: none; }

@@ -108,21 +108,34 @@
 #tab-live .zchips { display: flex; flex-wrap: wrap; gap: var(--s-1); }
 #tab-live .zchip { min-height: var(--tap); padding: 0 var(--s-3); border: 1px solid var(--c-border); border-radius: var(--r-pill); background: var(--c-surface-2); color: var(--c-text-2); font: inherit; font-size: var(--fs-12); cursor: pointer; }
 #tab-live .zchip.active { background: var(--c-accent-bg); color: var(--c-accent); border-color: var(--c-accent); }
-#tab-live .live-events-empty { list-style: none; padding: var(--s-3) 0; text-align: center; color: var(--c-text-2); font-size: var(--fs-12); }
-
-/* ---------- Recent events strip ---------- */
+#tab-live .live-events-empty { list-style: none; display: flex; flex-direction: column; align-items: center; gap: var(--s-2); padding: var(--s-6) 0; text-align: center; color: var(--c-text-2); font-size: var(--fs-14); }
+#tab-live .live-events-empty .ds-icon { width: 32px; height: 32px; color: var(--c-text-3); }
+/* ---------- Recent events: 16:9 thumbnail cards, one icon per type, one-line meta ---------- */
 #tab-live .live-events-list { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--s-2); overflow-x: auto; scroll-snap-type: x proximity; }
-#tab-live .live-event { flex: 0 0 144px; scroll-snap-align: start; position: relative; min-height: var(--tap); border: 1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-surface-2); overflow: hidden; cursor: pointer; }
+#tab-live .live-event { --pill: var(--c-accent); flex: 0 0 200px; scroll-snap-align: start; display: flex; flex-direction: column; border: 1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-surface-2); overflow: hidden; cursor: pointer; transition: border-color .15s, background .15s; }
+#tab-live .live-event:hover, #tab-live .live-event:focus-visible { border-color: var(--pill); outline: none; }
 #tab-live .live-event.fresh { border-color: var(--c-accent); }
-#tab-live .live-event img, #tab-live .live-event .no-thumb { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--c-bg); }
-#tab-live .live-event .ev-type { padding: var(--s-1) var(--s-2) 0; font-size: var(--fs-12); font-weight: 600; }
-#tab-live .live-event .ev-time { padding: 0 var(--s-2) var(--s-1); font-size: var(--fs-12); color: var(--c-text-2); font-family: var(--font-num); }
-#tab-live .live-event .ev-detail { display: none; }
+#tab-live .live-event .ev-thumb { position: relative; aspect-ratio: 16 / 9; background: var(--c-bg); }
+#tab-live .live-event .ev-thumb img, #tab-live .live-event .no-thumb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: flex; align-items: center; justify-content: center; color: var(--c-text-3); }
+#tab-live .live-event .ev-badge { position: absolute; top: var(--s-2); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-pill); background: var(--c-scrim); }
+#tab-live .live-event .ev-badge .ds-icon { width: 16px; height: 16px; }
+#tab-live .live-event .ev-badge--type { left: var(--s-2); color: var(--pill); }
+#tab-live .live-event .ev-badge--own { right: var(--s-2); }
+#tab-live .live-event .ev-own--true { color: var(--c-ok); }
+#tab-live .live-event .ev-own--false { color: var(--c-danger); }
+#tab-live .live-event .ev-meta { display: flex; align-items: center; gap: var(--s-2); min-width: 0; padding: var(--s-2) var(--s-3); font-size: var(--fs-12); color: var(--c-text-2); white-space: nowrap; }
+#tab-live .live-event .ev-time { font-family: var(--font-num); font-size: var(--fs-14); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--c-text); }
+#tab-live .live-event .ev-day { flex: none; }
+#tab-live .live-event .ev-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-num); }
+#tab-live .live-event .ev-conf { margin-left: auto; flex: none; width: 36px; height: 6px; border-radius: var(--r-pill); background: var(--c-border); overflow: hidden; }
+#tab-live .live-event .ev-conf i { display: block; height: 100%; background: var(--pill); }
+#tab-live .live-events-card .badge { display: inline-flex; align-items: center; gap: var(--s-1); font-family: var(--font-num); }
+#tab-live .live-events-card .badge .ds-icon { width: 14px; height: 14px; }
 @media (min-width: 1024px) {
-    #tab-live .live-events-list { flex-direction: column; overflow: visible; }
-    #tab-live .live-event { flex: none; display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; }
-    #tab-live .live-event > div:not(.ev-type):not(.ev-time) { display: contents; }
+    #tab-live .live-events-list { flex-direction: column; overflow-x: hidden; overflow-y: auto; max-height: 72vh; }
+    #tab-live .live-event { flex: none; }
 }
+
 
 /* ---------- Cloud cover ---------- */
 #tab-live .live-pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
