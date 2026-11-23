@@ -262,6 +262,7 @@
                 replay_bbox: [],
             };
 
+            let stationLoaded = false; // stationConfig below holds only placeholder defaults until /api/station/config answers
             let stationConfig = {
                 latitude_deg: 0,
                 longitude_deg: 0,
@@ -566,6 +567,8 @@
                 if (!showSky && !showDso && !showLabels && !showGrid && !showSunMoon && !showBadge && !showAdsb && !showEvents) return;
 
                 const st = stationConfig || {};
+                // Station data not loaded yet: the hard-coded fallbacks below would draw a wrong map on first paint.
+                if (!stationLoaded) return;
                 const sensor = st.camera_sensor || {};
                 const optics = st.optics || {};
                 const ori = st.orientation || {};
@@ -1326,6 +1329,7 @@
                 .then((cfg) => {
                     if (cfg && typeof cfg === "object") {
                         stationConfig = cfg;
+                        stationLoaded = true;
                         drawReticle();
                     }
                 })
