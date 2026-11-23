@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate the shared chrome of every page from ONE definition: top bar + tab bar/rail + Menu sheet (TABS, MENU), the Zenivo
+"""Regenerate the shared chrome of every page from ONE definition: top bar + phone tab bar + one nav list (desktop sidebar = phone Menu sheet; TABS, MENU), the Zenivo
 brand mark + wordmark (BRAND) and the head links (title, description, icons, manifest, Open Graph, ds css/js: HEAD).
 
 Usage: python3 scripts/sync_nav.py            # rewrite src/web/*.html
@@ -44,15 +44,17 @@ HEAD = {
 # Admin-only destinations (hidden for guests via data-admin; the server enforces the same list)
 ADMIN_HREFS = {"/logs", "/focus", "/calibration", "/obs/dock"}
 
-# Tab bar (phone/tablet) = left rail (desktop): (href, icon, label, paths that mark it current). The 5th slot is the Menu sheet.
+# Phone tab bar (<1024px): (href, icon, label, paths that mark it current). The 5th slot opens the nav as a sheet.
 TABS = [("/live", "camera", "Live", "/live,/,/index.html"), ("/sky", "sparkles", "Sky", "/sky"),
-        ("/community", "users", "Community", "/community"), ("/gallery", "archive", "Archive", "/gallery,/logs")]
-MORE_PATHS = "/flights3d,/satellites3d,/overhead,/focus,/calibration,/settings,/obs"
-# Menu sheet groups: (title, admin-only group, [(href, icon, label, admin item, new tab)])
+        ("/overhead", "radio", "Overhead", "/overhead"), ("/gallery", "archive", "Archive", "/gallery")]
+# Navigation list, ONE definition for the desktop sidebar and the phone Menu sheet:
+# (section title or None, admin-only group, [(href, icon, label, admin item, new tab)])
 MENU = [
+    (None, False, [("/live", "camera", "Live", False, False), ("/sky", "sparkles", "Sky", False, False),
+                   ("/overhead", "radio", "Overhead", False, False), ("/gallery", "archive", "Archive", False, False),
+                   ("/community", "users", "Community", False, False)]),
     ("Explore", False, [("/flights3d", "plane", "Flights 3D", False, False),
-                        ("/satellites3d", "satellite", "Satellites 3D", False, False),
-                        ("/overhead", "radio", "Overhead", False, False)]),
+                        ("/satellites3d", "satellite", "Satellites 3D", False, False)]),
     ("Camera", True, [("/focus", "telescope", "Focus", False, False),
                       ("/calibration", "moon-star", "Master dark", False, False),
                       ("/settings#image", "sliders-horizontal", "Image output", False, False),
@@ -61,11 +63,12 @@ MENU = [
                        ("/settings#skymask", "shield", "Sky mask", False, False),
                        ("/settings#integrations", "plug", "Integrations", False, False),
                        ("/settings#community", "share-2", "Sharing", False, False),
-                       ("/settings#admin", "key-round", "Admin", False, False),
-                       ("/logs", "activity", "Activity log", False, False)]),
+                       ("/logs", "activity", "Activity log", False, False),
+                       ("/settings#admin", "key-round", "Admin", False, False)]),
     ("Streaming", False, [("/obs/dock", "film", "OBS dock", True, False),
-                          ("/obs", "arrow-up-right", "OBS preview", False, True)]),
+                          ("/obs", "arrow-up-right", "OBS", False, True)]),
 ]
+MORE_PATHS = ",".join(sorted({h.split("#")[0] for _, _, items in MENU for h, *_ in items} - {t[0] for t in TABS}))
 
 
 def ic(name):
@@ -89,13 +92,14 @@ def render_head(name):
              '<meta property="og:site_name" content="Zenivo">', '<meta property="og:type" content="website">',
              f'<meta property="og:title" content="{title}">', f'<meta property="og:description" content="{desc}">',
              f'<meta property="og:image" content="{img}">', '<meta name="twitter:card" content="summary_large_image">',
+             '<script>try{if(localStorage.getItem("zenivo.nav")==="0")document.documentElement.classList.add("zs-collapsed")}catch(e){}</script>',
              '<link rel="stylesheet" href="/static/css/ds-tokens.css?v=20261123a">',
-             '<link rel="stylesheet" href="/static/css/ds-components.css?v=20261123a">',
-             '<link rel="stylesheet" href="/static/css/shell.css?v=20261127g">',
-             '<script src="/static/auth.js?v=1"></script>',
+             '<link rel="stylesheet" href="/static/css/ds-components.css?v=20261204b">',
+             '<link rel="stylesheet" href="/static/css/shell.css?v=20261204b">',
+             '<script src="/static/auth.js?v=20261204b"></script>',
              '<script src="/static/js/ds.js?v=20261123a" defer></script>',
              '<script src="/static/brand/version.js?v=4" defer></script>',
-             '<script src="/static/shell.js?v=20261123b" defer></script>', "<!-- head-brand:end -->"]
+             '<script src="/static/shell.js?v=20261204b" defer></script>', "<!-- head-brand:end -->"]
     return "\n    ".join(lines)
 
 
@@ -119,34 +123,37 @@ def render(current, is_index):
          '    <nav class="ds-tabbar" aria-label="Main navigation">']
     for h, i, t, p in TABS:
         o.append(f'        <a class="ds-tab" href="{h}" data-paths="{p}">{ic(i)}<span>{t}</span></a>')
-    o += [f'        <button class="ds-tab" type="button" data-ds-open="m-more-sheet" data-paths="{MORE_PATHS}" aria-haspopup="dialog">'
+    o += [f'        <button class="ds-tab" type="button" data-ds-open="zs-nav" data-paths="{MORE_PATHS}" aria-haspopup="dialog">'
           f'{ic("menu")}<span>Menu</span></button>', '    </nav>', '',
-          '    <div class="ds-sheet" id="m-more-sheet" role="dialog" aria-modal="true" aria-label="Menu">',
-          '        <div class="ds-sheet__scrim" data-ds-close></div>', '        <div class="ds-sheet__panel">',
-          '            <div class="ds-sheet__grab" aria-hidden="true"></div>',
-          '            <div class="ds-sheet__head"><div class="ds-sheet__title"><span id="m-st-name">Zenivo</span> '
-          '<small class="zt-ver" id="app-version" data-app-version>Zenivo</small></div>'
-          f'<a class="ds-btn ds-btn--ghost" href="/login" data-auth-link>{ic("log-in")}<span>Sign in</span></a>'
+          '    <aside class="ds-sheet zs" id="zs-nav" role="dialog" aria-modal="true" aria-label="Menu">',
+          '        <div class="ds-sheet__scrim" data-ds-close></div>', '        <div class="zs__panel">',
+          '            <div class="zs__head"><div class="ds-sheet__title"><span id="m-st-name">Zenivo</span></div>'
           f'<button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" data-ds-close aria-label="Close">{ic("x")}</button></div>',
-          '            <div class="ds-sheet__tiles zt-quick">',
-          f'                <button class="ds-tile" type="button" id="m-rv-toggle" aria-pressed="false">{ic("moon-star")}<span>Red vision</span></button>',
-          f'                <button class="ds-tile" type="button" id="m-fs-btn">{ic("maximize")}<span>Fullscreen</span></button>',
-          f'                <button class="ds-tile" type="button" id="m-chat-btn">{ic("message-circle")}<span>Chat</span></button>',
-          f'                <button class="ds-tile" type="button" id="m-share-btn">{ic("share-2")}<span id="m-share-sub">Share</span></button>',
-          '            </div>']
+          '            <nav class="zs__nav" aria-label="Sections">']
     for title, admin_grp, items in MENU:
-        o.append(f'            <section class="zt-group"{" data-admin" if admin_grp else ""}>')
-        o.append(f'                <h3 class="zt-gtitle">{title}</h3>')
-        o.append('                <div class="ds-sheet__tiles">')
+        o.append(f'                <section class="zs__group"{" data-admin" if admin_grp else ""}>')
+        if title:
+            o.append(f'                    <h3 class="zs__title">{title}</h3>')
         for h, i, label, adm, blank in items:
-            path = h.split("#")[0]
-            attrs = (f' data-paths="{path}"' if "#" not in h else "") + (" data-admin" if adm else "")
+            path, _, frag = h.partition("#")
+            attrs = f' data-paths="{path}"' + (f' data-hash="{frag}"' if frag else "") + (" data-admin" if adm else "")
             attrs += ' target="_blank" rel="noopener"' if blank else ""
+            plain = label.replace("&amp;", "&")
             badge = '<b class="zt-badge" id="log-error-badge" hidden>0</b>' if h == "/logs" and is_index else ""
-            o.append(f'                    <a class="ds-tile" href="{h}"{attrs}>{ic(i)}<span>{label}</span>{badge}</a>')
-        o += ['                </div>', '            </section>']
-    o += [f'            <a class="ds-tile zt-settings" href="/settings" data-admin data-paths="/settings">{ic("settings")}<span>Settings</span></a>',
-          '        </div>', '    </div>', '    <!-- chrome:end -->']
+            o.append(f'                    <a class="zs__item" href="{h}"{attrs} data-tip="{plain}" aria-label="{plain}">'
+                     f'{ic(i)}<span class="zs__label">{label}</span>{badge}</a>')
+        o.append('                </section>')
+    o += ['            </nav>',
+          '            <div class="zs__foot">',
+          '                <div class="zs__utils">',
+          f'                    <button class="zs__item" type="button" id="m-fs-btn" data-tip="Fullscreen" aria-label="Fullscreen">{ic("maximize")}<span class="zs__label">Fullscreen</span></button>',
+          f'                    <button class="zs__item" type="button" id="m-share-btn" data-tip="Share" aria-label="Share">{ic("share-2")}<span class="zs__label">Share</span></button>',
+          f'                    <button class="zs__item" type="button" id="m-chat-btn" data-tip="Chat" aria-label="Chat">{ic("message-circle")}<span class="zs__label">Chat</span></button>',
+          '                </div>',
+          f'                <a class="zs__item" href="/login" data-auth-link data-tip="Sign in" aria-label="Sign in">{ic("log-in")}<span class="zs__label" data-auth-label>Sign in</span></a>',
+          '                <div class="zs__meta"><small class="zs__ver" id="app-version" data-app-version>Zenivo</small>'
+          f'<button class="zs__toggle" type="button" id="zs-toggle" aria-expanded="true" aria-controls="zs-nav" aria-label="Collapse menu" data-tip="Collapse menu">{ic("chevrons-left")}</button></div>',
+          '            </div>', '        </div>', '    </aside>', '    <!-- chrome:end -->']
     return "\n".join(o)
 
 

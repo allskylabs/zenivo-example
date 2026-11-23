@@ -30,20 +30,68 @@
 .zt-cluster #btn-night-vision { min-width: 44px; min-height: 44px; }
 .zt-cluster #btn-night-vision[aria-pressed="true"] { color: var(--c-danger, var(--danger)); }
 
-/* Menu sheet */
-.zt-ver { color: var(--text-muted); font-size: 12px; }
-.zt-quick { margin-bottom: 12px; }
-.zt-gtitle { margin: 14px 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
-.zt-badge { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 12px; }
+/* Navigation: ONE list (markup from scripts/sync_nav.py). >=1024px it is the fixed sidebar below the topbar (expanded icon+label, or the
+ * collapsed icon rail, html.zs-collapsed); below that the same element is the Menu sheet opened from the tab bar. */
+:root { --rail-w: 232px; }
+html.zs-collapsed { --rail-w: 64px; }
+.zs__panel { display: flex; flex-direction: column; background: var(--c-surface-1); color: var(--c-text); }
+.zs__head { display: flex; align-items: center; gap: var(--s-3); min-height: var(--tap); padding: var(--s-2) var(--s-3) var(--s-2) var(--s-4); }
+.zs__nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 var(--s-2); }
+.zs__group { display: grid; grid-template-columns: 1fr 1fr; gap: 2px var(--s-2); padding: var(--s-2) 0; }
+.zs__group + .zs__group { border-top: 1px solid var(--c-divider); }
+.zs__title { grid-column: 1 / -1; margin: var(--s-2) 0 var(--s-1) var(--s-3); font: 600 var(--fs-12) / 1 var(--font-ui); letter-spacing: .06em; text-transform: uppercase; color: var(--c-text-3); }
+.zs__item { position: relative; display: flex; align-items: center; gap: var(--s-3); width: 100%; min-height: var(--tap); padding: 0 var(--s-3); border: 0; border-radius: var(--r-md); background: none; color: var(--c-text-2); font: 500 var(--fs-14) / 1.2 var(--font-ui); text-align: left; text-decoration: none; cursor: pointer; }
+.zs__item:hover { background: var(--c-surface-2); color: var(--c-text); }
+.zs__item:focus-visible, .zs__toggle:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -2px; }
+.zs__item[aria-current="page"] { background: var(--c-accent-bg); color: var(--c-accent); }
+.zs__item[aria-current="page"] .ds-icon { stroke-width: 2.4; }
+.zs__item .ds-icon { flex: 0 0 auto; }
+.zs__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zt-badge { margin-left: auto; padding: 2px 6px; border-radius: var(--r-pill); background: var(--c-danger, var(--danger)); color: var(--c-on-accent, var(--c-bg)); font-size: var(--fs-12); line-height: 1; }
 .zt-badge[hidden] { display: none; }
-.zt-settings { margin-top: 12px; }
-.ds-tile[aria-current="page"], .ds-tile[aria-pressed="true"] { border-color: var(--accent); }
+.zs__foot { flex: 0 0 auto; padding: var(--s-2); border-top: 1px solid var(--c-divider); }
+.zs__utils { display: flex; gap: 2px; }
+.zs__utils .zs__item { flex: 1; justify-content: center; padding: 0; }
+.zs__utils .zs__label { display: none; }
+.zs__meta { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); padding-left: var(--s-3); }
+.zs__ver { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-12); color: var(--c-text-3); }
+.zs__toggle { display: none; flex: 0 0 auto; width: var(--tap); height: var(--tap); align-items: center; justify-content: center; border: 0; border-radius: var(--r-md); background: none; color: var(--c-text-2); cursor: pointer; }
+.zs__toggle:hover { background: var(--c-surface-2); color: var(--c-text); }
+.zs__toggle .ds-icon { transition: transform var(--dur) var(--ease); }
+
+/* phone / tablet: bottom sheet (centred dialog from 768px) */
+@media (max-width: 1023.98px) {
+    .zs__panel { position: absolute; left: 0; right: 0; bottom: 0; max-height: min(86dvh, calc(100dvh - var(--s-6))); padding-bottom: env(safe-area-inset-bottom, 0px); border: 1px solid var(--c-border); border-radius: var(--r-xl) var(--r-xl) 0 0; box-shadow: var(--shadow-2); animation: ds-sheet-up var(--dur) var(--ease); }
+    .zs__utils { padding-bottom: var(--s-1); }
+}
+@media (min-width: 768px) and (max-width: 1023.98px) {
+    .zs__panel { left: 50%; right: auto; bottom: auto; top: 50%; width: min(520px, calc(100vw - 48px)); transform: translate(-50%, -50%); border-radius: var(--r-xl); animation: ds-sheet-fade var(--dur) var(--ease); }
+}
+
+/* desktop: fixed sidebar under the topbar */
+@media (min-width: 1024px) {
+    .zs { display: block; inset: var(--topbar-h) auto 0 0; width: var(--rail-w); z-index: var(--z-nav); }
+    .zs .ds-sheet__scrim, .zs__head { display: none; }
+    .zs__panel { height: 100%; border-right: 1px solid var(--c-border); }
+    .zs__group { grid-template-columns: 1fr; gap: 2px; }
+    .zs__toggle { display: inline-flex; }
+    .zs__utils .zs__item { min-width: 0; }
+    /* collapsed icon rail: labels live in aria-label + title, sections become hairlines */
+    html.zs-collapsed .zs__label, html.zs-collapsed .zs__title, html.zs-collapsed .zs__ver { display: none; }
+    html.zs-collapsed .zs__item { justify-content: center; padding: 0; }
+    html.zs-collapsed .zs__nav { padding: 0 var(--s-2); scrollbar-width: none; }
+    html.zs-collapsed .zs__utils { flex-direction: column; }
+    html.zs-collapsed .zs__meta { justify-content: center; padding-left: 0; }
+    html.zs-collapsed .zs__toggle .ds-icon { transform: rotate(180deg); }
+    html.zs-collapsed .zt-badge { position: absolute; top: 4px; right: 4px; margin: 0; padding: 2px 4px; }
+}
 
 /* station chat button sits above the tab bar on phones, clear of the topbar on desktop */
 .zcw-launch { z-index: var(--z-fab); }
 @media (max-width: 1023.98px) { .zcw-launch { bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom, 0px)); } }
-html.embed .ds-topbar, html.embed .ds-tabbar, html.embed .ds-sheet, html.embed .zcw-launch { display: none !important; }
+html.embed .ds-topbar, html.embed .ds-tabbar, html.embed .ds-sheet, html.embed .zs, html.embed .zcw-launch { display: none !important; }
 html.embed .app-main { padding: 0; }
+html.embed { --rail-w: 0px; }
 
 /* Desktop: location already shows in the brand; the dot alone is the status. Phones: brand hidden, name shows. */
 @media (min-width: 641px) { .ds-topbar__title .zt-name { display: none; } .ds-topbar__title { flex: 1; } }
@@ -52,3 +100,9 @@ html.embed .app-main { padding: 0; }
 
 /* screen-reader-only text must work on every page that has the topbar (ds-base is scoped) */
 .ds-topbar .ds-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* group heading inside the settings sheet */
+.zt-gtitle { margin: 14px 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+
+/* admin-only nav items (pages that do not load pages.css) */
+:root:not(.is-admin) .zs [data-admin] { display: none !important; }

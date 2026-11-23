@@ -15,7 +15,9 @@
         if (document.body) document.body.classList.toggle("is-admin", auth.admin);
         const here = encodeURIComponent(location.pathname + location.hash);
         document.querySelectorAll("[data-auth-link]").forEach((a) => {
-            a.textContent = auth.admin ? "Sign out" : "Sign in";
+            const label = auth.admin ? "Sign out" : "Sign in", t = a.querySelector("[data-auth-label]");
+            if (t) { t.textContent = label; a.setAttribute("aria-label", label); if (a.title) a.title = label; const u = a.querySelector("use"); if (u) u.setAttribute("href", u.getAttribute("href").replace(/#i-.*/, auth.admin ? "#i-log-out" : "#i-log-in")); }
+            else a.textContent = label;
             a.setAttribute("href", auth.admin ? "#signout" : `/login?next=${here}`);
         });
     }

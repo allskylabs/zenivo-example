@@ -17,13 +17,14 @@
     <meta property="og:description" content="Map of the Zenivo all-sky stations that share themselves with the community.">
     <meta property="og:image" content="/static/brand/og-image.png">
     <meta name="twitter:card" content="summary_large_image">
+    <script>try{if(localStorage.getItem("zenivo.nav")==="0")document.documentElement.classList.add("zs-collapsed")}catch(e){}</script>
     <link rel="stylesheet" href="/static/css/ds-tokens.css?v=20261123a">
-    <link rel="stylesheet" href="/static/css/ds-components.css?v=20261123a">
-    <link rel="stylesheet" href="/static/css/shell.css?v=20261127g">
-    <script src="/static/auth.js?v=1"></script>
+    <link rel="stylesheet" href="/static/css/ds-components.css?v=20261204b">
+    <link rel="stylesheet" href="/static/css/shell.css?v=20261204b">
+    <script src="/static/auth.js?v=20261204b"></script>
     <script src="/static/js/ds.js?v=20261123a" defer></script>
     <script src="/static/brand/version.js?v=4" defer></script>
-    <script src="/static/shell.js?v=20261123b" defer></script>
+    <script src="/static/shell.js?v=20261204b" defer></script>
     <!-- head-brand:end -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
@@ -63,60 +64,61 @@
     <nav class="ds-tabbar" aria-label="Main navigation">
         <a class="ds-tab" href="/live" data-paths="/live,/,/index.html"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg><span>Live</span></a>
         <a class="ds-tab" href="/sky" data-paths="/sky"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><span>Sky</span></a>
-        <a class="ds-tab" href="/community" data-paths="/community"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-users"></use></svg><span>Community</span></a>
-        <a class="ds-tab" href="/gallery" data-paths="/gallery,/logs"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-archive"></use></svg><span>Archive</span></a>
-        <button class="ds-tab" type="button" data-ds-open="m-more-sheet" data-paths="/flights3d,/satellites3d,/overhead,/focus,/calibration,/settings,/obs" aria-haspopup="dialog"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-menu"></use></svg><span>Menu</span></button>
+        <a class="ds-tab" href="/overhead" data-paths="/overhead"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-radio"></use></svg><span>Overhead</span></a>
+        <a class="ds-tab" href="/gallery" data-paths="/gallery"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-archive"></use></svg><span>Archive</span></a>
+        <button class="ds-tab" type="button" data-ds-open="zs-nav" data-paths="/calibration,/community,/flights3d,/focus,/logs,/obs,/obs/dock,/satellites3d,/settings" aria-haspopup="dialog"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-menu"></use></svg><span>Menu</span></button>
     </nav>
 
-    <div class="ds-sheet" id="m-more-sheet" role="dialog" aria-modal="true" aria-label="Menu">
+    <aside class="ds-sheet zs" id="zs-nav" role="dialog" aria-modal="true" aria-label="Menu">
         <div class="ds-sheet__scrim" data-ds-close></div>
-        <div class="ds-sheet__panel">
-            <div class="ds-sheet__grab" aria-hidden="true"></div>
-            <div class="ds-sheet__head"><div class="ds-sheet__title"><span id="m-st-name">Zenivo</span> <small class="zt-ver" id="app-version" data-app-version>Zenivo</small></div><a class="ds-btn ds-btn--ghost" href="/login" data-auth-link><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-log-in"></use></svg><span>Sign in</span></a><button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" data-ds-close aria-label="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></div>
-            <div class="ds-sheet__tiles zt-quick">
-                <button class="ds-tile" type="button" id="m-rv-toggle" aria-pressed="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon-star"></use></svg><span>Red vision</span></button>
-                <button class="ds-tile" type="button" id="m-fs-btn"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg><span>Fullscreen</span></button>
-                <button class="ds-tile" type="button" id="m-chat-btn"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-message-circle"></use></svg><span>Chat</span></button>
-                <button class="ds-tile" type="button" id="m-share-btn"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-share-2"></use></svg><span id="m-share-sub">Share</span></button>
+        <div class="zs__panel">
+            <div class="zs__head"><div class="ds-sheet__title"><span id="m-st-name">Zenivo</span></div><button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" data-ds-close aria-label="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button></div>
+            <nav class="zs__nav" aria-label="Sections">
+                <section class="zs__group">
+                    <a class="zs__item" href="/live" data-paths="/live" data-tip="Live" aria-label="Live"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg><span class="zs__label">Live</span></a>
+                    <a class="zs__item" href="/sky" data-paths="/sky" data-tip="Sky" aria-label="Sky"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sparkles"></use></svg><span class="zs__label">Sky</span></a>
+                    <a class="zs__item" href="/overhead" data-paths="/overhead" data-tip="Overhead" aria-label="Overhead"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-radio"></use></svg><span class="zs__label">Overhead</span></a>
+                    <a class="zs__item" href="/gallery" data-paths="/gallery" data-tip="Archive" aria-label="Archive"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-archive"></use></svg><span class="zs__label">Archive</span></a>
+                    <a class="zs__item" href="/community" data-paths="/community" data-tip="Community" aria-label="Community"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-users"></use></svg><span class="zs__label">Community</span></a>
+                </section>
+                <section class="zs__group">
+                    <h3 class="zs__title">Explore</h3>
+                    <a class="zs__item" href="/flights3d" data-paths="/flights3d" data-tip="Flights 3D" aria-label="Flights 3D"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg><span class="zs__label">Flights 3D</span></a>
+                    <a class="zs__item" href="/satellites3d" data-paths="/satellites3d" data-tip="Satellites 3D" aria-label="Satellites 3D"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg><span class="zs__label">Satellites 3D</span></a>
+                </section>
+                <section class="zs__group" data-admin>
+                    <h3 class="zs__title">Camera</h3>
+                    <a class="zs__item" href="/focus" data-paths="/focus" data-tip="Focus" aria-label="Focus"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg><span class="zs__label">Focus</span></a>
+                    <a class="zs__item" href="/calibration" data-paths="/calibration" data-tip="Master dark" aria-label="Master dark"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon-star"></use></svg><span class="zs__label">Master dark</span></a>
+                    <a class="zs__item" href="/settings#image" data-paths="/settings" data-hash="image" data-tip="Image output" aria-label="Image output"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg><span class="zs__label">Image output</span></a>
+                    <a class="zs__item" href="/settings#detection" data-paths="/settings" data-hash="detection" data-tip="Detection" aria-label="Detection"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg><span class="zs__label">Detection</span></a>
+                </section>
+                <section class="zs__group" data-admin>
+                    <h3 class="zs__title">Station</h3>
+                    <a class="zs__item" href="/settings#station" data-paths="/settings" data-hash="station" data-tip="Station & optics" aria-label="Station & optics"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-map-pin"></use></svg><span class="zs__label">Station &amp; optics</span></a>
+                    <a class="zs__item" href="/settings#skymask" data-paths="/settings" data-hash="skymask" data-tip="Sky mask" aria-label="Sky mask"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-shield"></use></svg><span class="zs__label">Sky mask</span></a>
+                    <a class="zs__item" href="/settings#integrations" data-paths="/settings" data-hash="integrations" data-tip="Integrations" aria-label="Integrations"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plug"></use></svg><span class="zs__label">Integrations</span></a>
+                    <a class="zs__item" href="/settings#community" data-paths="/settings" data-hash="community" data-tip="Sharing" aria-label="Sharing"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-share-2"></use></svg><span class="zs__label">Sharing</span></a>
+                    <a class="zs__item" href="/logs" data-paths="/logs" data-tip="Activity log" aria-label="Activity log"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-activity"></use></svg><span class="zs__label">Activity log</span></a>
+                    <a class="zs__item" href="/settings#admin" data-paths="/settings" data-hash="admin" data-tip="Admin" aria-label="Admin"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-key-round"></use></svg><span class="zs__label">Admin</span></a>
+                </section>
+                <section class="zs__group">
+                    <h3 class="zs__title">Streaming</h3>
+                    <a class="zs__item" href="/obs/dock" data-paths="/obs/dock" data-admin data-tip="OBS dock" aria-label="OBS dock"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-film"></use></svg><span class="zs__label">OBS dock</span></a>
+                    <a class="zs__item" href="/obs" data-paths="/obs" target="_blank" rel="noopener" data-tip="OBS" aria-label="OBS"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-arrow-up-right"></use></svg><span class="zs__label">OBS</span></a>
+                </section>
+            </nav>
+            <div class="zs__foot">
+                <div class="zs__utils">
+                    <button class="zs__item" type="button" id="m-fs-btn" data-tip="Fullscreen" aria-label="Fullscreen"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-maximize"></use></svg><span class="zs__label">Fullscreen</span></button>
+                    <button class="zs__item" type="button" id="m-share-btn" data-tip="Share" aria-label="Share"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-share-2"></use></svg><span class="zs__label">Share</span></button>
+                    <button class="zs__item" type="button" id="m-chat-btn" data-tip="Chat" aria-label="Chat"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-message-circle"></use></svg><span class="zs__label">Chat</span></button>
+                </div>
+                <a class="zs__item" href="/login" data-auth-link data-tip="Sign in" aria-label="Sign in"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-log-in"></use></svg><span class="zs__label" data-auth-label>Sign in</span></a>
+                <div class="zs__meta"><small class="zs__ver" id="app-version" data-app-version>Zenivo</small><button class="zs__toggle" type="button" id="zs-toggle" aria-expanded="true" aria-controls="zs-nav" aria-label="Collapse menu" data-tip="Collapse menu"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevrons-left"></use></svg></button></div>
             </div>
-            <section class="zt-group">
-                <h3 class="zt-gtitle">Explore</h3>
-                <div class="ds-sheet__tiles">
-                    <a class="ds-tile" href="/flights3d" data-paths="/flights3d"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg><span>Flights 3D</span></a>
-                    <a class="ds-tile" href="/satellites3d" data-paths="/satellites3d"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg><span>Satellites 3D</span></a>
-                    <a class="ds-tile" href="/overhead" data-paths="/overhead"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-radio"></use></svg><span>Overhead</span></a>
-                </div>
-            </section>
-            <section class="zt-group" data-admin>
-                <h3 class="zt-gtitle">Camera</h3>
-                <div class="ds-sheet__tiles">
-                    <a class="ds-tile" href="/focus" data-paths="/focus"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg><span>Focus</span></a>
-                    <a class="ds-tile" href="/calibration" data-paths="/calibration"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-moon-star"></use></svg><span>Master dark</span></a>
-                    <a class="ds-tile" href="/settings#image"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-sliders-horizontal"></use></svg><span>Image output</span></a>
-                    <a class="ds-tile" href="/settings#detection"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg><span>Detection</span></a>
-                </div>
-            </section>
-            <section class="zt-group" data-admin>
-                <h3 class="zt-gtitle">Station</h3>
-                <div class="ds-sheet__tiles">
-                    <a class="ds-tile" href="/settings#station"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-map-pin"></use></svg><span>Station &amp; optics</span></a>
-                    <a class="ds-tile" href="/settings#skymask"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-shield"></use></svg><span>Sky mask</span></a>
-                    <a class="ds-tile" href="/settings#integrations"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plug"></use></svg><span>Integrations</span></a>
-                    <a class="ds-tile" href="/settings#community"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-share-2"></use></svg><span>Sharing</span></a>
-                    <a class="ds-tile" href="/settings#admin"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-key-round"></use></svg><span>Admin</span></a>
-                    <a class="ds-tile" href="/logs" data-paths="/logs"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-activity"></use></svg><span>Activity log</span></a>
-                </div>
-            </section>
-            <section class="zt-group">
-                <h3 class="zt-gtitle">Streaming</h3>
-                <div class="ds-sheet__tiles">
-                    <a class="ds-tile" href="/obs/dock" data-paths="/obs/dock" data-admin><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-film"></use></svg><span>OBS dock</span></a>
-                    <a class="ds-tile" href="/obs" data-paths="/obs" target="_blank" rel="noopener"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-arrow-up-right"></use></svg><span>OBS preview</span></a>
-                </div>
-            </section>
-            <a class="ds-tile zt-settings" href="/settings" data-admin data-paths="/settings"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-settings"></use></svg><span>Settings</span></a>
         </div>
-    </div>
+    </aside>
     <!-- chrome:end -->
 
     <div class="app-main">
