@@ -4,6 +4,7 @@ Mixin of AllSkyService (src/api/service.py): methods only, all state lives on th
 
 import os
 import re
+import time
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import numpy as np
@@ -132,6 +133,24 @@ class EventsMixin:
             "cloud_cover_pct": round(cc, 1), "_overview": overview,
         })
 
+    @staticmethod
+    def _event_confidence(ev: Dict[str, Any]) -> float:
+        """0..1 estimate that the event is what its type says, from what the detector measured and from the
+        cross-checks (a named flight or satellite is near-certain; a meteor next to an aircraft is not)."""
+        t = ev.get("type")
+        if t in ("plane", "satellite") and (ev.get("flight") or ev.get("satellite")):
+            return 0.95
+        c = 0.5
+        if t == "meteor":
+            c = 0.3 + min(0.3, float(ev.get("peak_dn") or 0) / 400.0) + (0.1 if float(ev.get("length_px") or 0) >= 40 else 0.0)
+            if ev.get("nearest_flight"):
+                c -= 0.15
+        elif t in ("plane", "satellite"):
+            c = 0.4 + min(0.3, 0.05 * float(ev.get("frames") or 1)) + (0.1 if ev.get("moving_dot") else 0.0)
+        elif t == "flash":
+            c = 0.3
+        return round(max(0.05, min(0.9, c)), 2)
+
     PLANE_GROUP_GAP_S = 300.0
 
     def _group_plane_fragments(self, ev: Dict[str, Any]) -> None:
@@ -168,6 +187,7 @@ class EventsMixin:
             pass  # flight naming is a bonus; never lose the event over it
         crop, overview = ev.pop("_crop", None), ev.pop("_overview", None)
         self._group_plane_fragments(ev)
+        ev["confidence"] = self._event_confidence(ev)
         dt = datetime.fromtimestamp(float(ev.get("start_ts", ev["ts"]))).astimezone()
         day = dt.strftime("%Y-%m-%d")
         self._event_seq = (self._event_seq + 1) % 1000
@@ -252,7 +272,12 @@ class EventsMixin:
                     "thumbnail_url": e.get("thumbnail_url"), "sky_url": e.get("sky_url"),
                     "line": e.get("line"), "moving_dot": bool(e.get("moving_dot")), "frames": e.get("frames"),
                     "length_px": e.get("length_px"), "peak_dn": e.get("peak_dn"),
-                    "flight": callsign(e)} for e in out]
+                    "flight": callsign(e), "confidence": e.get("confidence"),
+                    "satellite": (e.get("satellite") or {}).get("name"), "group_id": e.get("group_id")}
+                   for e in out]
+        labels = self.event_labels()
+        if labels:
+            out = [({**e, "owner_label": labels[e.get("event_id")]["label"]} if e.get("event_id") in labels else e) for e in out]
         return {"events": out, "total_count": len(events), "counts": counts, **self.get_event_config()}
 
     _EVENT_ID_RE = re.compile(r"^[a-z]+_(\d{4})(\d{2})(\d{2})_\d{6}_\d{3}$")
@@ -270,7 +295,8 @@ class EventsMixin:
             return None
         for e in self._load_events():
             if e.get("event_id") == event_id:
-                return e
+                lab = self.event_labels().get(event_id)
+                return {**e, "owner_label": lab["label"]} if lab else e
         try:
             with open(os.path.join(self.events_dir, day, "events.jsonl"), encoding="utf-8") as fp:
                 for line in fp:
@@ -281,6 +307,46 @@ class EventsMixin:
         except (OSError, ValueError):
             pass
         return None
+
+    def _labels_path(self) -> str:
+        return os.path.join(self.events_dir, "labels.jsonl")
+
+    def event_labels(self) -> Dict[str, Dict[str, Any]]:
+        """Owner verdicts by event id (the newest line per event wins; `clear` removes it)."""
+        import json
+
+        out: Dict[str, Dict[str, Any]] = {}
+        with self._events_lock:
+            try:
+                with open(self._labels_path(), encoding="utf-8") as fp:
+                    for ln in fp:
+                        try:
+                            r = json.loads(ln)
+                        except ValueError:
+                            continue
+                        if r.get("label") == "clear":
+                            out.pop(r.get("event_id"), None)
+                        elif r.get("event_id"):
+                            out[r["event_id"]] = {k: r.get(k) for k in ("label", "actual_type", "ts", "auto_type")}
+            except OSError:
+                pass
+        return out
+
+    def label_event(self, event_id: str, label: str, actual_type: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Record the owner's verdict; None when the event does not exist. Keeps the detector's own type for tuning."""
+        import json
+
+        ev = self.get_event(event_id)
+        if ev is None:
+            return None
+        rec = {"event_id": event_id, "label": label, "actual_type": (actual_type or None) if label != "clear" else None,
+               "auto_type": ev.get("type"), "ts": time.time()}
+        os.makedirs(self.events_dir, exist_ok=True)
+        with self._events_lock:
+            with open(self._labels_path(), "a", encoding="utf-8") as fp:
+                fp.write(json.dumps(rec) + "\n")
+        self.activity.info("events", f"Event {event_id} labelled {label}", event_id=event_id)
+        return rec
 
     def delete_event(self, event_id: str) -> bool:
         """Remove one event: its line in the day's events.jsonl and its image files. False when it does not exist."""

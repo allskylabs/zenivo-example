@@ -95,6 +95,12 @@ class PerformanceSettingsRequest(BaseModel):
     )
 
 
+class EventLabelRequest(BaseModel):
+    """Owner verdict on one event: it was real (`true`), a false alarm (`false`), or the verdict is withdrawn (`clear`)."""
+    label: Literal["true", "false", "clear"]
+    actual_type: Optional[str] = None  # "it was X" (meteor, plane, satellite, ...), optional
+
+
 class EventConfigRequest(BaseModel):
     """Turn detection of each sky event type on or off; omitted types stay unchanged."""
     meteor: Optional[bool] = None

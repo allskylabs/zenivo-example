@@ -452,6 +452,8 @@ function eventFacts(ev) {
         if (ev.peak_dn) facts.push(["Brightness", `+${ev.peak_dn} above the sky`]);
         if (ev.dashes > 1) facts.push([ev.moving_dot ? "Blinks" : "Dashes", String(ev.dashes)]);
     }
+    if (ev.satellite && ev.satellite.name) facts.push(["Satellite", ev.satellite.name]);
+    if (ev.confidence != null) facts.push(["Confidence", `${Math.round(ev.confidence * 100)}%`]);
     if (ev.sky_from && ev.sky_to) {
         const d = (p) => `${COMPASS[Math.round(((p.az_deg % 360) + 360) % 360 / 45) % 8]} ${Math.round(p.alt_deg)}° up`;
         facts.push(["Where in the sky", ev.frames > 1 ? `${d(ev.sky_from)} → ${d(ev.sky_to)}` : d(ev.sky_from)]);

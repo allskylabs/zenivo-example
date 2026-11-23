@@ -178,6 +178,8 @@ it, and captures are cached for `max(min_capture_interval_s, 0.9 x exposure)`.
 | POST | `/api/gallery/generate`, `/api/timelapse/generate` | Rebuild the day's products. Query `fps` (1 to 60, default 12) |
 | POST | `/api/timelapse/build` | Timelapse over a date range. Query `date_from`, `date_to` (`YYYY-MM-DD`, required), `fps` (1 to 60, default 24), `width` (0 to 1920, 0 = native), `overlay` |
 | GET | `/api/events`, `/api/events/meteors` | Sky events. Query `limit` (1 to 3000, default 20; above 100 only with `brief`), `type` (`meteor`, `plane`, `satellite`, `clouds`, `flash`), `since`, `until`, `brief` |
+| GET | `/api/events/labels` | Owner verdicts `{event_id: {label, actual_type, ts, auto_type}}` (events/labels.jsonl, newest wins) |
+| POST | `/api/events/{id}/label` | Body `{label: "true"\|"false"\|"clear", actual_type?}`; admin only. Events carry `confidence`, `sky_from`/`sky_to`, `satellite`, `group_id`, `original_type`/`reclassified_from`, `owner_label` |
 | GET | `/api/events/img/{day}/{name}` | Event image |
 | GET, POST | `/api/events/config` | Detection switches: `meteor`, `plane`, `satellite`, `clouds`, `flash` |
 

@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import HTTPException, Path, Query, Depends
 
 from src.api.schemas import (
-    EventConfigRequest,
+    EventConfigRequest, EventLabelRequest,
 )
 from src.api.service import AllSkyService
 from src.storage import frame_codec
@@ -138,6 +138,12 @@ def get_event_image(day: str, name: str, service: AllSkyService = Depends(get_se
 _EVENT_ID = r"^[a-z]+_\d{8}_\d{6}_\d{3}$"
 
 
+@router.get("/api/events/labels")
+def get_event_labels(service: AllSkyService = Depends(get_service)):
+    """Every owner verdict so far: {event_id: {label, actual_type, ts}}; the labelled set for tuning the detectors."""
+    return {"labels": service.event_labels()}
+
+
 @router.get("/api/events/{event_id}")
 def get_event(event_id: str = Path(pattern=_EVENT_ID), service: AllSkyService = Depends(get_service)):
     """One saved sky event (deep link: /gallery?event=<id>)."""
@@ -145,6 +151,15 @@ def get_event(event_id: str = Path(pattern=_EVENT_ID), service: AllSkyService = 
     if ev is None:
         raise HTTPException(status_code=404, detail="Event not found")
     return ev
+
+
+@router.post("/api/events/{event_id}/label")
+def label_event(req: EventLabelRequest, event_id: str = Path(pattern=_EVENT_ID), service: AllSkyService = Depends(get_service)):
+    """Owner true / false-alarm verdict for one event (appended to events/labels.jsonl; the newest wins). Admin only."""
+    rec = service.label_event(event_id, req.label, req.actual_type)
+    if rec is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return rec
 
 
 @router.delete("/api/events/{event_id}")

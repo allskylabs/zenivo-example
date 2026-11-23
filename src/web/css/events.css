@@ -175,6 +175,10 @@ body.no-scroll { overflow: hidden; }
 
 .ev-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.9rem; }
 .ev-actions a[hidden] { display: none; }
+.ev-label { display: inline-flex; gap: 0.35rem; }
+.ev-label button { padding: 0.3rem 0.55rem; display: inline-flex; align-items: center; }
+.ev-label button[aria-pressed="true"].ev-lab-true { background: #1f6f43; border-color: #1f6f43; color: #fff; }
+.ev-label button[aria-pressed="true"].ev-lab-false { background: #8a2f2f; border-color: #8a2f2f; color: #fff; }
 
 @media (max-width: 760px) {
     .event-viewer { padding: 0; align-items: stretch; }

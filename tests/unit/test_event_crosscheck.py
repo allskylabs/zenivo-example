@@ -60,3 +60,22 @@ def test_plane_fragments_of_one_flight_share_a_group():
     assert "group_id" not in evs[3]
     off = _Svc({"crosscheck": False}); e = {"type": "plane", "start_ts": 1, "flight": {"icao": "x"}}
     off._group_plane_fragments(e); assert "group_id" not in e
+
+
+def test_confidence_and_labels(tmp_path):
+    import os, threading
+    from unittest.mock import MagicMock
+
+    class S(EventsMixin):
+        pass
+
+    s = S(); s.events_dir = str(tmp_path); s._events_lock = threading.RLock(); s.activity = MagicMock()
+    s._events_cache = [{"event_id": "meteor_20261117_022957_021", "type": "meteor"}]
+    assert S._event_confidence({"type": "plane", "flight": {"icao": "a"}}) == 0.95
+    assert S._event_confidence({"type": "meteor", "peak_dn": 148, "length_px": 99}) > S._event_confidence(
+        {"type": "meteor", "peak_dn": 148, "length_px": 99, "nearest_flight": {"icao": "a"}})
+    assert s.label_event("meteor_20261117_022957_021", "true")["auto_type"] == "meteor"
+    assert s.label_event("nope_20261117_022957_001", "true") is None
+    assert s.event_labels()["meteor_20261117_022957_021"]["label"] == "true"
+    s.label_event("meteor_20261117_022957_021", "clear")
+    assert s.event_labels() == {}

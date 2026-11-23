@@ -26,6 +26,10 @@ eventViewer.innerHTML = `
         <dl class="ev-facts"></dl>
         <section class="ev-match" hidden><h3>Matched aircraft</h3><div class="ev-match-card"></div></section>
         <div class="ev-actions">
+            <span class="ev-label" role="group" aria-label="Owner verdict">
+                <button type="button" class="btn btn-sm btn-outline ev-lab-true" data-admin data-label="true" aria-label="Real event" title="Real event" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+                <button type="button" class="btn btn-sm btn-outline ev-lab-false" data-admin data-label="false" aria-label="False alarm" title="False alarm" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+            </span>
             <a class="btn btn-sm btn-outline ev-open-crop" download rel="noopener">Download close-up</a>
             <a class="btn btn-sm btn-outline ev-open-sky" download rel="noopener">Download whole sky</a>
             <button type="button" class="btn btn-sm btn-outline ev-copy">Copy link</button>
@@ -85,7 +89,28 @@ function showEvent(i) {
     if (crop) oc.href = crop;
     if (ev.sky_url) os.href = ev.sky_url;
     evDelDisarm();
+    evLabelShow(ev.owner_label);
     evQ(".ev-copy").textContent = "Copy link";
+}
+
+// Owner verdict (true / false alarm) -> POST /api/events/<id>/label; tapping the active one again withdraws it
+function evLabelShow(label) {
+    eventViewer.querySelectorAll(".ev-label button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.label === label)));
+}
+async function evLabel(btn) {
+    const ev = evList[evIndex];
+    if (!ev || !ev.event_id) return;
+    const want = btn.getAttribute("aria-pressed") === "true" ? "clear" : btn.dataset.label;
+    try {
+        const res = await fetch(`/api/events/${encodeURIComponent(ev.event_id)}/label`, {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label: want }),
+        });
+        if (!res.ok) throw new Error(res.status === 401 || res.status === 403 ? "Sign in as admin" : `HTTP ${res.status}`);
+        ev.owner_label = want === "clear" ? undefined : want;
+        evLabelShow(ev.owner_label);
+    } catch (err) {
+        btn.title = `Not saved: ${err.message}`;
+    }
 }
 
 // Deep link to one event: /gallery?event=<id> (the page opens it in this viewer)
@@ -158,6 +183,7 @@ eventViewer.addEventListener("click", (e) => {
     if (e.target === eventViewer || e.target.closest(".ev-close") || e.target.closest(".ev-back")) closeEventViewer();
     else if (e.target.closest(".ev-copy")) evCopyLink();
     else if (e.target.closest(".ev-del")) evDelete();
+    else if (e.target.closest(".ev-label button")) evLabel(e.target.closest(".ev-label button"));
     else if (e.target.closest(".ev-prev")) showEvent(evIndex - 1);
     else if (e.target.closest(".ev-next")) showEvent(evIndex + 1);
 });
