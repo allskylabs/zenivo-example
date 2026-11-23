@@ -1,46 +1,11 @@
 
-/* Past days: denser{
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 0.9rem;
-}
 
-.events-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8rem;
-    text-align: left;
-}
-
-.events-table th {
-    background: var(--bg-card-sub);
-    padding: 0.6rem 0.8rem;
-    color: var(--text-muted);
-    font-weight: 600;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.events-table td {
-    padding: 0.6rem 0.8rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    font-family: var(--font-mono);
-}
-
-/* Helpers */
 .text-success { color: var(--success) !important; }
 .text-accent { color: var(--accent) !important; }
 .text-warning { color: var(--warning) !important; }
 .text-danger { color: var(--danger) !important; }
 .text-muted { color: var(--text-muted) !important; }
 .mt-3 { margin-top: 0.75rem; }
-.mt-4 { margin-top: 1.5rem; }
-
-/* Section headings inside cards */
-.section-heading h2 {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    margin-bottom: 0.6rem;
-}
 
 .description a { color: var(--accent); }
 

@@ -1,4 +1,4 @@
-/* Plate-solve sky mask editor */
+
 .mask-canvas-wrap {
     position: relative;
     margin-top: 0.5rem;
@@ -17,7 +17,6 @@
     touch-action: manipulation;
 }
 
-/* Flight named by ADS-B on aircraft events */
 .flight-tag {
     color: var(--accent);
     text-decoration: none;
@@ -28,7 +27,6 @@
 .flight-meta { color: var(--text-secondary); }
 .adsb-grid { margin-top: 0.75rem; }
 
-/* Event detail viewer */
 body.no-scroll { overflow: hidden; }
 
 @media (max-width: 760px) {
@@ -37,7 +35,6 @@ body.no-scroll { overflow: hidden; }
 .live-event:hover, .live-event:focus-visible { background: color-mix(in srgb, var(--pill, var(--accent)) 8%, var(--bg-card-sub)); outline: none; }
 .live-event .ev-type { color: var(--pill, var(--text-primary)); }
 
-/* Flights overhead (ADS-B) */
 .flights-card { display: flex; flex-direction: column; max-height: 420px; }
 .flights-card[hidden] { display: none; }
 .flights-status { font-size: 0.75rem; color: var(--text-secondary); margin: -0.25rem 0 0.6rem; }
@@ -49,13 +46,9 @@ body.no-scroll { overflow: hidden; }
     border: 1px solid var(--border-color);
 }
 .flight.in-view { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg-card-sub)); }
-.fl-top { display: flex; align-items: center; gap: 0.45rem; font-size: 0.85rem; }
-.fl-hdg { display: inline-block; color: var(--text-secondary); font-size: 0.8rem; line-height: 1; }
 .fl-where { margin-left: auto; font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; }
 .fl-inview { color: var(--accent); font-weight: 600; }
-.fl-meta { display: flex; gap: 0.9rem; font-size: 0.75rem; color: var(--text-secondary); font-family: var(--font-mono); margin-top: 0.1rem; }
 
-/* Capture info (time / exposure / gain / brightness) shown over images instead of burned into them */
 .frame-info {
     position: absolute;
     top: 8px;
@@ -71,7 +64,7 @@ body.no-scroll { overflow: hidden; }
 }
 .frame-info[hidden] { display: none; }
 .frame-info .frame-event { color: #ffcc66; font-weight: 600; }
-/* Live viewport: LIVE pill on top, capture info under it, the sky-overlay badge under that (nothing stacked on anything) */
+
 .viewport-wrapper > .frame-info { top: 44px; left: 12px; }
 .vp-status .vp-exp { display: none; }
 

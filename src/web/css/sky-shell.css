@@ -1,6 +1,4 @@
-/* ===== Phone layout (<=600px); desktop unaffected ===== */
-.checkbox-label { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
-.checkbox-label input[type="checkbox"] { flex: 0 0 auto; width: auto; margin: 0; }
+
 @media (max-width: 600px) {
     html, body { overflow-x: hidden; max-width: 100%; }
     .sensor-subtitle { display: none; }
@@ -25,15 +23,12 @@
     #tab-logs .card-header h2 { flex: 1 1 100%; }
     .events-table-wrapper { max-width: 100%; overflow-x: auto; }
 }
-/* ===================================================================
-   Night Sky shell: page layout; chrome lives in shell.css + ds-*.css,
-   settings sub-sections, Live right rail
-   =================================================================== */
+
 .app-main { min-width: 0; display: flex; flex-direction: column; }
 .app-main > .container { width: 100%; }
 .nav-pill .pill-label { text-transform: uppercase; letter-spacing: 0.04em; }
 #nav-local-label { text-transform: none; }
-/* Settings: one sub-section at a time */
+
 #tab-settings[data-sub="image"] [data-sgroup]:not([data-sgroup~="image"]),
 #tab-settings[data-sub="detection"] [data-sgroup]:not([data-sgroup~="detection"]),
 #tab-settings[data-sub="station"] [data-sgroup]:not([data-sgroup~="station"]),
@@ -42,20 +37,15 @@
 #tab-settings[data-sub="community"] [data-sgroup]:not([data-sgroup~="community"]),
 #tab-settings[data-sub="admin"] [data-sgroup]:not([data-sgroup~="admin"]) { display: none; }
 #tab-settings > .card { margin-bottom: var(--space-4, 16px); }
-/* Live: big viewport + right rail */
+
 #tab-live .dashboard-grid { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; gap: var(--space-4, 16px); }
 #tab-live .main-viewport-col { display: flex; flex-direction: column; gap: var(--space-4, 16px); min-width: 0; }
 #tab-live .controls-col { display: flex; flex-direction: column; gap: var(--space-4, 16px); min-width: 0; }
 #tab-live .main-viewport-col > .cloud-card { margin: 0; }
-.collapsible-card > summary.card-header { cursor: pointer; list-style: none; margin-bottom: 0; }
-.collapsible-card > summary.card-header::-webkit-details-marker { display: none; }
-.collapsible-card > summary.card-header h2::before { content: "▾ "; color: var(--text-muted); }
-.collapsible-card:not([open]) > summary.card-header h2::before { content: "▸ "; }
-.collapsible-card[open] > summary.card-header { margin-bottom: var(--space-3, 12px); }
 @media (max-width: 1280px) {
     #tab-live .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
 }
-/* Live viewport overlays */
+
 .vp-status { position: absolute; top: 12px; left: 12px; display: flex; gap: 8px; z-index: 2; pointer-events: none; }
 .vp-pill {
     display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: var(--radius-pill, 999px);
@@ -83,15 +73,15 @@
     background: rgba(20, 4, 4, 0.8); border-color: var(--border-color); color: var(--text-primary);
 }
 @media (max-width: 600px) {
-    /* Phone: the controls sit on the picture (vp-bar, see redesign.css), the capture info is two thin lines */
+    
     .vp-meta { display: none; }
-    /* the capture info shrinks to two thin lines in the corner and the LIVE pill moves to the other corner; the picture stays clear */
+    
     .viewport-wrapper > .frame-info { top: 8px; left: 8px; font-size: 10px; line-height: 1.35; padding: 2px 6px; }
     .viewport-wrapper > .frame-info div:nth-child(3) { display: none; }
     .vp-status { left: auto; right: 8px; top: 8px; }
     .vp-status .vp-pill { height: 20px; padding: 0 8px; font-size: 10px; }
 }
-/* ===== Live right rail: telemetry tiles, exposure presets, cloud/histogram pair ===== */
+
 #tab-live .live-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4, 16px); align-items: stretch; }
 #tab-live .live-pair > .card { margin: 0; display: flex; flex-direction: column; min-width: 0; }
 #tab-live .live-pair .cloud-chart-wrap { flex: 1 1 auto; }
@@ -103,13 +93,13 @@
 .card-foot strong { font-family: var(--font-mono); color: var(--text-primary); font-weight: 600; }
 .card-foot strong.text-warning { color: var(--warning); }
 .card-foot strong.text-danger { color: var(--danger); }
-/* Cloud range pills */
+
 .cloud-ranges .btn-range {
     height: 28px; min-width: 40px; padding: 0 12px; border-radius: var(--radius-pill, 999px); font-size: 12px; font-weight: 600;
 }
 .cloud-ranges .btn-range.active { background: var(--accent); border-color: var(--accent); color: var(--bg-primary); }
 [data-theme="red"] .cloud-ranges .btn-range.active { color: #1a0000; }
-/* Telemetry tiles */
+
 .telemetry-card .gauge-grid { gap: var(--space-2, 8px); }
 .telemetry-card .gauge-box { padding: 10px 12px; min-width: 0; }
 .telemetry-card .gauge-label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
@@ -120,7 +110,7 @@ details.registers-box > summary::-webkit-details-marker { display: none; }
 details.registers-box > summary::before { content: "\25B8\00a0"; }
 details.registers-box[open] > summary::before { content: "\25BE\00a0"; }
 details.registers-box[open] > summary { margin-bottom: 0.3rem; }
-/* Exposure card */
+
 #exposure-card > summary.card-header { gap: var(--space-2, 8px); flex-wrap: wrap; }
 #exposure-card .exp-summary { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
 .exp-preset-chips { display: flex; flex-wrap: wrap; gap: var(--space-2, 8px); margin-bottom: var(--space-3, 12px); }

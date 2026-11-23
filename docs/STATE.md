@@ -15,12 +15,15 @@ Updated 2026-11-23 by PM. main = 1b62a84 (local, nothing pushed). Release tag v1
 - UI S0: ds-tokens/base/components, Lucide sprite, ds-demo.html, ds lint (1b62a84).
 - Facebook: release comment posted on the Allsky Camera group post; new group "Zenivo Allsky" created by Worker-1 (cover not yet committed: docs/zenivo-group-cover.jpg).
 
-## In progress
-- Worker-5: S1a (split index.html sections into separate pages) + S1 shell (topbar, tab bar/rail, sheet, chat FAB), then report; owner reviews before Live page.
+## Done: UI rebuild on ds (2026-11-23)
+Live, Overhead, Sign-in, Archive+event viewer, Sky, Community, Admin, Logs, OBS dock, full.html, 3D page chrome (Flights/Satellites), Settings 3a/3b, cleanup (112 dead legacy CSS rules pruned, redesign-data.css + ds-demo-phone.html deleted, ?v=20261202a). Overhead sits under Menu by design (5-tab shell); the Menu tab highlights.
 
-## Next (plan order)
-Live, Overhead, Sign-in, Archive+event viewer, Sky, Settings 3a/3b, Community, Admin, OBS, 3D page chrome, full.html; then delete old UI files, lint zero.
-Detector follow-ups: measure gates on real new events after a few days; tune from owner labels. Cloud: watch a few days, add mislabelled frames to the set. Night moon handling not done.
+## Remaining (unverified / open)
+- Plan section 9: legacy index.html pages (Live/Archive/Settings/Calibration/Focus) still load style.css + redesign*.css/pages.css/phone.css (live rules); ds_lint --report still shows hex/px/z-index in those, flights3d.html scene colours (44 hex), sky_catalog.js (99 hex), app/*.js canvas hex. Default ds_lint = 0.
+- Red mode on every page, Lighthouse-style a11y pass, loading/empty/error states per page, `data-ui` flag check: not verified.
+
+## In progress
+nothing. Next: detector follow-ups: measure gates on real new events after a few days; tune from owner labels. Cloud: watch a few days, add mislabelled frames to the set. Night moon handling not done.
 
 ## Workers
-W1-W4 idle (finished), W5 working. Max 3 at once.
+All workers idle. Max 3 at once.

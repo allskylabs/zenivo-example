@@ -1,4 +1,4 @@
-/* Station & Camera Settings */
+
 .settings-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -158,23 +158,6 @@
     gap: 0.65rem;
     margin-top: 1rem;
 }
-.params-summary {
-    margin-top: 1.25rem;
-    border-top: 1px solid var(--border-color);
-    padding-top: 0.75rem;
-}
-.params-summary summary {
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-}
-.params-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-    gap: 0.6rem;
-    margin-top: 0.75rem;
-}
 .telem-box {
     display: flex;
     flex-direction: column;
@@ -196,7 +179,7 @@
     color: var(--text-primary);
     word-break: break-word;
 }
-/* Footer */
+
 .footer {
     background: var(--bg-card);
     border-top: 1px solid var(--border-color);

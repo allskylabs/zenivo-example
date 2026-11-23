@@ -1,4 +1,4 @@
-/* ---------------- Activity log & toasts ---------------- */
+
 .log-badge {
     display: inline-block;
     min-width: 1.3em;
@@ -12,7 +12,7 @@
     text-align: center;
 }
 .log-badge[hidden] { display: none; }
-/* Cloud cover history chart */
+
 .cloud-card .card-header { flex-wrap: wrap; gap: 0.5rem; }
 .cloud-ranges { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .btn-range {
@@ -38,8 +38,6 @@
 .cloud-summary strong { color: var(--text-primary); font-family: var(--font-mono); }
 .cloud-legend { margin-left: auto; display: inline-flex; align-items: center; gap: 0.35rem; color: var(--text-muted); }
 .cloud-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; }
-.cloud-legend .lg-night { background: rgba(148, 163, 184, 0.14); border: 1px solid rgba(148, 163, 184, 0.25); margin-left: 0.5rem; }
-.cloud-legend .lg-low { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--accent); background: var(--bg-card); margin-left: 0.5rem; }
 .cloud-chart-wrap { position: relative; width: 100%; }
 #cloud-chart { display: block; width: 100%; height: 260px; touch-action: pan-y; }
 #cloud-chart .grid { stroke: rgba(255, 255, 255, 0.06); stroke-width: 1; }
