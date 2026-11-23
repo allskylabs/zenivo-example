@@ -22,7 +22,7 @@ from src.auth.routes import auth_router
 from src.version import PRODUCT, __version__
 
 # Local scripts/styles in the pages carry a hand-written ?v=...: replaced at serve time by <version>-<hash of mtime+size>
-_ASSET_URL = re.compile(r'((?:src|href)=")(/static/[^"?#]+|/style\.css)\?v=[^"]*(")')
+_ASSET_URL = re.compile(r'((?:src|href)=")(/static/[^"?#]+|/style\.css)\?v=[^"#]*((?:#[^"]*)?")')
 
 
 # CSP is Report-Only on purpose: it lists what the pages load today (self + the CDNs/tile servers they use,
