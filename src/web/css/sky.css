@@ -88,3 +88,6 @@
 .sk-state { position: absolute; inset: 0; z-index: var(--z-nav); display: flex; align-items: center; justify-content: center; padding: var(--s-6); background: var(--c-bg); }
 .sk-state[hidden] { display: none; }
 .sk-state .ds-skeleton { width: min(320px, 80%); }
+
+.sk-card .oc-head .oc-btn { flex: none; width: var(--tap); padding: 0; }
+.sk-card .oc-sub { position: relative; display: flex; align-items: center; gap: var(--s-1); }
