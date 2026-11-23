@@ -12,22 +12,26 @@
         const n = new URLSearchParams(location.search).get("next") || "/";
         return n.startsWith("/") && !n.startsWith("//") && !n.includes("\\") && !/[\u0000-\u001f]/.test(n) && !n.startsWith("/login") ? n : "/";
     }
-    function show(msg) { err.textContent = msg; err.classList.toggle("hidden", !msg); }
+    function show(msg) { document.getElementById("login-error-text").textContent = msg; err.hidden = !msg; if (msg) err.scrollIntoView({ block: "nearest" }); }
 
     function mode(isSetup) {
         setup = isSetup;
-        document.getElementById("login-title").textContent = isSetup ? "First-time setup" : "Admin sign-in";
-        const lock = document.querySelector(".login-lock"); if (lock) lock.hidden = isSetup;
-        document.getElementById("login-lead").textContent = isSetup
-            ? "Enter the setup code, then choose a password of at least 10 characters."
-            : "Settings and calibration need an admin session.";
+        document.getElementById("login-title").textContent = isSetup ? "First-time setup" : "Sign in";
+        document.getElementById("lg-ic-login").hidden = isSetup;
+        document.getElementById("lg-ic-setup").hidden = !isSetup;
         document.getElementById("field-code").hidden = !isSetup;
         document.getElementById("field-repeat").hidden = !isSetup;
         document.getElementById("login-password-label").textContent = isSetup ? "New password" : "Password";
         pw.autocomplete = isSetup ? "new-password" : "current-password";
-        submit.textContent = isSetup ? "Set password and sign in" : "Sign in";
+        document.getElementById("login-submit-text").textContent = isSetup ? "Set password" : "Sign in";
+        pw.placeholder = isSetup ? "min. 10" : "";
         (isSetup ? code : pw).focus();
     }
+
+    document.getElementById("lg-info").addEventListener("click", (e) => {
+        const h = document.getElementById("lg-hint"), open = h.hidden;
+        h.hidden = !open; e.currentTarget.setAttribute("aria-expanded", String(open));
+    });
 
     fetch("/api/auth/status", { cache: "no-store" }).then((r) => r.json()).then((s) => {
         if (s.admin) { location.replace(safeNext()); return; }

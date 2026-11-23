@@ -29,7 +29,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
-    <link rel="stylesheet" href="/style.css?v=20261122m">
+    <link rel="stylesheet" href="/style.css?v=20261123c">
+    <link rel="stylesheet" href="/static/css/overhead.css?v=20261123b">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
 </head>
 <body class="dark-mode">
@@ -113,32 +114,39 @@
 
     <div class="app-main">
 
-    <main class="oh">
-        <div class="ov-seg oh-seg" role="tablist" aria-label="Overhead lists">
-            <button type="button" role="tab" class="ov-tab active" id="oh-tab-aircraft" data-layer="aircraft" aria-selected="true">Flights <span class="ov-n" id="oh-n-aircraft">0</span></button>
-            <button type="button" role="tab" class="ov-tab" id="oh-tab-satellites" data-layer="satellites" aria-selected="false">Satellites <span class="ov-n" id="oh-n-satellites">0</span></button>
-            <button type="button" role="tab" class="ov-tab" id="oh-tab-sondes" data-layer="sondes" aria-selected="false">Sondes <span class="ov-n" id="oh-n-sondes">0</span></button>
-        </div>
-        <div class="oh-grid">
-            <section class="card oh-radar" aria-label="Sky radar">
-                <div class="card-header"><h2 id="oh-radar-title">Aircraft now</h2><span class="ov-live off" id="oh-live">connecting</span></div>
-                <div class="oh-plot"><canvas id="oh-canvas" role="img" aria-label="Sky radar: N up, zenith in the centre, horizon at the edge"></canvas></div>
-                <p class="oh-hint" id="oh-hint">Rings at 30&deg; &middot; 60&deg; &middot; tap a row to select</p>
-                <div class="oh-links"><a class="live-events-more" href="/flights3d">Flights 3D map &rsaquo;</a><a class="live-events-more" href="/satellites3d">Satellites 3D &rsaquo;</a></div>
-            </section>
-            <div class="oh-side">
-                <div class="zchips" id="oh-chips" role="group" aria-label="Filter"></div>
-                <section class="card oh-list ov-panel" aria-label="Objects overhead">
-                    <ul class="flights-list oh-rows" id="oh-rows"></ul>
-                    <div class="ov-meta"><span class="badge" id="oh-count">--</span><span class="flights-status" id="oh-status">Loading&hellip;</span></div>
-                </section>
+    <main class="oh" aria-labelledby="oh-title">
+        <h1 class="ds-sr-only" id="oh-title">Overhead now</h1>
+        <section class="ds-card oh-card">
+            <div class="oh-top">
+                <div class="oh-seg" role="tablist" aria-label="Overhead lists">
+                    <button type="button" role="tab" class="oh-tab" id="oh-tab-aircraft" data-layer="aircraft" aria-selected="true"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg><span>Flights</span><b class="oh-n" id="oh-n-aircraft">–</b></button>
+                    <button type="button" role="tab" class="oh-tab" id="oh-tab-satellites" data-layer="satellites" aria-selected="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg><span>Satellites</span><b class="oh-n" id="oh-n-satellites">–</b></button>
+                    <button type="button" role="tab" class="oh-tab" id="oh-tab-sondes" data-layer="sondes" aria-selected="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-balloon"></use></svg><span>Sondes</span><b class="oh-n" id="oh-n-sondes">–</b></button>
+                </div>
+                <span class="oh-live" id="oh-live" role="img" aria-label="Updating" title="Updating"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-wifi"></use></svg></span>
+                <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="oh-info" aria-label="About this list" title="About this list" aria-expanded="false" aria-controls="oh-status"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
             </div>
-        </div>
+            <p class="oh-note" id="oh-status" role="status" hidden></p>
+            <div class="oh-body">
+                <div class="oh-plot" id="oh-plot">
+                    <canvas id="oh-canvas" role="img" aria-label="Sky radar: N up, zenith in the centre, horizon at the edge"></canvas>
+                    <div class="oh-plot-foot">
+                        <span class="oh-range" id="oh-range" title="Rings at 30° and 60° elevation. Tap a dot or a row to select."><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-crosshair"></use></svg><b id="oh-count">–</b></span>
+                        <a class="ds-btn ds-btn--ghost ds-btn--icon" href="/flights3d" aria-label="Flights 3D" title="Flights 3D"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg></a>
+                        <a class="ds-btn ds-btn--ghost ds-btn--icon" href="/satellites3d" aria-label="Satellites 3D" title="Satellites 3D"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg></a>
+                    </div>
+                </div>
+                <div class="oh-side">
+                    <div class="ds-chips" id="oh-chips" role="group" aria-label="Filter"></div>
+                    <ul class="ds-list oh-rows" id="oh-rows" aria-live="polite"></ul>
+                </div>
+            </div>
+        </section>
     </main>
     </div><!-- .app-main -->
     </div><!-- .app-shell -->
 
     <script src="/static/overlay_decode.js?v=1"></script>
-    <script src="/static/overhead.js?v=3"></script>
+    <script src="/static/overhead.js?v=4"></script>
 </body>
 </html>

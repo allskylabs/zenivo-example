@@ -14,47 +14,48 @@
     const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
     const compass = (az) => COMPASS[Math.round(((az % 360) + 360) % 360 / 45) % 8];
     const LAYERS = ["aircraft", "satellites", "sondes"];
-    const TITLES = { aircraft: "Aircraft now", satellites: "Satellites now", sondes: "Sondes now" };
     const idOf = { aircraft: (a) => a.icao, satellites: (s) => s.norad, sondes: (s) => s.serial };
     const labelOf = { aircraft: (a) => a.callsign || a.icao, satellites: (s) => s.name, sondes: (s) => s.serial };
 
-    // Filter chips per segment, only from fields that exist (the aircraft ones are the Live card's)
+    const ic = (n) => `<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-${n}"></use></svg>`;
+    const LAYER_ICON = { aircraft: "plane", satellites: "satellite", sondes: "balloon" };
+    // Filter chips per segment: [key, short label, test, icon], only from fields that exist
     const FILTERS = {
-        aircraft: [["all", "All", () => true], ["view", "In view", (a) => !!a.in_view],
-            ["up", "Climbing", (a) => a.climb_m_min != null && a.climb_m_min > 60], ["down", "Descending", (a) => a.climb_m_min != null && a.climb_m_min < -60]],
-        satellites: [["all", "All", () => true], ["view", "In view", (s) => !!s.in_view], ["vis", "Visible", (s) => !!s.visible]],
-        sondes: [["all", "All", () => true], ["view", "In view", (s) => !!s.in_view]],
+        aircraft: [["all", "All", () => true, "layers"], ["view", "In view", (a) => !!a.in_view, "eye"],
+            ["up", "Climbing", (a) => a.climb_m_min != null && a.climb_m_min > 60, "arrow-up-right"], ["down", "Descending", (a) => a.climb_m_min != null && a.climb_m_min < -60, "chevron-down"]],
+        satellites: [["all", "All", () => true, "layers"], ["view", "In view", (s) => !!s.in_view, "eye"], ["vis", "Visible", (s) => !!s.visible, "sparkles"]],
+        sondes: [["all", "All", () => true, "layers"], ["view", "In view", (s) => !!s.in_view, "eye"]],
     };
 
-    const state = { seg: "aircraft", filter: { aircraft: "all", satellites: "all", sondes: "all" }, data: {}, sel: null, wsLive: false, restAt: 0 };
+    const state = { seg: "aircraft", filter: { aircraft: "all", satellites: "all", sondes: "all" }, data: {}, failed: {}, sel: null, wsLive: false, restAt: 0 };
 
-    // ---- rows (same markup and classes as the Live "Overhead now" card, see app/08b-events-live.js) ----
-    const SVG = (d) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
-    const ICON = {
-        aircraft: SVG('<polygon points="3 11 22 2 13 21 11 13 3 11"/>'),
-        satellites: SVG('<rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 12H4M20 12h-5M12 9V4M12 20v-5"/><path d="M2 9h4M2 15h4M18 9h4M18 15h4"/>'),
-        sondes: SVG('<path d="M12 2a6.5 6.5 0 0 1 6.5 6.5c0 3.6-3 6.5-6.5 8.5-3.5-2-6.5-4.9-6.5-8.5A6.5 6.5 0 0 1 12 2z"/><path d="M12 17v2M10 22h4M12 19v3"/>'),
-    };
     const elOf = (a) => a.in_view || (a.above_horizon !== false && a.alt_deg >= 0) ? `El ${Math.round(a.alt_deg)}° · ${compass(a.az_deg)}` : "Below horizon";
     function rowHtml(layer, a) {
-        const id = esc(idOf[layer](a));
-        const cls = `flight oh-row${a.in_view ? " in-view" : ""}${state.sel && state.sel.layer === layer && String(state.sel.id) === String(idOf[layer](a)) ? " sel" : ""}`;
-        const open = `<li class="${cls}" data-id="${id}" tabindex="0" role="button" aria-label="${esc(labelOf[layer](a))}"><span class="oh-ic">${ICON[layer]}</span>`;
-        const tail = (val, a2) => `<div class="oh-val"><b>${val}</b><span>${a2.in_view ? '<i class="oh-dot" aria-hidden="true"></i>' : ""}${esc(elOf(a2))}</span></div></li>`;
+        const rid = idOf[layer](a), id = esc(rid), name = esc(labelOf[layer](a));
+        const sel = state.sel && state.sel.layer === layer && String(state.sel.id) === String(rid);
         const num = (v) => esc(Number(v).toLocaleString());
+        let sub, val, url, ext;
         if (layer === "aircraft") {
             const climb = a.climb_m_min == null ? "" : a.climb_m_min > 60 ? " ↗" : a.climb_m_min < -60 ? " ↘" : "";
-            const url = `https://globe.adsbexchange.com/?icao=${encodeURIComponent(String(a.icao).toLowerCase())}`;
-            return `${open}<div class="oh-main"><a href="${url}" target="_blank" rel="noopener" class="flight-tag">${esc(labelOf[layer](a))}</a>
-                <span class="oh-sub" title="Altitude, ground speed">${num(a.altitude_m)} m${climb} · ${a.speed_kmh != null ? `${esc(a.speed_kmh)} km/h` : "-- km/h"}</span></div>${tail(`${esc(a.distance_km)} km`, a)}`;
-        }
-        if (layer === "sondes") {
+            sub = `${num(a.altitude_m)} m${climb}${a.speed_kmh != null ? ` · ${esc(a.speed_kmh)} km/h` : ""}`;
+            val = `${esc(a.distance_km)} km`;
+            url = `https://globe.adsbexchange.com/?icao=${encodeURIComponent(String(a.icao).toLowerCase())}`; ext = "ADS-B Exchange";
+        } else if (layer === "sondes") {
             const dir = a.climb_m_s > 1 ? " ↗" : a.climb_m_s < -1 ? " ↘" : "";
-            return `${open}<div class="oh-main"><a href="https://sondehub.org/${encodeURIComponent(a.serial)}" target="_blank" rel="noopener" class="flight-tag">${esc(a.serial)}</a>
-                <span class="oh-sub" title="${esc(a.type || "")}">${num(a.altitude_m)} m${dir}${a.freq_mhz ? " · " + esc(a.freq_mhz) + " MHz" : a.type ? " · " + esc(a.type) : ""}</span></div>${tail(`${esc(a.distance_km)} km`, a)}`;
+            sub = `${num(a.altitude_m)} m${dir}${a.freq_mhz ? " · " + esc(a.freq_mhz) + " MHz" : ""}`;
+            val = `${esc(a.distance_km)} km`;
+            url = `https://sondehub.org/${encodeURIComponent(a.serial)}`; ext = "SondeHub";
+        } else {
+            sub = a.visible ? "Visible" : "Not visible";
+            val = `${num(a.height_km)} km`;
+            url = `https://www.n2yo.com/satellite/?s=${encodeURIComponent(a.norad)}`; ext = "N2YO";
         }
-        return `${open}<div class="oh-main"><a href="https://www.n2yo.com/satellite/?s=${encodeURIComponent(a.norad)}" target="_blank" rel="noopener" class="flight-tag">${esc(a.name)}</a>
-            <span class="oh-sub">${a.visible ? "Visible" : "Not visible"}</span></div>${tail(`${num(a.height_km)} km`, a)}`;
+        const el = `${a.in_view ? ic("eye") + " " : ""}${esc(elOf(a))} · ${sub}`;
+        return `<li class="ds-row oh-row${a.in_view ? " in-view" : ""}${sel ? " sel" : ""}" data-id="${id}" tabindex="0" role="button" aria-pressed="${sel ? "true" : "false"}" aria-label="${name}">
+            <span class="ds-row__icon">${ic(LAYER_ICON[layer])}</span>
+            <span class="ds-row__body"><span class="ds-row__title">${name}</span><span class="ds-row__sub">${el}</span></span>
+            <span class="ds-row__value">${val}</span>
+            <a class="ds-btn ds-btn--ghost ds-btn--icon oh-ext" href="${url}" target="_blank" rel="noopener" aria-label="${esc(ext)}" title="${esc(ext)}">${ic("arrow-up-right")}</a></li>`;
     }
 
     // Objects of a segment: satellites only while above the horizon, sorted like the Live card
@@ -92,42 +93,38 @@
 
     let queued = false;
     function render() { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; draw(); }); } }
+    const empty = (icon, title, extra) => `<li class="ds-empty oh-empty">${ic(icon)}<span class="ds-empty__title">${esc(title)}</span>${extra || ""}</li>`;
+    const SKEL = '<li class="oh-skel" aria-hidden="true"><span class="ds-skeleton"></span><span class="ds-skeleton"></span><span class="ds-skeleton"></span></li>'.repeat(4);
     function draw() {
         const layer = state.seg, d = state.data[layer];
         LAYERS.forEach((l) => {
-            const t = $("oh-tab-" + l), on = l === layer;
-            t.classList.toggle("active", on); t.setAttribute("aria-selected", on ? "true" : "false");
+            const t = $("oh-tab-" + l);
+            t.setAttribute("aria-selected", l === layer ? "true" : "false");
             const dd = state.data[l];
             $("oh-n-" + l).textContent = !dd ? "–" : (dd.enabled === false || dd.disabled) ? "off" : String(objectsOf(l).length);
         });
-        $("oh-radar-title").textContent = TITLES[layer];
         const [count, status] = statusOf(layer);
         $("oh-count").textContent = count;
         $("oh-status").textContent = status;
-        const live = $("oh-live");
-        live.textContent = d && !(d.enabled === false || d.disabled) ? `${objectsOf(layer).length} in range` : "";
-        live.title = state.wsLive ? "Live" : "Updating"; live.classList.toggle("off", !state.wsLive);
-        // chips
-        const chips = $("oh-chips");
+        $("oh-info").title = "Info";
+        const live = $("oh-live"); live.classList.toggle("is-on", state.wsLive);
+        live.setAttribute("aria-label", state.wsLive ? "Live" : "Updating"); live.title = state.wsLive ? "Live" : "Updating";
+        const chips = $("oh-chips"), all = objectsOf(layer);
         if (chips.dataset.layer !== layer) {
             chips.dataset.layer = layer;
-            chips.innerHTML = FILTERS[layer].map(([k, t]) => `<button type="button" class="zchip" data-f="${k}" aria-pressed="false">${esc(t)}</button>`).join("");
+            chips.innerHTML = FILTERS[layer].map(([k, t, , i]) => `<button type="button" class="ds-chip" data-f="${k}" aria-pressed="false">${ic(i)}<span>${esc(t)}</span></button>`).join("");
             chips.dataset.n = "";
         }
-        const allBtn = chips.querySelector('[data-f="all"]'), nAll = String(objectsOf(layer).length);
+        const allBtn = chips.querySelector('[data-f="all"] span'), nAll = String(all.length);
         if (allBtn && chips.dataset.n !== nAll) { allBtn.textContent = `All ${nAll}`; chips.dataset.n = nAll; }
-        chips.querySelectorAll(".zchip").forEach((c) => { const on = c.dataset.f === state.filter[layer]; c.classList.toggle("active", on); c.setAttribute("aria-pressed", String(on)); });
-        // rows
+        chips.querySelectorAll(".ds-chip").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.f === state.filter[layer])));
         const ul = $("oh-rows");
-        const all = objectsOf(layer);
         const fn = (FILTERS[layer].find((f) => f[0] === state.filter[layer]) || FILTERS[layer][0])[2];
         const list = all.filter(fn);
-        if (!d) ul.innerHTML = "";
-        else if (d.enabled === false || d.disabled) ul.innerHTML = `<li class="live-events-empty">${esc(status)}.</li>`;
-        else if (!list.length) {
-            const none = layer === "aircraft" ? "aircraft heard" : layer === "satellites" ? "large satellite above the horizon" : "radiosonde flying nearby";
-            ul.innerHTML = `<li class="live-events-empty">${all.length ? "Nothing matches this filter." : `No ${none} right now.`}</li>`;
-        } else ul.innerHTML = list.map((a) => rowHtml(layer, a)).join("");
+        if (!d) ul.innerHTML = state.failed[layer] ? empty("wifi-off", "Can't load", `<button type="button" class="ds-btn" data-retry>${ic("refresh-cw")}<span>Retry</span></button>`) : SKEL;
+        else if (d.enabled === false || d.disabled) ul.innerHTML = empty("power", "Off");
+        else if (!list.length) ul.innerHTML = empty(all.length ? "funnel" : LAYER_ICON[layer], all.length ? "No match" : "Nothing above");
+        else ul.innerHTML = list.map((a) => rowHtml(layer, a)).join("");
         drawRadar();
     }
 
@@ -136,7 +133,7 @@
     let dots = [];   // hit targets of the last draw: { id, x, y }
     function drawRadar() {
         if (!cv) return;
-        const box = cv.parentElement, size = Math.max(160, Math.min(box.clientWidth, window.innerWidth <= 520 ? 208 : 340)), dpr = window.devicePixelRatio || 1;
+        const box = cv.parentElement, size = Math.max(160, Math.min(box.clientWidth, window.innerWidth <= 640 ? 320 : 520)), dpr = window.devicePixelRatio || 1;
         if (cv.width !== Math.round(size * dpr)) { cv.width = Math.round(size * dpr); cv.height = Math.round(size * dpr); }
         cv.style.width = size + "px"; cv.style.height = size + "px";
         const g = cv.getContext("2d");
@@ -144,18 +141,18 @@
         g.clearRect(0, 0, size, size);
         const css = getComputedStyle(document.documentElement);
         const col = (n, f) => (css.getPropertyValue(n) || "").trim() || f;
-        const ink = col("--text-secondary", "#94a3b8"), line = col("--border-color", "#1e293b"), accent = col("--accent", "#38bdf8"),
-            warn = col("--warning", "#fbbf24"), main = col("--text-primary", "#f1f5f9"), sub = col("--bg-card-sub", "#0b1220");
+        const ink = col("--c-text-2", "gray"), line = col("--c-border", "gray"), accent = col("--c-accent", "gray"),
+            warn = col("--c-warn", "gray"), main = col("--c-text", "gray"), sub = col("--c-surface-2", "black");
         const R = size / 2 - 22, cx = size / 2, cy = size / 2;
         g.fillStyle = sub; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill();
         g.strokeStyle = line; g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.stroke();
         g.lineWidth = 1;
         [1 / 3, 2 / 3].forEach((f) => { g.beginPath(); g.arc(cx, cy, R * f, 0, Math.PI * 2); g.stroke(); });
         g.beginPath(); g.moveTo(cx - R, cy); g.lineTo(cx + R, cy); g.moveTo(cx, cy - R); g.lineTo(cx, cy + R); g.stroke();
-        g.fillStyle = ink; g.font = "600 12px " + col("--font-sans", "sans-serif"); g.textAlign = "center"; g.textBaseline = "middle";
+        g.fillStyle = ink; g.font = "600 12px " + col("--font-ui", "sans-serif"); g.textAlign = "center"; g.textBaseline = "middle";
         g.fillStyle = accent; g.fillText("N", cx, cy - R - 11); g.fillStyle = ink;
         g.fillText("S", cx, cy + R + 11); g.fillText("E", cx + R + 11, cy); g.fillText("W", cx - R - 11, cy);
-        g.font = "10px " + col("--font-sans", "sans-serif"); g.fillStyle = ink;
+        g.font = "12px " + col("--font-ui", "sans-serif"); g.fillStyle = ink;
         g.fillText("60°", cx + 14, cy - R / 3 + 8); g.fillText("30°", cx + 14, cy - 2 * R / 3 + 8);
         g.fillStyle = main; g.beginPath(); g.arc(cx, cy, 2.5, 0, Math.PI * 2); g.fill();
         dots = [];
@@ -175,13 +172,13 @@
         // Labels: the selected object always, then at most 5 others that find free space (greedy, boxes must not touch a dot or another label)
         const MAX_LABELS = 6, taken = [];
         const hit = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
-        const fam = col("--font-sans", "sans-serif");
+        const fam = col("--font-ui", "sans-serif");
         const order = placed.filter((p) => p.sel).concat(placed.filter((p) => !p.sel));
         let drawn = 0;
         order.forEach((p) => {
             if (drawn >= MAX_LABELS) return;
             const t = String(labelOf[layer](p.o));
-            g.font = (p.sel ? "700 " : "") + "11px " + fam;
+            g.font = (p.sel ? "700 " : "") + "12px " + fam;
             const w = g.measureText(t).width, h = 13, dy = p.sel ? -10 : 0, preferRight = p.x < cx + R * 0.45;
             const boxFor = (right) => { const x0 = right ? p.x + 9 : p.x - 9 - w, y0 = p.y + dy - h / 2; return { x0, y0, x1: x0 + w, y1: y0 + h, right }; };
             const free = (bx) => bx.x0 >= 0 && bx.x1 <= size && bx.y0 >= 0 && bx.y1 <= size && !taken.some((t2) => hit(bx, t2)) &&
@@ -199,7 +196,7 @@
         const same = state.sel && state.sel.layer === layer && String(state.sel.id) === String(id);
         state.sel = same ? null : { layer, id };
         render();
-        if (scroll && state.sel) requestAnimationFrame(() => { const li = $("oh-rows").querySelector(".flight.sel"); if (li) li.scrollIntoView({ block: "nearest", behavior: "smooth" }); });
+        if (scroll && state.sel) requestAnimationFrame(() => { const li = $("oh-rows").querySelector(".oh-row.sel"); if (li) li.scrollIntoView({ block: "nearest", behavior: "smooth" }); });
     }
     cv.addEventListener("click", (e) => {
         const b = cv.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top;
@@ -210,19 +207,24 @@
     if (window.ResizeObserver) new ResizeObserver(drawRadar).observe(cv.parentElement);
 
     // ---- interaction ----
-    document.querySelectorAll(".oh-seg .ov-tab").forEach((t) => t.addEventListener("click", () => {
+    document.querySelectorAll(".oh-seg .oh-tab").forEach((t) => t.addEventListener("click", () => {
         if (state.seg === t.dataset.layer) return;
         state.seg = t.dataset.layer; state.sel = null;
         subscribe(); render();
     }));
     $("oh-chips").addEventListener("click", (e) => {
-        const b = e.target.closest(".zchip");
+        const b = e.target.closest(".ds-chip");
         if (!b) return;
         state.filter[state.seg] = b.dataset.f; render();
     });
     const rows = $("oh-rows");
-    rows.addEventListener("click", (e) => { if (e.target.closest("a")) return; const li = e.target.closest("li.flight"); if (li) select(state.seg, li.dataset.id, false); });
-    rows.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && !e.target.closest("a")) { const li = e.target.closest("li.flight"); if (li) { e.preventDefault(); select(state.seg, li.dataset.id, false); } } });
+    rows.addEventListener("click", (e) => {
+        if (e.target.closest("a")) return;
+        if (e.target.closest("[data-retry]")) { loadRest(); return; }
+        const li = e.target.closest("li.oh-row"); if (li) select(state.seg, li.dataset.id, false);
+    });
+    $("oh-info").addEventListener("click", () => { const n = $("oh-status"), open = n.hidden; n.hidden = !open; $("oh-info").setAttribute("aria-expanded", String(open)); });
+    rows.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && !e.target.closest("a")) { const li = e.target.closest("li.oh-row"); if (li) { e.preventDefault(); select(state.seg, li.dataset.id, false); } } });
 
     // ---- data: REST for the first paint and while the socket is down ----
     const REST = { aircraft: "/api/adsb/aircraft?limit=60", satellites: "/api/satellites", sondes: "/api/radiosondes" };
@@ -231,11 +233,12 @@
         await Promise.all(LAYERS.map(async (l) => {
             try {
                 const r = await fetch(REST[l]);
-                if (!r.ok) return;
+                if (!r.ok) { state.failed[l] = true; return; }
                 const d = await r.json();
+                state.failed[l] = false;
                 if (state.wsLive && state.data[l]) return;   // the socket got there first
                 state.data[l] = d;
-            } catch (e) { /* optional feature */ }
+            } catch (e) { state.failed[l] = true; }
         }));
         render();
     }

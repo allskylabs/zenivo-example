@@ -1,0 +1,27 @@
+/* /login: icon-led sign-in card. Tokens only (ds-tokens.css); red mode comes from the token set. */
+.lg-page { margin: 0; min-height: 100dvh; background: var(--c-bg); color: var(--c-text); font-family: var(--font-ui); font-size: var(--fs-14); line-height: var(--lh-body); display: flex; flex-direction: column; align-items: center; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.lg-top { width: 100%; max-width: 420px; padding: var(--s-3) var(--s-4) 0; box-sizing: border-box; }
+.lg-card { width: calc(100% - 2 * var(--s-4)); max-width: 420px; margin: var(--s-4) auto var(--s-6); display: flex; flex-direction: column; align-items: stretch; gap: var(--s-4); box-sizing: border-box; }
+.lg-brand { display: flex; align-items: center; justify-content: center; gap: var(--s-2); }
+.lg-brand .brand-mark { width: 28px; height: 28px; }
+.lg-brand .bm-ring, .lg-brand .bm-inner { stroke: var(--c-accent); }
+.lg-brand .bm-tick { stroke: var(--c-text); }
+.lg-brand .bm-star { fill: var(--c-text); }
+.lg-brand .brand-name { margin: 0; font-size: var(--fs-22); font-weight: 700; color: var(--c-text); letter-spacing: 0.02em; }
+.lg-badge { align-self: center; display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: var(--r-pill); background: var(--c-accent-bg); color: var(--c-accent); }
+.lg-badge .ds-icon { width: 28px; height: 28px; }
+.lg-form { display: flex; flex-direction: column; gap: var(--s-4); }
+.lg-field { display: flex; flex-direction: column; gap: var(--s-2); }
+.lg-field[hidden], .lg-hint[hidden], .lg-error[hidden] { display: none; }
+.lg-label { display: flex; align-items: center; gap: var(--s-2); color: var(--c-text-2); font-size: var(--fs-12); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.lg-label span { flex: 1; }
+.lg-input { min-height: var(--tap); padding: 0 var(--s-4); border: 1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-surface-2); color: var(--c-text); font: 400 var(--fs-16) / 1 var(--font-ui); box-sizing: border-box; width: 100%; }
+.lg-input:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 1px; border-color: var(--c-accent); }
+.lg-hint { margin: 0; color: var(--c-text-2); font-size: var(--fs-12); }
+.lg-hint code { color: var(--c-text); }
+.lg-error { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-3); border-radius: var(--r-md); background: var(--c-danger-bg); color: var(--c-danger); font-size: var(--fs-14); font-weight: 600; }
+.lg-error .ds-icon { flex: none; }
+.lg-submit { width: 100%; }
+.lg-submit:disabled { opacity: 0.6; cursor: progress; }
+.lg-guest { align-self: center; color: var(--c-text-2); }
+.ds-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
