@@ -22,7 +22,7 @@ textarea.sa-input { resize: vertical; font-family: var(--font-num); }
 .sa-note, .sa-hint { margin: 0; padding: var(--s-2) var(--s-4); background: var(--c-surface-2); color: var(--c-text-2); font: 400 var(--fs-12) / 1.45 var(--font-ui); border-bottom: 1px solid var(--c-divider); }
 .sa-hint { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-2); }
 .sa-status { margin: 0; padding: var(--s-2) var(--s-4); color: var(--c-text-2); font: 400 var(--fs-12) / 1.45 var(--font-ui); overflow-wrap: anywhere; }
-.sa-wrap { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+.ds-row__sub.sa-wrap, .sa-wrap { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 .sa-row > .ds-row__body { min-width: 0; flex: 1 1 0; }
 /* browser autofill must not paint a white field on the dark UI */
 .sa-input:-webkit-autofill, .sa-input:-webkit-autofill:hover, .sa-input:-webkit-autofill:focus { -webkit-box-shadow: 0 0 0 1000px var(--c-surface-2) inset; box-shadow: 0 0 0 1000px var(--c-surface-2) inset; -webkit-text-fill-color: var(--c-text); caret-color: var(--c-text); transition: background-color 9999s ease-out; }
