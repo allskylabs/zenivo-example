@@ -145,7 +145,8 @@
         // Sun altitude: the server's value (satellite push, < 5 min old); else the local tile once the station position is known; else "--"
         const srv = window.ALLSKY_SUN_ALT;
         let sa = srv && Date.now() - srv.t < 300000 ? srv.v : NaN;
-        if (!Number.isFinite(sa)) {
+        // The local tile is computed from the default station position until the server answers (showed "Day" at night), so only trust it after a grace period
+        if (!Number.isFinite(sa) && performance.now() > 20000) {
             const la = $("station-lat"), lo = $("station-lon");
             const known = la && lo && la.value !== "" && lo.value !== "" && (parseFloat(la.value) !== 0 || parseFloat(lo.value) !== 0);
             if (known) sa = parseFloat((($("telem-sun-alt") || {}).textContent || "").replace("\u2212", "-").replace("+", ""));
@@ -154,8 +155,9 @@
         const icon = (id, name) => { const u = $(id) && $(id).querySelector("use"); const h = `/static/icons.svg#i-${name}`; if (u && u.getAttribute("href") !== h) u.setAttribute("href", h); };
         const sky = Number.isFinite(sa) ? (sa > -0.83 ? "Day" : sa > -18 ? "Twilight" : "Night") : "--";
         set("now-sky", sky);
-        icon("now-sky-ic", sky === "Day" ? "sun" : "moon");
-        const nsk = $("now-sky"); if (nsk) nsk.title = sky;
+        icon("now-sky-ic", sky === "--" ? "clock" : sky === "Day" ? "sun" : "moon");
+        const skyTile = $("now-sky").closest(".now-tile"); if (skyTile) skyTile.classList.toggle("is-wait", sky === "--");
+        const nsk = $("now-sky"); if (nsk) { nsk.title = sky === "--" ? "Waiting for data" : sky; const t = nsk.closest(".now-tile"); if (t) t.setAttribute("aria-label", "Sky: " + (sky === "--" ? "waiting for data" : sky)); }
         tone("now-sky", sky === "Night" ? "ok" : sky === "--" ? "" : "warn");
         const cp = cm ? parseFloat(cm[1]) : NaN;
         tone("now-cloud", Number.isFinite(cp) ? (cp < 30 ? "ok" : cp < 70 ? "warn" : "bad") : "");
@@ -164,6 +166,7 @@
         const on = navigator.onLine !== false;
         icon("now-online-ic", on ? "wifi" : "wifi-off");
         set("now-online-t", on ? "Online" : "Offline");
+        { const t = $("now-online"); if (t) { t.title = on ? "Online" : "Offline"; t.setAttribute("aria-label", on ? "Online" : "Offline"); } }
         tone("now-online", on ? "ok" : "bad");
         const em = /^\s*(\d+)/.exec(($("live-events-count") || {}).textContent || "");
         set("now-events", em ? em[1] : "--");

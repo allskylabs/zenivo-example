@@ -666,7 +666,7 @@ function renderFlights(d) {
     if (d.source_in_use === "public" && d.public_provider) {
         // adsb.fi / adsb.lol terms: credit the source with a link
         const pp = d.public_provider;
-        flightsStatus.innerHTML = `Live from the public network: <a href="${escapeHtml(pp.link)}" target="_blank" rel="noopener">${escapeHtml(pp.name)}</a>`;
+        flightsStatus.innerHTML = `Live from the public network: <a class="ds-link" href="${escapeHtml(pp.link)}" target="_blank" rel="noopener" aria-label="${escapeHtml(pp.name)} (opens in a new tab)">${escapeHtml(pp.name)}<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-arrow-up-right"></use></svg></a>`;
     } else {
         flightsStatus.textContent = d.connected ? "Live from the ADS-B receiver" : "Receiver not connected";
     }

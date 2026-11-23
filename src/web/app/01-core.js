@@ -12,6 +12,13 @@ const PAGES = {
     "/logs": "tab-logs",
     "/focus": "tab-focus",
 };
+// Old hash deep links (/#archive, /#settings ...) go to the page's own URL
+(() => {
+    const HASH_PAGES = { archive: "/gallery", gallery: "/gallery", events: "/gallery", settings: "/settings", calibration: "/calibration", logs: "/logs", activity: "/logs", focus: "/focus", live: "/live" };
+    const p = window.location.pathname.replace(/\/+$/, "") || "/";
+    const to = HASH_PAGES[window.location.hash.replace(/^#\/?/, "").toLowerCase()];
+    if ((p === "/" || p === "/live" || p === "/index.html") && to && to !== p) window.location.replace(to);
+})();
 const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
 const currentPage = PAGES[currentPath] || "tab-live";
 

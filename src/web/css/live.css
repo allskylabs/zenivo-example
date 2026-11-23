@@ -190,3 +190,10 @@
   #tab-live .live-grid { max-width: 1600px; }
 }
 #tab-live #live-events-status:empty { display: none; }
+
+/* first-paint neutral state, public-network source link */
+#tab-live .now-tile.is-wait { opacity: .6; }
+#tab-live .now-tile.is-wait b { color: var(--c-text-2); }
+#tab-live .flights-status .ds-link { display: inline-flex; align-items: center; gap: var(--s-1); color: var(--c-accent); text-decoration: underline; text-underline-offset: 2px; min-height: var(--tap); }
+#tab-live .flights-status .ds-link .ds-icon { width: 14px; height: 14px; }
+#tab-live .flights-status .ds-link:hover { color: var(--c-text); }
