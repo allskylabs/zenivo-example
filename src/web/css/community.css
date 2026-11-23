@@ -1,0 +1,76 @@
+/* Community page (/community). Token-only: colours --c-*, type --fs-*, space --s-*, radii --r-*, sizes --tap/--icon-*.
+ * Phone = map on top, station list below. Desktop >= 1024 = map and list side by side. Red Vision works through --c-* only. */
+.cm { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-3); max-width: var(--content-max); margin: 0 auto; color: var(--c-text); font-family: var(--font-ui); }
+.cm [hidden] { display: none !important; }
+.cm-mapbox { position: relative; isolation: isolate; height: 52dvh; min-height: 300px; border-radius: var(--r-lg); border: 1px solid var(--c-border); overflow: hidden; background: var(--c-bg); }
+#cmap { position: absolute; inset: 0; background: var(--c-bg); }
+#cmap .leaflet-container { font-family: var(--font-ui); }
+#cmap .leaflet-control-attribution { background: var(--c-surface-1); color: var(--c-text-3); font-size: var(--fs-12); }
+#cmap .leaflet-bar a { width: var(--tap); height: var(--tap); line-height: var(--tap); background: var(--c-surface-1); color: var(--c-text); border-color: var(--c-border); }
+.cm-legend { position: absolute; left: var(--s-2); bottom: var(--s-6); z-index: 500; display: flex; gap: var(--s-1); }
+.cm-legend .ds-chip { background: var(--c-surface-1); }
+
+/* ---------- map markers ---------- */
+.cm-mk { background: none; border: 0; }
+.cm-dot { position: relative; display: block; width: 14px; height: 14px; margin: 6px; border-radius: 50%; border: 2px solid var(--c-bg); box-shadow: 0 0 0 1px var(--c-border); }
+.cm-dot.online { background: var(--c-ok); }
+.cm-dot.online::after { content: ""; position: absolute; inset: -7px; border-radius: 50%; border: 2px solid var(--c-ok); opacity: .6; animation: cm-pulse 2s ease-out infinite; }
+.cm-dot.idle { background: var(--c-warn); }
+.cm-dot.offline { background: transparent; border: 2px solid var(--c-text-3); box-shadow: none; }
+.cm-dot.own { box-shadow: 0 0 0 3px var(--c-accent); }
+.cm-cluster { cursor: pointer; }
+.cm-cl { position: relative; display: block; width: 40px; height: 40px; border-radius: 50%; box-shadow: 0 0 0 1px var(--c-border); }
+.cm-cl.own { box-shadow: 0 0 0 3px var(--c-accent); }
+.cm-cl-n { position: absolute; inset: 5px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--c-surface-1); border: 1px solid var(--c-border); color: var(--c-text); font: 700 var(--fs-14) / 1 var(--font-num); }
+.cm-cluster:focus-visible .cm-cl, .leaflet-marker-icon:focus-visible .cm-dot { outline: 2px solid var(--c-focus); outline-offset: 3px; }
+@keyframes cm-pulse { from { transform: scale(.6); opacity: .8; } to { transform: scale(1.5); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .cm-dot.online::after { animation: none; } }
+
+/* ---------- list ---------- */
+.cm-list { display: flex; flex-direction: column; min-width: 0; }
+.cm-head { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--c-divider); font: 600 var(--fs-16) / 1 var(--font-ui); }
+.cm-head .ds-icon { color: var(--c-accent); }
+.cm-head span { margin-inline-start: auto; font: 500 var(--fs-14) / 1 var(--font-num); color: var(--c-text-2); }
+.cm-rows { margin: 0; padding: 0; list-style: none; }
+.cm-row-wrap { display: flex; align-items: center; border-bottom: 1px solid var(--c-divider); }
+.cm-row-wrap:last-child { border-bottom: 0; }
+.cm-row-wrap .ds-row { border-bottom: 0; flex: 1; min-width: 0; }
+.cm-row-wrap .ds-row:focus-visible, .cm-dm:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -2px; }
+.cm-dm { flex: none; display: grid; place-items: center; width: var(--tap); height: var(--tap); margin-inline-end: var(--s-2); border: 0; border-radius: var(--r-md); background: transparent; color: var(--c-accent); cursor: pointer; }
+.cm-dm:hover { background: var(--c-accent-bg); }
+.cm-st { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: var(--r-sm); }
+.cm-st.online { background: var(--c-ok-bg); color: var(--c-ok); }
+.cm-st.idle { background: var(--c-warn-bg); color: var(--c-warn); }
+.cm-st.offline { background: var(--c-surface-2); color: var(--c-text-3); }
+.cm-st .ds-icon { width: var(--icon-sm); height: var(--icon-sm); }
+.cm-you { color: var(--c-accent); }
+.cm-skel { display: flex; align-items: center; gap: var(--s-3); min-height: 56px; padding: var(--s-2) var(--s-4); border-bottom: 1px solid var(--c-divider); }
+.cm-skel .ds-skeleton:first-child { flex: none; width: 36px; height: 36px; border-radius: var(--r-sm); }
+.cm-skel .ds-skeleton:nth-child(2) { flex: 1; }
+.cm-skel .ds-skeleton:last-child { flex: none; width: 48px; }
+.cm-empty .ds-btn { margin-top: var(--s-1); }
+
+/* ---------- station sheet ---------- */
+.cm-sheet .ds-sheet__panel { max-height: 86dvh; overflow-y: auto; }
+.cm-sheet-name { display: flex; flex-direction: column; min-width: 0; }
+.cm-sheet-name b { overflow-wrap: anywhere; }
+.cm-sheet-name small { font: 500 var(--fs-12) / 1.3 var(--font-ui); color: var(--c-text-2); }
+.cm-frame { display: block; width: 100%; padding: 0; border: 0; border-radius: var(--r-md); overflow: hidden; background: var(--c-surface-2); cursor: zoom-in; aspect-ratio: 4 / 3; }
+.cm-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.cm-facts { margin: var(--s-3) 0; }
+.cm-facts .ds-row { min-height: 48px; cursor: default; }
+.cm-acts { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.cm-acts .ds-btn { flex: 1; }
+
+/* ---------- full-size preview ---------- */
+.cm-light { position: fixed; inset: 0; z-index: var(--z-modal); background: var(--c-scrim); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--s-3); gap: var(--s-2); }
+.cm-light img { max-width: 100%; max-height: calc(100dvh - 120px); object-fit: contain; border-radius: var(--r-md); }
+.cm-light figcaption { color: var(--c-text); font-size: var(--fs-12); text-align: center; }
+.cm-light figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: var(--s-2); min-height: 0; }
+.cm-light-close { position: absolute; top: var(--s-3); right: var(--s-3); }
+
+@media (min-width: 1024px) {
+    .cm { flex-direction: row; align-items: flex-start; padding: var(--s-4); gap: var(--s-4); }
+    .cm-mapbox { flex: 1; min-width: 0; height: calc(100dvh - var(--topbar-h) - var(--s-8)); }
+    .cm-list { flex: 0 0 360px; max-height: calc(100dvh - var(--topbar-h) - var(--s-8)); overflow-y: auto; }
+}

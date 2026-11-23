@@ -35,87 +35,7 @@
     <link rel="stylesheet" href="/static/tokens.css?v=20261118a">
     <link rel="stylesheet" href="/style.css?v=20261122m">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-sans); }
-        .community { flex: 1; min-height: 0; display: flex; }
-        #cmap-wrap { scroll-margin-top: 64px; position: relative; flex: 1; min-width: 0; isolation: isolate; }
-        #cmap { position: absolute; inset: 0; background: var(--bg-primary); }
-        #cmap .leaflet-popup-content-wrapper, #cmap .leaflet-popup-tip { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); }
-        #cmap .leaflet-container a { color: var(--accent); }
-        #cmap .leaflet-control-attribution { background: color-mix(in srgb, var(--bg-card) 85%, transparent); color: var(--text-secondary); }
-        .cm-pop { font: 13px/1.45 var(--font-sans); width: min(300px, 70vw); }
-        .cm-mk { background: none; border: 0; }
-        .cm-dot { position: relative; display: block; width: 14px; height: 14px; margin: 6px; border-radius: 50%; border: 2px solid var(--bg-primary); box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-primary) 35%, transparent); }
-        .cm-dot.online { background: var(--success); }
-        .cm-dot.online::after { content: ""; position: absolute; inset: -7px; border-radius: 50%; border: 2px solid var(--success); opacity: .6; animation: cm-pulse 2s ease-out infinite; }
-        .cm-dot.idle { background: var(--warning); }
-        .cm-dot.offline { background: transparent; border: 2px solid var(--text-muted); box-shadow: none; }
-        .cm-dot.own { box-shadow: 0 0 0 3px var(--accent); }
-        .cm-cluster { cursor: pointer; }
-        .cm-cl { position: relative; display: block; width: 40px; height: 40px; border-radius: 50%; box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-primary) 25%, transparent); }
-        .cm-cl.own { box-shadow: 0 0 0 3px var(--accent); }
-        .cm-cl-n { position: absolute; inset: 5px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); font: 700 13px/1 var(--font-num); }
-        .cm-cluster:focus-visible .cm-cl { outline: 2px solid var(--accent); outline-offset: 3px; }
-        @keyframes cm-pulse { from { transform: scale(.6); opacity: .8; } to { transform: scale(1.5); opacity: 0; } }
-        @media (prefers-reduced-motion: reduce) { .cm-dot.online::after { animation: none; } }
-        .cm-led { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; vertical-align: baseline; }
-        .cm-led.online { background: var(--success); } .cm-led.idle { background: var(--warning); } .cm-led.offline { border: 2px solid var(--text-muted); }
-        .cm-state { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin: 2px 0; }
-        .cm-state.online { color: var(--success); } .cm-state.idle { color: var(--warning); } .cm-state.offline { color: var(--text-muted); }
-        .cm-pop img { max-height: 38vh; object-fit: contain; }
-        .cm-zoom { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
-        .cm-light { position: fixed; inset: 0; z-index: 5000; background: rgba(0, 0, 0, 0.88); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; }
-        .cm-light-fig { margin: 0; max-width: 100%; max-height: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 0; }
-        .cm-light-fig img { max-width: 100%; max-height: calc(100vh - 110px); width: auto; height: auto; min-width: min(480px, 90vw); object-fit: contain; border-radius: var(--radius-sm); image-rendering: auto; }
-        .cm-light-fig figcaption { color: var(--text-secondary); font: 13px/1.4 var(--font-sans); text-align: center; }
-        .cm-light-close { position: absolute; top: 12px; right: 12px; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font: 600 13px var(--font-sans); cursor: pointer; }
-        .cm-pop h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; overflow-wrap: anywhere; }
-        .cm-pop .meta { color: var(--text-secondary); font-size: 12px; overflow-wrap: anywhere; }
-        .cm-pop img { display: block; width: 100%; height: auto; margin: 8px 0; border-radius: var(--radius-sm); background: var(--bg-primary); }
-        .cm-pop .own { color: var(--accent); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
-        .cm-pop .acts { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px; }
-        .cm-pop .open { display: inline-block; padding: 6px 0; font-weight: 600; }
-        .cm-pop .msg { display: inline-flex; margin-left: auto; padding: 6px 14px; border-radius: var(--radius-md); border: 1px solid var(--accent); background: var(--accent-bg); color: var(--text-primary); font: 600 13px var(--font-sans); cursor: pointer; }
-        .cm-pop .msg:hover { background: var(--hover); }
-        #clist { width: 320px; flex: 0 0 320px; overflow-y: auto; background: var(--bg-card); border-left: 1px solid var(--border-color); }
-        #clist h2 { font-size: 13px; font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; gap: 8px; }
-        #clist h2 span { color: var(--text-secondary); font-weight: 400; }
-        #cstations { list-style: none; }
-        #cstations li { position: relative; border-bottom: 1px solid var(--border-color); }
-        #cstations .hit { position: absolute; inset: 0; width: 100%; padding: 0; cursor: pointer; background: none; border: 0; font: inherit; }
-        #cstations li:hover .hit, #cstations .hit:focus-visible { background: var(--bg-card-sub); outline: none; }
-        #cstations .row { position: relative; pointer-events: none; min-height: 44px; padding: 8px 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: baseline; color: var(--text-primary); }
-        #cstations .nm { display: block; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
-        #cstations .sub { display: block; font-size: 12px; color: var(--text-secondary); }
-        #cstations .you { color: var(--accent); }
-        #cempty { padding: 16px 12px; color: var(--text-secondary); font-size: 13px; }
-        #cempty a { color: var(--accent); display: inline-block; padding: 6px 0; }
-        #cnote { padding: 10px 12px; color: var(--text-muted); font-size: 12px; }
-        #clegend { position: absolute; left: 10px; bottom: 10px; z-index: 500; display: flex; gap: 14px; padding: 8px 12px; border-radius: 999px; background: color-mix(in srgb, var(--bg-card) 88%, transparent); border: 1px solid var(--border-color); font-size: 13px; color: var(--text-secondary); pointer-events: none; }
-        #clegend .cm-led { margin-right: 6px; }
-        #cstations .st-r { grid-column: 2; grid-row: 1 / span 2; text-align: right; display: flex; flex-direction: column; }
-        #cstations .st-r b { font-size: 13px; font-weight: 700; }
-        #cstations .st-r small { font-size: 12px; color: var(--text-secondary); }
-        #cstations .dm { pointer-events: auto; display: inline-grid; place-items: center; width: 28px; height: 28px; margin: -6px 0 -6px 6px; padding: 0; vertical-align: middle; cursor: pointer; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--accent); }
-        #cstations .dm:hover, #cstations .dm:focus-visible { background: var(--accent-bg); border-color: var(--accent); outline: none; }
-        #cstations .cm-state-lbl.online { color: var(--success); } #cstations .cm-state-lbl.idle { color: var(--warning); } #cstations .cm-state-lbl.offline { color: var(--text-muted); }
-        @media (min-width: 769px) {
-            body { overflow: hidden; }
-            .app-shell { height: calc(100vh - var(--topbar-h)); min-height: 0; }
-            .community { min-height: 0; }
-        }
-        @media (max-width: 768px) {
-            .community { flex-direction: column; }
-            #cmap-wrap { flex: none; height: 50vh; height: 50dvh; min-height: 280px; margin: 12px 12px 0; border-radius: var(--radius-card); border: 1px solid var(--border-color); overflow: hidden; }
-            #clist { width: calc(100% - 24px); flex: none; margin: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-card); overflow: hidden; }
-            #clist h2 { font-size: 17px; font-weight: 700; padding: 14px 16px; }
-            #cstations .row { min-height: 60px; padding: 10px 16px; }
-            #cstations .nm { font-size: 16px; } #cstations .sub { font-size: 13px; }
-            #cstations li:last-child { border-bottom: 0; }
-            #cstations .dm { width: 36px; height: 36px; margin: -10px 0 -10px 4px; }
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/community.css?v=20261201a">
 </head>
 <body class="dark-mode">
     <div class="app-shell">
@@ -198,16 +118,33 @@
 
     <div class="app-main">
 
-    <header class="page-top"><a class="page-back" href="/live" aria-label="Back to the station"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></a><span class="page-top-title">Community</span></header>
-    <main class="community">
-        <div id="cmap-wrap"><div id="cmap" role="application" aria-label="Map of community stations"></div><div id="clegend" hidden></div></div>
-        <aside id="clist" aria-label="Community stations">
-            <h2>Stations <span id="ccount"></span></h2>
+    <main class="cm" aria-label="Community stations">
+        <div class="cm-mapbox">
+            <div id="cmap" role="application" aria-label="Map of community stations"></div>
+            <div class="cm-legend" id="clegend" hidden></div>
+        </div>
+        <section class="ds-card ds-card--flush cm-list" aria-labelledby="cm-head">
+            <h2 class="cm-head" id="cm-head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-users"></use></svg><span class="ds-sr-only">Stations</span><span id="ccount"></span></h2>
             <div id="cempty" hidden></div>
-            <ul id="cstations"></ul>
-            <p id="cnote">Stations without a public address appear on the map but cannot be opened.</p>
-        </aside>
+            <ul class="cm-rows" id="cstations">
+                <li class="cm-skel" aria-hidden="true"><i class="ds-skeleton"></i><i class="ds-skeleton"></i><i class="ds-skeleton"></i></li>
+                <li class="cm-skel" aria-hidden="true"><i class="ds-skeleton"></i><i class="ds-skeleton"></i><i class="ds-skeleton"></i></li>
+                <li class="cm-skel" aria-hidden="true"><i class="ds-skeleton"></i><i class="ds-skeleton"></i><i class="ds-skeleton"></i></li>
+            </ul>
+        </section>
     </main>
+    <div class="ds-sheet cm-sheet" id="cm-sheet" role="dialog" aria-modal="true" aria-label="Station">
+        <div class="ds-sheet__scrim" data-ds-close></div>
+        <div class="ds-sheet__panel">
+            <div class="ds-sheet__grab" aria-hidden="true"></div>
+            <div class="ds-sheet__head">
+                <span class="cm-st" id="cm-sheet-st" aria-hidden="true"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-camera"></use></svg></span>
+                <div class="ds-sheet__title cm-sheet-name"><b id="cm-sheet-name"></b><small id="cm-sheet-sub"></small></div>
+                <button class="ds-btn ds-btn--ghost ds-btn--icon" type="button" data-ds-close aria-label="Close"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-x"></use></svg></button>
+            </div>
+            <div id="cm-sheet-body"></div>
+        </div>
+    </div>
     </div><!-- .app-main -->
     </div><!-- .app-shell -->
 
@@ -215,6 +152,6 @@
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"
             integrity="sha384-eXVCORTRlv4FUUgS/xmOyr66XBVraen8ATNLMESp92FKXLAMiKkerixTiBvXriZr" crossorigin=""></script>
-    <script src="/static/community.js?v=20261130h"></script>
+    <script src="/static/community.js?v=20261201a"></script>
 </body>
 </html>

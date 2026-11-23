@@ -11,15 +11,13 @@
     const listEl = document.getElementById("cstations");
     const emptyEl = document.getElementById("cempty");
     const countEl = document.getElementById("ccount");
-    const noteEl = document.getElementById("cnote");
-
+    
     // Neutral basemap drawn by the page itself: coastlines only (Natural Earth 1:50m land, public domain),
     // no borders, no place names and no third-party tile server
     const css = getComputedStyle(document.documentElement);
     const tone = (name, fallback) => (css.getPropertyValue(name) || "").trim() || fallback;
+    let popupOpen = false;   // the station sheet is open: do not rebuild the list under it
     const world = L.latLngBounds([-85, -180], [85, 180]);
-    let popupOpen = false;   // do not rebuild the markers under an open popup
-    let openPopup = null;    // the open Leaflet popup, re-laid out when its frame loads
     const map = L.map("cmap", {
         minZoom: 0.5, zoomSnap: 0.25, maxZoom: 9, preferCanvas: true, maxBounds: world.pad(0.6), maxBoundsViscosity: 0.6,
         attributionControl: false,
@@ -46,8 +44,8 @@
     if (window.ResizeObserver) new ResizeObserver(() => { map.invalidateSize(); fitMinZoom(); autoFit(); }).observe(cmapEl);
     fitMinZoom();
     if (map.getMinZoom() > 2) map.setView([20, 10], map.getMinZoom());
-    const ink = tone("--text-muted", "#64748b"), landFill = tone("--border-color", "#1e293b");
-    const sea = tone("--bg-primary", "#0a0f1c");
+    const ink = tone("--c-text-3", "#64748b"), landFill = tone("--c-surface-2", "#1e293b");
+    const sea = tone("--c-bg", "#0a0f1c");
     const gridLines = (step, lim) => {
         const g = [];
         for (let lon = -180; lon <= 180; lon += step) g.push([[-85, lon], [85, lon]]);
@@ -101,7 +99,7 @@
     // Nearby stations merge into a cluster (Leaflet.markercluster); without that file the page falls back to plain markers
     const clustered = typeof L.markerClusterGroup === "function";
     let spiderfied = false;   // a spider is open: do not rebuild the markers under it
-    const stateTone = { online: "var(--success)", idle: "var(--warning)", offline: "var(--text-muted)" };
+    const stateTone = { online: "var(--c-ok)", idle: "var(--c-warn)", offline: "var(--c-text-3)" };
     function clusterIcon(c) {
         const kids = c.getAllChildMarkers(), n = { online: 0, idle: 0, offline: 0 };
         let own = false;
@@ -124,7 +122,7 @@
         // away, markercluster drops the marker and the popup closes with it
         removeOutsideVisibleBounds: false, zoomToBoundsOnClick: true, spiderfyOnMaxZoom: true,
         spiderfyDistanceMultiplier: 1.3, animate: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-        spiderLegPolylineOptions: { weight: 1.5, color: tone("--text-secondary", "gray"), opacity: 0.6 },
+        spiderLegPolylineOptions: { weight: 1.5, color: tone("--c-text-2", "gray"), opacity: 0.6 },
         iconCreateFunction: clusterIcon,
     }) : L.layerGroup();
     layer.addTo(map);
@@ -137,7 +135,6 @@
     let cards = [];
     let fitted = false;
 
-    const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     const finite = (v) => typeof v === "number" && Number.isFinite(v);
 
     function httpsUrl(u) {
@@ -154,6 +151,9 @@
         return `${Math.round(s / 86400)} days ago`;
     }
 
+    const ICON = { online: "wifi", idle: "clock", offline: "wifi-off" };
+    const STATE_LABEL = { online: "Online", idle: "Idle", offline: "Offline" };
+    function icon(name) { return window.DS ? window.DS.icon(name) : document.createElementNS("http://www.w3.org/2000/svg", "svg"); }
     function el(tag, cls, text) {
         const e = document.createElement(tag);
         if (cls) e.className = cls;
@@ -168,7 +168,7 @@
         back.setAttribute("role", "dialog");
         back.setAttribute("aria-modal", "true");
         back.setAttribute("aria-label", `Preview of ${title}`);
-        const fig = el("figure", "cm-light-fig");
+        const fig = el("figure");
         const img = document.createElement("img");
         img.alt = `Latest frame of ${title}`;
         img.referrerPolicy = "no-referrer";
@@ -176,12 +176,14 @@
         img.addEventListener("error", () => { if (next < sources.length) img.src = sources[next++]; });
         img.src = sources[0];
         const cap = el("figcaption", "", note ? `${title} \u2014 ${note}` : title);
-        const close = el("button", "cm-light-close", "Close");
+        const close = el("button", "ds-btn ds-btn--icon cm-light-close");
         close.type = "button";
-        const shut = () => { back.remove(); document.removeEventListener("keydown", onKey); };
-        const onKey = (ev) => { if (ev.key === "Escape") shut(); };
-        back.addEventListener("click", (ev) => { if (ev.target === back || ev.target === close) shut(); });
-        document.addEventListener("keydown", onKey);
+        close.setAttribute("aria-label", "Close");
+        close.appendChild(icon("x"));
+        const shut = () => { back.remove(); document.removeEventListener("keydown", onKey, true); };
+        const onKey = (ev) => { if (ev.key === "Escape") { ev.stopPropagation(); shut(); } };
+        back.addEventListener("click", (ev) => { if (ev.target === back || ev.target.closest(".cm-light-close")) shut(); });
+        document.addEventListener("keydown", onKey, true);
         fig.append(img, cap);
         back.append(close, fig);
         document.body.appendChild(back);
@@ -225,96 +227,79 @@
         const age = Date.now() / 1000 - (t > 1e12 ? t / 1000 : t);
         return !t ? "offline" : age < 900 ? "online" : age < 21600 ? "idle" : "offline";
     }
-    function popupFor(card, isOwn) {
-        const box = el("div", "cm-pop");
-        if (isOwn) box.appendChild(el("div", "own", "This station"));
-        box.appendChild(el("h3", "", String(card.name || "Unnamed station")));
-        if (card.camera) box.appendChild(el("div", "meta", String(card.camera)));
-        const stt = stationState(card, isOwn);
-        box.appendChild(el("div", `cm-state ${stt}`, stt === "online" ? "Online" : stt === "idle" ? "Idle" : "Offline"));
-        if (card.software) box.appendChild(el("div", "meta", String(card.software)));
-        box.appendChild(el("div", "meta", seenText(card, isOwn).replace(/^./, (c) => c.toUpperCase())));
+    // Station sheet: icon-led facts, the latest frame, then Open / Message
+    const sheet = document.getElementById("cm-sheet");
+    const fact = (ic, title, value) => {
+        const r = el("div", "ds-row");
+        const i = el("span", "ds-row__icon"); i.appendChild(icon(ic));
+        const b = el("span", "ds-row__body"); b.appendChild(el("span", "ds-row__title", title));
+        r.append(i, b);
+        if (value) r.appendChild(el("span", "ds-row__value", value));
+        return r;
+    };
+    function openSheet(card, isOwn) {
+        const stt = stationState(card, isOwn), name = String(card.name || "Unnamed station");
+        document.getElementById("cm-sheet-name").textContent = name;
+        document.getElementById("cm-sheet-sub").textContent = (isOwn ? "You \u00b7 " : "") + STATE_LABEL[stt] + " \u00b7 " + (isOwn ? "now" : agoOnly(card));
+        const stEl = document.getElementById("cm-sheet-st");
+        stEl.className = `cm-st ${stt}`;
+        stEl.replaceChildren(icon(ICON[stt]));
+        const body = document.getElementById("cm-sheet-body");
+        body.textContent = "";
         const base = httpsUrl(card.url);
         let src = null;
         if (base) src = base.replace(/\/+$/, "") + "/api/community/thumb.jpg";
         else if (typeof card.thumb === "string" && THUMB_DATA.test(card.thumb)) src = card.thumb;
         if (src) {
             const img = document.createElement("img");
-            img.alt = `Latest frame of ${String(card.name || "the station")}`;
+            img.alt = `Latest frame of ${name}`;
             img.referrerPolicy = "no-referrer";
-            // The frame arrives after the popup has opened and panned into view; the popup then grows upward and its
-            // top (the station name) ends up under the map edge. Re-layout and re-pan once the frame is in.
-            const relayout = () => { if (openPopup && openPopup.isOpen()) openPopup.update(); };
-            img.addEventListener("load", relayout);
-            img.addEventListener("error", () => { img.remove(); relayout(); });
-            img.src = src;
-            // Click to enlarge: the large preview when the station offers one, else the same small image scaled up
-            const relays = base ? [] : relaySources(card);
-            const larges = base && card.preview === true ? [base.replace(/\/+$/, "") + "/api/community/preview.jpg"]
-                : relays.map((r) => r.url);
-            const relayNote = relays.length ? `Preview relayed by ${relays[0].host}: this station has no public address.` : "";
-            const zoom = el("button", "cm-zoom");
+            const zoom = el("button", "cm-frame");
             zoom.type = "button";
             zoom.title = "Enlarge";
-            zoom.setAttribute("aria-label", `Enlarge the preview of ${String(card.name || "the station")}`);
+            zoom.setAttribute("aria-label", `Enlarge the preview of ${name}`);
+            img.addEventListener("error", () => zoom.remove());
+            img.src = src;
             zoom.appendChild(img);
-            zoom.addEventListener("click", () => openLightbox(larges.concat([src]), String(card.name || "Unnamed station"),
-                relayNote || (card.preview === true ? "" : "This station shares only a small preview.")));
-            box.appendChild(zoom);
-            if (relayNote) box.appendChild(el("div", "meta", relayNote));
+            const relays = base ? [] : relaySources(card);
+            const larges = base && card.preview === true ? [base.replace(/\/+$/, "") + "/api/community/preview.jpg"] : relays.map((r) => r.url);
+            const note = relays.length ? `Relayed by ${relays[0].host}` : (card.preview === true ? "" : "Small preview only");
+            zoom.addEventListener("click", () => openLightbox(larges.concat([src]), name, note));
+            body.appendChild(zoom);
         }
-        const acts = el("div", "acts");   // "Open station" and "Message" share one row
+        const facts = el("div", "ds-list cm-facts");
+        if (card.camera) facts.appendChild(fact("camera", String(card.camera)));
+        if (card.software) facts.appendChild(fact("cpu", String(card.software)));
+        facts.appendChild(fact("clock", seenText(card, isOwn).replace(/^./, (c) => c.toUpperCase())));
+        if (!base) facts.appendChild(fact("lock", "No public address"));
+        else if (card.open === false) facts.appendChild(fact("lock", "Page not linked by the owner"));
+        body.appendChild(facts);
+        const acts = el("div", "cm-acts");
         if (base && card.open !== false) {
-            const a = el("a", "open", "Open station");
-            a.href = base;
-            a.target = "_blank";
-            a.rel = "noopener noreferrer";
+            const a = el("a", "ds-btn ds-btn--primary");
+            a.href = base; a.target = "_blank"; a.rel = "noopener noreferrer";
+            a.setAttribute("aria-label", "Open station");
+            a.append(icon("arrow-up-right"), el("span", "", "Open"));
             acts.appendChild(a);
-        } else if (base) {
-            box.appendChild(el("div", "meta", "The owner does not link to this station's page."));
-        } else if (!(card.relays || relayed[card.id])) {
-            box.appendChild(el("div", "meta", "This station has no public address, so it cannot be opened and shares only a small preview."));
         }
         if (!isOwn && window.ZenivoChat && window.ZenivoChat.canDM(card.id)) {
-            const msg = el("button", "msg", "Message");
-            msg.type = "button";
-            msg.addEventListener("click", () => window.ZenivoChat.openDM(card.id));
-            acts.appendChild(msg);
+            const m = el("button", "ds-btn");
+            m.type = "button";
+            m.setAttribute("aria-label", `Message ${name}`);
+            m.append(icon("message-circle"), el("span", "", "Message"));
+            m.addEventListener("click", () => { window.DS.closeSheet(sheet); window.ZenivoChat.openDM(card.id); });
+            acts.appendChild(m);
         }
-        if (acts.childNodes.length) box.appendChild(acts);
-        return box;
+        if (acts.childNodes.length) body.appendChild(acts);
+        popupOpen = true;
+        window.DS.openSheet(sheet);
     }
-
-    // Size the popup to the map it opens on: a phone map is short, so the desktop padding (room for the zoom
-    // buttons) and height cap would push the popup past the map's edges
-    function fitPopup(p) {
-        const s = map.getSize(), short = s.y < 360, o = p.options;
-        o.autoPanPaddingTopLeft = [12, short ? 12 : 76];
-        o.autoPanPaddingBottomRight = [12, short ? 12 : 24];
-        o.maxWidth = Math.max(160, Math.min(340, s.x - 24 - 46));
-        o.maxHeight = Math.max(120, Math.min(460, s.y - o.autoPanPaddingTopLeft[1] - o.autoPanPaddingBottomRight[1] - 50));
-        // shrink the frame rather than make the visitor scroll a small popup (~150 px of text and buttons around it)
-        const img = p.getElement() && p.getElement().querySelector(".cm-pop img");
-        if (img) img.style.maxHeight = Math.max(80, o.maxHeight - 150) + "px";
-        p.update();
-    }
-    map.on("popupopen", (e) => { popupOpen = true; openPopup = e.popup; fitPopup(e.popup); });
-    map.on("popupclose", () => { popupOpen = false; openPopup = null; });
-
-    // markercluster may call zoomToShowLayer's callback while the cluster is still re-forming after the zoom (the marker
-    // is not on the map yet, so openPopup does nothing): ask again until the marker itself is shown
-    function revealAndOpen(marker, tries) {
-        layer.zoomToShowLayer(marker, () => {
-            if (marker._map) marker.openPopup();
-            else if (tries > 0) setTimeout(() => revealAndOpen(marker, tries - 1), 300);
-        });
-    }
+    new MutationObserver(() => { if (!sheet.hasAttribute("data-open")) popupOpen = false; }).observe(sheet, { attributes: true, attributeFilter: ["data-open"] });
 
     function drawMarkers() {
         layer.clearLayers();
         stations = [];
         listEl.textContent = "";
-        const accent = cssVar("--accent"), other = cssVar("--success");
         const valid = cards.filter((c) => c && finite(c.lat) && finite(c.lon) && Math.abs(c.lat) <= 90 && Math.abs(c.lon) <= 180);
         const rank = { online: 0, idle: 1, offline: 2 }, seenOf = (c) => { const t = Number(seenMap[c.id]) || Number(c.updated) || 0; return t > 1e12 ? t / 1000 : t; };
         valid.sort((a, b) => (a.id === ownId ? -1 : b.id === ownId ? 1 : 0) || rank[stationState(a, false)] - rank[stationState(b, false)] || seenOf(b) - seenOf(a) || String(a.name).localeCompare(String(b.name)));
@@ -323,74 +308,56 @@
         for (const card of valid) {
             const isOwn = card.id === ownId;
             const st = stationState(card, isOwn);
+            const name = String(card.name || "Unnamed station");
             const marker = L.marker([card.lat, card.lon], {
-                icon: L.divIcon({ className: "cm-mk", iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -12],
+                icon: L.divIcon({ className: "cm-mk", iconSize: [26, 26], iconAnchor: [13, 13],
                     html: `<span class="cm-dot ${st}${isOwn ? " own" : ""}"></span>` }),
-                title: `${String(card.name || "Station")} (${st})`, keyboard: true, cmState: st, cmOwn: isOwn,
+                title: `${name} (${st})`, keyboard: true, cmState: st, cmOwn: isOwn,
             }).addTo(layer);
-            // Leaflet re-runs a content function on every popup.update() (fitPopup, frame load): build the content once
-            // per opening, or each update swaps the DOM under the pointer (the frame never takes a click) and reloads the frame
-            let content = null;
-            marker.bindPopup(() => content || (content = popupFor(card, isOwn)), { keepInView: true });   // size and padding: fitPopup
-            marker.on("popupclose", () => { content = null; });
+            marker.on("click", () => openSheet(card, isOwn));
             pts.push([card.lat, card.lon]);
-            const item = el("li");
-            // The whole row is one hit button under the visible text; the message button sits beside the name on top of it
-            // (a button cannot hold another button)
-            const btn = el("button", "hit");
-            btn.type = "button";
-            btn.setAttribute("aria-label", `Show ${String(card.name || "Unnamed station")} on the map`);
-            const row = el("div", "row");
-            const nm = el("span", isOwn ? "nm you" : "nm");
-            nm.appendChild(el("i", `cm-led ${st}`));
-            nm.appendChild(document.createTextNode(String(card.name || "Unnamed station")));
-            if (isOwn) nm.appendChild(el("em", "you-pill", "You"));
+            const item = el("li", "cm-row-wrap");
+            const row = el("button", "ds-row");
+            row.type = "button";
+            row.setAttribute("aria-label", `${name}, ${STATE_LABEL[st]}`);
+            const ic = el("span", `cm-st ${st}`); ic.appendChild(icon(ICON[st]));
+            const bd = el("span", "ds-row__body");
+            bd.appendChild(el("span", isOwn ? "ds-row__title cm-you" : "ds-row__title", isOwn ? `${name} \u00b7 You` : name));
+            bd.appendChild(el("span", "ds-row__sub", card.camera || seenText(card, isOwn)));
+            row.append(ic, bd, el("span", "ds-row__value", isOwn ? "now" : agoOnly(card)));
+            counts[st] += 1;
+            row.addEventListener("click", () => {
+                userMoved = true;
+                map.setView([card.lat, card.lon], Math.max(map.getZoom(), 6), { animate: false });
+                openSheet(card, isOwn);
+                if (window.matchMedia("(max-width: 1023px)").matches) document.querySelector(".cm-mapbox").scrollIntoView({ block: "start", behavior: "smooth" });
+            });
+            item.appendChild(row);
             if (!isOwn && window.ZenivoChat && window.ZenivoChat.canDM(card.id)) {
                 // admin only: the chat widget exists only for the signed-in owner
-                const dm = el("button", "dm");
+                const dm = el("button", "cm-dm");
                 dm.type = "button";
                 dm.title = "Message";
-                dm.setAttribute("aria-label", `Message ${String(card.name || "this station")}`);
-                dm.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+                dm.setAttribute("aria-label", `Message ${name}`);
+                dm.appendChild(icon("message-circle"));
                 dm.addEventListener("click", () => window.ZenivoChat.openDM(card.id));
-                nm.appendChild(dm);
+                item.appendChild(dm);
             }
-            row.appendChild(nm);
-            row.appendChild(el("span", "sub", card.camera || seenText(card, isOwn)));
-            const rt = el("span", "st-r");
-            rt.appendChild(el("b", `cm-state-lbl ${st}`, st === "online" ? "Online" : st === "idle" ? "Idle" : "Offline"));
-            rt.appendChild(el("small", "", isOwn ? "now" : agoOnly(card)));
-            row.appendChild(rt);
-            counts[st] += 1;
-            btn.addEventListener("click", () => {
-                if (clustered) {
-                    // the marker may sit inside a cluster: zoom or spiderfy until it shows, then open its popup
-                    userMoved = true;
-                    map.setView([card.lat, card.lon], Math.max(map.getZoom(), 6), { animate: false });
-                    revealAndOpen(marker, 5);
-                } else {
-                    map.flyTo([card.lat, card.lon], Math.max(map.getZoom(), 6));
-                    marker.openPopup();
-                }
-                if (window.matchMedia("(max-width: 768px)").matches) document.getElementById("cmap-wrap").scrollIntoView({ block: "start", behavior: "smooth" });
-            });
-            item.appendChild(btn);
-            item.appendChild(row);
             listEl.appendChild(item);
             stations.push({ card, marker });
         }
-        countEl.textContent = valid.length ? `${valid.length} · ${counts.online} online` : "";
+        countEl.textContent = valid.length ? `${counts.online}/${valid.length}` : "";
         const lg = document.getElementById("clegend");
         if (lg) {
             lg.hidden = !valid.length;
             lg.replaceChildren(...["online", "idle", "offline"].map((k) => {
-                const sp = el("span", "lg-item");
-                sp.appendChild(el("i", `cm-led ${k}`));
-                sp.appendChild(document.createTextNode(`${k[0].toUpperCase()}${k.slice(1)} ${counts[k]}`));
+                const sp = el("span", `ds-chip ds-chip--${k === "online" ? "ok" : k === "idle" ? "warn" : "info"}`);
+                sp.title = STATE_LABEL[k];
+                sp.append(icon(ICON[k]), document.createTextNode(String(counts[k])));
+                sp.setAttribute("aria-label", `${STATE_LABEL[k]} ${counts[k]}`);
                 return sp;
             }));
         }
-        noteEl.hidden = !valid.length;
         lastPts = pts;
         if (!fitted && pts.length) {
             fitted = true;
@@ -399,16 +366,20 @@
     }
 
     function showEmpty(kind, reason) {
+        listEl.textContent = "";
         emptyEl.hidden = false;
+        emptyEl.className = "ds-empty cm-empty";
         emptyEl.textContent = "";
-        if (kind === "off") {
-            emptyEl.appendChild(document.createTextNode("Sharing is off. Turn it on in "));
-            const a = el("a", "", "Settings → Community");
+        const off = kind === "off";
+        emptyEl.appendChild(icon(off ? "share-2" : "wifi-off"));
+        emptyEl.appendChild(el("div", "ds-empty__title", off ? "Sharing is off" : "Not available"));
+        if (!off && reason) emptyEl.appendChild(el("div", "ds-empty__hint", String(reason)));
+        if (off) {
+            const a = el("a", "ds-btn ds-btn--primary");
             a.href = "/settings#community";
+            a.setAttribute("aria-label", "Open sharing settings");
+            a.append(icon("settings"), el("span", "", "Sharing"));
             emptyEl.appendChild(a);
-            emptyEl.appendChild(document.createTextNode("."));
-        } else {
-            emptyEl.textContent = reason || "Community is not available.";
         }
     }
 
@@ -429,6 +400,7 @@
             relayed = data.relayed && typeof data.relayed === "object" ? data.relayed : {};
             seenMap = data.seen && typeof data.seen === "object" ? data.seen : {};
             if (!popupOpen && !spiderfied) drawMarkers();
+            if (!cards.length) showEmpty("unavailable", "No stations yet");
         } catch (err) {
             showEmpty("unavailable", "Could not load the stations. Retrying.");
         }
