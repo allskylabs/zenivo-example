@@ -288,3 +288,44 @@ a.ds-row:hover, button.ds-row:hover { background: var(--c-surface-2); }
 @keyframes ds-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 /* Scrollable chip rows: reserve an end gutter and fade it so a hidden chip is visible as such (no fade when the row fits) */
 .ds-chips:not(.lg-chips), .zchips, .arc-chips { padding-inline-end: var(--s-6); -webkit-mask-image: linear-gradient(90deg, black calc(100% - var(--s-6)), transparent); mask-image: linear-gradient(90deg, black calc(100% - var(--s-6)), transparent); }
+
+/* ---------- Split frame: [main card flex:1] + [side list card], shared by Flights 3D, Satellites 3D, Community ----------
+ * .ds-split[data-state] = expanded | rail | hidden (set by /static/split.js, remembered per page).
+ * Desktop >= 901px: side by side. Phone: stacked, the side card is a bottom panel (expanded / header only / hidden). */
+.ds-split { --split-w: 380px; --split-rail: 56px; flex: 1 1 auto; min-height: 0; min-width: 0; width: 100%; box-sizing: border-box; display: flex; gap: var(--s-3); padding: var(--s-3); }
+.ds-split__main { position: relative; isolation: isolate; flex: 1 1 0; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--c-border); border-radius: var(--r-xl); background: var(--c-bg); }
+.ds-split__side { position: relative; flex: 0 0 var(--split-w); width: var(--split-w); min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+    background: var(--c-surface-1); border: 1px solid var(--c-border); border-radius: var(--r-xl); box-shadow: var(--shadow-1);
+    transition: flex-basis var(--dur) var(--ease), width var(--dur) var(--ease), margin var(--dur) var(--ease), opacity var(--dur) var(--ease); }
+.ds-split__head { display: flex; align-items: center; gap: var(--s-2); min-height: var(--tap); padding: 0 var(--s-2) 0 var(--s-4); font-weight: 600; flex: none; }
+.ds-split__head .ds-split__n { margin-left: auto; font: 600 var(--fs-14) var(--font-num); color: var(--c-text-2); }
+.ds-split__toggle .ds-icon { width: var(--icon-md); height: var(--icon-md); }
+.ds-split[data-state="rail"] .ds-split__side { flex-basis: var(--split-rail); width: var(--split-rail); }
+.ds-split[data-state="rail"] .ds-split__side > :not(.ds-split__head) { display: none; }
+.ds-split[data-state="rail"] .ds-split__head { flex-direction: column; justify-content: flex-start; padding: var(--s-2) 0; gap: var(--s-2); }
+.ds-split[data-state="rail"] .ds-split__head .ds-split__n { margin: 0; font-size: var(--fs-12); }
+.ds-split[data-state="rail"] .ds-split__head > :is(.ds-icon, svg:not(.ds-icon)) { order: 2; }
+.ds-split[data-state="rail"] .ds-split__n { order: 3; }
+.ds-split[data-state="hidden"] .ds-split__side { flex-basis: 0; width: 0; margin-left: calc(-1 * var(--s-3)); opacity: 0; border-width: 0; pointer-events: none; }
+.ds-split__show { position: absolute; top: var(--s-3); right: var(--s-3); z-index: var(--z-fab); display: none; align-items: center; gap: var(--s-2); min-height: var(--tap); padding: 0 var(--s-3);
+    background: var(--c-surface-1); border: 1px solid var(--c-border); border-radius: var(--r-pill); color: var(--c-text); box-shadow: var(--shadow-1); font: 600 var(--fs-14) var(--font-num); cursor: pointer; }
+.ds-split__show .ds-icon { width: var(--icon-md); height: var(--icon-md); }
+.ds-split[data-state="hidden"] .ds-split__show { display: inline-flex; }
+@media (prefers-reduced-motion: reduce) { .ds-split__side { transition: none; } }
+@media (max-width: 900px) {
+    .ds-split { flex-direction: column; }
+    .ds-split__side, .ds-split[data-state="rail"] .ds-split__side { flex: 0 0 auto; width: auto; height: min(46dvh, 420px); transition: height var(--dur) var(--ease), margin var(--dur) var(--ease), opacity var(--dur) var(--ease); }
+    .ds-split[data-state="rail"] .ds-split__side { height: calc(var(--tap) + 2px); }
+    .ds-split[data-state="rail"] .ds-split__side > :not(.ds-split__head) { display: none; }
+    .ds-split[data-state="rail"] .ds-split__head { flex-direction: row; padding: 0 var(--s-2) 0 var(--s-4); gap: var(--s-2); }
+    .ds-split[data-state="rail"] .ds-split__head .ds-split__n { margin-left: auto; font-size: var(--fs-14); }
+    .ds-split[data-state="hidden"] .ds-split__side { flex-basis: 0; width: auto; height: 0; margin-left: 0; margin-top: calc(-1 * var(--s-3)); }
+    .ds-split__toggle .ds-icon { transform: rotate(90deg); }
+    .ds-split--flow { flex: none; overflow: visible; }
+    .ds-split--flow .ds-split__main { flex: none; height: 52dvh; min-height: 300px; }
+    .ds-split--flow .ds-split__side { height: auto; }
+    .ds-split--flow .ds-split__toggle, .ds-split--flow .ds-split__show { display: none !important; }
+    .ds-split--flow[data-state] .ds-split__side { flex-basis: auto; opacity: 1; margin: 0; pointer-events: auto; border-width: 1px; }
+    .ds-split--flow[data-state] .ds-split__side > * { display: revert; }
+    .ds-split--flow[data-state] .ds-split__head { display: flex; }
+}

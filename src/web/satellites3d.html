@@ -34,6 +34,7 @@
     <link rel="stylesheet" href="/style.css?v=20261203k">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
     <link rel="stylesheet" href="/static/css/scene3d.css?v=20261203k">
+    <script src="/static/split.js?v=1" defer></script>
     <script type="importmap">
         { "imports": {
             "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -119,7 +120,9 @@
 
     <div class="app-main">
 
-    <div id="stage">
+    <div class="ds-split" id="split">
+    <div id="stage" class="ds-split__main">
+    <button class="ds-split__show" type="button" aria-label="Show list (L)" title="Show list (L)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-panel-right-open"></use></svg><span class="ds-split__n">--</span></button>
 <canvas id="globe"></canvas>
     <div id="labels"><div id="me"><i></i><b>You</b></div></div>
 
@@ -145,28 +148,6 @@
             </div>
         </div>
     </div><!-- #left-col -->
-
-    <div id="list" class="collapsed">
-        <div class="sc-head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg><span class="sc-count" id="count">--</span>
-            <button id="list-toggle" class="ds-btn ds-btn--icon ds-btn--ghost" type="button" aria-label="Show or hide the satellite list" title="Satellite list"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-up"></use></svg></button></div>
-        <div id="list-tools">
-            <div class="sc-row sc-chipbar" id="filters">
-                <button class="ds-chip" type="button" data-filter="visible" aria-label="Naked-eye now" title="Above the horizon, lit by the sun and dark sky: can be seen by eye. Not the same as being in the camera frame."><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg><span>Visible</span></button>
-                <button class="ds-chip" type="button" data-filter="above" aria-label="Above horizon" title="Above the horizon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg><span>Above</span></button>
-                <button class="ds-chip" type="button" data-filter="all" aria-label="All" title="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-list"></use></svg><span>All</span></button>
-            </div>
-            <div class="sc-row">
-                <input id="search" type="search" placeholder="Name or NORAD" aria-label="Search name or NORAD" autocomplete="off">
-                <select id="sort" title="Sort" aria-label="Sort">
-                    <option value="alt">Elevation</option>
-                    <option value="range">Range</option>
-                    <option value="height">Height</option>
-                    <option value="name">Name</option>
-                </select>
-            </div>
-        </div>
-        <ul id="sat-list"></ul>
-    </div>
 
     <div id="cam-foot" class="sc-panel"><span class="sc-dot"></span><span id="cam-foot-text"></span></div>
 
@@ -206,6 +187,29 @@
         </div>
     </div>
     </div><!-- #stage -->
+
+    <aside id="list" class="ds-split__side" aria-label="Satellites">
+        <div class="sc-head ds-split__head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-satellite"></use></svg><span class="sc-count ds-split__n" id="count" data-split-count>--</span>
+            <button class="ds-btn ds-btn--icon ds-btn--ghost ds-split__toggle" type="button" aria-label="Hide list (L)" title="Hide list (L)"></button></div>
+        <div id="list-tools">
+            <div class="sc-row sc-chipbar" id="filters">
+                <button class="ds-chip" type="button" data-filter="visible" aria-label="Naked-eye now" title="Above the horizon, lit by the sun and dark sky: can be seen by eye. Not the same as being in the camera frame."><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-eye"></use></svg><span>Visible</span></button>
+                <button class="ds-chip" type="button" data-filter="above" aria-label="Above horizon" title="Above the horizon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg><span>Above</span></button>
+                <button class="ds-chip" type="button" data-filter="all" aria-label="All" title="All"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-list"></use></svg><span>All</span></button>
+            </div>
+            <div class="sc-row">
+                <input id="search" type="search" placeholder="Name or NORAD" aria-label="Search name or NORAD" autocomplete="off">
+                <select id="sort" title="Sort" aria-label="Sort">
+                    <option value="alt">Elevation</option>
+                    <option value="range">Range</option>
+                    <option value="height">Height</option>
+                    <option value="name">Name</option>
+                </select>
+            </div>
+        </div>
+        <ul id="sat-list"></ul>
+    </aside>
+    </div><!-- .ds-split -->
     </div><!-- .app-main -->
     </div><!-- .app-shell -->
 
@@ -975,45 +979,12 @@
             lp.needsUpdate = fp.needsUpdate = true;
         }
 
-        // The globe sits in the free area of #stage: not under the satellite list (right) or the info card (left), and,
-        // on a phone, above the bottom sheet. A view offset shifts and scales the render, the canvas itself stays full.
-        function freeArea(W, H) {
-            const sr = $("stage").getBoundingClientRect();
-            let l = 0, r = W, t = 0, b = H;
-            const phone = window.innerWidth <= 700;
-            for (const id of ["list", "info"]) {
-                const e = $(id);
-                if (!e || getComputedStyle(e).display === "none") continue;
-                const q = e.getBoundingClientRect();
-                if (!q.width || !q.height) continue;
-                const x0 = q.left - sr.left, x1 = q.right - sr.left, y0 = q.top - sr.top;
-                if (phone) { if (y0 > H * 0.3) b = Math.min(b, y0); }
-                else if (x0 > W / 2) r = Math.min(r, x0);
-                else if (x1 < W / 2) l = Math.max(l, x1);
-            }
-            return [l, t, Math.max(r, l + 120), Math.max(b, t + 120)];
-        }
-        function fitGlobe() {
-            const g = globe, W = g.canvas.clientWidth, H = g.canvas.clientHeight;
-            if (!W || !H) return;
-            const [l, t, r, b] = freeArea(W, H), key = [W, H, l, t, r, b].map(Math.round).join();
-            if (key === g.fitKey) return;
-            g.fitKey = key;
-            const fw = r - l, fh = b - t, pad = 24;
-            // at the default distance the disc is about 0.93 of the height: shrink the view only when it would not fit
-            const k = Math.min(1, (fw - pad) / (0.93 * H), (fh - pad) / (0.93 * H));
-            const kk = Math.max(0.3, k);
-            g.cam.setViewOffset(W / kk, H / kk, W / (2 * kk) - (l + fw / 2), H / (2 * kk) - (t + fh / 2), W, H);
-            g.cam.updateProjectionMatrix();
-        }
         function resizeGlobe() {
             if (!globe) return;
             const W = $("stage").clientWidth, H = $("stage").clientHeight;
             if (!W || !H) return;
             globe.renderer.setSize(W, H, false);   // the canvas's CSS size comes from the stylesheet
             globe.cam.aspect = W / H;
-            globe.fitKey = "";
-            fitGlobe();
             globe.cam.updateProjectionMatrix();
             for (const mt of Object.values(globe.trackMats)) mt.uniforms.uRes.value.set(W, H);
             globe.trailMat.uniforms.uRes.value.set(W, H);
@@ -1126,7 +1097,6 @@
             G.raf = requestAnimationFrame(globeFrame);
             const now = nowS(), dt = Math.min(now - G.t, 0.1);
             G.t = now;
-            fitGlobe();   // follows the list / info card opening, closing and sliding
             const W = G.canvas.clientWidth, H = G.canvas.clientHeight;
             if (station && !G.stationMarked) markStation();
             if (station && !G.aimed) aimAt(station.lat, station.lon);   // nothing remembered or located yet: the station
@@ -1364,7 +1334,6 @@
         $("btn-track").onclick = () => setCamMode("track");
         $("cam-stop").onclick = () => stopCamera();
         $("left-toggle").onclick = () => $("left-col").classList.toggle("collapsed");
-        $("list-toggle").onclick = () => $("list").classList.toggle("collapsed");
         $("filters").onclick = (e) => {
             const b = e.target.closest("button[data-filter]");
             if (!b) return;
@@ -1385,8 +1354,8 @@
             stopCamera();
             aimGlobe();
         };
-        if (window.innerWidth <= 700) { $("list").classList.add("collapsed"); $("left-col").classList.add("collapsed"); }
-        // The globe fills #stage (beside the rail), not the window: resize it with its container
+        if (window.innerWidth <= 700) $("left-col").classList.add("collapsed");
+        // The globe fills its own card (#stage): resize with it (list toggle, sidebar toggle, window)
         if (window.ResizeObserver) new ResizeObserver(() => resizeGlobe()).observe($("stage"));
         document.addEventListener("visibilitychange", () => { startGlobe(); if (!document.hidden && Date.now() - lastFetch > POLL_MS) poll(); });
         try {

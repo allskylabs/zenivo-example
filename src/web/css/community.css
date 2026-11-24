@@ -1,8 +1,8 @@
 /* Community page (/community). Token-only: colours --c-*, type --fs-*, space --s-*, radii --r-*, sizes --tap/--icon-*.
  * Phone = map on top, station list below. Desktop >= 1024 = map and list side by side. Red Vision works through --c-* only. */
-.cm { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-3); width: 100%; box-sizing: border-box; max-width: var(--content-max); margin: 0 auto; color: var(--c-text); font-family: var(--font-ui); }
+.cm { width: 100%; box-sizing: border-box; color: var(--c-text); font-family: var(--font-ui); }
 .cm [hidden] { display: none !important; }
-.cm-mapbox { position: relative; isolation: isolate; height: 52dvh; min-height: 300px; border-radius: var(--r-lg); border: 1px solid var(--c-border); overflow: hidden; background: var(--c-bg); }
+.cm-mapbox { background: var(--c-bg); }
 #cmap { position: absolute; inset: 0; background: var(--c-bg); }
 #cmap .leaflet-container { font-family: var(--font-ui); }
 #cmap .leaflet-control-attribution { background: var(--c-surface-1); color: var(--c-text-3); font-size: var(--fs-12); max-width: calc(100% - 96px); white-space: normal; margin: 0 0 var(--s-2) var(--s-2); border-radius: var(--r-sm, 6px); padding: 2px var(--s-2); }
@@ -27,11 +27,13 @@
 @media (prefers-reduced-motion: reduce) { .cm-dot.online::after { animation: none; } }
 
 /* ---------- list ---------- */
-.cm-list { display: flex; flex-direction: column; min-width: 0; }
+.cm-list { min-width: 0; }
+.cm-title { margin: 0; font: inherit; }
 .cm-head { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--c-divider); font: 600 var(--fs-16) / 1 var(--font-ui); }
 .cm-head .ds-icon { color: var(--c-accent); }
-.cm-head span { margin-inline-start: auto; font: 500 var(--fs-14) / 1 var(--font-num); color: var(--c-text-2); }
-.cm-rows { margin: 0; padding: 0; list-style: none; }
+.cm-rows { margin: 0; padding: 0; list-style: none; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+@media (min-width: 901px) { .app-shell { height: 100dvh; min-height: 0; } }
+@media (max-width: 900px) { .cm-rows { overflow: visible; } }
 .cm-row-wrap { display: flex; align-items: center; border-bottom: 1px solid var(--c-divider); }
 .cm-row-wrap:last-child { border-bottom: 0; }
 .cm-row-wrap .ds-row { border-bottom: 0; flex: 1; min-width: 0; }
@@ -69,11 +71,6 @@
 .cm-light figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: var(--s-2); min-height: 0; }
 .cm-light-close { position: absolute; top: var(--s-3); right: var(--s-3); }
 
-@media (min-width: 1024px) {
-    .cm { flex-direction: row; align-items: flex-start; padding: var(--s-4); gap: var(--s-4); }
-    .cm-mapbox { flex: 1; min-width: 0; height: calc(100dvh - var(--topbar-h) - var(--s-8)); }
-    .cm-list { flex: 0 0 360px; max-height: calc(100dvh - var(--topbar-h) - var(--s-8)); overflow-y: auto; }
-}
 
 /* 44px hit area around small map markers without changing their look */
 .cm-mk { position: relative; }

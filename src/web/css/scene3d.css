@@ -4,7 +4,7 @@
 html, body { height: 100%; margin: 0; }
 body { background: var(--c-bg); color: var(--c-text); font-family: var(--font-ui); overflow: hidden; }
 .app-shell { height: 100vh; height: 100dvh; min-height: 0; }   /* the topbar is inside the shell: no empty strip below the canvas */
-#stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+#stage { position: relative; overflow: hidden; }   /* the map / globe card: a .ds-split__main (ds-components.css), canvases live only inside it */
 #map { position: absolute; inset: 0; background: var(--c-bg); }
 #globe { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: var(--c-bg); touch-action: none; }
 #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
@@ -59,19 +59,13 @@ button[hidden], a[hidden], img[hidden] { display: none !important; }
 .sc-note p { margin: var(--s-2) 0 0; }
 
 /* ---------- list ---------- */
-#list { position: absolute; z-index: var(--z-fab); display: flex; flex-direction: column; overflow: hidden; left: var(--s-3); right: var(--s-3); bottom: var(--s-3);
-    max-height: 46%; background: color-mix(in srgb, var(--c-surface-1) 94%, transparent); border: 1px solid var(--c-border); border-radius: var(--r-xl);
-    box-shadow: var(--shadow-1); backdrop-filter: blur(8px); }
+#list { min-height: 0; }   /* the side card: a .ds-split__side (ds-components.css) */
 .sc-head { display: flex; align-items: center; gap: var(--s-2); min-height: var(--tap); padding: 0 var(--s-2) 0 var(--s-4); font-weight: 600; }
 .sc-head .sc-ico { color: var(--c-text-2); }
-.sc-head .sc-count { margin-left: auto; font: 600 var(--fs-14) var(--font-num); color: var(--c-text-2); }
 #list-tools { padding: var(--s-2) var(--s-3); border-top: 1px solid var(--c-divider); display: flex; flex-direction: column; gap: var(--s-2); }
 #list-tools .sc-row { flex-wrap: nowrap; }
 #list-tools #search { flex: 1; }
-#list ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; border-top: 1px solid var(--c-divider); }
-#list.collapsed ul, #list.collapsed #list-tools { display: none; }
-#list-toggle { transition: transform var(--dur) var(--ease); }
-#list:not(.collapsed) #list-toggle { transform: rotate(180deg); }
+#list ul { list-style: none; margin: 0; padding: 0; flex: 1 1 auto; min-height: 0; overflow-y: auto; border-top: 1px solid var(--c-divider); }
 #list li { padding: var(--s-2) var(--s-4); min-height: var(--tap); border-bottom: 1px solid var(--c-divider); cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: var(--s-2);
     white-space: nowrap; font: var(--fs-12) var(--font-num); }
 #list li:last-child { border-bottom: 0; }
@@ -191,13 +185,9 @@ button[hidden], a[hidden], img[hidden] { display: none !important; }
 
 /* ---------- desktop ---------- */
 @media (min-width: 701px) {
-    #left-col { right: auto; max-width: calc(100% - 420px); }
+    #left-col { right: auto; max-width: calc(100% - 2 * var(--s-3)); }
     #left-toggle { display: none; }
     #left-col.collapsed #top > :not(.sc-row:first-child) { display: flex; }
-    #list { left: auto; top: var(--s-3); bottom: var(--s-3); right: var(--s-3); width: 380px; max-height: none; }
-    #list-toggle { display: none; }
-    #list.collapsed ul { display: block; }
-    #list.collapsed #list-tools { display: flex; }
     #info { right: auto; left: var(--s-3); width: 320px; bottom: var(--s-3); max-height: calc(100% - 200px); }
     #cam-foot { left: calc(var(--s-3) + 340px); }
     #cam-badge { top: var(--s-3); }

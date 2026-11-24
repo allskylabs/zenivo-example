@@ -35,6 +35,7 @@
     <link rel="stylesheet" href="/style.css?v=20261203k">
     <script>try{if(JSON.parse(localStorage.getItem("allsky.ui.prefs.v1")||"{}").nightVision)document.documentElement.setAttribute("data-theme","red")}catch(e){}</script>
     <link rel="stylesheet" href="/static/css/scene3d.css?v=20261203k">
+    <script src="/static/split.js?v=1" defer></script>
     <script type="importmap">
         { "imports": {
             "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -120,7 +121,9 @@
 
     <div class="app-main">
 
-    <div id="stage">
+    <div class="ds-split" id="split">
+    <div id="stage" class="ds-split__main">
+    <button class="ds-split__show" type="button" aria-label="Show list (L)" title="Show list (L)"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-panel-right-open"></use></svg><span class="ds-split__n">--</span></button>
 <div id="map"></div>
     <div id="labels"></div>
 
@@ -148,12 +151,6 @@
             </div>
         </div>
     </div><!-- #left-col -->
-
-    <div id="list" class="collapsed">
-        <div class="sc-head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg><span class="sc-count" id="count">--</span>
-            <button id="list-toggle" class="ds-btn ds-btn--icon ds-btn--ghost" type="button" aria-label="Show or hide the aircraft list" title="Aircraft list"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-chevron-up"></use></svg></button></div>
-        <ul id="ac-list"></ul>
-    </div>
 
     <div id="cam-foot" class="sc-panel"><span class="sc-dot"></span><span id="cam-foot-text"></span></div>
 
@@ -209,6 +206,13 @@
         </div>
     </div>
     </div><!-- #stage -->
+
+    <aside id="list" class="ds-split__side" aria-label="Aircraft">
+        <div class="sc-head ds-split__head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plane"></use></svg><span class="sc-count ds-split__n" id="count" data-split-count>--</span>
+            <button class="ds-btn ds-btn--icon ds-btn--ghost ds-split__toggle" type="button" aria-label="Hide list (L)" title="Hide list (L)"></button></div>
+        <ul id="ac-list"></ul>
+    </aside>
+    </div><!-- .ds-split -->
     </div><!-- .app-main -->
     </div><!-- .app-shell -->
 
@@ -2295,7 +2299,6 @@
         $("btn-chase").onclick = () => setCamMode("chase");
         $("cam-stop").onclick = () => stopCamera();
         $("left-toggle").onclick = () => $("left-col").classList.toggle("collapsed");
-        $("list-toggle").onclick = () => $("list").classList.toggle("collapsed");
         $("btn-base-terrain").classList.remove("on");   // setBase() marks the active one once the style is ready
         $("btn-base-terrain").onclick = () => setBase("terrain");
         $("btn-base-google").onclick = () => setBase("google");
@@ -2378,29 +2381,9 @@
                     poll();
                 }).catch(() => {});
         };
-        if (window.innerWidth <= 700) { $("list").classList.add("collapsed"); $("left-col").classList.add("collapsed"); }
-        // The map lives in #stage (beside the rail), not the window: resize it with its container
-        // The map centre is the centre of the free area: not under the list (right) or the info card (left), above a phone's sheet
-        let padKey = "";
-        function padMap() {
-            const sr = $("stage").getBoundingClientRect(), W = sr.width, H = sr.height, phone = window.innerWidth <= 700;
-            const p = { left: 0, right: 0, top: 0, bottom: 0 };
-            for (const id of ["list", "info"]) {
-                const e = $(id);
-                if (!e || getComputedStyle(e).display === "none") continue;
-                const q = e.getBoundingClientRect();
-                if (!q.width || !q.height) continue;
-                if (phone) { if (q.top - sr.top > H * 0.3) p.bottom = Math.max(p.bottom, sr.bottom - q.top); }
-                else if (q.left - sr.left > W / 2) p.right = Math.max(p.right, sr.right - q.left);
-                else if (q.right - sr.left < W / 2) p.left = Math.max(p.left, q.right - sr.left);
-            }
-            const k = [p.left, p.right, p.bottom].map(Math.round).join();
-            if (k === padKey) return;
-            padKey = k;
-            map.setPadding(p);
-        }
-        if (window.ResizeObserver) new ResizeObserver(() => { map.resize(); padMap(); }).observe($("stage"));
-        setInterval(padMap, 250);   // the list / info card open, close and slide
+        if (window.innerWidth <= 700) $("left-col").classList.add("collapsed");
+        // The map fills its own card (#stage): resize with it (list toggle, sidebar toggle, window)
+        if (window.ResizeObserver) new ResizeObserver(() => map.resize()).observe($("stage"));
         poll();
         setInterval(() => { if (!document.hidden && !map.isMoving()) poll(); }, POLL_MS);
         document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastFetch > POLL_MS) poll(); });

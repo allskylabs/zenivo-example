@@ -113,13 +113,14 @@
 
     <div class="app-main">
 
-    <main class="cm" aria-label="Community stations">
-        <div class="cm-mapbox">
+    <main class="cm ds-split ds-split--flow" id="split" aria-label="Community stations">
+        <div class="cm-mapbox ds-split__main">
+            <button class="ds-btn ds-btn--ghost ds-split__show" type="button" aria-label="Show list"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-panel-right-open"></use></svg><span class="ds-split__n">--</span></button>
             <div id="cmap" role="application" aria-label="Map of community stations"></div>
             <div class="cm-legend" id="clegend" hidden></div>
         </div>
-        <section class="ds-card ds-card--flush cm-list" aria-labelledby="cm-head">
-            <h2 class="cm-head" id="cm-head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-users"></use></svg><span class="ds-sr-only">Stations</span><span id="ccount"></span></h2>
+        <section class="cm-list ds-split__side" aria-labelledby="cm-head">
+            <div class="cm-head ds-split__head"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-users"></use></svg><h2 id="cm-head" class="cm-title">Stations</h2><span class="ds-split__n" id="ccount" data-split-count></span><button class="ds-btn ds-btn--icon ds-btn--ghost ds-split__toggle" type="button"></button></div>
             <div id="cempty" hidden></div>
             <ul class="cm-rows" id="cstations">
                 <li class="cm-skel" aria-hidden="true"><i class="ds-skeleton"></i><i class="ds-skeleton"></i><i class="ds-skeleton"></i></li>
@@ -147,6 +148,7 @@
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"
             integrity="sha384-eXVCORTRlv4FUUgS/xmOyr66XBVraen8ATNLMESp92FKXLAMiKkerixTiBvXriZr" crossorigin=""></script>
+    <script src="/static/split.js?v=1" defer></script>
     <script src="/static/community.js?v=20261203k"></script>
 </body>
 </html>
