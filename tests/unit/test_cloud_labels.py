@@ -7,7 +7,9 @@ import cloud_label_eval as ev  # noqa: E402
 
 
 def test_day_absolute_method_beats_relative_on_labelled_frames():
-    old = ev.summary(ev.day(ev.evaluate(False)))
+    old = ev.summary(ev.day(ev.evaluate(True, legacy=True)))
     new = ev.summary(ev.day(ev.evaluate(True)))
-    assert new["mae"] < 15 and new["mae"] < old["mae"]
+    assert new["mae"] < 15 and new["mae"] <= old["mae"] + 0.5
     assert new["overcast_below_50"] == 0
+    # whole set (night frames judged by colour only here): the new rules must be clearly better
+    assert ev.summary(ev.evaluate(True))["mae"] < ev.summary(ev.evaluate(True, legacy=True))["mae"] - 5

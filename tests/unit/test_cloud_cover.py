@@ -1,4 +1,5 @@
-"""Cloud cover analysis (colour / brightness structure, learned template), history storage and API."""
+"""Cloud cover analysis (history storage and API; the relative envelope / learned-template machinery is exercised with legacy=True, the
+absolute day/night rules in test_cloud_audit.py)."""
 
 import numpy as np
 import cv2
@@ -33,32 +34,32 @@ def _sky(cloud_frac: float, seed: int = 1, night: bool = True, glow: float = 40.
 def test_broken_cloud_is_measured_day_and_night():
     for night, sun in ((True, -40.0), (False, 40.0)):
         for frac in (0.3, 0.6):
-            r = analyze_cloud_cover(_sky(frac, night=night), 1.0, 10.0, sun)
+            r = analyze_cloud_cover(_sky(frac, night=night), 1.0, 10.0, sun, legacy=True)
             assert r["method"] == ("night" if night else "day")
             assert abs(r["cloud_cover_pct"] - 100 * frac) < 12, (night, frac, r)
 
 
 def test_clear_sky_with_glow_and_shading_is_clear():
     for night, sun in ((True, -40.0), (False, 40.0)):
-        r = analyze_cloud_cover(_sky(0.0, night=night, glow=60.0), 1.0, 10.0, sun)
+        r = analyze_cloud_cover(_sky(0.0, night=night, glow=60.0), 1.0, 10.0, sun, legacy=True)
         assert r["cloud_cover_pct"] < 5 and r["status"] == "clear"
 
 
 def test_sky_mask_excludes_buildings():
     img = _sky(0.0)
     img[:, 400:] = (90, 140, 200)  # a lit wall on the right: bright and orange
-    walls = analyze_cloud_cover(img, 1.0, 10.0, -40.0)
+    walls = analyze_cloud_cover(img, 1.0, 10.0, -40.0, legacy=True)
     mask = {"sky": [[[0, 0], [0.8, 0], [0.8, 1], [0, 1]]], "obstruction": []}
-    masked = analyze_cloud_cover(img, 1.0, 10.0, -40.0, sky_polygons=mask)
+    masked = analyze_cloud_cover(img, 1.0, 10.0, -40.0, sky_polygons=mask, legacy=True)
     assert walls["cloud_cover_pct"] > 10 and masked["cloud_cover_pct"] < 5
 
 
 def test_overexposed_and_black_frames_are_skipped():
     white = np.full((200, 300, 3), 255, np.uint8)
-    res = analyze_cloud_cover(white, 0.001, 0.0, 40.0)
+    res = analyze_cloud_cover(white, 0.001, 0.0, 40.0, legacy=True)
     assert res["cloud_cover_pct"] is None and res["status"] == "overexposed"
     black = np.full((200, 300, 3), 8, np.uint8)
-    res = analyze_cloud_cover(black, 10.0, 30.0, -40.0)
+    res = analyze_cloud_cover(black, 10.0, 30.0, -40.0, legacy=True)
     assert res["cloud_cover_pct"] is None and res["status"] == "unknown"
 
 
@@ -66,17 +67,17 @@ def test_template_learns_static_glow(monkeypatch):
     from src.analytics import cloud_cover
 
     monkeypatch.setattr(cloud_cover, "TEMPLATE_RATE", 0.02)  # learn in 80 samples instead of a few nights
-    before = analyze_cloud_cover(_sky(0.0, bump=60.0), 1.0, 10.0, -40.0)["cloud_cover_pct"]
+    before = analyze_cloud_cover(_sky(0.0, bump=60.0), 1.0, 10.0, -40.0, legacy=True)["cloud_cover_pct"]
     assert before > 0.5  # the lamp glow looks like a small cloud at first
     ref = CloudReference(None)
     for seed in range(80):
-        analyze_cloud_cover(_sky(0.15, seed=seed, bump=60.0), 1.0, 10.0, -40.0, reference=ref, count_stars=False)
+        analyze_cloud_cover(_sky(0.15, seed=seed, bump=60.0), 1.0, 10.0, -40.0, reference=ref, count_stars=False, legacy=True)
     assert ref.night_samples >= MIN_TEMPLATE_SAMPLES
-    after = analyze_cloud_cover(_sky(0.0, bump=60.0), 1.0, 10.0, -40.0, reference=ref)
+    after = analyze_cloud_cover(_sky(0.0, bump=60.0), 1.0, 10.0, -40.0, reference=ref, legacy=True)
     assert after["cloud_cover_pct"] < before / 4
     # Twilight does not teach the template
     n = ref.night_samples
-    analyze_cloud_cover(_sky(0.0), 1.0, 10.0, -8.0, reference=ref)
+    analyze_cloud_cover(_sky(0.0), 1.0, 10.0, -8.0, reference=ref, legacy=True)
     assert ref.night_samples == n
 
 
@@ -84,7 +85,7 @@ def test_reference_persists(tmp_path):
     p = tmp_path / "ref.json"
     ref = CloudReference(str(p))
     for seed in range(CloudReference.SAVE_EVERY):
-        analyze_cloud_cover(_sky(0.0, seed=seed), 1.0, 10.0, -40.0, reference=ref, count_stars=False)
+        analyze_cloud_cover(_sky(0.0, seed=seed), 1.0, 10.0, -40.0, reference=ref, count_stars=False, legacy=True)
     again = CloudReference(str(p))
     assert again.night_samples == CloudReference.SAVE_EVERY and again.template is not None
     assert np.allclose(again.template, ref.template, atol=1e-3)

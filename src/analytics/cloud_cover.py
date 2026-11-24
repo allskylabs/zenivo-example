@@ -57,6 +57,16 @@ DAY_BLUE_P90 = 1.20               # p90 of B/R at or above this: blue sky is vis
 DAY_GREY_P90 = 1.05               # p90 of B/R at or below this: a flat grey sky (uniform overcast)
 DAY_BLUE_DUSK = 0.08              # added to DAY_BLUE_P90 with the sun below the horizon: even a grey dusk sky has a blue cast
 DAY_SUN_DILATE = 9                # work pixels: extra margin around the saturated sun disc / glare for this test
+# Absolute sky-state measure (v2). Everything is a ratio of the frame's own channels, so it does not depend on
+# exposure or sensor gain; the white-balance dependent numbers are B/R levels of a clear blue sky vs a grey one.
+BLUE_DAY_RATIO, BLUE_DAY_FULL = 1.35, 0.55    # sun >= DAY_LOW_SUN: share of pixels with B/R above this ...
+BLUE_LOW_RATIO, BLUE_LOW_FULL = 1.50, 0.30    # ... (twilight / low sun: the sky is bluer than the cloud only by more)
+DAY_LOW_SUN = 6.0
+NIGHT_MIN_SUN = -12.0
+NIGHT_COLOUR_CLEAR, NIGHT_COLOUR_CLOUD = 1.15, 0.90   # median B/R: a clear (moon-)lit sky is blue, cloud lit by town glow is not
+NIGHT_STRUCT_CLEAR, NIGHT_STRUCT_CLOUD = 0.30, 0.10  # smoothed-luminance spread: a clear sky has a horizon/moon gradient, cloud is flat
+SPREAD_CLEAR, SPREAD_CLOUD = 0.35, 0.15     # p90-p10 of B/R across the sky: clear sky has a colour gradient whatever the white balance, cloud is uniform
+STAR_CLEAR_CLARITY = 0.12                    # at least this share of catalogue stars seen: the sky is clear whatever the colour says
 # Night: a catalogue match this bad while many stars ARE visible means a stale pointing, not a cloudy sky
 STALE_CLARITY = 0.1
 STALE_MIN_STARS = 6
@@ -242,7 +252,8 @@ def cloud_map(
         small = np.repeat(small[:, :, None], 3, axis=2)
     sky = sky_work_mask((wh, ww), sky_polygons, roi, circle)
     out: Dict[str, Any] = {"cloud": None, "valid": None, "sky_frac": 0.0, "saturated_frac": 0.0,
-                           "sky_level": 0.0, "res_c": None, "res_l": None, "br_p90": None}
+                           "sky_level": 0.0, "res_c": None, "res_l": None, "br_p90": None,
+                           "feat": None}
     if not sky.any():
         return out
     sat = small.max(axis=2) >= 248
@@ -257,6 +268,14 @@ def cloud_map(
         return out
 
     c_raw, l_raw = np.log(b / r), np.log(lum)
+    far = valid
+    if not night:
+        far = valid & ~cv2.dilate(sat.astype(np.uint8), np.ones((DAY_SUN_DILATE,) * 2, np.uint8)).astype(bool)
+    q = (b / r)[far if far.sum() >= 50 else valid]
+    ls = cv2.GaussianBlur(lum, (0, 0), 2.0)[valid]
+    out["feat"] = {"blue_day": float((q > BLUE_DAY_RATIO).mean()), "blue_low": float((q > BLUE_LOW_RATIO).mean()),
+                   "br50": float(np.median((b / r)[valid])),
+                   "brsp": float(np.percentile((b / r)[valid], 90) - np.percentile((b / r)[valid], 10)), "struct": float(ls.std() / max(1e-6, ls.mean()))}
     if not night:
         # Absolute blue test, away from the sun disc and its glare (saturated pixels plus a margin)
         far = valid & ~cv2.dilate(sat.astype(np.uint8), np.ones((DAY_SUN_DILATE,) * 2, np.uint8)).astype(bool)
@@ -283,6 +302,25 @@ def cloud_map(
     return out
 
 
+def _ramp(v: float, clear: float, cloud: float) -> float:
+    """0 at `clear`, 1 at `cloud` (either order), linear between, clipped."""
+    return float(min(1.0, max(0.0, (v - clear) / (cloud - clear))))
+
+
+def sky_state_cover(feat: Dict[str, float], sun_elev: float) -> Tuple[float, str]:
+    """Cloud fraction (0..1) from the frame's colour / structure statistics, and the rule used.
+
+    Day (sun well up): share of clearly blue pixels. Twilight / low sun: the same with a bluer bar.
+    Night: a clear sky is blue (moonlight scatter) and has a gradient; cloud lit from below by the town is
+    reddish and flat. Both cues are tested, the worse one wins."""
+    if sun_elev >= DAY_LOW_SUN:
+        return min(_ramp(feat["blue_day"], BLUE_DAY_FULL, 0.0), _ramp(feat["brsp"], SPREAD_CLEAR, SPREAD_CLOUD)), "day"
+    if sun_elev > NIGHT_MIN_SUN:
+        return min(_ramp(feat["blue_low"], BLUE_LOW_FULL, 0.0), _ramp(feat["brsp"], SPREAD_CLEAR, SPREAD_CLOUD)), "twilight"
+    return max(_ramp(feat["br50"], NIGHT_COLOUR_CLEAR, NIGHT_COLOUR_CLOUD),
+               _ramp(feat["struct"], NIGHT_STRUCT_CLEAR, NIGHT_STRUCT_CLOUD)), "night"
+
+
 def analyze_cloud_cover(
     frame: np.ndarray,
     exposure_s: float,
@@ -295,6 +333,7 @@ def analyze_cloud_cover(
     star_ref: Optional[Dict[str, Any]] = None,
     circle: Optional[Sequence[float]] = None,
     day_abs: bool = True,
+    legacy: bool = False,
 ) -> Dict[str, Any]:
     """
     Estimate cloud cover of one frame.
@@ -345,7 +384,13 @@ def analyze_cloud_cover(
         with reference.lock:
             reference.learn(cm["res_c"], cm["res_l"], valid)
 
-    if day_abs and not night and cm["br_p90"] is not None:
+    if not legacy and cm["feat"] is not None:
+        cc_env = cc
+        cc, rule = sky_state_cover(cm["feat"], sun_elev)
+        if rule != "night":
+            cc = max(cc, cc_env)  # by day the relative map still sees broken cloud in an otherwise blue sky
+        result.update(rule=rule, cloud_env_pct=round(100.0 * cc_env, 1), **{k: round(v, 3) for k, v in cm["feat"].items()})
+    elif day_abs and not night and cm["br_p90"] is not None:
         blue = DAY_BLUE_P90 + (DAY_BLUE_DUSK if sun_elev < 0.0 else 0.0)
         grey = (blue - cm["br_p90"]) / (blue - DAY_GREY_P90)
         result["day_grey"] = round(min(1.0, max(0.0, grey)), 2)
@@ -366,7 +411,12 @@ def analyze_cloud_cover(
             result.update(stars_expected=sc["expected"], stars_seen=sc["seen"], star_clarity=sc["clarity"],
                           star_shift_px=sc.get("shift_px"))
             if sc["clarity"] is not None:
-                if sc["clarity"] < STALE_CLARITY and result["star_count"] >= STALE_MIN_STARS and cc < 0.3:
+                if not legacy and sc["clarity"] >= STAR_CLEAR_CLARITY:
+                    cc = min(cc, 0.2)  # the catalogue stars are there: whatever the colour says, this sky is clear
+                    clarity_used = True
+                elif not legacy:
+                    clarity_used = True  # few stars seen: reported only, a bright moon or town glow hides them on clear nights too
+                elif sc["clarity"] < STALE_CLARITY and result["star_count"] >= STALE_MIN_STARS and cc < 0.3:
                     # Many stars stand out but none where the catalogue puts them: the stored pointing is stale
                     result["star_ref_stale"] = True
                 else:
