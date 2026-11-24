@@ -32,8 +32,8 @@ f. Frame 0 of the day was black (no value).
 Inside the sky mask at 160 px: day (sun>=6) cloud = min(blue-share ramp, colour-spread ramp); twilight (-12..6) uses a stricter blue share; night (<-12) = max(median B/R ramp, luminance-structure ramp); legacy envelope kept as a max for day/twilight. Stars: report, and cap cloud when clearly seen. Confidence is reported by the analyzer. Thresholds are in cloud_cover.py constants.
 
 ## 5. Limits
-- Absolute B/R thresholds depend on white balance; the older set has neutral balance and needed the spread cue. The Pi (imx708) was not reachable from this session for a frame check, so thresholds there are unverified: after deploy, compare Pi history against the live view.
-- Known misses: frame 10 (thin moonlit overcast, reads 21 vs label 95), frame 18 (dawn flat colour, 79 vs 20).
+- Absolute B/R thresholds depend on white balance; the older set has neutral balance and needed the spread cue. The Pi (imx708) was checked, see section 7: no per-sensor calibration needed, but no clear Pi sky exists in the set.
+- Known misses, both accepted limits: frame 10 (thin moonlit overcast reads 21 vs 95: the cloud is lit by the moon and shows stars/structure like clear sky; telling them apart needs a star solution at night, which the offline set lacks, so the live star-clarity cap covers it); frame 18 (dawn, flat colour reads 79 vs 20: a clear pre-dawn sky has no blue share or spread to measure; only a time-of-day sky model would fix it, not worth the complexity).
 - No truly clear day in the audit set; clear-day calibration comes from the older set.
 
 ## 6. Per-frame table
@@ -109,3 +109,9 @@ Inside the sky mask at 160 px: day (sun>=6) cloud = min(blue-share ramp, colour-
 | 68 | 11-24T11:41 | 48 | -44 | overcast 95 | 4 | 100 | ✓ |
 | 69 | 11-24T12:16 | 48 | -42 | overcast 95 | 4 | 100 | ✓ |
 | 70 | 11-24T12:51 | 45 | -39 | overcast 95 | 4 | 100 | ✓ |
+
+## 7. Pi (imx708) check, 2026-11-24
+Pi is a 66x41 deg rectilinear camera (no circle, rectangular sky mask), neutral/teal white balance (median B/R 1.00-1.04). 33 frames (18 hourly 11-23/11-24 + 15 from 11-19..11-22: dawn, day, dusk, night), labelled by eye, frozen in `tests/fixtures/cloud_audit_pi`, test `test_pi_imx708_frames_agree`.
+- Result: 31/33 class agreement (93.9 %). Overcast day frames read 100, night overcast 68-100. Blue-gap frame (11-21 13:00, label 60) fires the cues (blue_day 0.13, spread 0.48) and reads 62.5.
+- Misses: 11-19 23:00 (label 90, reads 68, dark night overcast, no star solution offline) and 11-22 15:00 (hazy teal with a warm sun-side glow, label 85, reads 50: the warm-to-cool gradient raises the spread cue).
+- No clear Pi frame exists: the old Pi history shows low cc on 11-19 but the frames are fully overcast (the old method under-read), and frames before 11-17 are not kept. The blue-share/spread thresholds are therefore verified only for overcast and partly-cloudy there. Decision: no per-sensor calibration added (nothing to fit; a config knob without data would be guesswork). Revisit when the first clear Pi day appears.

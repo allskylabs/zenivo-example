@@ -98,7 +98,7 @@ def test_sky_analysis_throttled_and_recorded_day_and_night(monkeypatch):
     svc = AllSkyService.get_instance()
     calls = []
 
-    def fake(frame, exp, gain, sun, roi, reference, sky_polygons=None, star_ref=None, circle=None):
+    def fake(frame, exp, gain, sun, roi, reference, sky_polygons=None, star_ref=None, circle=None, day_abs=True):
         calls.append(sun)
         return {"star_count": 7 if sun < 0 else 0, "cloud_cover_pct": 12.0, "status": "clear", "method": "night" if sun < 0 else "day", "confidence": 0.8}
 

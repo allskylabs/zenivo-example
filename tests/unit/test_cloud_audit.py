@@ -54,3 +54,29 @@ def test_smoothing_median_and_hysteresis():
     assert f(90)["cloud_cover_pct"] == 12          # one outlier cannot move the median
     assert f(26)["status"] == "clear"              # 26 is inside the 5 % hysteresis band
     assert f(80, "day")["cloud_cover_pct"] == 80   # method change restarts the history
+
+
+def test_pi_imx708_frames_agree():
+    """33 frames of the Pi (imx708, rectilinear 66x41 deg, teal/neutral white balance): the B/R rules need no per-sensor
+    calibration there. The set has no clear sky (Nov 2026 was overcast); 11-21 13:00 is the blue-gap partly case."""
+    import csv
+    import json
+    from datetime import datetime, timedelta, timezone
+
+    import cv2
+    from src.calibration.auto_exposure import calculate_solar_elevation
+
+    d = os.path.join(os.path.dirname(__file__), "..", "fixtures", "cloud_audit_pi")
+    st = json.load(open(os.path.join(d, "station.json")))
+    tz = timezone(timedelta(hours=st["tz_hours"]))
+    rs = []
+    for r in csv.DictReader(open(os.path.join(d, "labels.csv"))):
+        t = datetime.strptime(r["frame"][6:21], "%Y%m%d_%H%M%S").replace(tzinfo=tz)
+        sun = calculate_solar_elevation(st["lat"], st["lon"], t)
+        res = analyze_cloud_cover(cv2.imread(os.path.join(d, r["frame"])), 0.1, 0.0, sun, sky_polygons=st["sky_mask"],
+                                  circle=None, count_stars=False)
+        rs.append({"frame": r["frame"], "label": float(r["label_pct"]), "value": res["cloud_cover_pct"]})
+    sc = ev.score(rs, "value")
+    assert sc["n"] == 33 and sc["agree_pct"] >= 90 and sc["mae"] <= 15, sc
+    gap = next(r for r in rs if "20261121_130020" in r["frame"])
+    assert 25 <= gap["value"] < 85
