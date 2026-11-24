@@ -2380,7 +2380,27 @@
         };
         if (window.innerWidth <= 700) { $("list").classList.add("collapsed"); $("left-col").classList.add("collapsed"); }
         // The map lives in #stage (beside the rail), not the window: resize it with its container
-        if (window.ResizeObserver) new ResizeObserver(() => map.resize()).observe($("stage"));
+        // The map centre is the centre of the free area: not under the list (right) or the info card (left), above a phone's sheet
+        let padKey = "";
+        function padMap() {
+            const sr = $("stage").getBoundingClientRect(), W = sr.width, H = sr.height, phone = window.innerWidth <= 700;
+            const p = { left: 0, right: 0, top: 0, bottom: 0 };
+            for (const id of ["list", "info"]) {
+                const e = $(id);
+                if (!e || getComputedStyle(e).display === "none") continue;
+                const q = e.getBoundingClientRect();
+                if (!q.width || !q.height) continue;
+                if (phone) { if (q.top - sr.top > H * 0.3) p.bottom = Math.max(p.bottom, sr.bottom - q.top); }
+                else if (q.left - sr.left > W / 2) p.right = Math.max(p.right, sr.right - q.left);
+                else if (q.right - sr.left < W / 2) p.left = Math.max(p.left, q.right - sr.left);
+            }
+            const k = [p.left, p.right, p.bottom].map(Math.round).join();
+            if (k === padKey) return;
+            padKey = k;
+            map.setPadding(p);
+        }
+        if (window.ResizeObserver) new ResizeObserver(() => { map.resize(); padMap(); }).observe($("stage"));
+        setInterval(padMap, 250);   // the list / info card open, close and slide
         poll();
         setInterval(() => { if (!document.hidden && !map.isMoving()) poll(); }, POLL_MS);
         document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastFetch > POLL_MS) poll(); });
