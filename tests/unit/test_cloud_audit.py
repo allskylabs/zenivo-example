@@ -41,3 +41,16 @@ def test_overcast_labelled_frames_never_read_clear():
     bad = [r["frame"] for r in ev.rows() if r["label"] >= 90 and r["value"] is not None
            and r["value"] < 25 and r["frame"] not in known]
     assert not bad, bad
+
+
+def test_smoothing_median_and_hysteresis():
+    from types import SimpleNamespace
+    from src.api.service import AllSkyService as S
+    o = SimpleNamespace(performance={"cloud_day_abs": 1}, DAY_SMOOTH_N=5, CLOUD_HYST_PCT=5.0)
+    f = lambda cc, m="night": S._smooth_day_cloud(o, {"cloud_cover_pct": cc, "method": m, "status": "x"})
+    for v in (10, 12, 11):
+        r = f(v)
+    assert r["status"] == "clear"
+    assert f(90)["cloud_cover_pct"] == 12          # one outlier cannot move the median
+    assert f(26)["status"] == "clear"              # 26 is inside the 5 % hysteresis band
+    assert f(80, "day")["cloud_cover_pct"] == 80   # method change restarts the history

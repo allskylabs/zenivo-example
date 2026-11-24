@@ -53,6 +53,11 @@ from src.defaults import DEFAULT_LAT, DEFAULT_LON
 
 
 
+def _status_edge(a: str, b: str) -> float:
+    """Threshold (percent) between two adjacent cloud status labels."""
+    return 25.0 if "clear" in (a, b) else 70.0
+
+
 class _BoundedCache(OrderedDict):
     """Least-recently-used dict: a full-res master dark is ~10-15 MB, and a night that walks through
     every exposure profile would otherwise keep the whole library (70+ MB) resident."""
@@ -441,22 +446,36 @@ class AllSkyService(CalibrationMixin, ProductsMixin, EventsMixin, TrafficMixin, 
 
     DAY_SMOOTH_N = 5  # day samples (5 min apart) in the median: a passing glare / sun-disc frame cannot flip the state
 
+    CLOUD_HYST_PCT = 5.0  # the status label only flips once the median is this far past a threshold
+
     def _smooth_day_cloud(self, stats: Dict[str, Any]) -> Dict[str, Any]:
-        """Median of the last few day readings (the day estimate is noisier than the night one); resets at night."""
+        """Median of the last few readings (day, twilight and night alike) plus hysteresis on the status label.
+
+        History restarts when the method changes (day -> night) so a stale value never carries over.
+        """
         hist = getattr(self, "_day_cc_hist", None)
         if hist is None:
             hist = self._day_cc_hist = []
         cc = stats.get("cloud_cover_pct")
-        if stats.get("method") != "day" or cc is None or not int(self.performance.get("cloud_day_abs", 1)):
-            if stats.get("method") != "day":
-                hist.clear()
+        method = stats.get("method")
+        if method != getattr(self, "_cc_hist_method", None):
+            hist.clear()
+            self._cc_hist_method = method
+        if cc is None or not int(self.performance.get("cloud_day_abs", 1)):
             return stats
         hist.append(float(cc))
         del hist[:-self.DAY_SMOOTH_N]
         med = sorted(hist)[len(hist) // 2]
+        out = dict(stats)
         if med != cc:
-            stats = {**stats, "cloud_cover_raw": cc, "cloud_cover_pct": round(med, 1), "status": _status(med)}
-        return stats
+            out.update(cloud_cover_raw=cc, cloud_cover_pct=round(med, 1))
+        status = _status(med)
+        prev = getattr(self, "_cc_status", None)
+        if prev and prev != status and abs(med - _status_edge(prev, status)) < self.CLOUD_HYST_PCT:
+            status = prev
+        self._cc_status = status
+        out["status"] = status
+        return out
 
     def _sky_stats(self, frame: np.ndarray, is_pytest: bool, meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Star count / cloud cover, at most once per analysis_interval_s; each sample goes to the cloud history."""
