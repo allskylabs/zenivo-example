@@ -73,6 +73,6 @@
 
 
 /* 44px hit area around small map markers without changing their look */
-.cm-mk { position: relative; }
+.leaflet-marker-icon.cm-mk { position: absolute; } /* never "relative": it pulls every marker into normal flow and shifts it by the height of the markers before it */
 .cm-mk::after { content: ""; position: absolute; left: 50%; top: 50%; width: var(--tap); height: var(--tap); transform: translate(-50%, -50%); }
 .cm > * { min-width: 0; }
