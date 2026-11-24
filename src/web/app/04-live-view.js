@@ -302,7 +302,7 @@ if (btnStationSolve) {
         runStationSolve(btnStationSolve, chkStationDeep && chkStationDeep.checked ? "deep" : "auto"));
 }
 
-// One in-flight GET /api/station/sky-mask shared by the mask editor and the star-align panel (both load together)
+// One in-flight GET /api/station/sky-mask used by the mask editor (the star-align panel has no mask of its own)
 let skyMaskInflight = null;
 function fetchSkyMask() {
     if (!skyMaskInflight) {
@@ -451,7 +451,6 @@ if (alignBox) {
     const alignAlert = document.getElementById("align-alert");
     const btnApply = document.getElementById("align-apply");
     let picks = [];          // [x, y] fractions (snapped to the star once identified)
-    let maskPolys = { sky: [], obstruction: [] };
     let identified = null;   // last successful preview
     let alignRetries = 0, alignTimer = null;
 
@@ -462,18 +461,6 @@ if (alignBox) {
         alignCanvas.height = h;
         const ctx = alignCanvas.getContext("2d");
         ctx.clearRect(0, 0, w, h);
-        const outline = (polys, rgb) => polys.forEach((pts) => {
-            ctx.beginPath();
-            pts.forEach(([x, y], i) => (i ? ctx.lineTo(x * w, y * h) : ctx.moveTo(x * w, y * h)));
-            ctx.closePath();
-            ctx.strokeStyle = `rgba(${rgb},0.7)`;
-            ctx.setLineDash([6, 4]);
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-            ctx.setLineDash([]);
-        });
-        outline(maskPolys.sky, "34,197,94");
-        outline(maskPolys.obstruction, "239,68,68");
         const names = new Map();
         if (identified) identified.matched_stars.forEach((m) => names.set(`${m.x}|${m.y}`, m));
         picks.forEach(([x, y], i) => {
@@ -499,15 +486,6 @@ if (alignBox) {
     const loadAlignFrame = () => {
         clearTimeout(alignTimer);
         alignImg.src = `/api/live/snapshot.jpg?t=${Date.now()}`;
-    };
-    const loadAlignMask = async () => {
-        try {
-            const d = await fetchSkyMask();
-            if (d) {
-                maskPolys = { sky: d.sky || [], obstruction: d.obstruction || [] };
-                drawAlign();
-            }
-        } catch (e) {}
     };
     const reset = () => { picks = []; identified = null; btnApply.disabled = true; drawAlign(); };
     alignImg.addEventListener("error", () => {
@@ -582,7 +560,6 @@ if (alignBox) {
     });
     if (currentPage === "tab-settings") {
         loadAlignFrame();
-        loadAlignMask();
     }
 }
 
