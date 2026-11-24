@@ -6,6 +6,21 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.3.0-beta.6] - 2026-11-24
+
+### Added
+- Community seeds and automatic discovery of nearby stations.
+- Split frame (map card plus a separate, hideable list card) for Flights 3D, Satellites 3D and Community.
+- Stream view and Stream control; one shared sky mask for all features.
+
+### Changed
+- UI rebuilt on the `ds` design system: new sidebar and topbar, full-width layout, Settings restructured, Admin deduplicated, icons first with short labels.
+- Cloud detection rewritten (colour spread, blue fraction, structure, star clarity as a cap) with smoothing and hysteresis; agreement with the 70-frame audit set rose from 38.6% to 88.6% (Pi imx708 set: 31/33).
+- Events detector gates: meteor, SGP4 satellite cross-check and plane grouping, each with a rollback switch.
+
+### Fixed
+- Icons rendering, mobile chat layout, phone offset of the split list, cached redesign CSS.
+
 ## [1.3.0-beta.5] - 2026-11-23
 
 ### Added
