@@ -8,7 +8,7 @@ Value path: `analyze_cloud_cover` (src/analytics/cloud_cover.py) -> `AllSkyServi
 Worker-17 (f018f1c/30d4540) restricted counting to the single saved sky mask. That is correct and is **not** the cause: errors come from the colour and star logic, not the mask. The same frames were wrong with any mask.
 
 ## 2. Method
-70 frames from the mini-PC, 2022-11-22 20:17 to 11-24 12:51 local (every ~35 min, day, twilight, night, moon up, rain/dew), 960x720, stored in tests/fixtures/cloud_audit/ with my visual labels (labels.csv: clear <25, partly 25-70, overcast >=70) and the value the deployed service had recorded. Metric: class agreement % and MAE in percent points. `python3 scripts/cloud_audit_eval.py [-v]` reproduces it; tests/unit/test_cloud_audit.py pins it.
+70 frames from the mini-PC, 2026-11-22 20:17 to 2026-11-24 12:51 local (every ~35 min, day, twilight, night, moon up, rain/dew), 960x720, stored in tests/fixtures/cloud_audit/ with my visual labels (labels.csv: clear <25, partly 25-70, overcast >=70) and the value the deployed service had recorded. Metric: class agreement % and MAE in percent points. `python3 scripts/cloud_audit_eval.py [-v]` reproduces it; tests/unit/test_cloud_audit.py pins it.
 
 | Group | n | Deployed agree / MAE | New agree / MAE |
 |---|---|---|---|
