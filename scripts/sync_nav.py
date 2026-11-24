@@ -59,8 +59,8 @@ MENU = [
     ("Streaming", False, [("/obs/dock", "film", "OBS dock", True, False)]),
     # Settings owns every Camera/Station/Integrations/Activity destination in its own two-pane list: ONE sidebar item.
     # The standalone /focus /calibration /logs pages are Settings destinations too, so Settings stays the one active item.
-    (None, False, [("/settings", "settings", "Settings", True, False),
-                   ("/settings#admin", "key-round", "Admin", True, False)]),
+    # Settings > Admin is the one Admin entry (no duplicate sidebar item); /settings#admin and /admin deep links still work.
+    (None, False, [("/settings", "settings", "Settings", True, False)]),
 ]
 MORE_PATHS = ",".join(sorted(({h.split("#")[0] for _, _, items in MENU for h, *_ in items} | set(SETTINGS_PATHS.split(","))) - {t[0] for t in TABS}))
 
@@ -140,10 +140,7 @@ def render(current, is_index):
             o.append(f'                    <h3 class="zs__title">{title}</h3>')
         for h, i, label, adm, blank in items:
             path, _, frag = h.partition("#")
-            if h == "/settings#admin":
-                attrs = " data-admin"  # shortcut only: never highlighted (Settings is the one active item)
-            else:
-                attrs = f' data-paths="{SETTINGS_PATHS if h == "/settings" else path}"' + (f' data-hash="{frag}"' if frag else "") + (" data-admin" if adm else "")
+            attrs = f' data-paths="{SETTINGS_PATHS if h == "/settings" else path}"' + (f' data-hash="{frag}"' if frag else "") + (" data-admin" if adm else "")
             attrs += ' target="_blank" rel="noopener"' if blank else ""
             plain = label.replace("&amp;", "&")
             badge = '<b class="zt-badge" id="log-error-badge" hidden>0</b>' if h == "/logs" and is_index else ""
