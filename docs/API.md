@@ -49,7 +49,7 @@ object of `/api/adsb/aircraft` and `/api/satellites`; the ADS-B receiver address
 | GET | `/sky`, `/flights3d`, `/satellites3d`, `/community` | Separate pages: observer sky view, Flights 3D, Satellites 3D, Community map |
 | GET | `/login` | Admin sign-in and first-start setup page |
 | GET, HEAD | `/full`, `/live/full`, `/obs` | Clean full-frame live page (OBS browser source) |
-| GET, HEAD | `/obs/dock`, `/obs/control`, `/dock` | OBS dock page (admin: redirects to `/login`) |
+| GET, HEAD | `/obs/dock`, `/obs/control`, `/dock` | Stream control (OBS dock) page (admin: redirects to `/login`) |
 | GET | `/index.html`, `/style.css`, `/static/focus.js` | Shell and legacy asset aliases |
 | GET | `/favicon.ico`, `/site.webmanifest` | Brand assets |
 | GET | `/static/...` | Files of `src/web/` (scripts, styles, `brand/`, `skydata/`, `sky/`) |

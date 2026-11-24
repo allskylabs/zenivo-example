@@ -129,7 +129,7 @@ Full steps (camera access, time zone, nginx, ADS-B feeder, upgrades, uninstall) 
 | `/sky` | Observer sky view (WebGL planetarium with aircraft, satellites, events) |
 | `/flights3d`, `/satellites3d` | 3D views of aircraft and satellites around the station |
 | `/community` | Community map of opted-in stations |
-| `/obs`, `/obs/dock` | Clean OBS browser source (also `/full`, `/live/full`) and its control dock |
+| `/obs`, `/obs/dock` | "Stream view": clean OBS browser source (also `/full`, `/live/full`); "Stream control": its admin dock |
 | `/login` | Admin sign-in and first-start setup |
 
 ## Documentation

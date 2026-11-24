@@ -24,8 +24,7 @@
             ["/settings#community", "community", "users", "Community sharing", "community share map public", true, () => { const e = $("community-enabled"); return e ? (e.checked ? "On" : "Off") : ""; }],
         ]],
         ["Streaming", [
-            ["/obs/dock", "", "radio", "OBS dock", "obs streaming control panel", true, () => ""],
-            ["/obs", "", "play", "OBS preview", "obs streaming preview", false, () => ""],
+            ["/obs/dock", "", "radio", "Stream control", "obs dock streaming control panel stream", true, () => ""],
         ]],
         ["Admin", [
             ["/logs", "", "activity", "Activity log", "log errors events system", true, () => ""],
@@ -40,7 +39,7 @@
     const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     box.innerHTML = GROUPS.map(([g, rows]) => `<section class="sh-group"${rows.every((r) => r[5]) ? " data-admin" : ""} aria-label="${esc(g)}"><h2 class="sh-title">${esc(g)}</h2><div class="ds-card ds-card--flush"><div class="ds-list">` +
         rows.map(([href, sec, ic, title, kw, adm]) =>
-            `<a class="ds-row sh-row" href="${href}"${sec ? ` data-section="${sec}"` : ""}${adm ? " data-admin" : ""} data-k="${esc((title + " " + kw).toLowerCase())}"${href === "/obs" ? ' target="_blank" rel="noopener"' : ""}>` +
+            `<a class="ds-row sh-row" href="${href}"${sec ? ` data-section="${sec}"` : ""}${adm ? " data-admin" : ""} data-k="${esc((title + " " + kw).toLowerCase())}">` +
             `<span class="ds-row__icon">${icon(ic)}</span><span class="ds-row__body"><span class="ds-row__title">${esc(title)}</span><span class="ds-row__sub" hidden></span></span>` +
             `<span class="ds-row__chev">${icon("chevron-right")}</span></a>`).join("") + "</div></div></section>").join("");
     const rowEls = [...box.querySelectorAll(".sh-row")];

@@ -56,7 +56,8 @@ MENU = [
                    ("/community", "users", "Community", False, False)]),
     ("Explore", False, [("/flights3d", "plane", "Flights 3D", False, False),
                         ("/satellites3d", "satellite", "Satellites 3D", False, False)]),
-    ("Streaming", False, [("/obs/dock", "film", "OBS dock", True, False)]),
+    # "Stream view" = the public viewing page /obs; the control dock (/obs/dock) lives in Settings > Streaming as "Stream control".
+    ("Streaming", False, [("/obs", "play", "Stream view", False, True)]),
     # Settings owns every Camera/Station/Integrations/Activity destination in its own two-pane list: ONE sidebar item.
     # The standalone /focus /calibration /logs pages are Settings destinations too, so Settings stays the one active item.
     # Settings > Admin is the one Admin entry (no duplicate sidebar item); /settings#admin and /admin deep links still work.
