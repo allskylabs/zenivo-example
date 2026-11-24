@@ -205,3 +205,47 @@ button[hidden], a[hidden], img[hidden] { display: none !important; }
 #status { display: inline-flex; gap: var(--s-3); align-items: center; }
 .sc-stat { display: inline-flex; align-items: center; gap: var(--s-1); font-variant-numeric: tabular-nums; }
 #sky, #tle { display: inline-flex; align-items: center; gap: var(--s-1); }
+
+/* ---------- map library controls (MapLibre) in ds tokens: dark surface + LIGHT icon, never the library's white bar / black icons ---------- */
+#stage {
+    --mc-plus: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 12h14%22/%3E%3Cpath d=%22M12 5v14%22/%3E%3C/svg%3E");
+    --mc-minus: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 12h14%22/%3E%3C/svg%3E");
+    --mc-compass: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2210%22/%3E%3Cpath d=%22m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z%22/%3E%3C/svg%3E");
+    --mc-globe: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2210%22/%3E%3Cpath d=%22M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20%22/%3E%3Cpath d=%22M2 12h20%22/%3E%3C/svg%3E");
+    --mc-info: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2210%22/%3E%3Cpath d=%22M12 16v-4%22/%3E%3Cpath d=%22M12 8h.01%22/%3E%3C/svg%3E");
+    --mc-map: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z%22/%3E%3Cpath d=%22M15 5.764v15%22/%3E%3Cpath d=%22M9 3.236v15%22/%3E%3C/svg%3E");
+}
+#stage .maplibregl-ctrl-group { background: var(--c-surface-1); border: 1px solid var(--c-border); border-radius: var(--r-md); box-shadow: var(--shadow-1); overflow: hidden; }
+#stage .maplibregl-ctrl-group:not(:empty) { box-shadow: var(--shadow-1); }
+#stage .maplibregl-ctrl-group button { width: var(--tap); height: var(--tap); background: transparent; color: var(--c-text); border: 0; cursor: pointer; }
+#stage .maplibregl-ctrl-group button + button { border-top: 1px solid var(--c-border); }
+#stage .maplibregl-ctrl-group button .maplibregl-ctrl-icon { background-image: none; background-color: currentColor; width: 100%; height: 100%;
+    -webkit-mask: var(--mc-ico) center / 22px 22px no-repeat; mask: var(--mc-ico) center / 22px 22px no-repeat; }
+#stage .maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon { --mc-ico: var(--mc-plus); }
+#stage .maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon { --mc-ico: var(--mc-minus); }
+#stage .maplibregl-ctrl-compass .maplibregl-ctrl-icon { --mc-ico: var(--mc-compass); }
+#stage .maplibregl-ctrl-globe .maplibregl-ctrl-icon { --mc-ico: var(--mc-map); }
+#stage .maplibregl-ctrl-globe-enabled .maplibregl-ctrl-icon { --mc-ico: var(--mc-globe); }
+#stage .maplibregl-ctrl-group button:not(:disabled):hover { background: var(--c-surface-2); color: #fff; }
+#stage .maplibregl-ctrl-group button:not(:disabled):active { background: var(--c-accent); color: var(--c-bg); }
+#stage .maplibregl-ctrl-group button:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -3px; box-shadow: none; }
+#stage .maplibregl-ctrl-group button:disabled, #stage .maplibregl-ctrl-group button[aria-disabled="true"]:disabled { opacity: .4; cursor: not-allowed; }
+#stage .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: none; }
+body.night-mode #stage .maplibregl-ctrl-group button:not(:disabled):hover { color: var(--c-text); }
+/* attribution: a small ds chip, 12 px, light text on the dark surface; collapsed to its (i) button by default */
+#stage .maplibregl-ctrl-attrib { background: var(--c-surface-1); color: var(--c-text); border: 1px solid var(--c-border); border-radius: var(--r-pill); box-shadow: var(--shadow-1);
+    font: var(--fs-12) / 1.4 var(--font-ui, inherit); margin: 0 var(--s-3) var(--s-3) 0; min-height: 28px; }
+#stage .maplibregl-ctrl-attrib a { color: var(--c-text); text-decoration: underline; }
+#stage .maplibregl-ctrl-attrib a:hover { color: #fff; }
+#stage .maplibregl-ctrl-attrib.maplibregl-compact { min-height: 28px; min-width: 28px; padding: 0; }
+#stage .maplibregl-ctrl-attrib.maplibregl-compact-show { padding: 4px 32px 4px 12px; }
+#stage .maplibregl-ctrl-attrib-button { background-color: transparent; width: 28px; height: 28px; border-radius: var(--r-pill); color: var(--c-text); background-image: none;
+    -webkit-mask: none; }
+#stage .maplibregl-ctrl-attrib-button::before { content: ""; display: block; width: 100%; height: 100%; background: currentColor;
+    -webkit-mask: var(--mc-info) center / 16px 16px no-repeat; mask: var(--mc-info) center / 16px 16px no-repeat; }
+#stage .maplibregl-ctrl-attrib-button:hover { background-color: var(--c-surface-2); }
+#stage .maplibregl-ctrl-attrib-button:focus-visible { outline: 2px solid var(--c-focus); }
+#stage .maplibregl-ctrl-bottom-right { right: var(--s-3); bottom: 0; }
+#stage .maplibregl-ctrl-bottom-right .maplibregl-ctrl { margin: 0 0 var(--s-2) 0; }
+/* the camera pill steps aside while the attribution text is open */
+#stage:has(.maplibregl-compact-show) #cam-foot { opacity: 0; pointer-events: none; }

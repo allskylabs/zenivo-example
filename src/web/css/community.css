@@ -76,3 +76,12 @@
 .leaflet-marker-icon.cm-mk { position: absolute; } /* never "relative": it pulls every marker into normal flow and shifts it by the height of the markers before it */
 .cm-mk::after { content: ""; position: absolute; left: 50%; top: 50%; width: var(--tap); height: var(--tap); transform: translate(-50%, -50%); }
 .cm > * { min-width: 0; }
+
+/* Leaflet zoom: same look as the MapLibre group on the 3D pages (css/scene3d.css): dark ds surface, light glyph, 44px targets.
+   Leaflet's own :hover / .leaflet-disabled paint #f4f4f4 behind the light glyph, so they are overridden here. */
+#cmap .leaflet-bar { border: 1px solid var(--c-border); border-radius: var(--r-md); box-shadow: var(--shadow-1); background: var(--c-surface-1); overflow: hidden; }
+#cmap .leaflet-bar a, #cmap .leaflet-bar a:hover { background-color: var(--c-surface-1); color: var(--c-text); border-bottom-color: var(--c-border); font: 600 22px/var(--tap) var(--font-ui); }
+#cmap .leaflet-bar a:hover { background-color: var(--c-surface-2); color: #fff; }
+#cmap .leaflet-bar a:active { background-color: var(--c-accent); }
+#cmap .leaflet-bar a:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -2px; }
+#cmap .leaflet-bar a.leaflet-disabled { background-color: var(--c-surface-1); color: var(--c-text); opacity: .4; cursor: default; }
