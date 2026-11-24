@@ -165,12 +165,6 @@ class SatellitesConfigRequest(BaseModel):
     source: Optional[str] = Field(default=None, pattern="^(celestrak|satnogs)$", description="Orbit source: CelesTrak groups or the SatNOGS DB catalogue")
 
 
-class ManualStarSolveRequest(BaseModel):
-    """Stars clicked on the live frame (fractions of the displayed image) to find the camera pointing."""
-    points: List[List[float]] = Field(..., min_length=4, max_length=80, description="[x, y] fractions, x right, y down")
-    apply: bool = Field(False, description="Store the result; false only identifies the stars")
-
-
 class FocusConfigRequest(BaseModel):
     """Focus assistant region of interest and measurement method."""
     cx: Optional[float] = Field(None, ge=0.0, le=1.0, description="ROI centre x as a fraction of the frame width")

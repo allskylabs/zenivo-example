@@ -81,8 +81,7 @@ Coordinates here are in native sensor pixels. Mirror and flip are applied for yo
   and how far the camera is tilted off straight up. A manual edit takes effect in all overlays at once.
 - On the first **clear night**, press **Capture & Auto Plate-Solve** (quick first, deep if the quick one fails). The
   solver identifies bright stars, then stores the pointing and refines the lens. **Solver status** shows the result.
-- If the automatic solve is wrong, use **Align by stars** (Settings > Sky Mask): click four or more stars you can see,
-  press **Identify**, then **Apply**.
+- If the automatic solve is wrong, fix the pointing by hand in the fields above, or solve again on a clearer night.
 
 Check: on the Live page switch on **Stars**, **Labels** and **Grid**. The marks must sit on the real stars across the
 whole frame, also near the edge. If they are rotated or mirrored, fix **Orientation** in step 7 and solve again.

@@ -315,38 +315,6 @@ def test_service_reset_calibration_keeps_location_and_mask(monkeypatch):
     AllSkyService.reset_instance()
 
 
-def test_manual_star_align_identifies_clicked_stars(monkeypatch):
-    from src.api.service import AllSkyService
-
-    AllSkyService.reset_instance()
-    svc = AllSkyService.get_instance()
-    monkeypatch.setattr(svc, "_save_station_config", lambda: None)
-    svc.station_config.pop("sky_mask", None)
-    svc.station_config["image_transform"] = {}
-    svc.station_config["latitude_deg"], svc.station_config["longitude_deg"] = LAT, LON  # not the host's own saved location
-    svc.station_config["camera_sensor"] = {"width_px": 1296, "height_px": 972, "pixel_pitch_um": 2.8}
-    w, h, f, cx, cy, k = 1296, 972, 442.0, 664.0, 490.0, -0.02
-    stars = [s for s in bss.load_bright_star_catalog() if s["mag"] <= 2.6]
-    altaz = bss.stars_alt_az(stars, LAT, LON, WHEN)
-    enu = bss._enu(altaz[:, 0], altaz[:, 1])
-    xy, ok = bss._project(_rotation(156.0, 15.0, 1.0), enu, f, cx, cy, "equidistant", k)
-    img = np.full((h, w, 3), 40, np.uint8)
-    clicks = []
-    for (x, y), good, (al, _) in zip(xy, ok, altaz):
-        if good and al > 3 and 20 < x < w - 20 and 20 < y < h - 20:
-            cv2.circle(img, (int(round(x)), int(round(y))), 3, (255, 255, 255), -1)
-            clicks.append([(x + 4) / w, (y - 3) / h])  # a few px off: the click must snap to the star
-    svc.last_frame = img
-    res = svc.manual_star_solve(clicks[:6], apply=False, when=WHEN)
-    assert res["success"], res
-    assert len([n for n in res["names"] if n]) >= 5
-    assert abs(res["pointing"]["pointing_az_deg"] - 156.0) < 3.0
-    assert svc.station_config.get("solve_source") != "manual star alignment"  # preview stores nothing
-    with pytest.raises(ValueError):
-        svc.manual_star_solve(clicks[:3])
-    AllSkyService.reset_instance()
-
-
 def test_rectilinear_distortion_roundtrip_and_zero_is_identity():
     rng = np.random.default_rng(1)
     R = _rotation(120.0, 35.0, 5.0)

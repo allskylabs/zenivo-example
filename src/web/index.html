@@ -714,22 +714,6 @@
                     <div class="sa-actions"><button id="mask-save" class="ds-btn ds-btn--primary sa-solve" type="button" aria-label="Apply mask"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg><span>Apply</span></button></div>
                     <div id="mask-alert" class="alert-box hidden"></div>
                 </details>
-                <details class="sa-details ds-card ds-card--flush sa-group" id="star-align" open>
-                    <summary><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-star"></use></svg><span>Align by stars</span><button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-align" aria-label="Info" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button></summary>
-                    <p class="sa-note" id="sa-i-align" hidden>For when the automatic solve is wrong. Tap 4 or more stars you can really see on the open sky (the sky mask above is the only mask; this panel never edits it), spread over the frame, brightest first. The solver identifies them from their mutual angles, shows the result, and only stores it when you press Apply.</p>
-                    <div class="mask-canvas-wrap">
-                        <img id="align-img" alt="Live frame for picking stars">
-                        <canvas id="align-canvas"></canvas>
-                    </div>
-                    <div class="sa-actions sa-tools">
-                        <button id="align-refresh" class="ds-btn" type="button" title="New frame" aria-label="New frame"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-refresh-cw"></use></svg><span>Frame</span></button>
-                        <button id="align-identify" class="ds-btn" type="button" title="Identify the stars" aria-label="Identify"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-search"></use></svg><span>Identify</span></button>
-                        <button id="align-undo" class="ds-btn ds-btn--ghost ds-btn--icon" type="button" title="Undo star" aria-label="Undo star"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></button>
-                        <button id="align-clear" class="ds-btn ds-btn--ghost ds-btn--icon" type="button" title="Clear" aria-label="Clear"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-trash-2"></use></svg></button>
-                    </div>
-                    <div class="sa-actions"><button id="align-apply" class="ds-btn ds-btn--primary sa-solve" type="button" disabled aria-label="Apply"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-check"></use></svg><span>Apply</span></button></div>
-                    <div id="align-alert" class="alert-box hidden"></div>
-                </details>
             </div>
 
             <!-- Integrations: data sources overview (status rows open their settings) + weather + satellites -->

@@ -8,7 +8,6 @@ from src.api.schemas import (
     TimezoneRequest,
     StationLocationRequest,
     SkyMaskRequest,
-    ManualStarSolveRequest,
 )
 from src.api.service import AllSkyService
 from src.api.routes.common import (router, get_service, public_view)
@@ -128,15 +127,6 @@ def station_sky_mask_auto(service: AllSkyService = Depends(get_service)):
     """Propose sky and obstruction polygons from the current frame; nothing is saved until you apply them."""
     try:
         return service.auto_sky_mask()
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-
-
-@router.post("/api/station/star-align")
-def station_star_align(req: ManualStarSolveRequest, service: AllSkyService = Depends(get_service)):
-    """Identify 4+ stars clicked on the live frame and (apply=true) store the camera pointing from them."""
-    try:
-        return service.manual_star_solve(req.points, apply=req.apply)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 

@@ -14,8 +14,8 @@
 .sa-tools .ds-btn { flex: none; }
 .sa-tool-sky .ds-icon { color: var(--c-ok); }
 .sa-tool-obs .ds-icon { color: var(--c-danger); }
-#sky-mask-editor .alert-box, #star-align .alert-box { margin: var(--s-2) var(--s-4) var(--s-3); border-radius: var(--r-md); font-size: var(--fs-12); }
-#sky-mask-editor .alert-box.hidden, #star-align .alert-box.hidden { display: none; }
+#sky-mask-editor .alert-box { margin: var(--s-2) var(--s-4) var(--s-3); border-radius: var(--r-md); font-size: var(--fs-12); }
+#sky-mask-editor .alert-box.hidden { display: none; }
 
 /* Integrations */
 .sa-sources .ds-item { border-top: 1px solid var(--c-divider); }

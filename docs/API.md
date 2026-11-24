@@ -112,7 +112,6 @@ object of `/api/adsb/aircraft` and `/api/satellites`; the ADS-B receiver address
 | POST | `/api/station/plate-solve` | Run a plate solve in the request. Query `fov_hint` |
 | POST | `/api/station/plate-solve/start` | Start a background plate solve. Query `fov_hint`, `mode` (`auto` or `deep`) |
 | GET | `/api/station/plate-solve/status` | State of the background plate solve |
-| POST | `/api/station/star-align` | Identify stars from points picked by hand. Body `points` (4 to 80 `[x, y]` fractions), `apply` |
 | POST | `/api/station/calibration/reset` | Reset lens, sensor and mounting parameters to the camera defaults |
 | GET, POST | `/api/satellites/config` | Admin. `enabled`, `groups` (`stations`, `visual`, `weather`, `noaa`, `gps-ops`, `galileo`, `science`), `source` (`celestrak` or `satnogs`), `refresh_h` (6, 12, 24, 72 or 168), `tle_url` (https with `{group}`, empty = CelesTrak); GET also returns the download status |
 | POST | `/api/satellites/refresh` | Admin. Download the orbits now |
