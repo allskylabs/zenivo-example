@@ -19,11 +19,73 @@
 
     let defaultSeeds = [];
     const btnSeeds = document.getElementById("btn-community-seeds-default");
+    const rowsEl = document.getElementById("community-seed-rows");
+    const addEl = document.getElementById("community-seed-add");
+    const addBtn = document.getElementById("btn-community-seed-add");
+    const discEl = document.getElementById("community-autodisc");
+    let seedInfo = {};   // url -> {state, last_ok} from the status (owner only)
+    const seedList = () => seedsEl.value.split("\n").map((l) => l.trim()).filter(Boolean);
+    function setSeeds(list) {
+        seedsEl.value = list.join("\n");
+        renderSeeds();
+        seedsEl.dispatchEvent(new Event("change"));
+    }
+    // One ds-row per seed: state icon, address, built-in/answered line, state chip, edit and remove (textContent only)
+    function renderSeeds() {
+        if (!rowsEl) return;
+        rowsEl.replaceChildren();
+        for (const url of seedList()) {
+            const inf = seedInfo[url] || {};
+            const state = inf.state || "pending";
+            const li = document.createElement("li");
+            li.className = "ds-row";
+            li.dataset.ok = state === "ok" ? "yes" : state === "down" ? "no" : "self";
+            const ic = document.createElement("span");
+            ic.className = "ds-row__icon";
+            ic.innerHTML = `<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-${state === "ok" ? "circle-check" : state === "down" ? "circle-x" : "circle-help"}"></use></svg>`;
+            const body = document.createElement("span");
+            body.className = "ds-row__body";
+            const ti = document.createElement("span");
+            ti.className = "ds-row__title sa-wrap";
+            ti.textContent = url;
+            const sub = document.createElement("span");
+            sub.className = "ds-row__sub";
+            sub.textContent = (defaultSeeds.includes(url) ? "Built-in" : "Mine") + (inf.last_ok ? ` · answered ${ago(inf.last_ok)}` : "");
+            body.append(ti, sub);
+            const chip = document.createElement("span");
+            chip.className = "ds-chip";
+            chip.textContent = state === "ok" ? "OK" : state === "down" ? "Unreachable" : "Waiting";
+            li.append(ic, body, chip, rowBtn("pencil", "Edit seed", () => {
+                addEl.value = url;
+                setSeeds(seedList().filter((u) => u !== url));
+                addEl.focus();
+            }), rowBtn("trash-2", "Remove seed", () => setSeeds(seedList().filter((u) => u !== url))));
+            rowsEl.appendChild(li);
+        }
+    }
+    function rowBtn(icon, label, fn) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "ds-btn ds-btn--ghost ds-btn--icon";
+        b.setAttribute("aria-label", label);
+        b.title = label;
+        b.innerHTML = `<svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-${icon}"></use></svg>`;
+        b.addEventListener("click", fn);
+        return b;
+    }
+    function addSeed() {
+        const v = addEl.value.trim().replace(/\/+$/, "");
+        if (!v) return;
+        if (!/^https?:\/\/[^\s/]+/i.test(v)) { addEl.setCustomValidity("Start with https://"); addEl.reportValidity(); return; }
+        addEl.setCustomValidity("");
+        addEl.value = "";
+        if (!seedList().includes(v)) setSeeds(seedList().concat(v));
+    }
+    if (addBtn) addBtn.addEventListener("click", addSeed);
+    if (addEl) addEl.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addSeed(); } });
     // Puts the built-in seeds back at the top of the list and saves it
     if (btnSeeds) btnSeeds.addEventListener("click", () => {
-        const mine = seedsEl.value.split("\n").map((l) => l.trim()).filter(Boolean);
-        seedsEl.value = defaultSeeds.concat(mine.filter((u) => !defaultSeeds.includes(u))).join("\n");
-        seedsEl.dispatchEvent(new Event("change"));
+        setSeeds(defaultSeeds.concat(seedList().filter((u) => !defaultSeeds.includes(u))));
     });
 
     let lastStatus = null;
@@ -39,6 +101,9 @@
             statusEl.textContent = `Station id ${String(st.id || "").slice(0, 8)}. ${st.known} other stations known. ${round}`;
         }
         defaultSeeds = Array.isArray(st.default_seeds) ? st.default_seeds : defaultSeeds;
+        seedInfo = {};
+        for (const r of st.seed_status || []) seedInfo[r.url] = r;
+        renderSeeds();
         showHealth(st);
         box.disabled = !st.available;
         updateUrlHint();
@@ -221,6 +286,8 @@
             if (chatEl) chatEl.checked = s.chat_enabled !== false;
             syncChat();
             seedsEl.value = (s.seeds || []).join("\n");
+            if (discEl) discEl.checked = s.auto_discovery !== false;
+            renderSeeds();
             updateUrlHint();
         } catch (err) { /* optional feature */ }
         loadStatus();
@@ -237,7 +304,8 @@
             allow_open: openEl.checked,
             relay_previews: relayEl.checked,
             chat_enabled: chatEl ? chatEl.checked : true,
-            seeds: seedsEl.value.split("\n").map((l) => l.trim()).filter(Boolean),
+            seeds: seedList(),
+            auto_discovery: discEl ? discEl.checked : true,
         });
         setTimeout(loadStatus, 1500);
         loadStatus();

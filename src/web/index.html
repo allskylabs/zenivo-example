@@ -880,8 +880,19 @@
                         <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="btn-community-seeds-default" aria-label="Restore built-in seeds" title="Restore built-in seeds"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></button>
                         <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-seeds" aria-label="About seeds" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
                     </div>
-                    <p class="sa-note" id="sa-i-seeds" hidden>One URL per line. Stations asked first in every round. The built-in ones are listed and can be removed; with an empty list this station only talks to stations it already knows.</p>
-                    <label class="sa-pad" for="community-seeds"><span class="ds-sr-only">Seed stations</span><textarea class="sa-input" id="community-seeds" rows="3" maxlength="2000" spellcheck="false" placeholder="https://sky.example.org"></textarea></label>
+                    <p class="sa-note" id="sa-i-seeds" hidden>Stations asked first in every round. The built-in ones can be removed or edited. With an empty list this station only talks to stations it already knows. Typed addresses may be on your LAN (http allowed).</p>
+                    <textarea id="community-seeds" hidden></textarea>
+                    <ul class="ds-list sa-targets" id="community-seed-rows" aria-label="Seed stations"></ul>
+                    <div class="ds-row sa-row">
+                        <label class="ds-row__body" for="community-seed-add"><span class="ds-sr-only">Add a seed station</span><input class="sa-input" id="community-seed-add" type="url" inputmode="url" maxlength="200" spellcheck="false" autocomplete="off" placeholder="https://sky.example.org" /></label>
+                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="btn-community-seed-add" aria-label="Add seed" title="Add seed"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plus"></use></svg></button>
+                    </div>
+                    <div class="ds-row sa-row">
+                        <label class="sa-lab" for="community-autodisc"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Auto discovery</span></span></label>
+                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="community-autodisc-note" aria-label="About auto discovery" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
+                        <label class="ds-switch"><input type="checkbox" id="community-autodisc" checked /><span class="ds-switch__track"></span></label>
+                    </div>
+                    <p class="sa-note" id="community-autodisc-note" hidden>Every 15 minutes this station also asks a few stations it has already met and adds the new ones to the Community map (checked, signed, public addresses only; at most 200 kept; unreachable ones fade out after 30 days). Off: only the seed list above is asked.</p>
                 </section>
                 <section class="ds-card ds-card--flush sa-group" id="community-health" aria-label="Network" hidden>
                     <div class="ds-row sa-row">
@@ -1295,32 +1306,32 @@
     </div>
 
     <script src="/static/sky_catalog.js"></script>
-    <script src="/static/activity.js?v=20261204p"></script>
-    <script src="/static/focus/core.js?v=20261204p"></script>
-    <script src="/static/focus/state.js?v=20261204p"></script>
-    <script src="/static/focus/curve.js?v=20261204p"></script>
-    <script src="/static/focus/charts.js?v=20261204p"></script>
-    <script src="/static/focus/controls.js?v=20261204p"></script>
-    <script src="/static/focus/lens.js?v=20261204p"></script>
+    <script src="/static/activity.js?v=20261204q"></script>
+    <script src="/static/focus/core.js?v=20261204q"></script>
+    <script src="/static/focus/state.js?v=20261204q"></script>
+    <script src="/static/focus/curve.js?v=20261204q"></script>
+    <script src="/static/focus/charts.js?v=20261204q"></script>
+    <script src="/static/focus/controls.js?v=20261204q"></script>
+    <script src="/static/focus/lens.js?v=20261204q"></script>
     <script src="/static/overlay_decode.js?v=1"></script>
-    <script defer src="/static/zoom_pan.js?v=20261204p"></script>
-    <script defer src="/static/app/01-core.js?v=20261204p"></script>
-    <script defer src="/static/app/02-controls-calibration.js?v=20261204p"></script>
-    <script defer src="/static/app/03-station-settings.js?v=20261204p"></script>
-    <script defer src="/static/app/04-live-view.js?v=20261204p"></script>
-    <script defer src="/static/app/05-sky-overlay.js?v=20261204p"></script>
-    <script defer src="/static/app/05b-sky-reticle.js?v=20261204p"></script>
-    <script defer src="/static/app/05c-aircraft-overlay.js?v=20261204p"></script>
-    <script defer src="/static/app/06-telemetry.js?v=20261204p"></script>
-    <script defer src="/static/app/07-cloud.js?v=20261204p"></script>
-    <script defer src="/static/app/08-gallery-adsb.js?v=20261204p"></script>
-    <script defer src="/static/app/08b-events-live.js?v=20261204p"></script>
-    <script defer src="/static/app/08c-adsb-settings.js?v=20261204p"></script>
-    <script defer src="/static/app/08d-live-ui.js?v=20261204p"></script>
-    <script defer src="/static/app/09-community.js?v=20261204p"></script>
-    <script defer src="/static/app/10-admin.js?v=20261204p"></script>
-    <script defer src="/static/settings_home.js?v=20261204p"></script>
-    <script defer src="/static/settings_layout.js?v=20261204p"></script>
+    <script defer src="/static/zoom_pan.js?v=20261204q"></script>
+    <script defer src="/static/app/01-core.js?v=20261204q"></script>
+    <script defer src="/static/app/02-controls-calibration.js?v=20261204q"></script>
+    <script defer src="/static/app/03-station-settings.js?v=20261204q"></script>
+    <script defer src="/static/app/04-live-view.js?v=20261204q"></script>
+    <script defer src="/static/app/05-sky-overlay.js?v=20261204q"></script>
+    <script defer src="/static/app/05b-sky-reticle.js?v=20261204q"></script>
+    <script defer src="/static/app/05c-aircraft-overlay.js?v=20261204q"></script>
+    <script defer src="/static/app/06-telemetry.js?v=20261204q"></script>
+    <script defer src="/static/app/07-cloud.js?v=20261204q"></script>
+    <script defer src="/static/app/08-gallery-adsb.js?v=20261204q"></script>
+    <script defer src="/static/app/08b-events-live.js?v=20261204q"></script>
+    <script defer src="/static/app/08c-adsb-settings.js?v=20261204q"></script>
+    <script defer src="/static/app/08d-live-ui.js?v=20261204q"></script>
+    <script defer src="/static/app/09-community.js?v=20261204q"></script>
+    <script defer src="/static/app/10-admin.js?v=20261204q"></script>
+    <script defer src="/static/settings_home.js?v=20261204q"></script>
+    <script defer src="/static/settings_layout.js?v=20261204q"></script>
     <script>
     // Settings sub-navigation: one section at a time, driven by the URL hash (/settings#detection)
     (function () {

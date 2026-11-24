@@ -406,8 +406,19 @@
                         <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="btn-community-seeds-default" aria-label="Restore built-in seeds" title="Restore built-in seeds"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-rotate-ccw"></use></svg></button>
                         <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="sa-i-seeds" aria-label="About seeds" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
                     </div>
-                    <p class="sa-note" id="sa-i-seeds" hidden>One URL per line. Stations asked first in every round. The built-in ones are listed and can be removed; with an empty list this station only talks to stations it already knows.</p>
-                    <label class="sa-pad" for="community-seeds"><span class="ds-sr-only">Seed stations</span><textarea class="sa-input" id="community-seeds" rows="3" maxlength="2000" spellcheck="false" placeholder="https://sky.example.org"></textarea></label>
+                    <p class="sa-note" id="sa-i-seeds" hidden>Stations asked first in every round. The built-in ones can be removed or edited. With an empty list this station only talks to stations it already knows. Typed addresses may be on your LAN (http allowed).</p>
+                    <textarea id="community-seeds" hidden></textarea>
+                    <ul class="ds-list sa-targets" id="community-seed-rows" aria-label="Seed stations"></ul>
+                    <div class="ds-row sa-row">
+                        <label class="ds-row__body" for="community-seed-add"><span class="ds-sr-only">Add a seed station</span><input class="sa-input" id="community-seed-add" type="url" inputmode="url" maxlength="200" spellcheck="false" autocomplete="off" placeholder="https://sky.example.org" /></label>
+                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon" id="btn-community-seed-add" aria-label="Add seed" title="Add seed"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-plus"></use></svg></button>
+                    </div>
+                    <div class="ds-row sa-row">
+                        <label class="sa-lab" for="community-autodisc"><span class="ds-row__icon"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-telescope"></use></svg></span><span class="ds-row__body"><span class="ds-row__title">Auto discovery</span></span></label>
+                        <button type="button" class="ds-btn ds-btn--ghost ds-btn--icon sa-info" data-info="community-autodisc-note" aria-label="About auto discovery" aria-expanded="false"><svg class="ds-icon" aria-hidden="true"><use href="/static/icons.svg#i-info"></use></svg></button>
+                        <label class="ds-switch"><input type="checkbox" id="community-autodisc" checked /><span class="ds-switch__track"></span></label>
+                    </div>
+                    <p class="sa-note" id="community-autodisc-note" hidden>Every 15 minutes this station also asks a few stations it has already met and adds the new ones to the Community map (checked, signed, public addresses only; at most 200 kept; unreachable ones fade out after 30 days). Off: only the seed list above is asked.</p>
                 </section>
                 <section class="ds-card ds-card--flush sa-group" id="community-health" aria-label="Network" hidden>
                     <div class="ds-row sa-row">

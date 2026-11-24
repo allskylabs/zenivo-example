@@ -98,6 +98,8 @@ class GossipWorker:
             if _norm(url) not in seen:
                 seen.add(_norm(url))
                 out.append((url, url not in DEFAULT_SEEDS))  # typed addresses may be private (LAN); built-in ones are checked strictly
+        if not settings.get("auto_discovery", True):
+            return out   # discovery off: only the owner's own list is asked
         peers: List[str] = []
         for u in [c.get("url") for c in self.manager.registry_cards()] + self.manager.contacts():
             if u and _norm(u) not in seen:

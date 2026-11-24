@@ -14,7 +14,7 @@ from src.community.card import CardError, seed_origin, verify
 logger = logging.getLogger("imx335.community")
 
 MAX_AGE_S = 30 * 86400
-MAX_CARDS = 500
+MAX_CARDS = 200   # total stations kept (discovery stays bounded); the oldest unrefreshed go first
 NEW_ID_FUTURE_S = 60          # a first-time id may not claim to be more than a minute ahead of our clock
 SAVE_INTERVAL_S = 30          # the file is rewritten at most this often (marked dirty in between)
 # Origins that answered a gossip round, newest first. They expire after 180 days without an answer (the cap drops the
@@ -141,6 +141,11 @@ class Registry:
         if len(self._contacts) > MAX_CONTACTS:
             newest = sorted(self._contacts.items(), key=lambda kv: kv[1], reverse=True)[:MAX_CONTACTS]
             self._contacts = dict(newest)
+
+    def contact_map(self) -> Dict[str, int]:
+        """origin -> unix time it last answered a round (for the seed status in Settings)."""
+        with self._lock:
+            return dict(self._contacts)
 
     def note_seen(self, cid: str, now: Optional[float] = None) -> None:
         """Record that station `cid` itself just reached us (its announce) or answered us. Local metadata, not a card

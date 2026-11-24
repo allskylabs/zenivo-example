@@ -42,6 +42,8 @@ MAX_SEEDS = 10
 
 DEFAULTS: Dict[str, Any] = {
     "enabled": False, "name": "", "public_url": "", "public_precision_deg": 0.1, "share_thumbnail": True, "seeds": [],
+    # Keep learning stations from the stations we already know (off: only the seed list is asked)
+    "auto_discovery": True,
     # Large preview for map visitors, and whether the map may link to this station's own page
     "share_preview": True, "allow_open": True,
     # False until the owner saves a seed list: until then the built-in seeds are part of the list (and removable)
@@ -235,6 +237,26 @@ class CommunityManager:
 
     def registry_cards(self) -> List[Dict[str, Any]]:
         return self._registry.cards() if self._registry is not None else []
+
+    def contact_map(self) -> Dict[str, int]:
+        return self._registry.contact_map() if self._registry is not None else {}
+
+    def seed_status(self) -> List[Dict[str, Any]]:
+        """One row per seed in the owner's list: ok / unreachable / pending plus when it last answered."""
+        health = self.worker.health
+        cmap = self.contact_map()
+        rows = []
+        for url in self.settings().get("seeds") or []:
+            h = health.get(url) or {}
+            last = max(int(h.get("last_ok") or 0), int(cmap.get(url.rstrip("/")) or 0)) or None
+            if h.get("streak"):
+                state = "down"
+            elif h.get("ok") or last:
+                state = "ok"
+            else:
+                state = "pending"
+            rows.append({"url": url, "default": url in DEFAULT_SEEDS, "state": state, "last_ok": last})
+        return rows
 
     def contacts(self) -> List[str]:
         return self._registry.contacts() if self._registry is not None else []
@@ -864,6 +886,7 @@ class CommunityManager:
             "contacts": len(self.contacts()),
             "last_round": dict(self.worker.last_round),
             "network": self.network(enabled),
+            "auto_discovery": bool(s.get("auto_discovery", True)),
             "default_seeds": list(DEFAULT_SEEDS),  # for the "restore built-in seeds" button in Settings
             "chat": bool(enabled and s["chat_enabled"] and s["public_url"]),   # this station is a chat hub
             "relay": bool(enabled and s["relay_previews"]),   # senders read this: this station stores large previews
@@ -873,6 +896,7 @@ class CommunityManager:
             out["relay_held"] = len(self.relay_held())
         if admin:  # addresses (possibly LAN seeds the owner typed) and their health are for the owner only
             out["targets"] = [dict(t) for t in self.worker.last_targets]
+            out["seed_status"] = self.seed_status()
         return out
 
     def check_now(self) -> None:
