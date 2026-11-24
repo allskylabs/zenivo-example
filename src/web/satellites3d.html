@@ -975,12 +975,45 @@
             lp.needsUpdate = fp.needsUpdate = true;
         }
 
+        // The globe sits in the free area of #stage: not under the satellite list (right) or the info card (left), and,
+        // on a phone, above the bottom sheet. A view offset shifts and scales the render, the canvas itself stays full.
+        function freeArea(W, H) {
+            const sr = $("stage").getBoundingClientRect();
+            let l = 0, r = W, t = 0, b = H;
+            const phone = window.innerWidth <= 700;
+            for (const id of ["list", "info"]) {
+                const e = $(id);
+                if (!e || getComputedStyle(e).display === "none") continue;
+                const q = e.getBoundingClientRect();
+                if (!q.width || !q.height) continue;
+                const x0 = q.left - sr.left, x1 = q.right - sr.left, y0 = q.top - sr.top;
+                if (phone) { if (y0 > H * 0.3) b = Math.min(b, y0); }
+                else if (x0 > W / 2) r = Math.min(r, x0);
+                else if (x1 < W / 2) l = Math.max(l, x1);
+            }
+            return [l, t, Math.max(r, l + 120), Math.max(b, t + 120)];
+        }
+        function fitGlobe() {
+            const g = globe, W = g.canvas.clientWidth, H = g.canvas.clientHeight;
+            if (!W || !H) return;
+            const [l, t, r, b] = freeArea(W, H), key = [W, H, l, t, r, b].map(Math.round).join();
+            if (key === g.fitKey) return;
+            g.fitKey = key;
+            const fw = r - l, fh = b - t, pad = 24;
+            // at the default distance the disc is about 0.93 of the height: shrink the view only when it would not fit
+            const k = Math.min(1, (fw - pad) / (0.93 * H), (fh - pad) / (0.93 * H));
+            const kk = Math.max(0.3, k);
+            g.cam.setViewOffset(W / kk, H / kk, W / (2 * kk) - (l + fw / 2), H / (2 * kk) - (t + fh / 2), W, H);
+            g.cam.updateProjectionMatrix();
+        }
         function resizeGlobe() {
             if (!globe) return;
             const W = $("stage").clientWidth, H = $("stage").clientHeight;
             if (!W || !H) return;
             globe.renderer.setSize(W, H, false);   // the canvas's CSS size comes from the stylesheet
             globe.cam.aspect = W / H;
+            globe.fitKey = "";
+            fitGlobe();
             globe.cam.updateProjectionMatrix();
             for (const mt of Object.values(globe.trackMats)) mt.uniforms.uRes.value.set(W, H);
             globe.trailMat.uniforms.uRes.value.set(W, H);
@@ -1093,6 +1126,7 @@
             G.raf = requestAnimationFrame(globeFrame);
             const now = nowS(), dt = Math.min(now - G.t, 0.1);
             G.t = now;
+            fitGlobe();   // follows the list / info card opening, closing and sliding
             const W = G.canvas.clientWidth, H = G.canvas.clientHeight;
             if (station && !G.stationMarked) markStation();
             if (station && !G.aimed) aimAt(station.lat, station.lon);   // nothing remembered or located yet: the station

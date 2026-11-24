@@ -3,7 +3,7 @@
 
 html, body { height: 100%; margin: 0; }
 body { background: var(--c-bg); color: var(--c-text); font-family: var(--font-ui); overflow: hidden; }
-.app-shell { height: calc(100vh - var(--topbar-h)); min-height: 0; }
+.app-shell { height: 100vh; height: 100dvh; min-height: 0; }   /* the topbar is inside the shell: no empty strip below the canvas */
 #stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 #map { position: absolute; inset: 0; background: var(--c-bg); }
 #globe { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: var(--c-bg); touch-action: none; }
