@@ -20,6 +20,7 @@ All notable changes to Zenivo are recorded here. The format follows
 
 ### Fixed
 - Icons rendering, mobile chat layout, phone offset of the split list, cached redesign CSS.
+- Community map markers glued to lat/lon; map controls and attribution restyled on ds tokens (dark surface, light icons, 44 px).
 
 ## [1.3.0-beta.5] - 2026-11-23
 
