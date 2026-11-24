@@ -1,6 +1,6 @@
 # STATE: imx335-allsky (Zenivo)
 
-Updated 2026-11-24 by worker kind-bassi for the PM. Release tag v1.3.0-beta.5; later work is unreleased, nothing pushed.
+Updated 2026-11-24 by worker wonderful-cannon. Release tag v1.3.0-beta.6 (main 7563a0e, pushed; no GitHub release, as for beta.5). Live on sky.hoan.uk and allsky.hoan.uk: 1.3.0b6, md5 checked on both hosts. Backups: mini-PC ~/zenivo-bak-*.tgz, Pi ~/zenivo-src-bak-*.tgz and zenivo-web-bak-*.tgz.
 
 ## Owner decisions
 - **UI: full clean rebuild on the ds system, no more patching the old UI.** Mockups (23 pages) in docs/design/mockups/ and the owner's opnai account (permanent, never edit).
